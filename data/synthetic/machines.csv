@@ -1,0 +1,4 @@
+machine_id,machine_name,base_power_kw,operating_cost_per_hour,max_daily_hours
+M01,CNC Torna & Freze,4.5,650.0,16
+M02,Kaynak Robotu,3.2,520.0,16
+M03,Yüzey İşlem & Fırın,8.0,780.0,16

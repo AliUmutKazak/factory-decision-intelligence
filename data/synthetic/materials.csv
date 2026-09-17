@@ -1,0 +1,5 @@
+material_id,material_name,unit,unit_cost,supplier_id,lead_time_days,min_order_qty
+RAW_STEEL_A,Sac Plaka 4mm,kg,38.5,SUP_01,7,500
+RAW_STEEL_B,Yapısal Çelik Sac 8mm,kg,42.0,SUP_01,7,400
+RAW_ALLOY_ROD,Alaşımlı Çelik Mil,kg,78.0,SUP_02,12,250
+COATING_POWDER,Elektrostatik Toz Boya,kg,160.0,SUP_03,4,50
