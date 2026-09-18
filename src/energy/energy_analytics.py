@@ -2,6 +2,7 @@ import sqlite3
 import os
 import pandas as pd
 import numpy as np
+from src.config import RAW_DATA_DIR, DB_PATH
 
 DB_PATH = "data/factory.db"
 OUTPUT_ENERGY_KPI_PATH = "data/processed/energy_kpis.csv"
@@ -14,15 +15,34 @@ def load_data():
     conn.close()
     return schedule_df, machines_df
 
+
+def load_machine_specs() -> dict:
+    machines_csv_path = RAW_DATA_DIR.parent / "synthetic" / "machines.csv"
+    if machines_csv_path.exists():
+        df_m = pd.read_csv(machines_csv_path)
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        df_m = pd.read_sql("SELECT * FROM machines", conn)
+        conn.close()
+
+    specs = {}
+    for _, row in df_m.iterrows():
+        m_id = str(row["machine_id"])
+        # Hem CSV hem de DB sütun adlarını kapsayacak şekilde:
+        base_kw = float(row.get("base_power_kw", row.get("power_kw", row.get("base_kw", 0.0))))
+        specs[m_id] = {
+            "base_kw": base_kw,
+            "setup_kw": float(row.get("setup_kw", round(base_kw * 0.45, 2))),
+            "idle_kw": float(row.get("idle_kw", round(base_kw * 0.18, 2)))
+        }
+    return specs
+
+
 def compute_energy_analytics():
     schedule_df, machines_df = load_data()
+    machine_specs = load_machine_specs()
 
-    # Makine Güç Parametreleri (kW) - Sentetik Fabrika Spesifikasyonu
-    machine_specs = {
-        "M01": {"base_kw": 4.5, "setup_kw": 2.2, "idle_kw": 0.8},
-        "M02": {"base_kw": 3.2, "setup_kw": 1.5, "idle_kw": 0.6},
-        "M03": {"base_kw": 8.0, "setup_kw": 3.5, "idle_kw": 1.8}
-    }
+    makespan_min = int(schedule_df["end_min"].max())
 
     makespan_min = int(schedule_df["end_min"].max())
     total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["batch_qty"].sum()

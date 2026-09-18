@@ -2,6 +2,11 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import pulp
+from src.config import (
+    WEEKLY_HOURS_PER_MACHINE,
+    LABOR_COST_STANDARD_HR,
+    LABOR_COST_OVERTIME_HR
+)
 
 DB_PATH = "data/factory.db"
 OUTPUT_AGGREGATE_PATH = "data/processed/aggregate_plan.csv"
@@ -64,16 +69,17 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
         demand[(row["family_id"], row["period_week"])] = row["forecast_batches"]
 
     # Fabrika Çalışma Kapasitesi (3 makine, 6 gün, 16 saat)
-    nominal_weekly_hours = 6 * 16.0 * 3.0   # 288 saat/hafta
+    nominal_weekly_hours = WEEKLY_HOURS_PER_MACHINE * 3.0  # 288 saat/hafta
     capacity_buffer = 0.10                  # %10 Tampon (Şartname Madde 16)
     effective_hours = nominal_weekly_hours * (1.0 - capacity_buffer) # 259.2 saat
     max_overtime_hours = 48.0              # Fazla mesai üst sınırı
 
     # Dengelenmiş Maliyet Parametreleri
-    prod_cost_per_hr = 450.0               # Operasyonel dönüşüm maliyeti
-    holding_cost_per_batch = 25.0          # Koli başına haftalık elde tutma
-    overtime_cost_per_hr = 675.0           # Fazla mesai saati (1.5x)
-    backlog_penalty_per_batch = 1500.0     # Gecikme cezası > Üretim maliyeti
+    # Dengelenmiş Maliyet Parametreleri
+    prod_cost_per_hr = LABOR_COST_STANDARD_HR          # Operasyonel dönüşüm maliyeti
+    holding_cost_per_batch = 25.0                      # Koli başına haftalık elde tutma
+    overtime_cost_per_hr = LABOR_COST_OVERTIME_HR      # Fazla mesai saati (1.5x)
+    backlog_penalty_per_batch = 1500.0                 # Gecikme cezası > Üretim maliyeti
 
     model = pulp.LpProblem("Hax_Meal_Aggregate_Planning", pulp.LpMinimize)
 
