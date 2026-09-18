@@ -14,6 +14,19 @@
 Bu platform; perakende satış noktalarından gelen çok kanallı stok çekme taleplerini konsolide ederek operasyonel seviyede detaylı tezgâh çizelgelemesine ve kurumsal sürdürülebilirlik analitiğine dönüştüren **uçtan uca bir Endüstriyel Karar Zekâsı (Decision Intelligence) mimarisidir**.
 
 Klasik tahminleme veya basit çizelgeleme projelerinden farklı olarak; **Hax & Meal hiyerarşik planlama prensiplerini**, **zaman fazlı malzeme ihtiyaç patlatmasını (MRP-I)**, **sıra bağımlı hazırlık süreli (changeover) kısıt programlamasını (CP-SAT)** ve **GHG Protocol uyumlu dinamik yük profillemesini** tek bir ilişkisel veri modelinde (`SQLite`) bütünleştirir.
+## 🖥️ Karar Destek Panosu Önizlemesi
+
+| 📊 Yönetici Karar Özeti | 📈 Talep Tahmini & Model Kıyaslama |
+|:---:|:---:|
+| ![Yönetici Özeti](docs/screenshots/01_executive_summary.png) | ![Talep Tahmini](docs/screenshots/02_demand_forecast.png) |
+| *Bütünleşik KPI'lar ve 7 Fabrika Sorusu* | *WAPE Kıyaslaması ve 28 Günlük Tahminler* |
+
+| ⏱️ CP-SAT Tezgah Çizelgesi (Gantt) | 🌱 Yük Profili & Karbon Simülasyonu |
+|:---:|:---:|
+| ![Gantt Çizelgesi](docs/screenshots/03_detailed_schedule_gantt.png) | ![Enerji & Karbon](docs/screenshots/04_energy_carbon_analytics.png) |
+| *M01 Darboğaz Yönetimi ve Sıra Bağımlı Setup* | *15.7 kW Tepe Güç & EU ETS Fiyat Slider'ı* |
+
+---
 
 ---
 
