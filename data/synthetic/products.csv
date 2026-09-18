@@ -1,6 +1,6 @@
-product_id,product_name,unit_sale_price,holding_cost_per_week,late_penalty_per_day
-P01,Şasi Bağlantı Braketi,1250.0,12.0,150.0
-P02,Flanş Gövdesi,1850.0,18.0,220.0
-P03,Aks Mili,2400.0,25.0,300.0
-P04,Hidrolik Valf Kapağı,980.0,10.0,120.0
-P05,Rulman Taşıyıcı Gövde,1600.0,15.0,200.0
+product_id,family_id,product_name,unit_sale_price,holding_cost_per_week,late_penalty_per_day
+P01,FAM_A,Şasi Bağlantı Braketi,1250.0,12.0,150.0
+P02,FAM_A,Flanş Gövdesi,1850.0,18.0,220.0
+P03,FAM_A,Aks Mili,2400.0,25.0,300.0
+P04,FAM_B,Hidrolik Valf Kapağı,980.0,10.0,120.0
+P05,FAM_B,Rulman Taşıyıcı Gövde,1600.0,15.0,200.0
