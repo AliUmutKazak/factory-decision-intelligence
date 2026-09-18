@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 from ortools.sat.python import cp_model
+from src.config import WEEKLY_MINUTES_PER_MACHINE, WEEKLY_HOURS_PER_MACHINE
 
 DB_PATH = "data/factory.db"
 OUTPUT_SCHEDULE_PATH = "data/processed/production_schedule.csv"
@@ -164,8 +165,8 @@ def solve_cpsat_schedule():
     schedule_records = []
     if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         opt_makespan = solver.Value(makespan)
-        nominal_2shifts = 6720  # 7 gün * 16 saat
-        capacity_24_7 = 10080   # 7 gün * 24 saat
+        nominal_2shifts = WEEKLY_MINUTES_PER_MACHINE  # 6 gün * 16 saat = 5.760 dk
+        capacity_24_7 = 6 * 24 * 60                   # 6 gün * 24 saat (3 vardiya tavanı) = 8.640 dk
 
         print(f"Çözüm Durumu        : {'OPTIMAL' if status == cp_model.OPTIMAL else 'FEASIBLE'}")
         print(f"Baseline Makespan   : {base_makespan} dakika ({base_makespan / 60:.1f} saat)")
