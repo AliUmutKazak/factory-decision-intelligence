@@ -42,3 +42,13 @@ INITIAL_INVENTORY = {
 # 5. Talep Tahminleme & Taktik Planlama Ufku
 PLANNING_HORIZON_WEEKS = 4       # 4 haftalık taktik planlama ufku
 FORECAST_HORIZON_DAYS = PLANNING_HORIZON_WEEKS * 7  # 28 günlük günlük tahmin ufku
+# 6. Taktik Toplu Planlama (Aggregate Planning - LP) Parametreleri
+UNITS_PER_BATCH = 25                     # 1 Üretim Kolisi / Lot = 25 Perakende Adet
+AGGREGATE_CAPACITY_BUFFER = 0.10         # %10 Planlı duruş / bakım kapasite tamponu
+AGGREGATE_MAX_OVERTIME_HOURS = 48.0      # Haftalık azami fazla mesai saati
+AGGREGATE_HOLDING_COST_PER_BATCH = 25.0  # Koli başına haftalık stok elde tutma maliyeti ($/koli)
+AGGREGATE_BACKLOG_PENALTY_PER_BATCH = 1500.0  # Geciken koli cezası ($/koli)
+AGGREGATE_INITIAL_INVENTORY = {
+    "FAM_A": 40.0,
+    "FAM_B": 20.0
+}

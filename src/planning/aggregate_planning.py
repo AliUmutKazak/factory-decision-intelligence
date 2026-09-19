@@ -1,19 +1,25 @@
+import os
 import sqlite3
 import pandas as pd
 import numpy as np
 import pulp
+
 from src.config import (
+    DB_PATH,
+    PROCESSED_DATA_DIR,
     WEEKLY_HOURS_PER_MACHINE,
     LABOR_COST_STANDARD_HR,
-    LABOR_COST_OVERTIME_HR
+    LABOR_COST_OVERTIME_HR,
+    UNITS_PER_BATCH,
+    AGGREGATE_CAPACITY_BUFFER,
+    AGGREGATE_MAX_OVERTIME_HOURS,
+    AGGREGATE_HOLDING_COST_PER_BATCH,
+    AGGREGATE_BACKLOG_PENALTY_PER_BATCH,
+    AGGREGATE_INITIAL_INVENTORY,
 )
 
-DB_PATH = "data/factory.db"
-OUTPUT_AGGREGATE_PATH = "data/processed/aggregate_plan.csv"
-OUTPUT_SKU_PLAN_PATH = "data/processed/sku_production_plan.csv"
-
-# Perakende Tekil Talep -> Fabrika Üretim Kolisi (1 Lot = 25 Perakende Adet)
-UNITS_PER_BATCH = 25 
+OUTPUT_AGGREGATE_PATH = PROCESSED_DATA_DIR / "aggregate_plan.csv"
+OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
 
 def load_data():
     conn = sqlite3.connect(DB_PATH)
@@ -33,12 +39,15 @@ def build_weekly_forecast_bridge(forecast_df, products_df):
 
     merged = forecast_df.merge(products_df[["product_id", "family_id"]], on="product_id")
 
-    # Talebi üretim partilerine/kolilerine (Batches) dönüştür
+    # Talebi fabrika üretim partilerine / kolilerine (batches) dönüştür
     merged["forecast_batches"] = merged["forecast_demand"] / UNITS_PER_BATCH
 
     sku_weekly = (
         merged.groupby(["period_week", "product_id", "family_id"])
-        .agg(forecast_units=("forecast_demand", "sum"), forecast_batches=("forecast_batches", "sum"))
+        .agg(
+            forecast_units=("forecast_demand", "sum"),
+            forecast_batches=("forecast_batches", "sum")
+        )
         .reset_index()
     )
 
@@ -55,11 +64,11 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
     periods = sorted(family_weekly["period_week"].unique())
     families = sorted(family_weekly["family_id"].unique())
 
-    # Ürün bazlı toplam süre (saat/koli)
+    # Ürün bazlı toplam standart süre (saat/koli)
     prod_routing = routing_df.groupby("product_id")["processing_time_min"].sum().reset_index()
     prod_meta = products_df.merge(prod_routing, on="product_id")
-    
-    # Aile bazlı üretim süresi (saat/koli)
+
+    # Ürün ailesi bazlı ağırlıklı ortalama üretim süresi (saat/koli)
     family_hours = (
         prod_meta.groupby("family_id")["processing_time_min"].mean() / 60.0
     ).to_dict()
@@ -68,50 +77,39 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
     for _, row in family_weekly.iterrows():
         demand[(row["family_id"], row["period_week"])] = row["forecast_batches"]
 
-    # Fabrika Çalışma Kapasitesi (3 makine, 6 gün, 16 saat)
-    nominal_weekly_hours = WEEKLY_HOURS_PER_MACHINE * 3.0  # 288 saat/hafta
-    capacity_buffer = 0.10                  # %10 Tampon (Şartname Madde 16)
-    effective_hours = nominal_weekly_hours * (1.0 - capacity_buffer) # 259.2 saat
-    max_overtime_hours = 48.0              # Fazla mesai üst sınırı
+    # Fabrika Toplam Çalışma Kapasitesi (Makine sayısı dinamik okunur)
+    active_machine_count = len(machines_df)
+    nominal_weekly_hours = WEEKLY_HOURS_PER_MACHINE * float(active_machine_count)
+    effective_hours = nominal_weekly_hours * (1.0 - AGGREGATE_CAPACITY_BUFFER)
 
-    # Dengelenmiş Maliyet Parametreleri
-    # Dengelenmiş Maliyet Parametreleri
-    prod_cost_per_hr = LABOR_COST_STANDARD_HR          # Operasyonel dönüşüm maliyeti
-    holding_cost_per_batch = 25.0                      # Koli başına haftalık elde tutma
-    overtime_cost_per_hr = LABOR_COST_OVERTIME_HR      # Fazla mesai saati (1.5x)
-    backlog_penalty_per_batch = 1500.0                 # Gecikme cezası > Üretim maliyeti
-
-    model = pulp.LpProblem("Hax_Meal_Aggregate_Planning", pulp.LpMinimize)
+    model = pulp.LpProblem("Industrial_Aggregate_Planning", pulp.LpMinimize)
 
     # Karar Değişkenleri (Sürekli LP)
     P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
-    OT = pulp.LpVariable.dicts("Overtime", periods, lowBound=0, upBound=max_overtime_hours, cat="Continuous")
+    OT = pulp.LpVariable.dicts("Overtime", periods, lowBound=0, upBound=AGGREGATE_MAX_OVERTIME_HOURS, cat="Continuous")
 
-    # Amaç Fonksiyonu
+    # Amaç Fonksiyonu: Üretim İşçiliği + Elde Tutma + Gecikme Cezası + Fazla Mesai
     model += pulp.lpSum(
-        P[(f, t)] * family_hours[f] * prod_cost_per_hr +
-        I[(f, t)] * holding_cost_per_batch +
-        B[(f, t)] * backlog_penalty_per_batch
+        P[(f, t)] * family_hours[f] * LABOR_COST_STANDARD_HR +
+        I[(f, t)] * AGGREGATE_HOLDING_COST_PER_BATCH +
+        B[(f, t)] * AGGREGATE_BACKLOG_PENALTY_PER_BATCH
         for f in families for t in periods
-    ) + pulp.lpSum(OT[t] * overtime_cost_per_hr for t in periods)
-
-    # Başlangıç Stoğu (koli)
-    initial_inv = {"FAM_A": 40.0, "FAM_B": 20.0}
+    ) + pulp.lpSum(OT[t] * LABOR_COST_OVERTIME_HR for t in periods)
 
     capacity_constraints = {}
     for t in periods:
-        # Kapasite Kısıtı
+        # 1. Kapasite Kısıtı
         c_cap = pulp.lpSum(P[(f, t)] * family_hours[f] for f in families) <= effective_hours + OT[t]
         model += c_cap, f"Capacity_W{t}"
         capacity_constraints[t] = c_cap
 
         for f in families:
-            prev_inv = initial_inv[f] if t == 1 else I[(f, t - 1)]
+            prev_inv = AGGREGATE_INITIAL_INVENTORY.get(f, 0.0) if t == 1 else I[(f, t - 1)]
             prev_backlog = 0.0 if t == 1 else B[(f, t - 1)]
-            
-            # Stok Denge Kısıtı: I_t - B_t = I_{t-1} - B_{t-1} + P_t - D_t
+
+            # 2. Dinamik Envanter Denge Kısıtı: I_t - B_t = I_{t-1} - B_{t-1} + P_t - D_t
             model += (
                 I[(f, t)] - B[(f, t)] == prev_inv - prev_backlog + P[(f, t)] - demand[(f, t)],
                 f"Balance_{f}_W{t}"
@@ -144,7 +142,7 @@ def disaggregate_to_sku(family_plan_df, sku_weekly):
         ]["prod_batches"].values[0]
 
         total_fam_demand = group["forecast_batches"].sum()
-        
+
         for _, row in group.iterrows():
             ratio = (row["forecast_batches"] / total_fam_demand) if total_fam_demand > 0 else (1.0 / len(group))
             batch_target = round(fam_target * ratio, 1)
@@ -166,19 +164,20 @@ def run_planning_pipeline():
     family_plan_df, shadow_prices = solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df)
     sku_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
 
-    print("=" * 80)
+    print("=" * 85)
     print("      AŞAMA 4: HİYERARŞİK TAKTİK PLANLAMA (LEVEL 1: FAMILY AGGREGATE LP)      ")
-    print("=" * 80)
+    print("=" * 85)
     print(family_plan_df.to_string(index=False))
-    print("-" * 80)
+    print("-" * 85)
     print("KAPASİTE KISITI GÖLGE FİYATLARI (Shadow Prices - $/Saat):")
     for w, sp in shadow_prices.items():
         print(f"  - Hafta {w}: {sp:.2f} $/saat")
-    print("-" * 80)
-    print("LEVEL 2: SKU AYRIŞTIRMA (DISAGGREGATION) ÖZETİ:")
-    print(sku_plan_df.to_string(index=False))
-    print("=" * 80)
+    print("-" * 85)
+    print("LEVEL 2: SKU AYRIŞTIRMA (DISAGGREGATION) ÖZETİ (İlk 10 Kayıt):")
+    print(sku_plan_df.head(10).to_string(index=False))
+    print("=" * 85)
 
+    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     family_plan_df.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
     sku_plan_df.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
 
@@ -190,7 +189,8 @@ def run_planning_pipeline():
     print(f"[OK] Aile Taktik Planı Kaydedildi: {OUTPUT_AGGREGATE_PATH}")
     print(f"[OK] SKU Üretim Hedefleri Kaydedildi: {OUTPUT_SKU_PLAN_PATH}")
     print(f"[OK] SQLite 'aggregate_plan' ve 'sku_production_plan' güncellendi.")
-    print("=" * 80)
+    print("=" * 85)
 
 if __name__ == "__main__":
     run_planning_pipeline()
+    
