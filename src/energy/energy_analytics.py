@@ -11,11 +11,20 @@ def load_data():
     conn = sqlite3.connect(DB_PATH)
     schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
+    routing_df = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
     conn.close()
+
+    # Routing tablosundaki variable_kwh_per_unit'i operasyon bazında birleştir
+    schedule_df = schedule_df.merge(
+        routing_df,
+        on=["product_id", "operation_seq", "machine_id"],
+        how="left"
+    )
+    schedule_df["kwh_unit"] = schedule_df["variable_kwh_per_unit"].fillna(0.0)
+
     return schedule_df, machines_df
 
 def load_machine_specs() -> dict:
-    # Madde 18 & 19: CSV arama mantığı tamamen kaldırıldı, doğrudan SQLite SSOT kullanılır.
     conn = sqlite3.connect(DB_PATH)
     df_m = pd.read_sql("SELECT * FROM machines", conn)
     conn.close()
@@ -60,10 +69,7 @@ def compute_energy_analytics():
         proc_time_m = m_tasks["duration_min"].sum()
         m_proc_kwh = m_tasks["total_proc_energy_kwh"].sum()
 
-        # CP-SAT tarafından çözülen net fiili setup süreleri
         m_setup_time = m_tasks["setup_before_min"].sum() if "setup_before_min" in m_tasks.columns else 0
-
-        # Tezgâhın boşa çıktığı (idle) net süre = Toplam Makespan - (İşleme + Fiili Setup)
         m_idle_time = max(0, makespan_min - (proc_time_m + m_setup_time))
 
         m_setup_kwh = (m_setup_time / 60.0) * specs["setup_kw"]
@@ -106,7 +112,6 @@ def compute_energy_analytics():
             if len(active_proc) > 0:
                 total_power_kw += active_proc["proc_power_kw"].mean()
             else:
-                # Setup penceresi kontrolü
                 in_setup = False
                 for _, row in m_tasks.iterrows():
                     s_dur = row.get("setup_before_min", 0)
@@ -127,13 +132,9 @@ def compute_energy_analytics():
 
     profile_df = pd.DataFrame(profile_records)
     raw_peak_kw = profile_df["total_load_kw"].max()
-
-    # Madde 16: max(raw_peak_kw, avg_load_kw) yapay zorlaması kaldırıldı.
-    # Gözlenen profil tepe değeri doğrudan esas alınır.
     peak_kw = round(raw_peak_kw, 2)
     load_factor = round(avg_load_kw / peak_kw, 3) if peak_kw > 0 else 1.0
 
-    # Fiziksel kural kontrolü: Tepe yükün ortalama yükten küçük olması fizik kurallarına aykırıdır
     assert peak_kw >= avg_load_kw, f"Fiziksel Kural İhlali: Peak ({peak_kw} kW) < Avg ({avg_load_kw} kW)"
 
     kpi_summary = {
@@ -183,4 +184,3 @@ def compute_energy_analytics():
 
 if __name__ == "__main__":
     compute_energy_analytics()
-    

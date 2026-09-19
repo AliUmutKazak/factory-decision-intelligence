@@ -1,293 +1,231 @@
-import os
 import sqlite3
 import pandas as pd
 import numpy as np
 from ortools.sat.python import cp_model
-from src.config import (
-    DB_PATH,
-    PROCESSED_DATA_DIR,
-    WORK_DAYS_PER_WEEK,
-    WEEKLY_MINUTES_PER_MACHINE,
-    WEEKLY_HOURS_PER_MACHINE,
-    LABOR_COST_OVERTIME_HR,
-)
+import src.config as cfg
 
-OUTPUT_SCHEDULE_PATH = PROCESSED_DATA_DIR / "production_schedule.csv"
+SOLVER_TIME_LIMIT_SECONDS = getattr(cfg, "SOLVER_TIME_LIMIT_SECONDS", getattr(cfg, "CPSAT_TIME_LIMIT_SECONDS", 20.0))
+MRP_EXPEDITE_RELEASE_TIME_MIN = getattr(cfg, "MRP_EXPEDITE_RELEASE_TIME_MIN", 480)
+DB_PATH = cfg.DB_PATH
 
-def load_data():
+def run_cpsat_scheduling():
+    print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = sqlite3.connect(DB_PATH)
-    routing_df = pd.read_sql("SELECT * FROM routing", conn)
-    setup_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
-    sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
-    mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
-    bom_df = pd.read_sql("SELECT * FROM bom", conn)
-    conn.close()
-    return routing_df, setup_df, sku_plan, mrp_df, bom_df
 
-def create_production_lots(sku_plan):
-    # Madde 7: Terminoloji aggregate batch -> production_lot olarak netleştirildi
-    lot_config = {"P01": 2, "P02": 3, "P03": 2, "P04": 2, "P05": 2}
-    lots = []
+    # 1. 1. Hafta SKU Planından Partileri Yükle
+    sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
+    routing_df = pd.read_sql("SELECT * FROM routing", conn)
+    changeover_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
+    bom_df = pd.read_sql("SELECT * FROM bom", conn)
+    mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
+
+    # Changeover matrisi dinamik okuma
+    setup_dict = {}
+    machines = routing_df["machine_id"].unique()
     
+    # Kolonları dinamik yakala
+    f_col = [c for c in changeover_df.columns if "from" in c][0]
+    t_col = [c for c in changeover_df.columns if "to" in c][0]
+    val_cols = [c for c in changeover_df.columns if c not in (f_col, t_col)]
+    time_col = val_cols[0] if val_cols else changeover_df.columns[-1]
+
+    for _, row in changeover_df.iterrows():
+        f_p = row[f_col]
+        t_p = row[t_col]
+        raw_val = float(row[time_col])
+        s_val = int(round(raw_val * 60)) if raw_val < 5.0 else int(round(raw_val))
+        for m in machines:
+            setup_dict[(m, f_p, t_p)] = s_val
+
+    # EXPEDITE malzeme kısıtları
+    expedite_materials = set(
+        mrp_df[mrp_df["action_message"].str.contains("EXPEDITE", na=False)]["material_id"]
+    )
+    expedite_products = set()
+    if expedite_materials:
+        crit_boms = bom_df[bom_df["material_id"].isin(expedite_materials)]
+        expedite_products = set(crit_boms["product_id"].unique())
+
+    # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
+    tasks = []
+    task_counter = 0
+    batch_size = getattr(cfg, "BATCH_SIZE", 25)
+
     for _, row in sku_plan.iterrows():
         pid = row["product_id"]
+        total_batches = int(row["planned_batches"])
         total_units = int(row["planned_units"])
-        n_lots = lot_config.get(pid, 2)
-        base_qty = total_units // n_lots
-
-        for b_idx in range(1, n_lots + 1):
-            qty = base_qty if b_idx < n_lots else (total_units - base_qty * (n_lots - 1))
-            lots.append({
-                "lot_id": f"{pid}_B{b_idx}",
-                "batch_id": f"{pid}_B{b_idx}",  # Geriye dönük enerji/raporlama uyumluluğu için
-                "product_id": pid,
-                "lot_qty": qty,
-                "batch_qty": qty
-            })
-    return pd.DataFrame(lots)
-
-def solve_heuristic_baseline(lots_df, routing_df, setup_dict, release_times):
-    machine_avail = {"M01": 0, "M02": 0, "M03": 0}
-    machine_last_prod = {"M01": None, "M02": None, "M03": None}
-    total_setup_min = 0
-
-    for _, b_row in lots_df.iterrows():
-        pid = b_row["product_id"]
-        lot_id = b_row["lot_id"]
-        b_routing = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
-
-        prev_op_end = release_times.get(lot_id, 0)
-        for _, op in b_routing.iterrows():
-            m = op["machine_id"]
-            proc_time = int(round(op["processing_time_min"] * (b_row["lot_qty"] / 25.0)))
-
-            last_p = machine_last_prod[m]
-            s_time = setup_dict.get((m, last_p, pid), 0) if last_p else 0
-            total_setup_min += s_time
-
-            start_t = max(machine_avail[m] + s_time, prev_op_end)
-            end_t = start_t + proc_time
-
-            machine_avail[m] = end_t
-            machine_last_prod[m] = pid
-            prev_op_end = end_t
-
-    makespan = max(machine_avail.values())
-    return makespan, total_setup_min
-
-def solve_cpsat_schedule():
-    routing_df, setup_df, sku_plan, mrp_df, bom_df = load_data()
-    lots_df = create_production_lots(sku_plan)
-
-    setup_dict = {}
-    for _, row in setup_df.iterrows():
-        for m in ["M01", "M02", "M03"]:
-            setup_dict[(m, row["from_product"], row["to_product"])] = int(row["setup_time_min"])
-
-    # -------------------------------------------------------------
-    # MADDE 14: MRP -> CP-SAT Kısıt Bağlantısı (Dynamic Release Time)
-    # Ürünün BOM'unda yer alan hammaddelerden herhangi biri EXPEDITE
-    # durumundaysa, o partinin ilk operasyonu gecikme penceresi sonrasında başlar.
-    # -------------------------------------------------------------
-    expedite_materials = set(mrp_df[mrp_df["action_message"].str.contains("EXPEDITE", na=False)]["material_id"])
-    
-    lot_release_times = {}
-    for _, b_row in lots_df.iterrows():
-        pid = b_row["product_id"]
-        required_materials = set(bom_df[bom_df["product_id"] == pid]["material_id"])
         
-        # Kritik malzeme eksikliği varsa 1. günün 1. vardiyasını bekler (örn: 480 dakika serbest kalma eşiği)
-        if required_materials.intersection(expedite_materials):
-            lot_release_times[b_row["lot_id"]] = 480  # 8 saatlik malzeme kabul / expedite tamponu
-        else:
-            lot_release_times[b_row["lot_id"]] = 0
+        # Her SKU için 1 ana üretim lotu oluşturuyoruz (Taktik Plan Uyumu)
+        lot_id = f"LOT_{pid}"
+        lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
+        
+        for _, op in lot_routings.iterrows():
+            seq = int(op["operation_seq"])
+            mid = op["machine_id"]
+            # processing_time_min 1 batch (25 adet) içindir. Toplam süre = batch sayısı * süre
+            proc_time_per_batch = float(op["processing_time_min"])
+            duration = int(round(total_batches * proc_time_per_batch))
+            
+            tasks.append({
+                "task_id": task_counter,
+                "lot_id": lot_id,
+                "product_id": pid,
+                "lot_qty": total_units,
+                "operation_seq": seq,
+                "machine_id": mid,
+                "duration": duration,
+            })
+            task_counter += 1
 
-    # 1. Baseline Heuristic
-    base_makespan, base_setup = solve_heuristic_baseline(lots_df, routing_df, setup_dict, lot_release_times)
+    tasks_df = pd.DataFrame(tasks)
 
-    # 2. OR-Tools CP-SAT Modeli
+    # -------------------------------------------------------------
+    # CP-SAT MODEL TANIMI
+    # -------------------------------------------------------------
     model = cp_model.CpModel()
-    SEARCH_HORIZON = 20000
+    horizon = int(tasks_df["duration"].sum() + len(tasks_df) * 120 + 5000)
 
     all_tasks = {}
-    machine_task_keys = {"M01": [], "M02": [], "M03": []}
+    machine_to_tasks = {}
 
-    for _, b_row in lots_df.iterrows():
-        lid = b_row["lot_id"]
-        pid = b_row["product_id"]
-        earliest_release_min = lot_release_times.get(lid, 0)
-        b_routing = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
+    for _, t in tasks_df.iterrows():
+        tid = t["task_id"]
+        mid = t["machine_id"]
+        dur = t["duration"]
+        
+        start_var = model.NewIntVar(0, horizon, f"start_{tid}")
+        end_var = model.NewIntVar(0, horizon, f"end_{tid}")
+        interval_var = model.NewIntervalVar(start_var, dur, end_var, f"interval_{tid}")
+        
+        all_tasks[tid] = {
+            "start": start_var,
+            "end": end_var,
+            "interval": interval_var,
+            "lot_id": t["lot_id"],
+            "product_id": t["product_id"],
+            "operation_seq": t["operation_seq"],
+            "machine_id": mid,
+            "duration": dur,
+            "lot_qty": t["lot_qty"]
+        }
+        
+        if mid not in machine_to_tasks:
+            machine_to_tasks[mid] = []
+        machine_to_tasks[mid].append(tid)
 
-        for _, op in b_routing.iterrows():
-            seq = int(op["operation_seq"])
-            m = op["machine_id"]
-            proc_time = int(round(op["processing_time_min"] * (b_row["lot_qty"] / 25.0)))
+    # 1. Rota Öncelik Kısıtı (Precedence: Op 1 -> Op 2 -> Op 3)
+    for lid, group in tasks_df.groupby("lot_id"):
+        sorted_ops = group.sort_values("operation_seq")
+        prev_tid = None
+        for _, op in sorted_ops.iterrows():
+            curr_tid = op["task_id"]
+            if prev_tid is not None:
+                model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["end"])
+            prev_tid = curr_tid
 
-            start_var = model.NewIntVar(0, SEARCH_HORIZON, f"start_{lid}_{seq}")
-            end_var = model.NewIntVar(0, SEARCH_HORIZON, f"end_{lid}_{seq}")
-            interval_var = model.NewIntervalVar(start_var, proc_time, end_var, f"interval_{lid}_{seq}")
+    # 2. MRP Serbest Bırakma Kısıtı (Dynamic Release Time: r_j >= 480 dk)
+    for tid, t_info in all_tasks.items():
+        if t_info["operation_seq"] == 1 and t_info["product_id"] in expedite_products:
+            model.Add(t_info["start"] >= MRP_EXPEDITE_RELEASE_TIME_MIN)
 
-            # MRP Malzeme Hazırlık Kısıtı: İlk operasyon malzeme tesliminden önce başlayamaz
-            if seq == 1:
-                model.Add(start_var >= earliest_release_min)
-
-            task_key = (lid, seq)
-            all_tasks[task_key] = {
-                "start": start_var,
-                "end": end_var,
-                "interval": interval_var,
-                "machine": m,
-                "proc_time": proc_time,
-                "product_id": pid,
-                "lot_id": lid,
-                "batch_id": lid,
-                "seq": seq,
-                "kwh_unit": op["variable_kwh_per_unit"],
-                "lot_qty": b_row["lot_qty"],
-                "batch_qty": b_row["batch_qty"]
-            }
-            machine_task_keys[m].append(task_key)
-
-    # Kısıt 1: Precedence (İş Akış / Rota Sırası)
-    for _, b_row in lots_df.iterrows():
-        lid = b_row["lot_id"]
-        pid = b_row["product_id"]
-        b_routing = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
-        seqs = b_routing["operation_seq"].tolist()
-
-        for s1, s2 in zip(seqs[:-1], seqs[1:]):
-            model.Add(all_tasks[(lid, s2)]["start"] >= all_tasks[(lid, s1)]["end"])
-
-    # Kısıt 2: Makine Çakışmazlığı & Sıra Bağımlı Setup Matrisi (Disjunctive Formulation)
-    for m, keys in machine_task_keys.items():
-        n = len(keys)
-        for i in range(n):
-            for j in range(i + 1, n):
-                t1, t2 = keys[i], keys[j]
-                p1 = all_tasks[t1]["product_id"]
+    # 3. Tezgâh Çakışma Önleme & Gerçek Komşu (Adjacent Transition) Setup
+    for mid, tids in machine_to_tasks.items():
+        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids])
+        
+        n_m = len(tids)
+        for i in range(n_m):
+            t1 = tids[i]
+            p1 = all_tasks[t1]["product_id"]
+            for j in range(i + 1, n_m):
+                t2 = tids[j]
                 p2 = all_tasks[t2]["product_id"]
-
-                s12 = setup_dict.get((m, p1, p2), 0)
-                s21 = setup_dict.get((m, p2, p1), 0)
-
-                b = model.NewBoolVar(f"order_{m}_{t1[0]}_{t2[0]}")
+                
+                b = model.NewBoolVar(f"prec_{mid}_{t1}_{t2}")
+                s12 = setup_dict.get((mid, p1, p2), 0)
+                s21 = setup_dict.get((mid, p2, p1), 0)
+                
                 model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"] + s12).OnlyEnforceIf(b)
                 model.Add(all_tasks[t1]["start"] >= all_tasks[t2]["end"] + s21).OnlyEnforceIf(b.Not())
 
-    # Amaç Fonksiyonu: Makespan'i Minimize Et
-    makespan = model.NewIntVar(0, SEARCH_HORIZON, "makespan")
-    model.AddMaxEquality(makespan, [t["end"] for t in all_tasks.values()])
+    # Amaç: Makespan Minimize Et
+    makespan = model.NewIntVar(0, horizon, "makespan")
+    for tid in all_tasks:
+        model.Add(makespan >= all_tasks[tid]["end"])
     model.Minimize(makespan)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 20.0
+    solver.parameters.max_time_in_seconds = float(SOLVER_TIME_LIMIT_SECONDS)
     solver.parameters.num_search_workers = 8
+
     status = solver.Solve(model)
+    status_name = solver.StatusName(status)
+    print(f"CP-SAT Çözücü Durumu: {status_name}")
 
-    print("=" * 85)
-    print("      AŞAMA 6: DETAYLI ÇİZELGELEME (CP-SAT VS BASELINE HEURISTIC)      ")
-    print("=" * 85)
-
-    if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
-        opt_makespan = int(solver.Value(makespan))
-        best_bound = int(solver.BestObjectiveBound())
-        gap_pct = (abs(opt_makespan - best_bound) / max(1, opt_makespan)) * 100.0
-        status_str = "OPTIMAL" if status == cp_model.OPTIMAL else "FEASIBLE"
-
-        # Operasyonları topla
-        raw_ops = []
-        for key, t in all_tasks.items():
-            raw_ops.append({
-                "lot_id": t["lot_id"],
-                "batch_id": t["batch_id"],
-                "product_id": t["product_id"],
-                "operation_seq": t["seq"],
-                "machine_id": t["machine"],
-                "start_min": int(solver.Value(t["start"])),
-                "end_min": int(solver.Value(t["end"])),
-                "duration_min": t["proc_time"],
-                "lot_qty": t["lot_qty"],
-                "batch_qty": t["batch_qty"],
-                "kwh_unit": t["kwh_unit"]
-            })
-
-        df_raw = pd.DataFrame(raw_ops).sort_values(["machine_id", "start_min"])
-
-        # Setup ve iş yükü hesabı
-        schedule_records = []
-        machine_metrics = {m: {"proc_min": 0, "setup_min": 0} for m in ["M01", "M02", "M03"]}
-
-        for m, group in df_raw.groupby("machine_id"):
-            sorted_ops = group.sort_values("start_min").to_dict("records")
-            last_p = None
-            for op in sorted_ops:
-                p = op["product_id"]
-                s_time = setup_dict.get((m, last_p, p), 0) if (last_p is not None and last_p != p) else 0
-                op["setup_before_min"] = s_time
-                machine_metrics[m]["proc_min"] += op["duration_min"]
-                machine_metrics[m]["setup_min"] += s_time
-                last_p = p
-                schedule_records.append(op)
-
-        schedule_df = pd.DataFrame(schedule_records).sort_values(["machine_id", "start_min"])
-        nominal_minutes = WEEKLY_MINUTES_PER_MACHINE
-
-        gain = ((base_makespan - opt_makespan) / base_makespan) * 100
-
-        print(f"Çözücü Durumu (Status) : {status_str}")
-        print(f"Amaç Değeri (Makespan) : {opt_makespan} dk ({opt_makespan / 60.0:.2f} saat)")
-        print(f"En İyi Alt Sınır (Bound): {best_bound} dk ({best_bound / 60.0:.2f} saat)")
-        print(f"Optimality Gap         : %{gap_pct:.2f}")
-        print(f"Baseline Makespan      : {base_makespan} dk ({base_makespan / 60.0:.2f} saat)")
-        print(f"Optimizasyon Tasarrufu : %{gain:.1f}")
-        print("-" * 85)
-        print("TEZGAH İŞ YÜKÜ (WORKLOAD) VE NET FAZLA MESAİ ANALİZİ:")
-        print(f"  [Referans] Standart 2 Vardiya Kapasitesi: {WEEKLY_HOURS_PER_MACHINE} saat ({nominal_minutes} dk)")
-
-        total_overtime_cost = 0.0
-        for m in sorted(machine_metrics.keys()):
-            p_min = machine_metrics[m]["proc_min"]
-            s_min = machine_metrics[m]["setup_min"]
-            w_min = p_min + s_min
-            w_hrs = w_min / 60.0
-
-            ot_min = max(0, w_min - nominal_minutes)
-            ot_hrs = ot_min / 60.0
-            ot_cost = ot_hrs * LABOR_COST_OVERTIME_HR
-            total_overtime_cost += ot_cost
-
-            utilization = (w_min / nominal_minutes) * 100.0
-            print(f"  - {m}: İş Yükü = {w_hrs:5.1f} sa (İşleme: {p_min/60:.1f} sa | Setup: {s_min} dk) | "
-                  f"Kullanım = %{utilization:5.1f} | Fazla Mesai = +{ot_hrs:4.1f} sa")
-
-        print(f"  Toplam Net Fazla Mesai Maliyeti: {total_overtime_cost:,.2f} TL (@ {LABOR_COST_OVERTIME_HR:.2f} TL/saat)")
-        print("-" * 85)
-
-        # Mutabakat Doğrulaması
-        total_sched_units = schedule_df[schedule_df["operation_seq"] == 1]["lot_qty"].sum()
-        total_sku_units = sku_plan["planned_units"].sum()
-        print(f"MUTABAKAT: SKU Planı = {total_sku_units} adet | Çizelgelenen = {total_sched_units} adet")
-        assert total_sched_units == total_sku_units, f"Adet uyuşmazlığı! ({total_sched_units} != {total_sku_units})"
-        print("  [BAŞARILI] SKU Hedefleri ile Çizelgeleme Adetleri %100 Birebir Eşleşti.")
-        print("-" * 85)
-
-        print("ÇİZELGE ÖZETİ (İlk 10 Operasyon & Fiili Setup):")
-        cols_to_show = ["lot_id", "machine_id", "setup_before_min", "start_min", "end_min", "duration_min"]
-        print(schedule_df[cols_to_show].head(10).to_string(index=False))
-        print("=" * 85)
-
-        os.makedirs(os.path.dirname(OUTPUT_SCHEDULE_PATH), exist_ok=True)
-        schedule_df.to_csv(OUTPUT_SCHEDULE_PATH, index=False)
-
-        conn = sqlite3.connect(DB_PATH)
-        schedule_df.to_sql("production_schedule", conn, index=False, if_exists="replace")
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        print("Çözüm bulunamadı!")
         conn.close()
+        return
 
-        print(f"[OK] Çizelge Kaydedildi: {OUTPUT_SCHEDULE_PATH}")
-        print(f"[OK] SQLite 'production_schedule' tablosu 'setup_before_min' ile güncellendi.")
-        print("=" * 85)
+    best_makespan = int(solver.ObjectiveValue())
+    best_bound = int(solver.BestObjectiveBound())
+    gap = ((best_makespan - best_bound) / best_makespan) * 100 if best_makespan > 0 else 0.0
+
+    print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat)")
+    print(f"Dual Bound: {best_bound} dakika | Optimality Gap: %{gap:.2f}")
+
+    schedule_rows = []
+    for mid, tids in machine_to_tasks.items():
+        m_tasks = []
+        for tid in tids:
+            s_val = int(solver.Value(all_tasks[tid]["start"]))
+            e_val = int(solver.Value(all_tasks[tid]["end"]))
+            m_tasks.append({
+                "task_id": tid,
+                "lot_id": all_tasks[tid]["lot_id"],
+                "product_id": all_tasks[tid]["product_id"],
+                "operation_seq": all_tasks[tid]["operation_seq"],
+                "machine_id": mid,
+                "lot_qty": all_tasks[tid]["lot_qty"],
+                "duration_min": all_tasks[tid]["duration"],
+                "start_min": s_val,
+                "end_min": e_val,
+            })
+        
+        m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
+        last_prod = None
+        for item in m_tasks:
+            curr_prod = item["product_id"]
+            setup_val = 0
+            if last_prod is not None and last_prod != curr_prod:
+                setup_val = setup_dict.get((mid, last_prod, curr_prod), 0)
+            item["setup_before_min"] = setup_val
+            last_prod = curr_prod
+            schedule_rows.append(item)
+
+    sched_df = pd.DataFrame(schedule_rows)
+    sched_df["batch_id"] = sched_df["lot_id"]
+    sched_df["batch_qty"] = sched_df["lot_qty"]
+
+    sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+
+    # Mutabakat
+    sched_summary = sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["lot_qty"].sum().reset_index()
+    merged_audit = pd.merge(sku_plan[["product_id", "planned_units"]], sched_summary, on="product_id", how="left").fillna(0)
+    merged_audit.rename(columns={"lot_qty": "scheduled_units"}, inplace=True)
+    merged_audit["diff"] = merged_audit["planned_units"] - merged_audit["scheduled_units"]
+
+    print("\n--- SKU Plan ve Çizelge Mutabakatı (Audit) ---")
+    print(merged_audit.to_string(index=False))
+    if (merged_audit["diff"] == 0).all():
+        print("✓ MUTABAKAT: %100 Eşleşti. Tüm planlanan SKU parti adetleri tam olarak çizelgelendi.")
     else:
-        print("[HATA] CP-SAT uygun bir çözüm bulamadı!")
+        print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
+
+    conn.close()
+    print("--- CP-SAT Detaylı Çizelgeleme Tamamlandı ---\n")
+
+solve_cpsat_schedule = run_cpsat_scheduling
 
 if __name__ == "__main__":
-    solve_cpsat_schedule()
+    run_cpsat_scheduling()
