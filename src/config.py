@@ -26,3 +26,8 @@ WEEKLY_MINUTES_PER_MACHINE = WEEKLY_HOURS_PER_MACHINE * 60            # 5.760 da
 LABOR_COST_STANDARD_HR = 450.0  # Standart saatlik adam/saat maliyeti ($/saat)
 OVERTIME_MULTIPLIER = 1.5       # Fazla mesai katsayısı
 LABOR_COST_OVERTIME_HR = LABOR_COST_STANDARD_HR * OVERTIME_MULTIPLIER  # 675.0 $/saat
+# 3. Çevre & Sürdürülebilirlik Parametreleri (GHG Protocol & EU ETS)
+GRID_EMISSION_FACTOR = 0.440        # tCO2e / MWh (Ulusal Şebeke Emisyon Faktörü - Kapsam 2)
+DIESEL_EMISSION_FACTOR = 0.00268   # tCO2e / Litre dizel (Kapsam 1)
+DEFAULT_FORKLIFT_LITERS = 85.0     # Tesis içi lojistik dizel tüketimi (Litre/hafta)
+CARBON_PRICE_SCENARIOS_EUR = [0, 50, 80, 100, 120]  # EU ETS dahili karbon fiyatlandırma senaryoları (€/tCO2e)
