@@ -1,12 +1,13 @@
 # 🏭 Factory Decision Intelligence Platform
 ### Bütünleşik Hiyerarşik Üretim Planlama, Matematiksel Çizelgeleme ve Karbon Muhasebesi
 
+[![Fabrika Karar Zekası CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
 [![Optimization](https://img.shields.io/badge/OR--Tools-CP--SAT-orange.svg)](https://developers.google.com/optimization)
 [![LP](https://img.shields.io/badge/PuLP-Linear%20Programming-green.svg)](https://coin-or.github.io/pulp/)
 [![ML](https://img.shields.io/badge/LightGBM-Forecasting-yellow.svg)](https://lightgbm.readthedocs.io/)
 [![UI](https://img.shields.io/badge/Streamlit-Dashboard-red.svg)](https://streamlit.io/)
-[![Tests](https://img.shields.io/badge/pytest-6%20passed-brightgreen.svg)](https://docs.pytest.org/)
+
 
 Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden, tekil gerçeklik kaynağına (SSOT) bağlı karar zekâsı platformu. Sistem; talep tahmini, Hax & Meal hiyerarşik agrega planlama, Google OR-Tools CP-SAT ile sıra bağımlı tezgâh çizelgeleme, zaman fazlı MRP-I, 15 dakikalık yük analitiği ve GHG Kapsam 1-2 karbon fiyatlandırma simülasyonunu tek bir boru hattında birleştirir.
 
