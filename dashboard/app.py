@@ -5,6 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -43,18 +44,20 @@ tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability = st.tabs(
     "🌱 Enerji & Karbon Analitiği"
 ])
 
+# Veri Setlerini Yükle
+e_kpi = get_table("energy_kpis").iloc[0]
+c_kpi = get_table("carbon_kpis").iloc[0]
+mrp_df = get_table("mrp_plan")
+forecast_df = get_table("forecast_demand")
+sku_df = get_table("sku_production_plan")
+sched_df = get_table("production_schedule")
+agg_df = get_table("aggregate_plan")
+
 # =============================================================
 # TAB 1: YÖNETİCİ ÖZETİ
 # =============================================================
 with tab_summary:
     st.subheader("Bütünleşik Karar Akışı Göstergeleri")
-
-    e_kpi = get_table("energy_kpis").iloc[0]
-    c_kpi = get_table("carbon_kpis").iloc[0]
-    mrp_df = get_table("mrp_plan")
-    forecast_df = get_table("forecast_demand")
-    sku_df = get_table("sku_production_plan")
-    sched_df = get_table("production_schedule")
 
     total_gross_demand = int(forecast_df["forecast_demand"].sum())
     w1_planned_units = int(sku_df[sku_df["period_week"] == 1]["planned_units"].sum())
@@ -65,12 +68,13 @@ with tab_summary:
         f"{w1_planned_units:,} Adet",
         help="LP Modeli tarafından 1. hafta için optimize edilen net üretim miktarı"
     )
+    overtime_hrs = max(0.0, e_kpi['makespan_hours'] - float(WEEKLY_HOURS_PER_MACHINE))
     col2.metric(
         "Çizelge Makespan",
         f"{e_kpi['makespan_hours']:.1f} Saat",
-        delta=f"+{max(0.0, e_kpi['makespan_hours'] - 96.0):.1f} sa (Vardiya Aşımı)",
+        delta=f"+{overtime_hrs:.1f} sa (Kapasite Aşımı)" if overtime_hrs > 0 else "Kapasite İçi",
         delta_color="inverse",
-        help="CP-SAT tarafından bulunan toplam parti tamamlanma süresi (Standart kapasite: 96 saat)"
+        help=f"CP-SAT tarafından bulunan toplam parti tamamlanma süresi (Standart kapasite: {WEEKLY_HOURS_PER_MACHINE} saat)"
     )
     col3.metric(
         "Toplam Enerji Tüketimi",
@@ -100,21 +104,21 @@ with tab_summary:
         )
         past_due_count = len(mrp_df[mrp_df["action_message"].str.contains("EXPEDITE", na=False)])
         st.info(
-            f"**Tedarik:** Zaman fazlı MRP, 4 hammadde için net ihtiyaçları belirledi; "
+            f"**Tedarik Zinciri:** Zaman fazlı MRP-I, 4 hammadde için net ihtiyaçları belirledi; "
             f"temin süresi kısıtı nedeniyle **{past_due_count} sipariş için acil tedarik (EXPEDITE)** uyarısı üretildi."
         )
     with q_col2:
         st.info(
-            f"**Çizelgeleme:** OR-Tools CP-SAT, sıra bağımlı hazırlık sürelerini optimize ederek "
-            f"sezgisel sıralamaya göre **%3.6 zaman tasarrufu** sağladı."
+            f"**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
+            f"480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
         )
         st.info(
-            f"**Kapasite & Fazla Mesai:** M01 darboğazı standart 96 saati aşarak "
-            f"**+{e_kpi['makespan_hours'] - 96.0:.1f} saat** fazla mesai / 3. vardiya ihtiyacı doğurdu."
+            f"**Kapasite & Darboğaz:** LP dual değerleri Hafta 1-4 için M01 tezgâhını en bağlayıcı darboğaz olarak saptadı. "
+            f"M01 iş yükü standart 96 saati aşarak **+{overtime_hrs:.1f} saat** fazla mesai gerektirdi."
         )
         st.info(
-            f"**Sürdürülebilirlik:** Tesis tepe güç çekişi **{e_kpi['peak_load_kw']:.1f} kW** seviyesinde sınırlandı; "
-            f"EU ETS 80 €/tCO₂e senaryosunda karbon maruziyeti **€{c_kpi['total_tco2e'] * 80:,.2f}** hesaplandı."
+            f"**Sürdürülebilirlik:** Tesis tepe yükü **{e_kpi['peak_load_kw']:.1f} kW** olarak fiziksel kuralı doğruladı; "
+            f"EU ETS 80 €/tCO₂e senaryosunda karbon maruziyeti **€{c_kpi['total_tco2e'] * 80:,.2f}** seviyesindedir."
         )
 
 # =============================================================
@@ -122,7 +126,6 @@ with tab_summary:
 # =============================================================
 with tab_forecast:
     st.subheader("28 Günlük Tahminler ve Model Kıyaslama (Benchmark)")
-    forecast_df = get_table("forecast_demand")
 
     col_f1, col_f2 = st.columns([1, 2])
     with col_f1:
@@ -146,8 +149,6 @@ with tab_forecast:
 # =============================================================
 with tab_plan:
     st.subheader("Hiyerarşik Taktik Planlama & Zaman Fazlı MRP")
-    agg_df = get_table("aggregate_plan")
-    sku_df = get_table("sku_production_plan")
 
     col_p1, col_p2 = st.columns([3, 2])
     with col_p1:
@@ -189,22 +190,30 @@ with tab_plan:
 # =============================================================
 with tab_schedule:
     st.subheader("OR-Tools CP-SAT Çizelgesi & Darboğaz Analizi")
-    sched_df = get_table("production_schedule")
 
     base_time = pd.Timestamp("2026-01-05 08:00:00")
     sched_df["start_dt"] = sched_df["start_min"].apply(lambda m: base_time + pd.Timedelta(minutes=m))
     sched_df["end_dt"] = sched_df["end_min"].apply(lambda m: base_time + pd.Timedelta(minutes=m))
 
+    # Lot ID etiketleme kontrolü
+    hover_col = "lot_id" if "lot_id" in sched_df.columns else "batch_id"
+
     fig_gantt = px.timeline(
         sched_df, x_start="start_dt", x_end="end_dt", y="machine_id",
-        color="product_id", hover_name="batch_id",
-        title="Tezgâh Bazlı Operasyon Çizelgesi (Sıra Bağımlı Hazırlık Süreleri Dahil)",
+        color="product_id", hover_name=hover_col,
+        title="Tezgâh Bazlı Operasyon Çizelgesi (Sıra Bağımlı Setup & MRP Kısıtları Dahil)",
         labels={"machine_id": "Tezgâh", "start_dt": "Başlangıç", "end_dt": "Bitiş"}
+    )
+    # 480 dakikalık malzeme bekleme penceresini Gantt üzerinde dikey çizgiyle vurgula
+    mat_release_dt = base_time + pd.Timedelta(minutes=480)
+    fig_gantt.add_vline(
+        x=mat_release_dt, line_dash="dot", line_color="orange",
+        annotation_text="MRP Expedite Release (480. dk)", annotation_position="top right"
     )
     fig_gantt.update_yaxes(autorange="reversed")
     st.plotly_chart(fig_gantt, use_container_width=True)
 
-    sched_cols = ["batch_id", "machine_id", "start_min", "end_min", "duration_min", "batch_qty"]
+    sched_cols = [c for c in [hover_col, "machine_id", "setup_before_min", "start_min", "end_min", "duration_min", "batch_qty", "lot_qty"] if c in sched_df.columns]
     st.dataframe(sched_df[sched_cols], use_container_width=True)
 
 # =============================================================
@@ -220,12 +229,16 @@ with tab_sustainability:
     with col_s1:
         fig_load = px.line(
             prof_df, x="time_hour", y="total_load_kw",
-            title=f"Tesis Güç Çekiş Profili (Tepe Yük: {e_kpi['peak_load_kw']:.1f} kW)",
+            title=f"Tesis Güç Çekiş Profili (Tepe Yük: {e_kpi['peak_load_kw']:.1f} kW | Ortalama: {e_kpi['avg_load_kw']:.1f} kW)",
             labels={"time_hour": "Zaman (Saat)", "total_load_kw": "Toplam Güç (kW)"}
         )
         fig_load.add_hline(
             y=e_kpi["peak_load_kw"], line_dash="dash", line_color="red",
             annotation_text=f"Peak: {e_kpi['peak_load_kw']:.1f} kW"
+        )
+        fig_load.add_hline(
+            y=e_kpi["avg_load_kw"], line_dash="dot", line_color="green",
+            annotation_text=f"Avg: {e_kpi['avg_load_kw']:.1f} kW"
         )
         st.plotly_chart(fig_load, use_container_width=True)
 
@@ -253,3 +266,4 @@ with tab_sustainability:
         st.markdown("---")
         st.markdown("**Dahili Fiyatlandırma Senaryo Tablosu:**")
         st.dataframe(scen_df, use_container_width=True)
+        
