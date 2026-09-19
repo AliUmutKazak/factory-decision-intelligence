@@ -1,13 +1,18 @@
-import sqlite3
 import os
+import sqlite3
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-DB_PATH = "data/factory.db"
-OUTPUT_FORECAST_PATH = "data/processed/forecast_demand.csv"
-HORIZON_DAYS = 28  # 4 haftalık taktik planlama ufku
+from src.config import (
+    DB_PATH,
+    PROCESSED_DATA_DIR,
+    FORECAST_HORIZON_DAYS,
+)
+
+OUTPUT_FORECAST_PATH = PROCESSED_DATA_DIR / "forecast_demand.csv"
+HORIZON_DAYS = FORECAST_HORIZON_DAYS
 
 def load_factory_demand():
     conn = sqlite3.connect(DB_PATH)
@@ -24,38 +29,59 @@ def load_factory_demand():
 def evaluate_metrics(actual, pred):
     actual = np.array(actual, dtype=float)
     pred = np.array(pred, dtype=float)
-    
-    wape = np.sum(np.abs(actual - pred)) / np.sum(actual)
+
+    wape = np.sum(np.abs(actual - pred)) / np.sum(actual) if np.sum(actual) > 0 else 0.0
     rmse = np.sqrt(np.mean((actual - pred) ** 2))
     bias = np.sum(pred - actual)
-    
+
     return round(wape, 4), round(rmse, 2), round(bias, 1)
 
-def build_features(df_single):
-    df_feat = df_single.copy().sort_values("order_date").reset_index(drop=True)
+def extract_features_for_row(history_df, target_date):
+    """
+    Veri sızıntısını önlemek için yalnızca geçmiş verileri (history_df)
+    kullanarak tek bir hedef gün için öznitelik vektörü üretir.
+    """
+    features = {}
     
-    # Lag Özellikleri (Şartname Madde 6)
+    # 1. Gecikme (Lag) Özellikleri
+    demand_series = history_df["demand"].values
+    n = len(demand_series)
     for lag in [1, 7, 14, 28]:
-        df_feat[f"lag_{lag}"] = df_feat["demand"].shift(lag)
-        
-    # Kayan İstatistikler
+        features[f"lag_{lag}"] = demand_series[-lag] if n >= lag else demand_series.mean()
+
+    # 2. Kayan İstatistikler (Rolling)
     for window in [7, 14, 28]:
-        df_feat[f"rolling_mean_{window}"] = df_feat["demand"].shift(1).rolling(window=window).mean()
+        sub = demand_series[-window:] if n >= window else demand_series
+        features[f"rolling_mean_{window}"] = float(np.mean(sub))
     for window in [7, 28]:
-        df_feat[f"rolling_std_{window}"] = df_feat["demand"].shift(1).rolling(window=window).std()
-        
-    # Takvim Özellikleri
-    df_feat["day_of_week"] = df_feat["order_date"].dt.dayofweek
-    df_feat["week_of_year"] = df_feat["order_date"].dt.isocalendar().week.astype(int)
-    df_feat["month"] = df_feat["order_date"].dt.month
-    df_feat["day_of_year"] = df_feat["order_date"].dt.dayofyear
-    
-    return df_feat.dropna().reset_index(drop=True)
+        sub = demand_series[-window:] if n >= window else demand_series
+        features[f"rolling_std_{window}"] = float(np.std(sub)) if len(sub) > 1 else 0.0
+
+    # 3. Takvim Özellikleri
+    features["day_of_week"] = target_date.dayofweek
+    features["week_of_year"] = int(target_date.isocalendar().week)
+    features["month"] = target_date.month
+    features["day_of_year"] = target_date.dayofyear
+
+    return features
+
+def build_training_matrix(train_raw):
+    """
+    Eğitim seti için kronolojik öznitelik matrisi inşa eder.
+    """
+    records = []
+    for i in range(28, len(train_raw)):
+        history_sub = train_raw.iloc[:i]
+        target_row = train_raw.iloc[i]
+        feat = extract_features_for_row(history_sub, target_row["order_date"])
+        feat["demand"] = target_row["demand"]
+        records.append(feat)
+    return pd.DataFrame(records)
 
 def run_forecast_benchmark():
     df_all = load_factory_demand()
     products = sorted(df_all["product_id"].unique())
-    
+
     benchmark_summary = []
     final_forecast_records = []
 
@@ -65,10 +91,10 @@ def run_forecast_benchmark():
 
     for pid in products:
         pdf = df_all[df_all["product_id"] == pid].sort_values("order_date").reset_index(drop=True)
-        
-        # Kronolojik Train / Test Ayrımı (Son 28 gün Test Seti)
-        train_raw = pdf.iloc[:-HORIZON_DAYS].copy()
-        test_raw = pdf.iloc[-HORIZON_DAYS:].copy()
+
+        # Kronolojik Train / Test Ayrımı
+        train_raw = pdf.iloc[:-HORIZON_DAYS].copy().reset_index(drop=True)
+        test_raw = pdf.iloc[-HORIZON_DAYS:].copy().reset_index(drop=True)
         y_test = test_raw["demand"].values
 
         # 1. Naive Model (Son günün talebi)
@@ -77,7 +103,7 @@ def run_forecast_benchmark():
 
         # 2. Seasonal Naive Model (Son 7 günün haftalık döngüsü)
         last_7_days = train_raw["demand"].iloc[-7:].values
-        pred_snaive = np.tile(last_7_days, int(HORIZON_DAYS / 7))
+        pred_snaive = np.tile(last_7_days, int(np.ceil(HORIZON_DAYS / 7)))[:HORIZON_DAYS]
         w_snaive, r_snaive, b_snaive = evaluate_metrics(y_test, pred_snaive)
 
         # 3. Moving Average (Son 7 gün ortalaması)
@@ -86,22 +112,20 @@ def run_forecast_benchmark():
 
         # 4. Holt-Winters (Exponential Smoothing)
         hw_model = ExponentialSmoothing(
-            train_raw["demand"],
+            train_raw["demand"].astype(float),
             trend="add",
             seasonal="add",
             seasonal_periods=7
         ).fit()
         pred_hw = hw_model.forecast(HORIZON_DAYS).values
+        pred_hw = np.maximum(0, pred_hw)
         w_hw, r_hw, b_hw = evaluate_metrics(y_test, pred_hw)
 
-        # 5. LightGBM
-        feat_df = build_features(pdf)
-        train_feat = feat_df.iloc[:-HORIZON_DAYS]
-        test_feat = feat_df.iloc[-HORIZON_DAYS:]
-        
-        feature_cols = [c for c in feat_df.columns if c not in ["order_date", "product_id", "demand"]]
-        
-        lgb_train = lgb.Dataset(train_feat[feature_cols], label=train_feat["demand"])
+        # 5. LightGBM (Sızıntısız, Özyinelemeli / Recursive Çok Adımlı Tahmin)
+        train_matrix = build_training_matrix(train_raw)
+        feature_cols = [c for c in train_matrix.columns if c != "demand"]
+
+        lgb_train = lgb.Dataset(train_matrix[feature_cols], label=train_matrix["demand"])
         params = {
             "objective": "regression",
             "metric": "rmse",
@@ -111,10 +135,28 @@ def run_forecast_benchmark():
             "seed": 42
         }
         gbm = lgb.train(params, lgb_train, num_boost_round=150)
-        pred_lgb = gbm.predict(test_feat[feature_cols])
-        w_lgb, r_lgb, b_lgb = evaluate_metrics(test_feat["demand"].values, pred_lgb)
 
-        # Model Değerlendirme Havuzu
+        # 28 Günlük Özyinelemeli (Autoregressive) Simülasyon Döngüsü
+        sim_history = train_raw.copy()
+        pred_lgb = []
+
+        for step in range(HORIZON_DAYS):
+            target_date = test_raw["order_date"].iloc[step]
+            feat_step = extract_features_for_row(sim_history, target_date)
+            feat_df = pd.DataFrame([feat_step])[feature_cols]
+            pred_val = max(0.0, float(gbm.predict(feat_df)[0]))
+            pred_lgb.append(pred_val)
+
+            # Bir sonraki günün lag hesapları için kendi tahminini geçmişe ekler
+            sim_history = pd.concat([
+                sim_history,
+                pd.DataFrame([{"order_date": target_date, "product_id": pid, "demand": pred_val}])
+            ], ignore_index=True)
+
+        pred_lgb = np.array(pred_lgb)
+        w_lgb, r_lgb, b_lgb = evaluate_metrics(y_test, pred_lgb)
+
+        # Model Kıyaslama Havuzu
         models = {
             "Naive": (w_naive, r_naive, b_naive, pred_naive),
             "Seasonal Naive": (w_snaive, r_snaive, b_snaive, pred_snaive),
@@ -123,7 +165,7 @@ def run_forecast_benchmark():
             "LightGBM": (w_lgb, r_lgb, b_lgb, pred_lgb)
         }
 
-        # Şartname Kuralı: En düşük WAPE değerine sahip model seçilir
+        # En düşük WAPE'e sahip adil kazananı seç
         best_name = min(models, key=lambda k: models[k][0])
         best_pred = models[best_name][3]
 
@@ -151,7 +193,7 @@ def run_forecast_benchmark():
     print("-" * 85)
 
     # SQLite ve CSV'ye Kaydetme
-    os.makedirs(os.path.dirname(OUTPUT_FORECAST_PATH), exist_ok=True)
+    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     forecast_df = pd.DataFrame(final_forecast_records)
     forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
 

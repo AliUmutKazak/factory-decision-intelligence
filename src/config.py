@@ -39,3 +39,6 @@ INITIAL_INVENTORY = {
     "RAW_ALLOY_ROD": 6000.0,
     "COATING_POWDER": 600.0
 }
+# 5. Talep Tahminleme & Taktik Planlama Ufku
+PLANNING_HORIZON_WEEKS = 4       # 4 haftalık taktik planlama ufku
+FORECAST_HORIZON_DAYS = PLANNING_HORIZON_WEEKS * 7  # 28 günlük günlük tahmin ufku
