@@ -52,3 +52,11 @@ AGGREGATE_INITIAL_INVENTORY = {
     "FAM_A": 40.0,
     "FAM_B": 20.0
 }
+# Dizin Hiyerarşisi
+SRC_DIR = Path(__file__).resolve().parent
+BASE_DIR = SRC_DIR.parent
+DATA_DIR = BASE_DIR / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
+DB_PATH = DATA_DIR / "factory.db"

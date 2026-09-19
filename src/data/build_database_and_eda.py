@@ -2,10 +2,13 @@ import os
 import sqlite3
 import pandas as pd
 import numpy as np
+from src.config import (
+    DB_PATH,
+    PROCESSED_DATA_DIR,
+    SYNTHETIC_DATA_DIR,
+)
 
-DB_PATH = "data/factory.db"
-PROCESSED_ORDERS_PATH = "data/processed/factory_orders.csv"
-SYNTHETIC_DIR = "data/synthetic"
+PROCESSED_ORDERS_PATH = PROCESSED_DATA_DIR / "factory_orders.csv"
 
 def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
     daily_product_demand = (
@@ -26,12 +29,12 @@ def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
 
-    # Varyasyon Katsayisi (CV = sigma / mu)
+    # Varyasyon Katsayısı (CV = sigma / mu)
     stats["cv_volatilite"] = (stats["gunluk_std"] / stats["gunluk_ortalama"]).round(3)
     stats["talep_profili"] = np.where(
         stats["cv_volatilite"] < 0.5, "Düzenli (Smooth)", "Dalgalı (Erratic)"
     )
-    
+
     stats["gunluk_ortalama"] = stats["gunluk_ortalama"].round(1)
     stats["gunluk_std"] = stats["gunluk_std"].round(1)
 
@@ -44,11 +47,11 @@ def initialize_database():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # 1. Islenmis siparis verisini aktar
+    # 1. İşlenmiş sipariş verisini aktar
     orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     orders_df.to_sql("orders", conn, index=False, if_exists="replace")
 
-    # 2. Sentetik fabrika ana veri tablolarini aktar
+    # 2. Sentetik fabrika ana veri tablolarını aktar
     synthetic_tables = [
         "machines",
         "products",
@@ -59,23 +62,23 @@ def initialize_database():
     ]
 
     for table in synthetic_tables:
-        csv_file = os.path.join(SYNTHETIC_DIR, f"{table}.csv")
+        csv_file = SYNTHETIC_DATA_DIR / f"{table}.csv"
         if os.path.exists(csv_file):
             tdf = pd.read_csv(csv_file)
             tdf.to_sql(table, conn, index=False, if_exists="replace")
 
     conn.commit()
 
-    # 3. EDA Ozet Tablosu
+    # 3. EDA Özet Tablosu
     eda_summary = analyze_demand_characteristics(orders_df)
 
-    print("=" * 70)
-    print("      FABRİKA VERİTABANI & TALEP EDA RAPORU      ")
-    print("=" * 70)
+    print("=" * 75)
+    print("           FABRİKA VERİTABANI & TALEP EDA RAPORU           ")
+    print("=" * 75)
     print(eda_summary.to_string(index=False))
-    print("-" * 70)
+    print("-" * 75)
 
-    # 4. Veritabani Dogrulama Sorgusu
+    # 4. Veritabanı Doğrulama
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = [row[0] for row in cursor.fetchall()]
 
@@ -88,7 +91,8 @@ def initialize_database():
         print(f"  - {t:<20}: {count:>6} satır")
 
     conn.close()
-    print("=" * 70)
+    print("=" * 75)
 
 if __name__ == "__main__":
     initialize_database()
+    
