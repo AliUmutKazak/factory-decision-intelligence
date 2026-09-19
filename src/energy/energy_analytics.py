@@ -2,7 +2,7 @@ import os
 import sqlite3
 import pandas as pd
 import numpy as np
-from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DB_PATH
+from src.config import PROCESSED_DATA_DIR, DB_PATH
 
 OUTPUT_ENERGY_KPI_PATH = PROCESSED_DATA_DIR / "energy_kpis.csv"
 OUTPUT_PROFILE_PATH = PROCESSED_DATA_DIR / "energy_profile_15min.csv"
@@ -15,13 +15,10 @@ def load_data():
     return schedule_df, machines_df
 
 def load_machine_specs() -> dict:
-    machines_csv_path = RAW_DATA_DIR.parent / "synthetic" / "machines.csv"
-    if machines_csv_path.exists():
-        df_m = pd.read_csv(machines_csv_path)
-    else:
-        conn = sqlite3.connect(DB_PATH)
-        df_m = pd.read_sql("SELECT * FROM machines", conn)
-        conn.close()
+    # Madde 18 & 19: CSV arama mantığı tamamen kaldırıldı, doğrudan SQLite SSOT kullanılır.
+    conn = sqlite3.connect(DB_PATH)
+    df_m = pd.read_sql("SELECT * FROM machines", conn)
+    conn.close()
 
     specs = {}
     for _, row in df_m.iterrows():
@@ -39,6 +36,7 @@ def compute_energy_analytics():
     machine_specs = load_machine_specs()
 
     makespan_min = int(schedule_df["end_min"].max())
+    makespan_hours = makespan_min / 60.0
     total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["batch_qty"].sum()
 
     # 1. İşlem Enerjisi (Processing Energy) ve Anlık Güç Çekişi (kW)
@@ -64,12 +62,13 @@ def compute_energy_analytics():
 
         # CP-SAT tarafından çözülen net fiili setup süreleri
         m_setup_time = m_tasks["setup_before_min"].sum() if "setup_before_min" in m_tasks.columns else 0
-        
+
         # Tezgâhın boşa çıktığı (idle) net süre = Toplam Makespan - (İşleme + Fiili Setup)
         m_idle_time = max(0, makespan_min - (proc_time_m + m_setup_time))
 
         m_setup_kwh = (m_setup_time / 60.0) * specs["setup_kw"]
         m_idle_kwh = (m_idle_time / 60.0) * specs["idle_kw"]
+        m_total_kwh = m_proc_kwh + m_setup_kwh + m_idle_kwh
 
         total_setup_kwh += m_setup_kwh
         total_idle_kwh += m_idle_kwh
@@ -82,34 +81,32 @@ def compute_energy_analytics():
             "processing_kwh": round(m_proc_kwh, 1),
             "setup_kwh": round(m_setup_kwh, 1),
             "idle_kwh": round(m_idle_kwh, 1),
-            "total_kwh": round(m_proc_kwh + m_setup_kwh + m_idle_kwh, 1)
+            "total_kwh": round(m_total_kwh, 1)
         })
 
     grand_total_kwh = total_proc_kwh + total_setup_kwh + total_idle_kwh
-    kwh_per_unit = grand_total_kwh / total_units_produced if total_units_produced > 0 else 0.0
-    makespan_hours = makespan_min / 60.0
     avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
 
-    # 3. 15 Dakikalık Fiziksel Yük Profili
-    time_steps = list(range(0, makespan_min + 15, 15))
+    # 3. 15 Dakikalık Yük Profili Simülasyonu
+    step_min = 15
+    time_points = list(range(0, makespan_min + step_min, step_min))
     profile_records = []
 
-    for t in time_steps:
-        t_end = t + 15
+    for t in time_points:
+        t_end = t + step_min
         total_power_kw = 0.0
 
         for m_id, specs in machine_specs.items():
             m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-            
-            # A) İşleme Modunda mı?
+
             active_proc = m_tasks[
                 (m_tasks["start_min"] < t_end) & (m_tasks["end_min"] > t)
             ]
-            
+
             if len(active_proc) > 0:
                 total_power_kw += active_proc["proc_power_kw"].mean()
             else:
-                # B) Fiili Setup Penceresinde mi? [start - setup_before_min, start]
+                # Setup penceresi kontrolü
                 in_setup = False
                 for _, row in m_tasks.iterrows():
                     s_dur = row.get("setup_before_min", 0)
@@ -130,9 +127,13 @@ def compute_energy_analytics():
 
     profile_df = pd.DataFrame(profile_records)
     raw_peak_kw = profile_df["total_load_kw"].max()
-    peak_kw = round(max(raw_peak_kw, avg_load_kw), 2)
+
+    # Madde 16: max(raw_peak_kw, avg_load_kw) yapay zorlaması kaldırıldı.
+    # Gözlenen profil tepe değeri doğrudan esas alınır.
+    peak_kw = round(raw_peak_kw, 2)
     load_factor = round(avg_load_kw / peak_kw, 3) if peak_kw > 0 else 1.0
 
+    # Fiziksel kural kontrolü: Tepe yükün ortalama yükten küçük olması fizik kurallarına aykırıdır
     assert peak_kw >= avg_load_kw, f"Fiziksel Kural İhlali: Peak ({peak_kw} kW) < Avg ({avg_load_kw} kW)"
 
     kpi_summary = {
@@ -142,20 +143,20 @@ def compute_energy_analytics():
         "setup_kwh": round(total_setup_kwh, 1),
         "idle_kwh": round(total_idle_kwh, 1),
         "grand_total_kwh": round(grand_total_kwh, 1),
-        "kwh_per_unit": round(kwh_per_unit, 3),
+        "kwh_per_unit": round(grand_total_kwh / total_units_produced, 3) if total_units_produced > 0 else 0.0,
         "avg_load_kw": avg_load_kw,
         "peak_load_kw": peak_kw,
         "load_factor": load_factor
     }
 
     print("=" * 85)
-    print("             AŞAMA 7A: ENERJİ ANALİTİĞİ VE YÜK PROFİLİ RAPORU             ")
+    print("              AŞAMA 7A: ENERJİ ANALİTİĞİ VE YÜK PROFİLİ RAPORU              ")
     print("=" * 85)
     print(f"Toplam Üretim Miktarı     : {kpi_summary['total_units_produced']:,} adet")
     print(f"Toplam Enerji Tüketimi    : {kpi_summary['grand_total_kwh']:,} kWh")
-    print(f"  - İşlem (Processing)    : {kpi_summary['processing_kwh']:,} kWh (%{kpi_summary['processing_kwh']/grand_total_kwh*100:.1f})")
-    print(f"  - Fiili Hazırlık (Setup): {kpi_summary['setup_kwh']:,} kWh (%{kpi_summary['setup_kwh']/grand_total_kwh*100:.1f})")
-    print(f"  - Boşta Bekleme (Idle)  : {kpi_summary['idle_kwh']:,} kWh (%{kpi_summary['idle_kwh']/grand_total_kwh*100:.1f})")
+    print(f"  - İşlem (Processing)    : {kpi_summary['processing_kwh']:,} kWh ({kpi_summary['processing_kwh']/grand_total_kwh*100:.1f}%)")
+    print(f"  - Fiili Hazırlık (Setup): {kpi_summary['setup_kwh']:,} kWh ({kpi_summary['setup_kwh']/grand_total_kwh*100:.1f}%)")
+    print(f"  - Boşta Bekleme (Idle)  : {kpi_summary['idle_kwh']:,} kWh ({kpi_summary['idle_kwh']/grand_total_kwh*100:.1f}%)")
     print(f"Birim Enerji Tüketimi     : {kpi_summary['kwh_per_unit']} kWh/adet")
     print(f"Ortalama Yük (Avg Load)   : {kpi_summary['avg_load_kw']} kW")
     print(f"Tepe Yük (Peak Load)      : {kpi_summary['peak_load_kw']} kW")
