@@ -1,4 +1,4 @@
-machine_id,processing_hours,idle_hours,processing_kwh,setup_kwh,idle_kwh,total_kwh,scope_2_tco2e,carbon_share_pct
-M01,132.6,4.4,8153.4,3.5,3.6,8160.6,3.591,39.6
-M02,63.6,71.1,3711.2,5.8,41.3,3758.2,1.654,18.2
-M03,71.7,63.0,8579.6,14.4,90.8,8684.8,3.821,42.2
+machine_id,processing_hours,setup_hours,idle_hours,processing_kwh,setup_kwh,idle_kwh,total_kwh,scope_2_tco2e,carbon_share_pct
+M01,137.1,1.92,4.3,8434.4,3.9,3.5,8441.8,3.714,39.7
+M02,65.9,2.25,75.2,3844.6,3.2,43.6,3891.5,1.712,18.3
+M03,74.0,1.33,68.0,8846.7,4.8,97.9,8949.5,3.938,42.1

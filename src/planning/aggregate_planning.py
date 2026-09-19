@@ -63,53 +63,69 @@ def build_weekly_forecast_bridge(forecast_df, products_df):
 def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
     periods = sorted(family_weekly["period_week"].unique())
     families = sorted(family_weekly["family_id"].unique())
+    machines = sorted(machines_df["machine_id"].unique())
 
-    # Ürün bazlı toplam standart süre (saat/koli)
-    prod_routing = routing_df.groupby("product_id")["processing_time_min"].sum().reset_index()
-    prod_meta = products_df.merge(prod_routing, on="product_id")
-
-    # Ürün ailesi bazlı ağırlıklı ortalama üretim süresi (saat/koli)
-    family_hours = (
-        prod_meta.groupby("family_id")["processing_time_min"].mean() / 60.0
+    # 1. Her ürün ailesinin her tezgâhtaki birim işleme süresi (a_{f,m} - saat/koli)
+    merged_routing = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
+    fam_mach_hours = (
+        merged_routing.groupby(["family_id", "machine_id"])["processing_time_min"].mean() / 60.0
     ).to_dict()
+
+    # Toplam işçilik maliyeti için aile bazlı toplam rota süresi
+    family_total_hours = {
+        f: sum(fam_mach_hours.get((f, m), 0.0) for m in machines)
+        for f in families
+    }
 
     demand = {}
     for _, row in family_weekly.iterrows():
         demand[(row["family_id"], row["period_week"])] = row["forecast_batches"]
 
-    # Fabrika Toplam Çalışma Kapasitesi (Makine sayısı dinamik okunur)
-    active_machine_count = len(machines_df)
-    nominal_weekly_hours = WEEKLY_HOURS_PER_MACHINE * float(active_machine_count)
-    effective_hours = nominal_weekly_hours * (1.0 - AGGREGATE_CAPACITY_BUFFER)
+    # Makine Başına Efektif Kapasite (Buffer düşülmüş standart kapasite)
+    effective_hours_per_machine = WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER)
 
     model = pulp.LpProblem("Industrial_Aggregate_Planning", pulp.LpMinimize)
 
-    # Karar Değişkenleri (Sürekli LP)
+    # Karar Değişkenleri
     P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
-    OT = pulp.LpVariable.dicts("Overtime", periods, lowBound=0, upBound=AGGREGATE_MAX_OVERTIME_HOURS, cat="Continuous")
+    
+    # Fazla Mesai artık her makine için ayrı tanımlanır (OT_{m,t})
+    OT = pulp.LpVariable.dicts(
+        "Overtime",
+        [(m, t) for m in machines for t in periods],
+        lowBound=0,
+        upBound=AGGREGATE_MAX_OVERTIME_HOURS,
+        cat="Continuous"
+    )
 
-    # Amaç Fonksiyonu: Üretim İşçiliği + Elde Tutma + Gecikme Cezası + Fazla Mesai
+    # Amaç Fonksiyonu: İşçilik + Stok Tutma + Gecikme + Makine Bazlı Fazla Mesai Maliyeti
     model += pulp.lpSum(
-        P[(f, t)] * family_hours[f] * LABOR_COST_STANDARD_HR +
+        P[(f, t)] * family_total_hours[f] * LABOR_COST_STANDARD_HR +
         I[(f, t)] * AGGREGATE_HOLDING_COST_PER_BATCH +
         B[(f, t)] * AGGREGATE_BACKLOG_PENALTY_PER_BATCH
         for f in families for t in periods
-    ) + pulp.lpSum(OT[t] * LABOR_COST_OVERTIME_HR for t in periods)
+    ) + pulp.lpSum(
+        OT[(m, t)] * LABOR_COST_OVERTIME_HR for m in machines for t in periods
+    )
 
     capacity_constraints = {}
     for t in periods:
-        # 1. Kapasite Kısıtı
-        c_cap = pulp.lpSum(P[(f, t)] * family_hours[f] for f in families) <= effective_hours + OT[t]
-        model += c_cap, f"Capacity_W{t}"
-        capacity_constraints[t] = c_cap
+        # 1. MAKİNE BAZLI KAPASİTE KISITI: Her tezgâhın yükü kendi kapasitesini aşamaz
+        for m in machines:
+            c_cap = pulp.lpSum(
+                P[(f, t)] * fam_mach_hours.get((f, m), 0.0) for f in families
+            ) <= effective_hours_per_machine + OT[(m, t)]
+            
+            model += c_cap, f"Capacity_{m}_W{t}"
+            capacity_constraints[(m, t)] = c_cap
 
+        # 2. Dinamik Envanter Denge Kısıtı: I_t - B_t = I_{t-1} - B_{t-1} + P_t - D_t
         for f in families:
             prev_inv = AGGREGATE_INITIAL_INVENTORY.get(f, 0.0) if t == 1 else I[(f, t - 1)]
             prev_backlog = 0.0 if t == 1 else B[(f, t - 1)]
 
-            # 2. Dinamik Envanter Denge Kısıtı: I_t - B_t = I_{t-1} - B_{t-1} + P_t - D_t
             model += (
                 I[(f, t)] - B[(f, t)] == prev_inv - prev_backlog + P[(f, t)] - demand[(f, t)],
                 f"Balance_{f}_W{t}"
@@ -119,6 +135,8 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
 
     plan_records = []
     for t in periods:
+        # Hafta bazında en çok fazla mesai yapan makinenin süresini (darboğaz mesaisini) özet al
+        max_overtime_w = max(OT[(m, t)].varValue for m in machines)
         for f in families:
             plan_records.append({
                 "period_week": t,
@@ -127,32 +145,68 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
                 "prod_batches": round(P[(f, t)].varValue, 1),
                 "end_inv_batches": round(I[(f, t)].varValue, 1),
                 "backlog_batches": round(B[(f, t)].varValue, 1),
-                "overtime_hours": round(OT[t].varValue, 1)
+                "overtime_hours": round(max_overtime_w, 1)
             })
 
-    shadow_prices = {t: round(capacity_constraints[t].pi, 2) for t in periods}
+    # Darboğaz makinenin (M01) gölge fiyatını döndür
+    shadow_prices = {}
+    for t in periods:
+        # En kısıtlayıcı tezgâhın dual değerini al
+        bottleneck_pi = capacity_constraints[("M01", t)].pi if ("M01", t) in capacity_constraints else 0.0
+        shadow_prices[t] = round(bottleneck_pi, 2)
 
     return pd.DataFrame(plan_records), shadow_prices
 
 def disaggregate_to_sku(family_plan_df, sku_weekly):
     sku_plan = []
     for (week, fam), group in sku_weekly.groupby(["period_week", "family_id"]):
-        fam_target = family_plan_df[
+        # 1. Aile hedef batch sayısını tam sayıya yuvarla (Örn: 249.3 -> 249)
+        fam_target_raw = family_plan_df[
             (family_plan_df["period_week"] == week) & (family_plan_df["family_id"] == fam)
         ]["prod_batches"].values[0]
-
+        
+        fam_target = int(round(fam_target_raw))
         total_fam_demand = group["forecast_batches"].sum()
 
+        sku_allocations = []
         for _, row in group.iterrows():
             ratio = (row["forecast_batches"] / total_fam_demand) if total_fam_demand > 0 else (1.0 / len(group))
-            batch_target = round(fam_target * ratio, 1)
-            sku_plan.append({
+            
+            # Tam kısmı (floor) ve ondalık kalanı (remainder) ayır
+            exact_batches = fam_target * ratio
+            floor_batches = int(exact_batches) 
+            remainder = exact_batches - floor_batches
+            
+            sku_allocations.append({
                 "period_week": week,
                 "product_id": row["product_id"],
                 "family_id": fam,
                 "weekly_forecast_units": int(round(row["forecast_units"])),
-                "planned_batches": batch_target,
-                "planned_units": int(round(batch_target * UNITS_PER_BATCH))
+                "floor_batches": floor_batches,
+                "remainder": remainder
+            })
+
+        # 2. Largest Remainder Method: Eksik kalan batch'leri dağıt
+        total_allocated = sum(item["floor_batches"] for item in sku_allocations)
+        missing_batches = fam_target - total_allocated
+
+        # Kalan değerine göre büyükten küçüğe sırala
+        sku_allocations.sort(key=lambda x: x["remainder"], reverse=True)
+
+        # En büyük kalanlara sahip olanlara 1'er batch ekleyerek toplamı kilitle
+        for i in range(missing_batches):
+            sku_allocations[i]["floor_batches"] += 1
+
+        # 3. Nihai listeyi oluştur (Artık %100 tam sayı garantili)
+        for item in sku_allocations:
+            planned_batches = item["floor_batches"]
+            sku_plan.append({
+                "period_week": item["period_week"],
+                "product_id": item["product_id"],
+                "family_id": item["family_id"],
+                "weekly_forecast_units": item["weekly_forecast_units"],
+                "planned_batches": planned_batches,
+                "planned_units": int(planned_batches * UNITS_PER_BATCH)
             })
 
     return pd.DataFrame(sku_plan)

@@ -1,0 +1,41 @@
+name: Factory Decision Intelligence CI
+
+# 1. Hangi durumlarda tetiklenecek?
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+# 2. Çalıştırılacak görevler
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest  # Buluttaki sanal işletim sistemi
+
+    steps:
+    # Depodaki kodları sanal makineye indir
+    - name: Depoyu Klonla
+      uses: actions/checkout@v4
+
+    # Sanal makineye Python 3.11 kur
+    - name: Python 3.11 Kurulumu
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+        cache: "pip"
+
+    # Gerekli tüm kütüphaneleri (PuLP, OR-Tools, LightGBM vb.) yükle
+    - name: Bağımlılıkları Yükle
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Uçtan uca fabrikayı çalıştırıp veri tabanını doldur
+    - name: Uçtan Uca Pipeline'ı Koştur (Entegrasyon)
+      run: |
+        python main.py
+
+    # 5 kritik OR & fizik kuralını test et
+    - name: Matematiksel & Fiziksel OR Testlerini Çalıştır (Pytest)
+      run: |
+        pytest -v
