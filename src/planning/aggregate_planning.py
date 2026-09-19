@@ -1,3 +1,10 @@
+"""
+src/aggregate_planning.py
+Hax & Meal Hiyerarşik Agrega Üretim Planlama Modülü (PuLP)
+- Talep Ağırlıklı Kaynak Katsayıları (Forecast-weighted coefficients - Madde 6)
+- Dinamik Darboğaz Tespiti & Dual Değer Analizi (Dynamic Bottleneck Identification - Madde 13)
+"""
+
 import os
 import sqlite3
 import pandas as pd
@@ -60,20 +67,55 @@ def build_weekly_forecast_bridge(forecast_df, products_df):
 
     return sku_weekly, family_weekly
 
-def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
+def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df):
     periods = sorted(family_weekly["period_week"].unique())
     families = sorted(family_weekly["family_id"].unique())
     machines = sorted(machines_df["machine_id"].unique())
 
-    # 1. Her ürün ailesinin her tezgâhtaki birim işleme süresi (a_{f,m} - saat/koli)
-    merged_routing = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
-    fam_mach_hours = (
-        merged_routing.groupby(["family_id", "machine_id"])["processing_time_min"].mean() / 60.0
+    # -------------------------------------------------------------
+    # MADDE 6 İYİLEŞTİRMESİ: Talep Ağırlıklı Kaynak Katsayısı (a_{f,m,t})
+    # Basit aritmetik ortalama yerine, o hafta SKU talepleriyle ağırlıklandırılmış 
+    # birim operasyon süreleri hesaplanır.
+    # -------------------------------------------------------------
+    fam_mach_hours_per_period = {}
+    
+    # Rota verisini ürün ve aile bilgisiyle birleştir
+    routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
+
+    for t in periods:
+        # O haftaya ait SKU talep paylarını bulmak için sku_weekly filtrele
+        w_sku = sku_weekly[sku_weekly["period_week"] == t]
+        
+        for f in families:
+            f_skus = w_sku[w_sku["family_id"] == f]
+            for m in machines:
+                # Bu aile ve makine için ilgili SKU'ların routing süreleri
+                m_routing = routing_extended[(routing_extended["family_id"] == f) & (routing_extended["machine_id"] == m)]
+                
+                if m_routing.empty or f_skus.empty:
+                    fam_mach_hours_per_period[(f, m, t)] = 0.0
+                    continue
+
+                # SKU bazlı talep ve süreleri birleştir
+                merged_mix = f_skus.merge(m_routing, on="product_id", how="inner")
+                total_demand_f = merged_mix["forecast_batches"].sum()
+
+                if total_demand_f > 0:
+                    # Talep ağırlıklı ortalama süre (saat cinsinden)
+                    weighted_time_min = (merged_mix["forecast_batches"] * merged_mix["processing_time_min"]).sum() / total_demand_f
+                    fam_mach_hours_per_period[(f, m, t)] = weighted_time_min / 60.0
+                else:
+                    # Talep yoksa basit ortalama fallback
+                    fallback_min = m_routing["processing_time_min"].mean()
+                    fam_mach_hours_per_period[(f, m, t)] = (fallback_min / 60.0) if not pd.isna(fallback_min) else 0.0
+
+    # İşçilik maliyeti için genel aile-makine saatleri (statik toplamlar için ortalama)
+    fam_mach_hours_avg = (
+        routing_extended.groupby(["family_id", "machine_id"])["processing_time_min"].mean() / 60.0
     ).to_dict()
 
-    # Toplam işçilik maliyeti için aile bazlı toplam rota süresi
     family_total_hours = {
-        f: sum(fam_mach_hours.get((f, m), 0.0) for m in machines)
+        f: sum(fam_mach_hours_avg.get((f, m), 0.0) for m in machines)
         for f in families
     }
 
@@ -91,7 +133,7 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
     I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
     
-    # Fazla Mesai artık her makine için ayrı tanımlanır (OT_{m,t})
+    # Fazla Mesai her makine için ayrı tanımlanır (OT_{m,t})
     OT = pulp.LpVariable.dicts(
         "Overtime",
         [(m, t) for m in machines for t in periods],
@@ -100,7 +142,7 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
         cat="Continuous"
     )
 
-    # Amaç Fonksiyonu: İşçilik + Stok Tutma + Gecikme + Makine Bazlı Fazla Mesai Maliyeti
+    # Amaç Fonksiyonu
     model += pulp.lpSum(
         P[(f, t)] * family_total_hours[f] * LABOR_COST_STANDARD_HR +
         I[(f, t)] * AGGREGATE_HOLDING_COST_PER_BATCH +
@@ -112,16 +154,16 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
 
     capacity_constraints = {}
     for t in periods:
-        # 1. MAKİNE BAZLI KAPASİTE KISITI: Her tezgâhın yükü kendi kapasitesini aşamaz
+        # 1. MAKİNE BAZLI KAPASİTE KISITI (Talep ağırlıklı a_{f,m,t} katsayısı ile)
         for m in machines:
             c_cap = pulp.lpSum(
-                P[(f, t)] * fam_mach_hours.get((f, m), 0.0) for f in families
+                P[(f, t)] * fam_mach_hours_per_period.get((f, m, t), 0.0) for f in families
             ) <= effective_hours_per_machine + OT[(m, t)]
             
             model += c_cap, f"Capacity_{m}_W{t}"
             capacity_constraints[(m, t)] = c_cap
 
-        # 2. Dinamik Envanter Denge Kısıtı: I_t - B_t = I_{t-1} - B_{t-1} + P_t - D_t
+        # 2. Dinamik Envanter Denge Kısıtı
         for f in families:
             prev_inv = AGGREGATE_INITIAL_INVENTORY.get(f, 0.0) if t == 1 else I[(f, t - 1)]
             prev_backlog = 0.0 if t == 1 else B[(f, t - 1)]
@@ -135,7 +177,7 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
 
     plan_records = []
     for t in periods:
-        # Hafta bazında en çok fazla mesai yapan makinenin süresini (darboğaz mesaisini) özet al
+        # Hafta bazında maksimum fazla mesai yapan makinenin süresi
         max_overtime_w = max(OT[(m, t)].varValue for m in machines)
         for f in families:
             plan_records.append({
@@ -145,22 +187,38 @@ def solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df):
                 "prod_batches": round(P[(f, t)].varValue, 1),
                 "end_inv_batches": round(I[(f, t)].varValue, 1),
                 "backlog_batches": round(B[(f, t)].varValue, 1),
-                "overtime_hours": round(max_overtime_w, 1)
+                "max_machine_overtime_hours": round(max_overtime_w, 1)  # Madde 11 terminoloji düzeltmesi
             })
 
-    # Darboğaz makinenin (M01) gölge fiyatını döndür
-    shadow_prices = {}
+    # -------------------------------------------------------------
+    # MADDE 13 İYİLEŞTİRMESİ: Dinamik Darboğaz ve Gölge Fiyat Tespiti
+    # Sabit M01 yerine, o hafta en yüksek negatif dual değere (pi) sahip
+    # makine otomatik olarak darboğaz seçilir ve raporlanır.
+    # -------------------------------------------------------------
+    shadow_prices_summary = {}
     for t in periods:
-        # En kısıtlayıcı tezgâhın dual değerini al
-        bottleneck_pi = capacity_constraints[("M01", t)].pi if ("M01", t) in capacity_constraints else 0.0
-        shadow_prices[t] = round(bottleneck_pi, 2)
+        period_duals = {}
+        for m in machines:
+            constraint_key = (m, t)
+            if constraint_key in capacity_constraints:
+                pi_val = capacity_constraints[constraint_key].pi
+                period_duals[m] = pi_val if pi_val is not None else 0.0
+            else:
+                period_duals[m] = 0.0
+        
+        # En bağlayıcı (en düşük/negatif pi değeri) makineyi bul
+        binding_machine = min(period_duals, key=period_duals.get)
+        shadow_prices_summary[t] = {
+            "bottleneck_machine": binding_machine,
+            "shadow_price": round(period_duals[binding_machine], 2),
+            "all_duals": {m: round(val, 2) for m, val in period_duals.items()}
+        }
 
-    return pd.DataFrame(plan_records), shadow_prices
+    return pd.DataFrame(plan_records), shadow_prices_summary
 
 def disaggregate_to_sku(family_plan_df, sku_weekly):
     sku_plan = []
     for (week, fam), group in sku_weekly.groupby(["period_week", "family_id"]):
-        # 1. Aile hedef batch sayısını tam sayıya yuvarla (Örn: 249.3 -> 249)
         fam_target_raw = family_plan_df[
             (family_plan_df["period_week"] == week) & (family_plan_df["family_id"] == fam)
         ]["prod_batches"].values[0]
@@ -171,8 +229,6 @@ def disaggregate_to_sku(family_plan_df, sku_weekly):
         sku_allocations = []
         for _, row in group.iterrows():
             ratio = (row["forecast_batches"] / total_fam_demand) if total_fam_demand > 0 else (1.0 / len(group))
-            
-            # Tam kısmı (floor) ve ondalık kalanı (remainder) ayır
             exact_batches = fam_target * ratio
             floor_batches = int(exact_batches) 
             remainder = exact_batches - floor_batches
@@ -186,18 +242,13 @@ def disaggregate_to_sku(family_plan_df, sku_weekly):
                 "remainder": remainder
             })
 
-        # 2. Largest Remainder Method: Eksik kalan batch'leri dağıt
         total_allocated = sum(item["floor_batches"] for item in sku_allocations)
         missing_batches = fam_target - total_allocated
 
-        # Kalan değerine göre büyükten küçüğe sırala
         sku_allocations.sort(key=lambda x: x["remainder"], reverse=True)
-
-        # En büyük kalanlara sahip olanlara 1'er batch ekleyerek toplamı kilitle
         for i in range(missing_batches):
             sku_allocations[i]["floor_batches"] += 1
 
-        # 3. Nihai listeyi oluştur (Artık %100 tam sayı garantili)
         for item in sku_allocations:
             planned_batches = item["floor_batches"]
             sku_plan.append({
@@ -215,7 +266,7 @@ def run_planning_pipeline():
     forecast_df, products_df, routing_df, machines_df = load_data()
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
-    family_plan_df, shadow_prices = solve_aggregate_lp(family_weekly, products_df, routing_df, machines_df)
+    family_plan_df, shadow_prices = solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df)
     sku_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
 
     print("=" * 85)
@@ -223,9 +274,10 @@ def run_planning_pipeline():
     print("=" * 85)
     print(family_plan_df.to_string(index=False))
     print("-" * 85)
-    print("KAPASİTE KISITI GÖLGE FİYATLARI (Shadow Prices - $/Saat):")
-    for w, sp in shadow_prices.items():
-        print(f"  - Hafta {w}: {sp:.2f} $/saat")
+    print("DİNAMİK DARBOĞAZ VE GÖLGE FİYAT ANALİZİ (Shadow Prices & Binding Machines):")
+    for w, info in shadow_prices.items():
+        print(f"  - Hafta {w}: Darboğaz Tezgâh = {info['bottleneck_machine']} | Gölge Fiyat = {info['shadow_price']} $/saat")
+        print(f"            Tüm Makine Dual Değerleri: {info['all_duals']}")
     print("-" * 85)
     print("LEVEL 2: SKU AYRIŞTIRMA (DISAGGREGATION) ÖZETİ (İlk 10 Kayıt):")
     print(sku_plan_df.head(10).to_string(index=False))
@@ -247,4 +299,3 @@ def run_planning_pipeline():
 
 if __name__ == "__main__":
     run_planning_pipeline()
-    

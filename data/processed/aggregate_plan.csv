@@ -1,9 +1,9 @@
-period_week,family_id,demand_batches,prod_batches,end_inv_batches,backlog_batches,overtime_hours
-1,FAM_A,287.9,260.0,12.1,0.0,48.0
+period_week,family_id,demand_batches,prod_batches,end_inv_batches,backlog_batches,max_machine_overtime_hours
+1,FAM_A,287.9,253.4,5.5,0.0,48.0
 1,FAM_B,97.2,77.2,0.0,0.0,48.0
-2,FAM_A,286.7,248.4,0.0,26.2,48.0
+2,FAM_A,286.7,242.0,0.0,39.2,48.0
 2,FAM_B,93.8,93.8,0.0,0.0,48.0
-3,FAM_A,286.9,249.5,0.0,63.6,48.0
+3,FAM_A,286.9,242.9,0.0,83.2,48.0
 3,FAM_B,92.3,92.3,0.0,0.0,48.0
-4,FAM_A,287.1,252.9,0.0,97.8,48.0
+4,FAM_A,287.1,246.0,0.0,124.3,48.0
 4,FAM_B,87.4,87.4,0.0,0.0,48.0
