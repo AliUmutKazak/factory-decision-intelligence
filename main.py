@@ -7,11 +7,12 @@ malzeme gereksinim planlaması, enerji ve karbon muhasebesi zincirini çalışt�
 
 import sys
 import time
-from src.data.preprocessing import run_preprocessing_pipeline
-from src.data.build_database_and_eda import build_database
-from src.forecasting.train_forecast import train_and_forecast_pipeline
+# Yeni hali:
+from src.data.preprocessing import run_preprocessing
+from src.data.build_database_and_eda import initialize_database
+from src.forecasting.train_forecast import run_forecast_benchmark
 from src.planning.aggregate_planning import run_planning_pipeline
-from src.inventory.bom_mrp import run_mrp_pipeline
+from src.inventory.bom_mrp import run_mrp_engine
 from src.scheduling.schedule_cpsat import solve_cpsat_schedule
 from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
@@ -23,11 +24,11 @@ def run_end_to_end_pipeline():
     print("#" * 85 + "\n")
 
     steps = [
-        ("Aşama 1: Veri Ön İşleme & Temizlik", run_preprocessing_pipeline),
-        ("Aşama 2: SQLite Veritabanı Kurulumu", build_database),
-        ("Aşama 3: ML Talep Tahmini (LightGBM)", train_and_forecast_pipeline),
+        ("Aşama 1: Veri Ön İşleme & Temizlik", run_preprocessing),
+        ("Aşama 2: SQLite Veritabanı Kurulumu", initialize_database),
+        ("Aşama 3: ML Talep Tahmini (LightGBM)", run_forecast_benchmark),
         ("Aşama 4: Hiyerarşik Taktik Planlama & SKU Ayrıştırma", run_planning_pipeline),
-        ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", run_mrp_pipeline),
+        ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", run_mrp_engine),
         ("Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)", solve_cpsat_schedule),
         ("Aşama 7A: Enerji Analitiği & Yük Profili", compute_energy_analytics),
         ("Aşama 7B: Kurumsal Karbon Muhasebesi (GHG Protocol)", compute_carbon_analytics),
@@ -47,4 +48,3 @@ def run_end_to_end_pipeline():
 
 if __name__ == "__main__":
     run_end_to_end_pipeline()
-    
