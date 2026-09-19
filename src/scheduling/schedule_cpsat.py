@@ -1,12 +1,18 @@
-import sqlite3
 import os
+import sqlite3
 import pandas as pd
 import numpy as np
 from ortools.sat.python import cp_model
-from src.config import WEEKLY_MINUTES_PER_MACHINE, WEEKLY_HOURS_PER_MACHINE
+from src.config import (
+    DB_PATH,
+    PROCESSED_DATA_DIR,
+    WORK_DAYS_PER_WEEK,
+    WEEKLY_MINUTES_PER_MACHINE,
+    WEEKLY_HOURS_PER_MACHINE,
+    LABOR_COST_OVERTIME_HR,
+)
 
-DB_PATH = "data/factory.db"
-OUTPUT_SCHEDULE_PATH = "data/processed/production_schedule.csv"
+OUTPUT_SCHEDULE_PATH = PROCESSED_DATA_DIR / "production_schedule.csv"
 
 def load_data():
     conn = sqlite3.connect(DB_PATH)
@@ -166,7 +172,7 @@ def solve_cpsat_schedule():
     if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
         opt_makespan = solver.Value(makespan)
         nominal_2shifts = WEEKLY_MINUTES_PER_MACHINE  # 6 gün * 16 saat = 5.760 dk
-        capacity_24_7 = 6 * 24 * 60                   # 6 gün * 24 saat (3 vardiya tavanı) = 8.640 dk
+        capacity_24_7 = WORK_DAYS_PER_WEEK * 24 * 60   # 6 gün * 24 saat = 8.640 dk
 
         print(f"Çözüm Durumu        : {'OPTIMAL' if status == cp_model.OPTIMAL else 'FEASIBLE'}")
         print(f"Baseline Makespan   : {base_makespan} dakika ({base_makespan / 60:.1f} saat)")
@@ -175,13 +181,17 @@ def solve_cpsat_schedule():
         print(f"Optimizasyon Kazancı: %{gain:.1f} Zaman Tasarrufu")
         print("-" * 80)
         print("KAPASİTE & DARBOĞAZ DEĞERLENDİRMESİ:")
-        print(f"  - 2 Vardiya Tavanı (16 sa/gün) : {nominal_2shifts} dakika ({nominal_2shifts/60:.0f} saat)")
-        print(f"  - 3 Vardiya Tavanı (24/7)      : {capacity_24_7} dakika ({capacity_24_7/60:.0f} saat)")
+        print(f"  - Standart 2 Vardiya Sınırı : {nominal_2shifts} dk ({nominal_2shifts/60:.0f} saat)")
+        print(f"  - Maksimum 3 Vardiya Tavanı : {capacity_24_7} dk ({capacity_24_7/60:.0f} saat)")
+        
         if opt_makespan > nominal_2shifts:
             extra_h = (opt_makespan - nominal_2shifts) / 60.0
-            print(f"  [UYARI] M01 darboğazı nedeniyle 2 vardiya aşıldı! Gereken fazla mesai/3. vardiya: +{extra_h:.1f} saat")
+            overtime_cost = extra_h * LABOR_COST_OVERTIME_HR
+            print(f"  [KAPASİTE AŞIMI] M01 darboğazı nedeniyle standart 2 vardiya ({WEEKLY_HOURS_PER_MACHINE} sa) aşıldı.")
+            print(f"  - Gereken Fazla Mesai / 3. Vardiya : +{extra_h:.1f} saat")
+            print(f"  - Ek İşçilik Maliyeti (Overtime)   : ${overtime_cost:,.2f} (@ ${LABOR_COST_OVERTIME_HR:.2f}/saat)")
         else:
-            print(f"  [OK] Çizelge normal çalışma saatleri içinde tamamlandı.")
+            print("  [OK] Çizelge standart 2 vardiya (96 saat) sınırları içinde tamamlandı.")
         print("-" * 80)
 
         for key, t in all_tasks.items():
