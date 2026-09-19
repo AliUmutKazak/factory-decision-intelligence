@@ -31,3 +31,11 @@ GRID_EMISSION_FACTOR = 0.440        # tCO2e / MWh (Ulusal Şebeke Emisyon Faktö
 DIESEL_EMISSION_FACTOR = 0.00268   # tCO2e / Litre dizel (Kapsam 1)
 DEFAULT_FORKLIFT_LITERS = 85.0     # Tesis içi lojistik dizel tüketimi (Litre/hafta)
 CARBON_PRICE_SCENARIOS_EUR = [0, 50, 80, 100, 120]  # EU ETS dahili karbon fiyatlandırma senaryoları (€/tCO2e)
+# 4. Malzeme & Envanter Planlama Parametreleri (MRP-I)
+MRP_SERVICE_LEVEL_Z = 1.65  # %95 Çevrim Servis Seviyesi Emniyet Faktörü
+INITIAL_INVENTORY = {
+    "RAW_STEEL_A": 4500.0,
+    "RAW_STEEL_B": 8000.0,
+    "RAW_ALLOY_ROD": 6000.0,
+    "COATING_POWDER": 600.0
+}
