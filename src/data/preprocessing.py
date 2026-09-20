@@ -1,16 +1,25 @@
 import os
 import pandas as pd
+from pathlib import Path
 from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR
 
 def run_preprocessing():
     raw_path = RAW_DATA_DIR / "train.csv"
+    fixture_path = Path("data/fixtures/demand_fixture.csv")
     output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
 
-    if not os.path.exists(raw_path):
-        raise FileNotFoundError(f"Ham sipariş dosyası bulunamadı: {raw_path}")
+    if os.path.exists(raw_path):
+        data_source = raw_path
+        print(f"[1/3] Ham veri seti okunuyor ({raw_path})...")
+    elif os.path.exists(fixture_path):
+        data_source = fixture_path
+        print(f"[1/3] Ham veri bulunamadı, CI test fixture kullanılıyor ({fixture_path})...")
+    else:
+        raise FileNotFoundError(
+            f"Ne ham veri ({raw_path}) ne de test fixture ({fixture_path}) bulunabildi!"
+        )
 
-    print("[1/3] Ham veri seti okunuyor...")
-    df = pd.read_csv(raw_path)
+    df = pd.read_csv(data_source)
 
     # 5 Pilot Ürün Eşlemesi
     product_mapping = {1: "P01", 2: "P02", 3: "P03", 4: "P04", 5: "P05"}
