@@ -112,13 +112,20 @@ with tab_summary:
             f"**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
             f"480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
         )
+       # En yüksek iş yüküne sahip darboğaz tezgahı dinamik tespit et
+        mach_workload = sched_df.groupby("machine_id")["duration_min"].sum()
+        bottleneck_mach = mach_workload.idxmax() if not mach_workload.empty else "M01"
+        b_hours = mach_workload.max() / 60.0 if not mach_workload.empty else 0.0
+        overrun_hrs = max(0.0, b_hours - 96.0)
+
         st.info(
-            f"**Kapasite & Darboğaz:** LP dual değerleri Hafta 1-4 için M01 tezgâhını en bağlayıcı darboğaz olarak saptadı. "
-            f"M01 iş yükü standart 96 saati aşarak **+{overtime_hrs:.1f} saat** fazla mesai gerektirdi."
+            f"**Kapasite & Darboğaz:** LP dual analizi ve çizelgeleme yükü doğrultusunda **{bottleneck_mach}** "
+            f"tezgâhı en bağlayıcı darboğaz olarak gerçekleşti. Tezgâh iş yükü ({b_hours:.1f} sa) standart nominal "
+            f"96 saati aşarak **+{overrun_hrs:.1f} saat Nominal Kapasite Aşımı (Overrun)** oluşturdu."
         )
         st.info(
             f"**Sürdürülebilirlik:** Tesis tepe yükü **{e_kpi['peak_load_kw']:.1f} kW** olarak fiziksel kuralı doğruladı; "
-            f"EU ETS 80 €/tCO₂e senaryosunda karbon maruziyeti **€{c_kpi['total_tco2e'] * 80:,.2f}** seviyesindedir."
+            f"Dahili Karbon Senaryosu (80 €/tCO₂e) kapsamında karbon maruziyeti **€{c_kpi['total_tco2e'] * 80:,.2f}** seviyesindedir."
         )
 
 # =============================================================
@@ -191,25 +198,37 @@ with tab_plan:
 with tab_schedule:
     st.subheader("OR-Tools CP-SAT Çizelgesi & Darboğaz Analizi")
 
-    base_time = pd.Timestamp("2026-01-05 08:00:00")
-    sched_df["start_dt"] = sched_df["start_min"].apply(lambda m: base_time + pd.Timedelta(minutes=m))
-    sched_df["end_dt"] = sched_df["end_min"].apply(lambda m: base_time + pd.Timedelta(minutes=m))
+    sched_df["start_hour"] = sched_df["start_min"] / 60.0
+    sched_df["duration_hour"] = sched_df["duration_min"] / 60.0
 
-    # Lot ID etiketleme kontrolü
     hover_col = "lot_id" if "lot_id" in sched_df.columns else "batch_id"
 
-    fig_gantt = px.timeline(
-        sched_df, x_start="start_dt", x_end="end_dt", y="machine_id",
-        color="product_id", hover_name=hover_col,
-        title="Tezgâh Bazlı Operasyon Çizelgesi (Sıra Bağımlı Setup & MRP Kısıtları Dahil)",
-        labels={"machine_id": "Tezgâh", "start_dt": "Başlangıç", "end_dt": "Bitiş"}
+    fig_gantt = px.bar(
+        sched_df,
+        base="start_hour",
+        x="duration_hour",
+        y="machine_id",
+        color="product_id",
+        orientation="h",
+        hover_name=hover_col,
+        hover_data={"start_hour": ":.2f", "duration_hour": ":.2f", "machine_id": True},
+        title="Tezgâh Bazlı Operasyon Çizelgesi (Süreç Saati: Simulation Hours)",
+        labels={
+            "machine_id": "Tezgâh",
+            "duration_hour": "Süre (Saat)",
+            "start_hour": "Simülasyon Başlangıç (Saat)",
+            "product_id": "Ürün"
+        }
     )
-    # 480 dakikalık malzeme bekleme penceresini Gantt üzerinde dikey çizgiyle vurgula
-    mat_release_dt = base_time + pd.Timedelta(minutes=480)
+    # 480 dakikalık (8. saat) malzeme bekleme penceresini çizgiyle göster
     fig_gantt.add_vline(
-        x=mat_release_dt, line_dash="dot", line_color="orange",
-        annotation_text="MRP Expedite Release (480. dk)", annotation_position="top right"
+        x=8.0,
+        line_dash="dot",
+        line_color="orange",
+        annotation_text="Synthetic Expedite Release (8. sa)",
+        annotation_position="top right"
     )
+    fig_gantt.update_layout(xaxis_title="Simülasyon Zamanı (Saat)", yaxis_title="Tezgâh")
     fig_gantt.update_yaxes(autorange="reversed")
     st.plotly_chart(fig_gantt, use_container_width=True)
 
