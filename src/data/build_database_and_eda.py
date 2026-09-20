@@ -91,6 +91,8 @@ def initialize_database():
         print(f"  - {t:<20}: {count:>6} satır")
 
     conn.close()
+    print("Not: Master data iktisadi öznitelikleri (operating_cost, unit_sale_price vb.)")
+    print("     kurumsal şema uyumu ve çok amaçlı genişletmeler için rezerve edilmiştir.")
     print("=" * 75)
 
 if __name__ == "__main__":
