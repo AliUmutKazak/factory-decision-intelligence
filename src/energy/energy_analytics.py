@@ -93,7 +93,7 @@ def compute_energy_analytics():
     grand_total_kwh = total_proc_kwh + total_setup_kwh + total_idle_kwh
     avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
 
-                # 3. 15 Dakikalık Yük Profili Simülasyonu (Exact Boundary-Condition & Float Precision)
+                    # 3. 15 Dakikalık Yük Profili Simülasyonu (Exact Boundary-Condition & Float Precision)
     step_min = 15
     time_points = list(range(0, makespan_min, step_min))
     profile_records = []
@@ -140,6 +140,7 @@ def compute_energy_analytics():
             "time_hour": round(t / 60.0, 4),
             "total_load_kw": float(total_power_kw)
         })
+
 
 
 
