@@ -157,6 +157,7 @@ def run_cpsat_scheduling():
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(SOLVER_TIME_LIMIT_SECONDS)
     solver.parameters.num_search_workers = 8
+    solver.parameters.random_seed = 42
 
     status = solver.Solve(model)
     status_name = solver.StatusName(status)
