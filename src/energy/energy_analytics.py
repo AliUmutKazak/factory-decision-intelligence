@@ -139,6 +139,7 @@ def compute_energy_analytics():
         profile_records.append({
             "time_min": t,
             "time_hour": round(t / 60.0, 4),
+            "interval_min": round(float(actual_interval), 2),
             "total_load_kw": float(total_power_kw)
         })
 

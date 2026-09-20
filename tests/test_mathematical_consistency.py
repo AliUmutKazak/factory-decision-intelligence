@@ -213,8 +213,11 @@ def test_energy_integrals_reconciliation():
 
     assert not profile_df.empty and not kpis_df.empty, "Enerji tabloları boş!"
 
-    # 15 dakikalık dilim kWh hesabı: load (kW) * (15/60) h
-    profile_total_kwh = (profile_df["total_load_kw"] * 0.25).sum()
+    # Dinamik dilim kWh hesabı: load (kW) * (interval_min / 60) h
+    if "interval_min" in profile_df.columns:
+        profile_total_kwh = (profile_df["total_load_kw"] * (profile_df["interval_min"] / 60.0)).sum()
+    else:
+        profile_total_kwh = (profile_df["total_load_kw"] * 0.25).sum()
     kpi_total_kwh = kpis_df["grand_total_kwh"].iloc[0]
 
     assert profile_total_kwh == pytest.approx(kpi_total_kwh, rel=0.002), (
