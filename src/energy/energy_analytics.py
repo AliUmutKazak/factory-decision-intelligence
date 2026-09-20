@@ -120,8 +120,9 @@ def compute_energy_analytics():
             for _, row in m_tasks.iterrows():
                 s_dur = float(row.get("setup_before_min", 0))
                 if s_dur > 0:
-                    s_start = float(row["start_min"]) - s_dur
-                    s_end = float(row["start_min"])
+                    # CP-SAT tarafından kesin olarak takvimlenmiş fiziksel interval
+                    s_start = float(row.get("setup_start_min", float(row["start_min"]) - s_dur))
+                    s_end = float(row.get("setup_end_min", float(row["start_min"])))
                     o_start = max(float(t), s_start)
                     o_end = min(t_end, s_end)
                     if o_end > o_start:

@@ -133,19 +133,16 @@ def run_cpsat_scheduling():
         if t_info["operation_seq"] == 1 and t_info["product_id"] in expedite_products:
             model.Add(t_info["start"] >= MRP_EXPEDITE_RELEASE_TIME_MIN)
 
-    # 3. Tezgâh Çakışma Önleme & Gerçek Komşu (Adjacent Transition) Setup
-    # 3. Tezgâh Çakışma Önleme & Gerçek Doğrudan Komşu (AddCircuit Successor) Setup
+    # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri (AddCircuit + OptionalInterval)
     for mid, tids in machine_to_tasks.items():
-        # Tezgâhtaki işlerin çakışmasını engelle
-        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids])
-
         n_m = len(tids)
         if n_m <= 1:
+            model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids])
             continue
 
-        # Dummy node indeksi: n_m (makinenin başlangıç ve bitiş sanal düğümü)
         dummy = n_m
         circuit_arcs = []
+        machine_setup_intervals = []
 
         # 1) Dummy -> Task (Günün ilk işi): Başlangıç setup süresi 0
         for i, tid in enumerate(tids):
@@ -157,7 +154,7 @@ def run_cpsat_scheduling():
             lit = model.NewBoolVar(f"arc_end_{mid}_{tid}")
             circuit_arcs.append((i, dummy, lit))
 
-        # 3) Task i -> Task j (Yalnızca doğrudan peş peşe gelen komşuluklar)
+        # 3) Task i -> Task j (Doğrudan komşu işler ve fiziksel hazırlık intervalleri)
         for i in range(n_m):
             t1 = tids[i]
             p1 = all_tasks[t1]["product_id"]
@@ -170,10 +167,23 @@ def run_cpsat_scheduling():
                 lit = model.NewBoolVar(f"arc_{mid}_{t1}_{t2}")
                 circuit_arcs.append((i, j, lit))
 
-                s12 = setup_dict.get((mid, p1, p2), 0)
-                # Kısıt yalnızca ve yalnızca t1 doğrudan t2'nin hemen önceli ise tetiklenir:
-                model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"] + s12).OnlyEnforceIf(lit)
+                s12 = int(setup_dict.get((mid, p1, p2), 0))
+                if s12 > 0:
+                    # Fiziksel Setup İntervali: Model içinde optimize edilen bağımsız zaman aralığı
+                    s_start = model.NewIntVar(0, horizon, f"setup_start_{mid}_{t1}_{t2}")
+                    s_end = model.NewIntVar(0, horizon, f"setup_end_{mid}_{t1}_{t2}")
+                    s_interval = model.NewOptionalIntervalVar(s_start, s12, s_end, lit, f"setup_int_{mid}_{t1}_{t2}")
+                    machine_setup_intervals.append(s_interval)
 
+                    # Hazırlık öncül iş bitmeden başlayamaz
+                    model.Add(s_start >= all_tasks[t1]["end"]).OnlyEnforceIf(lit)
+                    # Hazırlık ardıl iş başlamadan hemen önce biter (Just-in-Time Setup)
+                    model.Add(s_end == all_tasks[t2]["start"]).OnlyEnforceIf(lit)
+                else:
+                    model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"]).OnlyEnforceIf(lit)
+
+        # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
+        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals)
         model.AddCircuit(circuit_arcs)
 
 

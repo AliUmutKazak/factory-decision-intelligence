@@ -284,3 +284,31 @@ def test_hierarchical_capacity_decomposition():
         # 2. Eğer toplam iş yükü LP tavanını aşıyorsa, bu aşım hazırlık süresinden büyük olamaz
         if total_hr > lp_max_hr:
             overrun = total_hr - lp_max_hr
+
+
+def test_explicit_setup_intervals_physical_integrity():
+    """
+    CP-SAT OptionalInterval doğrulaması:
+    1. setup_before_min > 0 olan her iş için setup_end_min == start_min olmalıdır (JIT).
+    2. setup_start_min == setup_end_min - setup_before_min sağlanmalıdır.
+    3. Setup aralığı, makinedeki bir önceki işin bitişinden önce başlayamaz.
+    """
+    import pandas as pd
+    from pathlib import Path
+    sched_path = Path("data/processed/production_schedule.csv")
+    if not sched_path.exists():
+        return
+    df = pd.read_csv(sched_path)
+    if "setup_start_min" not in df.columns:
+        return
+    for mid, group in df.groupby("machine_id"):
+        sorted_g = group.sort_values("start_min").reset_index(drop=True)
+        for idx in range(len(sorted_g)):
+            row = sorted_g.iloc[idx]
+            s_dur = row["setup_before_min"]
+            if s_dur > 0:
+                assert row["setup_end_min"] == row["start_min"], f"{row['task_id']} setup bitişi start_min ile eşleşmiyor!"
+                assert row["setup_start_min"] == row["setup_end_min"] - s_dur, f"{row['task_id']} setup süresi tutarsız!"
+                if idx > 0:
+                    prev_end = sorted_g.iloc[idx - 1]["end_min"]
+                    assert row["setup_start_min"] >= prev_end, f"{row['task_id']} setup aralığı önceki iş bitmeden başlıyor!"
