@@ -40,6 +40,7 @@ def test_sqlite_tables_exist(db_conn):
         "materials",
         "aggregate_plan",
         "sku_production_plan",
+        "machine_capacity_plan",
         "mrp_plan",
         "production_schedule",
         "energy_kpis",

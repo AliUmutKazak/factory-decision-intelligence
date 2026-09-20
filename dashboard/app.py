@@ -52,6 +52,7 @@ forecast_df = get_table("forecast_demand")
 sku_df = get_table("sku_production_plan")
 sched_df = get_table("production_schedule")
 agg_df = get_table("aggregate_plan")
+mach_cap_df = get_table("machine_capacity_plan")
 
 # =============================================================
 # TAB 1: YÖNETİCİ ÖZETİ
@@ -174,7 +175,19 @@ with tab_plan:
         w1_sku = sku_df[sku_df["period_week"] == 1][["product_id", "family_id", "planned_batches", "planned_units"]]
         st.dataframe(w1_sku, use_container_width=True)
         st.caption("Not: 1 Üretim Kolisi = 25 Perakende Satış Adedidir.")
-
+    st.markdown("---")
+    st.markdown("##### ⚙️ Dinamik Makine Kapasite Kullanımı & Darboğaz Analizi (LP Shadow Prices)")
+    if not mach_cap_df.empty:
+        st.dataframe(
+            mach_cap_df.style.apply(
+                lambda row: ['background-color: rgba(255, 75, 75, 0.2)' if row['is_bottleneck'] == 'YES' else '' for _ in row],
+                axis=1
+            ),
+            use_container_width=True
+        )
+        st.caption("🔴 Kırmızı vurgulanan satırlar o hafta için bağlayıcı kısıtı (binding bottleneck) ve marjinal gevşeme değerini ($/hour) gösterir.")
+    else:
+        st.info("Makine kapasite plan verisi bulunamadı.")
     st.markdown("---")
     st.subheader("Zaman Fazlı Malzeme İhtiyaç Planlaması (MRP-I)")
 
