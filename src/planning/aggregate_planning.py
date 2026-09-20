@@ -276,7 +276,7 @@ def run_planning_pipeline():
     print("-" * 85)
     print("DİNAMİK DARBOĞAZ VE GÖLGE FİYAT ANALİZİ (Shadow Prices & Binding Machines):")
     for w, info in shadow_prices.items():
-        print(f"  - Hafta {w}: Darboğaz Tezgâh = {info['bottleneck_machine']} | Gölge Fiyat = {info['shadow_price']} $/saat")
+        print(f"  - Hafta {w}: Darboğaz Tezgâh = {info['bottleneck_machine']} | Gölge Fiyat = {info['shadow_price']} $/hour")
         print(f"            Tüm Makine Dual Değerleri: {info['all_duals']}")
     print("-" * 85)
     print("LEVEL 2: SKU AYRIŞTIRMA (DISAGGREGATION) ÖZETİ (İlk 10 Kayıt):")

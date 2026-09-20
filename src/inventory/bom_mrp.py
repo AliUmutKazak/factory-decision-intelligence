@@ -128,7 +128,7 @@ def run_mrp_engine():
     print("SATINALMA BÜTÇESİ & TOPLAM MALZEME TAAHHÜT ÖZETİ:")
     print(summary_df.to_string(index=False))
     total_mrp_spend = summary_df["total_procurement_cost"].sum()
-    print(f"\nToplam Planlanan Satınalma Maliyeti: {total_mrp_spend:,.2f} TL")
+    print(f"\nToplam Planlanan Satınalma Maliyeti: ${total_mrp_spend:,.2f} USD")
     print("=" * 95)
 
     # SQLite ve CSV'ye Aktar

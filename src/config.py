@@ -23,6 +23,7 @@ WEEKLY_MINUTES_PER_MACHINE = WEEKLY_HOURS_PER_MACHINE * 60            # 5.760 da
 # 2. İktisadi & İşçilik Dönüşüm Parametreleri (Madde 14 Düzeltmesi)
 # Tezgâh amortisman/işletme maliyetleri machines.csv'den okunur.
 # Bu değerler tesis genel operasyon ve operatör işçilik bazını temsil eder.
+CURRENCY = "USD"
 LABOR_COST_STANDARD_HR = 450.0  # Standart saatlik adam/saat maliyeti ($/saat)
 OVERTIME_MULTIPLIER = 1.5       # Fazla mesai katsayısı
 LABOR_COST_OVERTIME_HR = LABOR_COST_STANDARD_HR * OVERTIME_MULTIPLIER  # 675.0 $/saat
@@ -46,8 +47,8 @@ FORECAST_HORIZON_DAYS = PLANNING_HORIZON_WEEKS * 7  # 28 günlük günlük tahmi
 UNITS_PER_BATCH = 25                     # 1 Üretim Kolisi / Lot = 25 Perakende Adet
 AGGREGATE_CAPACITY_BUFFER = 0.10         # %10 Planlı duruş / bakım kapasite tamponu
 AGGREGATE_MAX_OVERTIME_HOURS = 48.0      # Haftalık azami fazla mesai saati
-AGGREGATE_HOLDING_COST_PER_BATCH = 25.0  # Koli başına haftalık stok elde tutma maliyeti ($/koli)
-AGGREGATE_BACKLOG_PENALTY_PER_BATCH = 1500.0  # Geciken koli cezası ($/koli)
+AGGREGATE_HOLDING_COST_PER_BATCH = 25.0       # Parti başına haftalık stok elde tutma maliyeti ($/planning_lot)
+AGGREGATE_BACKLOG_PENALTY_PER_BATCH = 1500.0  # Geciken parti cezası ($/planning_lot)[cite: 7]
 AGGREGATE_INITIAL_INVENTORY = {
     "FAM_A": 40.0,
     "FAM_B": 20.0
