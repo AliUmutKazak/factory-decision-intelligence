@@ -180,9 +180,9 @@ def run_cpsat_scheduling():
     model.Minimize(makespan)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = float(SOLVER_TIME_LIMIT_SECONDS)
-    solver.parameters.num_search_workers = 8
-    solver.parameters.random_seed = 42
+    solver.parameters.max_time_in_seconds = float(getattr(cfg, "CPSAT_TIME_LIMIT_SECONDS", 30.0))
+    solver.parameters.num_search_workers = int(getattr(cfg, "CPSAT_NUM_SEARCH_WORKERS", 8))
+    solver.parameters.random_seed = int(getattr(cfg, "CPSAT_RANDOM_SEED", 42))
 
     status = solver.Solve(model)
     status_name = solver.StatusName(status)

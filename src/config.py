@@ -61,3 +61,8 @@ RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
 SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
 DB_PATH = DATA_DIR / "factory.db"
+
+# CP-SAT Çizelgeleme Çözücü Parametreleri
+CPSAT_TIME_LIMIT_SECONDS = 30.0
+CPSAT_NUM_SEARCH_WORKERS = 8
+CPSAT_RANDOM_SEED = 42

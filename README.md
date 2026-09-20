@@ -14,7 +14,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 
 ## 📊 Güncel Model Metrikleri ve Doğrulama (CI/CD Çıktıları)
 
-> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında %100 tekrarlanabilir (reproducible) global optimum çıktısı üretmektedir.
+> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında Reference run was solved to OPTIMAL under the configured solver environment. üretmektedir.
 
 | Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
 |---|---|---|---|
