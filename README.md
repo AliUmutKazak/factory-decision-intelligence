@@ -6,7 +6,7 @@
 ![Optimization](https://img.shields.io/badge/OR--Tools-CP--SAT-orange.svg)
 ![LP](https://img.shields.io/badge/PuLP-Linear%20Programming-green.svg)
 ![ML](https://img.shields.io/badge/LightGBM-Forecasting-yellow.svg)
-![Tests](https://img.shields.io/badge/pytest-9%20passed-brightgreen.svg)
+[![CI Pipeline](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions)
 
 Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden, tekil gerçeklik kaynağına (SSOT) bağlı karar zekâsı platformu. Sistem; talep tahmini, Hax & Meal hiyerarşik agrega planlama, Google OR-Tools CP-SAT ile sıra bağımlı tezgâh çizelgeleme, zaman fazlı MRP-I, 15 dakikalık yük analitiği ve GHG Kapsam 1-2 karbon fiyatlandırma simülasyonunu tek bir boru hattında birleştirir.
 
@@ -19,9 +19,9 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
 |---|---|---|---|
 | **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
-| **Makespan ($C_{\max}$)** | CP-SAT Detaylı Çizelge | **9,482 dk (158.03 sa)** | 1 haftalık fabrika sınırında (168 saat) tüm SKU lotları darboğaz dengelenerek tamamlandı. |
+| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **9,482 dk (158.03 sa)** | 1 takvim haftalık kesintisiz akış süresi sınırında (168 saat calendar week elapsed time) tüm SKU lotları tamamlandı. |
 | **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 9,482 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
-| **Kritik Makine (M01)** | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.75 sa Setup** | Standart 96 sa nominal kapasiteyi **39.95 sa aşarak (Nominal Capacity Overrun)** 3. vardiya / ek kapasite ihtiyacını işaret etti. |
+| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.92 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.07 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
@@ -116,8 +116,8 @@ $$\min C_{\max}$$
 4. **MRP Malzeme Hazırlık Kısıtı (Dynamic Release Time):**
    $$\text{Start}(o_{b, 1}) \ge r_b \quad (r_b = 480\text{ dk if material is EXPEDITE, else } 0)$$
 
-* **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (20 saniyelik çözücü süresiyle FEASIBLE statüsü, %36.94 optimality gap).
-* **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini 40.0 saat aşarak haftalık net fazla mesai / ek vardiya gereksinimini açıkça ortaya koymuştur.
+* **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
+* **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini 40.0 saat aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
 
 ---
 
