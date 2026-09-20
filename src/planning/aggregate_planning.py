@@ -93,21 +93,24 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
                 # Bu aile ve makine için ilgili SKU'ların routing süreleri
                 m_routing = routing_extended[(routing_extended["family_id"] == f) & (routing_extended["machine_id"] == m)]
                 
-                if m_routing.empty or f_skus.empty:
+                if f_skus.empty or m_routing.empty:
                     fam_mach_hours_per_period[(f, m, t)] = 0.0
                     continue
 
-                # SKU bazlı talep ve süreleri birleştir
-                merged_mix = f_skus.merge(m_routing, on="product_id", how="inner")
-                total_demand_f = merged_mix["forecast_batches"].sum()
+                # SKU bazlı talep ve süreleri birleştir (Rotası olmayan ürünler için işlem süresi 0.0 olmalıdır)
+                merged_mix = f_skus.merge(m_routing[["product_id", "processing_time_min"]], on="product_id", how="left")
+                merged_mix["processing_time_min"] = merged_mix["processing_time_min"].fillna(0.0)
 
-                if total_demand_f > 0:
-                    # Talep ağırlıklı ortalama süre (saat cinsinden)
-                    weighted_time_min = (merged_mix["forecast_batches"] * merged_mix["processing_time_min"]).sum() / total_demand_f
+                # Payda tüm ailenin toplam dönemsel talep tahmini olmalıdır
+                total_fam_demand = f_skus["forecast_batches"].sum()
+
+                if total_fam_demand > 0:
+                    # Talep ağırlıklı fiili makine yük katsayısı (saat/parti)
+                    weighted_time_min = (merged_mix["forecast_batches"] * merged_mix["processing_time_min"]).sum() / total_fam_demand
                     fam_mach_hours_per_period[(f, m, t)] = weighted_time_min / 60.0
                 else:
-                    # Talep yoksa basit ortalama fallback
-                    fallback_min = m_routing["processing_time_min"].mean()
+                    # Talep yoksa tüm aile SKU'larının ortalama süresi (rotasızlar 0.0 kabul edilerek)
+                    fallback_min = merged_mix["processing_time_min"].mean()
                     fam_mach_hours_per_period[(f, m, t)] = (fallback_min / 60.0) if not pd.isna(fallback_min) else 0.0
 
     # İşçilik maliyeti için genel aile-makine saatleri (statik toplamlar için ortalama)
