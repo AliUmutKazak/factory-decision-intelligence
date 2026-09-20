@@ -229,3 +229,34 @@ python -m pytest -v
 
 # Streamlit karar destek panelini başlatın
 streamlit run dashboard/app.py
+---
+
+## 7. Assumptions & Technical Limitations
+
+This platform bridges tactical operational research and discrete-event scheduling. To maintain transparent boundaries between empirical ground truth and simulation modeling, the following engineering assumptions and limitations are explicitly documented:
+
+* **Demand Forecasting (Historical Holdout/Backtest):** Store demand series represent an empirical retail dataset consolidated into factory pull orders. The multi-model benchmark (LightGBM, Holt-Winters, Moving Average, Naive baselines) is evaluated on a 28-day out-of-sample holdout test window without forward-looking leakage.
+* **Synthetic Manufacturing Master Data:** While store demand dynamics are real, factory production routings, machine work centers (M01, M02, M03), Bill of Materials (BOM), and sequence-dependent setup matrices were synthetically parameterized to reflect a representative discrete manufacturing plant.
+* **Weekly MRP Time Bucketing:** Material Requirements Planning (MRP-I) executes across discrete 1-week buckets. Procurement lead times and safety stock calculations assume weekly planning horizons rather than continuous replenishment cycles.
+* **Synthetic Expedite-Release Heuristic ($r_b = 480\text{ min}$):** For orders encountering material stockouts or past-due MRP expediting in Week 1, an operational heuristic enforces a synthetic release penalty ($r_b = 480\text{ min}$, equivalent to one 8-hour shift) before initial machine operations can commence.
+* **Continuous-Time Detailed Scheduling:** CP-SAT scheduling operates in continuous non-preemptive minutes ($[0, C_{\max}]$) independent of discrete tactical bucket boundaries, resolving exact sequence-dependent setup transitions and routing precedences deterministically.
+* **Nominal 96-Hour Two-Shift Capacity Benchmark:** Machine regular capacity is modeled against a nominal 2-shift schedule ($16\text{ h/day} \times 6\text{ days} = 96\text{ hours/week}$) buffered at 10% for unscheduled maintenance, with up to 48 hours/week overtime ceiling.
+* **Internal Carbon Price & Exposure Scenarios:** Financial carbon liabilities evaluate EU ETS compliance proxy trajectories at €0, €50, €80, €100, and €120 per $\text{tCO}_2\text{e}$ to model marginal regulatory exposure under CBAM (Carbon Border Adjustment Mechanism).
+* **Baseline Grid Emission Factor:** Scope 2 indirect emissions assume an average grid electricity emission factor of $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$), situated within standard national transmission-distribution carbon accounting baselines.
+
+---
+
+## 8. Academic & Methodological References
+
+1. **Hierarchical Production Planning:**  
+   Hax, A. C., & Meal, H. C. (1975). *Hierarchical Integration of Production Planning and Scheduling*. In M. A. Geisler (Ed.), *Logistics* (Vol. 1, North-Holland/TIMS Studies in the Management Sciences, pp. 53–69). Amsterdam: North-Holland Publishing Company.
+2. **Corporate Carbon Accounting:**  
+   World Resources Institute (WRI) & World Business Council for Sustainable Development (WBCSD). (2004). *The Greenhouse Gas Protocol: A Corporate Accounting and Reporting Standard* (Revised Edition). Scope 1 & Scope 2 Guidance.
+3. **Constraint Programming for Scheduling:**  
+   Laborie, P., Rogerie, J., Shaw, P., & Vilím, P. (2018). *Reasoning with Goal-Directed Search and Interval Variables in CP Optimizer*. *Constraints*, 23(2), 177–214.
+4. **Machine Learning Benchmarks:**  
+   Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., & Liu, T. Y. (2017). *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 3146–3154.
+5. **Demand Dataset Source:**  
+   Kaggle Store Item Demand Forecasting Dataset (10 stores, 50 items daily sales history), adapted for multi-echelon industrial manufacturing research.
+6. **Electricity Emission Factor Benchmark:**  
+   European Environment Agency (EEA) / IEA Greenhouse Gas Emission Factors for National Electricity Grids (standard baseline range: $0.400 - 0.480\text{ kgCO}_2\text{e/kWh}$).
