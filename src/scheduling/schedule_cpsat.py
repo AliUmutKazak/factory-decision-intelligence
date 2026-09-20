@@ -130,23 +130,48 @@ def run_cpsat_scheduling():
             model.Add(t_info["start"] >= MRP_EXPEDITE_RELEASE_TIME_MIN)
 
     # 3. Tezgâh Çakışma Önleme & Gerçek Komşu (Adjacent Transition) Setup
+    # 3. Tezgâh Çakışma Önleme & Gerçek Doğrudan Komşu (AddCircuit Successor) Setup
     for mid, tids in machine_to_tasks.items():
+        # Tezgâhtaki işlerin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids])
-        
+
         n_m = len(tids)
+        if n_m <= 1:
+            continue
+
+        # Dummy node indeksi: n_m (makinenin başlangıç ve bitiş sanal düğümü)
+        dummy = n_m
+        circuit_arcs = []
+
+        # 1) Dummy -> Task (Günün ilk işi): Başlangıç setup süresi 0
+        for i, tid in enumerate(tids):
+            lit = model.NewBoolVar(f"arc_start_{mid}_{tid}")
+            circuit_arcs.append((dummy, i, lit))
+
+        # 2) Task -> Dummy (Günün son işi)
+        for i, tid in enumerate(tids):
+            lit = model.NewBoolVar(f"arc_end_{mid}_{tid}")
+            circuit_arcs.append((i, dummy, lit))
+
+        # 3) Task i -> Task j (Yalnızca doğrudan peş peşe gelen komşuluklar)
         for i in range(n_m):
             t1 = tids[i]
             p1 = all_tasks[t1]["product_id"]
-            for j in range(i + 1, n_m):
+            for j in range(n_m):
+                if i == j:
+                    continue
                 t2 = tids[j]
                 p2 = all_tasks[t2]["product_id"]
-                
-                b = model.NewBoolVar(f"prec_{mid}_{t1}_{t2}")
+
+                lit = model.NewBoolVar(f"arc_{mid}_{t1}_{t2}")
+                circuit_arcs.append((i, j, lit))
+
                 s12 = setup_dict.get((mid, p1, p2), 0)
-                s21 = setup_dict.get((mid, p2, p1), 0)
-                
-                model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"] + s12).OnlyEnforceIf(b)
-                model.Add(all_tasks[t1]["start"] >= all_tasks[t2]["end"] + s21).OnlyEnforceIf(b.Not())
+                # Kısıt yalnızca ve yalnızca t1 doğrudan t2'nin hemen önceli ise tetiklenir:
+                model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"] + s12).OnlyEnforceIf(lit)
+
+        model.AddCircuit(circuit_arcs)
+
 
     # Amaç: Makespan Minimize Et
     makespan = model.NewIntVar(0, horizon, "makespan")
