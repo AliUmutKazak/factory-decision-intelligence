@@ -3,16 +3,18 @@ pandas==3.0.5
 numpy==2.4.6
 scipy==1.17.1
 
-# Machine Learning & Forecasting
+# Machine Learning & Time-Series Forecasting
 lightgbm==4.7.0
+statsmodels==0.15.0
 
 # Mathematical Optimization & Constraint Programming
 ortools==9.15.6755
+pulp==3.3.2
 
 # Web Interface & Visualization
 streamlit==1.64.0
-plotly>=5.18.0
-matplotlib>=3.8.0
+plotly==7.1.0
+matplotlib==3.11.2
 
 # Testing & Validation
 pytest==9.1.1
