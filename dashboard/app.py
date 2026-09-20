@@ -285,7 +285,7 @@ with tab_sustainability:
     with col_s2:
         st.markdown("### 💶 Dahili Karbon Fiyat Simülatörü")
         user_c_price = st.slider(
-            "EU ETS Karbon Fiyatı (€/tCO₂e):",
+            "İçsel Karbon Fiyat Senaryosu (€/tCO₂e):",
             min_value=0, max_value=200, value=80, step=10
         )
         sim_exposure = c_kpi["total_tco2e"] * user_c_price
@@ -296,6 +296,6 @@ with tab_sustainability:
         )
 
         st.markdown("---")
-        st.markdown("**Dahili Fiyatlandırma Senaryo Tablosu:**")
+        st.markdown("**İçsel Karbon Fiyatlandırma Senaryo Tablosu (Internal Carbon Pricing):**")
         st.dataframe(scen_df, use_container_width=True)
         
