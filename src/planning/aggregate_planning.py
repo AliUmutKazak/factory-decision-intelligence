@@ -144,7 +144,7 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
 
     # Amaç Fonksiyonu
     model += pulp.lpSum(
-        P[(f, t)] * family_total_hours[f] * LABOR_COST_STANDARD_HR +
+        P[(f, t)] * sum(fam_mach_hours_per_period.get((f, m, t), 0.0) for m in machines) * LABOR_COST_STANDARD_HR +
         I[(f, t)] * AGGREGATE_HOLDING_COST_PER_BATCH +
         B[(f, t)] * AGGREGATE_BACKLOG_PENALTY_PER_BATCH
         for f in families for t in periods
