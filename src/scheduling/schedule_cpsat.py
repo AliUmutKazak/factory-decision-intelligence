@@ -209,6 +209,12 @@ def run_cpsat_scheduling():
     sched_df["batch_qty"] = sched_df["lot_qty"]
 
     sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+    
+    # Repodaki CSV dosyasini SQLite ile senkronize tut
+    import os
+    os.makedirs('data/processed', exist_ok=True)
+    sched_df.to_csv('data/processed/production_schedule.csv', index=False)
+    print('✓ production_schedule.csv guncellendi.')
 
     # Mutabakat
     sched_summary = sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["lot_qty"].sum().reset_index()
