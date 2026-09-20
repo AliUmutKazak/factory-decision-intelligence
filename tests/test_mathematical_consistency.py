@@ -102,3 +102,149 @@ def test_schedule_mrp_release_time_coupling():
                 f"MRP Kısıt İhlali: {row['lot_id']} kritik hammadde eksik olmasına rağmen "
                 f"{row['start_min']}. dakikada başlatılmış!"
             )
+def test_precedence_constraints():
+    """Eksik 1: Her partinin ardışık operasyonları arasındaki öncelik kısıtını doğrular (Start_{o+1} >= End_o)."""
+    conn = get_db_connection()
+    sched_df = pd.read_sql("SELECT * FROM production_schedule ORDER BY lot_id, operation_seq", conn)
+    conn.close()
+
+    assert not sched_df.empty, "production_schedule tablosu boş!"
+
+    for lot_id, group in sched_df.groupby("lot_id"):
+        sorted_ops = group.sort_values("operation_seq").to_dict("records")
+        for i in range(len(sorted_ops) - 1):
+            curr_op = sorted_ops[i]
+            next_op = sorted_ops[i + 1]
+            assert next_op["start_min"] >= curr_op["end_min"], (
+                f"Öncelik (Precedence) İhlali ({lot_id}): "
+                f"Op {next_op['operation_seq']} başlangıcı ({next_op['start_min']}) < "
+                f"Op {curr_op['operation_seq']} bitişi ({curr_op['end_min']})"
+            )
+
+
+def test_machine_setup_consistency():
+    """Eksik 2: Aynı makinede ardışık çalışan işler arasında sıra bağımlı setup süresini doğrular."""
+    conn = get_db_connection()
+    sched_df = pd.read_sql("SELECT * FROM production_schedule ORDER BY machine_id, start_min", conn)
+    co_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
+    conn.close()
+
+    setup_map = {(row["from_product"], row["to_product"]): row["setup_time_min"] for _, row in co_df.iterrows()}
+
+    for machine_id, group in sched_df.groupby("machine_id"):
+        sorted_jobs = group.sort_values("start_min").to_dict("records")
+        for i in range(len(sorted_jobs) - 1):
+            prev_job = sorted_jobs[i]
+            curr_job = sorted_jobs[i + 1]
+
+            from_p = prev_job["product_id"]
+            to_p = curr_job["product_id"]
+            required_setup = setup_map.get((from_p, to_p), 0)
+
+            # Fiili aralık: curr_job başlangıcı ile prev_job bitişi arasındaki fark
+            # Modelde setup süresi start_min öncesinde rezerve edilmiş olabilir (start >= end + setup)
+            assert curr_job["start_min"] >= prev_job["end_min"] + required_setup, (
+                f"Setup İhlali (Makine {machine_id}): {prev_job['lot_id']} -> {curr_job['lot_id']} "
+                f"Gereken setup: {required_setup} dk, Fiili ara: {curr_job['start_min'] - prev_job['end_min']} dk"
+            )
+
+
+def test_routing_completeness():
+    """Eksik 3: Her partinin routing rotasındaki tüm operasyonlara eksiksiz sahip olduğunu doğrular."""
+    conn = get_db_connection()
+    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    routing_df = pd.read_sql("SELECT * FROM routing", conn)
+    conn.close()
+
+    expected_ops_per_product = routing_df.groupby("product_id")["operation_seq"].apply(set).to_dict()
+
+    for lot_id, group in sched_df.groupby("lot_id"):
+        pid = group["product_id"].iloc[0]
+        actual_ops = set(group["operation_seq"])
+        expected_ops = expected_ops_per_product.get(pid, set())
+        assert actual_ops == expected_ops, (
+            f"Routing Eksikliği ({lot_id} - {pid}): Beklenen operasyonlar {expected_ops}, Çizelgelenen {actual_ops}"
+        )
+
+
+def test_sku_level_schedule_reconciliation():
+    """Eksik 4: Taktik SKU planı ile operasyonel çizelgenin SKU bazında tam mutabakatını doğrular."""
+    conn = get_db_connection()
+    sku_plan_df = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
+    sched_df = pd.read_sql("SELECT * FROM production_schedule WHERE operation_seq = 1", conn)
+    conn.close()
+
+    plan_by_sku = sku_plan_df.groupby("product_id")["planned_units"].sum().to_dict()
+    sched_by_sku = sched_df.groupby("product_id")["lot_qty"].sum().to_dict()
+
+    for pid, plan_units in plan_by_sku.items():
+        sched_units = sched_by_sku.get(pid, 0)
+        assert sched_units == plan_units, (
+            f"SKU Mutabakat Hatası ({pid}): Planlanan {plan_units} adet != Çizelgelenen {sched_units} adet"
+        )
+
+
+def test_family_to_sku_disaggregation_reconciliation():
+    """Eksik 5: Her hafta ve aile için SKU toplamlarının aile agregasyon hedefine tam eşitliğini doğrular."""
+    conn = get_db_connection()
+    family_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
+    sku_df = pd.read_sql("SELECT * FROM sku_production_plan", conn)
+    conn.close()
+
+    sku_sum = sku_df.groupby(["period_week", "family_id"])["planned_batches"].sum().to_dict()
+
+    for _, row in family_df.iterrows():
+        w = row["period_week"]
+        f = row["family_id"]
+        expected_batches = int(round(row["prod_batches"]))
+        actual_batches = sku_sum.get((w, f), 0)
+        assert actual_batches == expected_batches, (
+            f"Ayrıştırma (Disaggregation) Hatası (Hafta {w}, {f}): "
+            f"Aile Hedefi {expected_batches} koli != SKU Toplamı {actual_batches} koli"
+        )
+
+
+def test_energy_integrals_reconciliation():
+    """Eksik 6: 15 dakikalık yük profil integrali ile enerji KPI toplam tüketiminin uyuştuğunu doğrular."""
+    conn = get_db_connection()
+    profile_df = pd.read_sql("SELECT * FROM energy_profile_15min", conn)
+    kpis_df = pd.read_sql("SELECT * FROM energy_kpis", conn)
+    conn.close()
+
+    assert not profile_df.empty and not kpis_df.empty, "Enerji tabloları boş!"
+
+    # 15 dakikalık dilim kWh hesabı: load (kW) * (15/60) h
+    profile_total_kwh = (profile_df["total_load_kw"] * 0.25).sum()
+    kpi_total_kwh = kpis_df["grand_total_kwh"].iloc[0]
+
+    assert profile_total_kwh == pytest.approx(kpi_total_kwh, rel=0.01), (
+        f"Enerji İntegral Tutarsızlığı: Profil Toplamı {profile_total_kwh:.2f} kWh != KPI {kpi_total_kwh:.2f} kWh"
+    )
+
+
+def test_carbon_share_conservation():
+    """Eksik 7: Makine bazlı Scope 2 emisyon yüzdelerinin toplamının tam 100 ettiğini doğrular."""
+    conn = get_db_connection()
+    machine_kpis = pd.read_sql("SELECT * FROM carbon_machine_kpis", conn)
+    conn.close()
+
+    assert not machine_kpis.empty, "carbon_machine_kpis tablosu boş!"
+
+    total_share = machine_kpis["carbon_share_pct"].sum()
+    assert total_share == pytest.approx(100.0, abs=0.2), (
+        f"Karbon Payı Korunumu Hatası: Makine karbon payları toplamı {total_share}% != 100%"
+    )
+
+
+def test_forecast_output_integrity():
+    """Eksik 8: Talep tahmin çıktısının boyut (5 SKU x 28 gün = 140), NaN ve negatiflik kontrollerini doğrular."""
+    conn = get_db_connection()
+    fc_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
+    conn.close()
+
+    assert len(fc_df) == 140, f"Tahmin Çıktı Boyutu Hatalı! Beklenen 140, Mevcut {len(fc_df)}"
+    assert not fc_df["forecast_demand"].isna().any(), "Tahmin tablosunda NaN değer tespit edildi!"
+    assert (fc_df["forecast_demand"] >= 0).all(), "Tahmin tablosunda negatif talep değeri tespit edildi!"
+
+    valid_models = {"LightGBM", "Holt-Winters", "Moving Average", "Seasonal Naive", "Naive"}
+    assert set(fc_df["model_used"]).issubset(valid_models), "Geçersiz model ismi tespit edildi!"            
