@@ -233,9 +233,17 @@ def test_carbon_share_conservation():
 
     assert not machine_kpis.empty, "carbon_machine_kpis tablosu boş!"
 
-    total_share = machine_kpis["carbon_share_pct"].sum()
-    assert total_share == pytest.approx(100.0, abs=0.2), (
-        f"Karbon Payı Korunumu Hatası: Makine karbon payları toplamı {total_share}% != 100%"
+    # Raw precision üzerinden fiziksel korunum denetimi (hesaplama katmanı vs raporlama katmanı)
+    if "raw_carbon_share_pct" in machine_kpis.columns:
+        total_raw_share = float(machine_kpis["raw_carbon_share_pct"].sum())
+        assert total_raw_share == pytest.approx(100.0, abs=1e-3), (
+            f"Fiziksel Karbon Payı Korunumu Hatası (Raw): {total_raw_share}% != 100%"
+        )
+    
+    # Raporlama katmanı yuvarlanmış değer denetimi (1 ondalık yuvarlama toleransı)
+    total_share = float(machine_kpis["carbon_share_pct"].sum())
+    assert total_share == pytest.approx(100.0, abs=1.0), (
+        f"Karbon Payı Korunumu Hatası (Raporlama): Makine karbon payları toplamı {total_share}% != 100%"
     )
 
 

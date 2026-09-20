@@ -29,10 +29,13 @@ def compute_carbon_analytics():
     total_mwh = total_kwh / 1000.0
     scope_2_tco2e = total_mwh * GRID_EMISSION_FACTOR
 
-    machine_kpis_df["scope_2_tco2e"] = (machine_kpis_df["total_kwh"] / 1000.0) * GRID_EMISSION_FACTOR
-    machine_kpis_df["carbon_share_pct"] = (machine_kpis_df["scope_2_tco2e"] / scope_2_tco2e) * 100.0
-    machine_kpis_df["scope_2_tco2e"] = machine_kpis_df["scope_2_tco2e"].round(3)
-    machine_kpis_df["carbon_share_pct"] = machine_kpis_df["carbon_share_pct"].round(1)
+    # Ham hassasiyetle hesapla (Raw Precision)
+    raw_scope_2 = (machine_kpis_df["total_kwh"] / 1000.0) * GRID_EMISSION_FACTOR
+    raw_share = (raw_scope_2 / scope_2_tco2e) * 100.0 if scope_2_tco2e > 0 else 0.0
+
+    machine_kpis_df["scope_2_tco2e"] = raw_scope_2.round(3)
+    machine_kpis_df["carbon_share_pct"] = raw_share.round(1)
+    machine_kpis_df["raw_carbon_share_pct"] = raw_share
 
     total_tco2e = scope_1_tco2e + scope_2_tco2e
     kgco2e_per_unit = (total_tco2e * 1000.0) / total_units if total_units > 0 else 0.0
