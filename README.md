@@ -21,7 +21,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
 | **Makespan ($C_{\max}$)** | CP-SAT Detaylı Çizelge | **9,482 dk (158.03 sa)** | 1 haftalık fabrika sınırında (168 saat) tüm SKU lotları darboğaz dengelenerek tamamlandı. |
 | **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 9,482 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
-| **Kritik Makine (M01)** | Kapasite & İş Yükü | **134.2 sa İşlem + 1.75 sa Setup** | Darboğaz operasyonu olarak toplam 135.95 sa yük ile haftalık planı karşıladı. |
+| **Kritik Makine (M01)** | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.75 sa Setup** | Standart 96 sa nominal kapasiteyi **39.95 sa aşarak (Nominal Capacity Overrun)** 3. vardiya / ek kapasite ihtiyacını işaret etti. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
