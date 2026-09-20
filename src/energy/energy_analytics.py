@@ -81,13 +81,13 @@ def compute_energy_analytics():
 
         machine_kpis.append({
             "machine_id": m_id,
-            "processing_hours": round(proc_time_m / 60.0, 1),
-            "setup_hours": round(m_setup_time / 60.0, 2),
-            "idle_hours": round(m_idle_time / 60.0, 1),
-            "processing_kwh": round(m_proc_kwh, 1),
-            "setup_kwh": round(m_setup_kwh, 1),
-            "idle_kwh": round(m_idle_kwh, 1),
-            "total_kwh": round(m_total_kwh, 1)
+            "processing_hours": round(proc_time_m / 60.0, 4),
+            "setup_hours": round(m_setup_time / 60.0, 4),
+            "idle_hours": round(m_idle_time / 60.0, 4),
+            "processing_kwh": float(m_proc_kwh),
+            "setup_kwh": float(m_setup_kwh),
+            "idle_kwh": float(m_idle_kwh),
+            "total_kwh": float(m_total_kwh)
         })
 
     grand_total_kwh = total_proc_kwh + total_setup_kwh + total_idle_kwh
