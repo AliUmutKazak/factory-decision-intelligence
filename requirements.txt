@@ -1,9 +1,18 @@
-pandas>=2.0.0
-numpy>=1.24.0
-lightgbm>=4.0.0
-statsmodels>=0.14.0
-pulp>=2.8.0
-ortools>=9.8.0
-streamlit>=1.30.0
+# Core Scientific & Data Processing
+pandas==3.0.5
+numpy==2.4.6
+scipy==1.17.1
+
+# Machine Learning & Forecasting
+lightgbm==4.7.0
+
+# Mathematical Optimization & Constraint Programming
+ortools==9.15.6755
+
+# Web Interface & Visualization
+streamlit==1.64.0
 plotly>=5.18.0
-pytest>=8.0.0
+matplotlib>=3.8.0
+
+# Testing & Validation
+pytest==9.1.1
