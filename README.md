@@ -14,16 +14,18 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 
 ## 📊 Güncel Model Metrikleri ve Doğrulama (CI/CD Çıktıları)
 
+> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında %100 tekrarlanabilir (reproducible) global optimum çıktısı üretmektedir.
+
 | Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
 |---|---|---|---|
-| **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **FEASIBLE** | 20 sn zaman kısıtında MRP kısıtları dahil uygulanabilir tamsayılı çizelge bulundu. |
-| **Makespan ($C_{\max}$)** | CP-SAT vs. Taban Çizgisi | **8,901 dk (148.35 sa)** | Sezgisel taban çizgiye (9,197 dk) kıyasla **%3.2 optimizasyon tasarrufu**. |
-| **Optimality Gap** | CP-SAT Dual Bound | **%36.94** (Bound: 5,613 dk) | 20 sn süre sınırında bulunmuş en iyi alt sınıra göre göreli boşluk. |
-| **Kritik Makine (M01)** | Kapasite Analitiği | **136.1 sa İş Yükü** | Standart 96 sa kapasiteyi **40.0 sa** aşarak fazla mesai ihtiyacını işaret etti. |
-| **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle birebir eşleşti. |
+| **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
+| **Makespan ($C_{\max}$)** | CP-SAT Detaylı Çizelge | **9,482 dk (158.03 sa)** | 1 haftalık fabrika sınırında (168 saat) tüm SKU lotları darboğaz dengelenerek tamamlandı. |
+| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 9,482 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
+| **Kritik Makine (M01)** | Kapasite & İş Yükü | **134.2 sa İşlem + 1.75 sa Setup** | Darboğaz operasyonu olarak toplam 135.95 sa yük ile haftalık planı karşıladı. |
+| **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
-| **Enerji & Pik Yük** | 15 Dk Yük Profili Modeli | **20,848.2 kWh / 248.23 kW** | Ortalama yük 140.53 kW, yük faktörü 0.566 olarak gerçekleşti. |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.401 tCO₂e** | Birim emisyon yoğunluğu: 1.140 kgCO₂e / adet. |
+| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.413 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (9.185 t) dengelendi. Birim emisyon: 1.141 kgCO₂e / adet. |
 
 ---
 
