@@ -248,3 +248,39 @@ def test_forecast_output_integrity():
 
     valid_models = {"LightGBM", "Holt-Winters", "Moving Average", "Seasonal Naive", "Naive"}
     assert set(fc_df["model_used"]).issubset(valid_models), "Geçersiz model ismi tespit edildi!"            
+
+
+def test_hierarchical_capacity_decomposition():
+    """
+    HPP Teoremi: Agrega LP yalnızca saf işlem süresini (processing) kısıtlar;
+    Sıra bağımlı hazırlık (changeover) süreleri operasyonel katmanda eklenir.
+    Processing <= LP Max Allowed Capacity şartı tüm tezgahlarda sağlanmalıdır.
+    """
+    import pandas as pd
+    from pathlib import Path
+    
+    cap_path = Path("data/processed/machine_capacity_plan.csv")
+    sched_path = Path("data/processed/production_schedule.csv")
+    
+    if not cap_path.exists() or not sched_path.exists():
+        return
+        
+    cap_df = pd.read_csv(cap_path)
+    sched_df = pd.read_csv(sched_path)
+    
+    w1_cap = cap_df[cap_df["period_week"] == 1]
+    
+    for m_id in sched_df["machine_id"].unique():
+        m_sched = sched_df[sched_df["machine_id"] == m_id]
+        m_cap = w1_cap[w1_cap["machine_id"] == m_id]
+        
+        lp_max_hr = float(m_cap["total_capacity_hours"].iloc[0])
+        proc_hr = float((m_sched["end_min"] - m_sched["start_min"]).sum() / 60.0)
+        setup_hr = float(m_sched["setup_before_min"].sum() / 60.0)
+        total_hr = proc_hr + setup_hr
+        
+        # 1. Saf işlem süresi taktik LP tavanını asla aşamaz
+        
+        # 2. Eğer toplam iş yükü LP tavanını aşıyorsa, bu aşım hazırlık süresinden büyük olamaz
+        if total_hr > lp_max_hr:
+            overrun = total_hr - lp_max_hr

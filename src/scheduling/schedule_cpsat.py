@@ -241,6 +241,35 @@ def run_cpsat_scheduling():
     sched_df.to_csv('data/processed/production_schedule.csv', index=False)
     print('✓ production_schedule.csv guncellendi.')
 
+    # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
+    print()
+    print("--- Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT) ---")
+    cap_plan_path = 'data/processed/machine_capacity_plan.csv'
+    if os.path.exists(cap_plan_path):
+        cap_df = pd.read_csv(cap_plan_path)
+        w1_cap = cap_df[cap_df["period_week"] == 1]
+        audit_records = []
+        for m_id in sorted(sched_df["machine_id"].unique()):
+            m_sched = sched_df[sched_df["machine_id"] == m_id]
+            m_cap_row = w1_cap[w1_cap["machine_id"] == m_id]
+            lp_allowed_max_hr = float(m_cap_row["total_capacity_hours"].iloc[0]) if not m_cap_row.empty else 134.4
+            proc_hours = round(float((m_sched["end_min"] - m_sched["start_min"]).sum() / 60.0), 2)
+            setup_hours = round(float(m_sched["setup_before_min"].sum() / 60.0), 2)
+            total_workload_hr = round(proc_hours + setup_hours, 2)
+            overrun_hr = max(0.0, round(total_workload_hr - lp_allowed_max_hr, 2))
+            audit_records.append({
+                "machine_id": m_id,
+                "lp_max_allowed_hr": lp_allowed_max_hr,
+                "proc_hours": proc_hours,
+                "setup_hours": setup_hours,
+                "total_workload_hr": total_workload_hr,
+                "setup_overrun_hr": overrun_hr
+            })
+        audit_df = pd.DataFrame(audit_records)
+        print(audit_df.to_string(index=False))
+        print("✓ HPP Tasarım Prensibi: Agrega LP saf işlem süresini sınırlar; sıra bağımlı hazırlık yükü operasyonel seviyede eklenir.")
+        print()
+
     # Mutabakat
     sched_summary = sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["lot_qty"].sum().reset_index()
     merged_audit = pd.merge(sku_plan[["product_id", "planned_units"]], sched_summary, on="product_id", how="left").fillna(0)
