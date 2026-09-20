@@ -26,6 +26,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
 | **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.413 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (9.185 t) dengelendi. Birim emisyon: 1.141 kgCO₂e / adet. |
+> **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir.
 
 ---
 
