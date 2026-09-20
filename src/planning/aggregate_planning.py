@@ -27,6 +27,7 @@ from src.config import (
 
 OUTPUT_AGGREGATE_PATH = PROCESSED_DATA_DIR / "aggregate_plan.csv"
 OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
+OUTPUT_MACHINE_CAPACITY_PATH = PROCESSED_DATA_DIR / "machine_capacity_plan.csv"
 
 def load_data():
     conn = sqlite3.connect(DB_PATH)
@@ -214,7 +215,40 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
             "all_duals": {m: round(val, 2) for m, val in period_duals.items()}
         }
 
-    return pd.DataFrame(plan_records), shadow_prices_summary
+    # -------------------------------------------------------------
+    # MADDE 13 İYİLEŞTİRMESİ: Makine Kapasite, Fazla Mesai ve Darboğaz Çıktısı
+    # -------------------------------------------------------------
+    machine_plan_records = []
+    for t in periods:
+        bottleneck_m = shadow_prices_summary[t]["bottleneck_machine"]
+        for m in machines:
+            reg_cap = round(effective_hours_per_machine, 1)
+            ot_val = round(OT[(m, t)].varValue, 1)
+            tot_cap = round(reg_cap + ot_val, 1)
+            utilized = round(
+                sum(
+                    fam_mach_hours_per_period.get((f, m, t), 0.0) * P[(f, t)].varValue
+                    for f in families
+                ),
+                1,
+            )
+            util_pct = round((utilized / tot_cap * 100) if tot_cap > 0 else 0.0, 1)
+            dual_val = shadow_prices_summary[t]["all_duals"][m]
+            is_bneck = "YES" if (m == bottleneck_m and dual_val < -1e-4) else "NO"
+
+            machine_plan_records.append({
+                "period_week": t,
+                "machine_id": m,
+                "regular_capacity_hours": reg_cap,
+                "overtime_hours": ot_val,
+                "total_capacity_hours": tot_cap,
+                "utilized_hours": utilized,
+                "utilization_pct": util_pct,
+                "shadow_price_usd_per_hr": dual_val,
+                "is_bottleneck": is_bneck
+            })
+
+    return pd.DataFrame(plan_records), shadow_prices_summary, pd.DataFrame(machine_plan_records)
 
 def disaggregate_to_sku(family_plan_df, sku_weekly):
     sku_plan = []
@@ -266,7 +300,7 @@ def run_planning_pipeline():
     forecast_df, products_df, routing_df, machines_df = load_data()
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
-    family_plan_df, shadow_prices = solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df)
+    family_plan_df, shadow_prices, machine_capacity_df = solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df)
     sku_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
 
     print("=" * 85)
@@ -286,15 +320,18 @@ def run_planning_pipeline():
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     family_plan_df.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
     sku_plan_df.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
+    machine_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)
 
     conn = sqlite3.connect(DB_PATH)
     family_plan_df.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
     sku_plan_df.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
+    machine_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
     conn.close()
 
     print(f"[OK] Aile Taktik Planı Kaydedildi: {OUTPUT_AGGREGATE_PATH}")
     print(f"[OK] SKU Üretim Hedefleri Kaydedildi: {OUTPUT_SKU_PLAN_PATH}")
-    print(f"[OK] SQLite 'aggregate_plan' ve 'sku_production_plan' güncellendi.")
+    print(f"[OK] Makine Kapasite Planı Kaydedildi: {OUTPUT_MACHINE_CAPACITY_PATH}")
+    print(f"[OK] SQLite 'aggregate_plan', 'sku_production_plan' ve 'machine_capacity_plan' güncellendi.")
     print("=" * 85)
 
 if __name__ == "__main__":
