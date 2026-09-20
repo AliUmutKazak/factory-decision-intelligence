@@ -217,7 +217,7 @@ def test_energy_integrals_reconciliation():
     profile_total_kwh = (profile_df["total_load_kw"] * 0.25).sum()
     kpi_total_kwh = kpis_df["grand_total_kwh"].iloc[0]
 
-    assert profile_total_kwh == pytest.approx(kpi_total_kwh, rel=0.01), (
+    assert profile_total_kwh == pytest.approx(kpi_total_kwh, rel=0.002), (
         f"Enerji İntegral Tutarsızlığı: Profil Toplamı {profile_total_kwh:.2f} kWh != KPI {kpi_total_kwh:.2f} kWh"
     )
 

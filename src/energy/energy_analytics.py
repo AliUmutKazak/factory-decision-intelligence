@@ -93,56 +93,58 @@ def compute_energy_analytics():
     grand_total_kwh = total_proc_kwh + total_setup_kwh + total_idle_kwh
     avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
 
-    # 3. 15 Dakikalık Yük Profili Simülasyonu
+            # 3. 15 Dakikalık Yük Profili Simülasyonu (Exact Boundary-Condition & Float Precision)
     step_min = 15
-    time_points = list(range(0, makespan_min + step_min, step_min))
+    time_points = list(range(0, makespan_min, step_min))
     profile_records = []
 
     for t in time_points:
-        t_end = t + step_min
+        actual_interval = min(float(step_min), float(makespan_min - t))
+        t_end = t + actual_interval
         total_power_kw = 0.0
 
         for m_id, specs in machine_specs.items():
             m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-            
-            # 15 dakikalık aralıkta tüketilen toplam enerji (kW * dakika)
+
             interval_energy_kw_min = 0.0
             accounted_min = 0.0
 
             # 1. İşlem (Processing) örtüşmeleri
             for _, row in m_tasks.iterrows():
-                o_start = max(t, row["start_min"])
-                o_end = min(t_end, row["end_min"])
+                o_start = max(float(t), float(row["start_min"]))
+                o_end = min(t_end, float(row["end_min"]))
                 if o_end > o_start:
                     dur = o_end - o_start
-                    interval_energy_kw_min += dur * row["proc_power_kw"]
+                    interval_energy_kw_min += dur * float(row["proc_power_kw"])
                     accounted_min += dur
 
             # 2. Setup örtüşmeleri
             for _, row in m_tasks.iterrows():
-                s_dur = row.get("setup_before_min", 0)
+                s_dur = float(row.get("setup_before_min", 0))
                 if s_dur > 0:
-                    s_start = row["start_min"] - s_dur
-                    s_end = row["start_min"]
-                    o_start = max(t, s_start)
+                    s_start = float(row["start_min"]) - s_dur
+                    s_end = float(row["start_min"])
+                    o_start = max(float(t), s_start)
                     o_end = min(t_end, s_end)
                     if o_end > o_start:
                         dur = o_end - o_start
-                        interval_energy_kw_min += dur * specs["setup_kw"]
+                        interval_energy_kw_min += dur * float(specs["setup_kw"])
                         accounted_min += dur
 
             # 3. Kalan süre boşta bekleme (Idle)
-            idle_dur = max(0.0, step_min - accounted_min)
-            interval_energy_kw_min += idle_dur * specs["idle_kw"]
+            idle_dur = max(0.0, actual_interval - accounted_min)
+            interval_energy_kw_min += idle_dur * float(specs["idle_kw"])
 
-            # Makinenin 15 dakikalık aralıktaki ortalama gücü (kW)
-            total_power_kw += interval_energy_kw_min / step_min
+            if actual_interval > 0:
+                total_power_kw += interval_energy_kw_min / actual_interval
 
         profile_records.append({
             "time_min": t,
-            "time_hour": round(t / 60.0, 2),
-            "total_load_kw": round(total_power_kw, 2)
+            "time_hour": round(t / 60.0, 4),
+            "total_load_kw": float(total_power_kw)
         })
+
+
 
     profile_df = pd.DataFrame(profile_records)
     raw_peak_kw = profile_df["total_load_kw"].max()
