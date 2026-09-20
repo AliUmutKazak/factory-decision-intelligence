@@ -241,7 +241,7 @@ This platform bridges tactical operational research and discrete-event schedulin
 * **Synthetic Expedite-Release Heuristic ($r_b = 480\text{ min}$):** For orders encountering material stockouts or past-due MRP expediting in Week 1, an operational heuristic enforces a synthetic release penalty ($r_b = 480\text{ min}$, equivalent to one 8-hour shift) before initial machine operations can commence.
 * **Continuous-Time Detailed Scheduling:** CP-SAT scheduling operates in continuous non-preemptive minutes ($[0, C_{\max}]$) independent of discrete tactical bucket boundaries, resolving exact sequence-dependent setup transitions and routing precedences deterministically.
 * **Nominal 96-Hour Two-Shift Capacity Benchmark:** Machine regular capacity is modeled against a nominal 2-shift schedule ($16\text{ h/day} \times 6\text{ days} = 96\text{ hours/week}$) buffered at 10% for unscheduled maintenance, with up to 48 hours/week overtime ceiling.
-* **Internal Carbon Price & Exposure Scenarios:** Financial carbon liabilities evaluate EU ETS compliance proxy trajectories at €0, €50, €80, €100, and €120 per $\text{tCO}_2\text{e}$ to model marginal regulatory exposure under CBAM (Carbon Border Adjustment Mechanism).
+* **Internal Carbon Price & Exposure Scenarios:** Financial carbon liabilities evaluate Internal Carbon Price scenarios (shadow pricing) at €0, €50, €80, €100, and €120 per $\text{tCO}_2\text{e}$ to model potential marginal regulatory exposure (e.g. CBAM/ETS proxy).
 * **Baseline Grid Emission Factor:** Scope 2 indirect emissions assume an average grid electricity emission factor of $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$), situated within standard national transmission-distribution carbon accounting baselines.
 
 ---

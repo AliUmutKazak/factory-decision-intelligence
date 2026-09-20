@@ -40,7 +40,7 @@ def compute_carbon_analytics():
     total_tco2e = scope_1_tco2e + scope_2_tco2e
     kgco2e_per_unit = (total_tco2e * 1000.0) / total_units if total_units > 0 else 0.0
 
-    # 3. EU ETS Dahili Karbon Fiyatlandırma Senaryoları (€/tCO2e)
+    # 3. Dahili Karbon Fiyatlandırma Senaryoları (€/tCO2e - Internal Carbon Pricing)
     scenario_records = []
     for price in CARBON_PRICE_SCENARIOS_EUR:
         exposure_eur = total_tco2e * price
@@ -64,7 +64,7 @@ def compute_carbon_analytics():
     print("MAKİNE BAZLI KAPSAM 2 KARBON DAĞILIMI:")
     print(machine_kpis_df[["machine_id", "total_kwh", "scope_2_tco2e", "carbon_share_pct"]].to_string(index=False))
     print("-" * 80)
-    print("EU ETS PİYASA TAHSİSAT FİYATI & DAHİLİ KARBON MARUZİYET SENARYOLARI:")
+    print("DAHİLİ KARBON FİYAT SENARYOLARI & GÖLGE MARUZİYET (INTERNAL CARBON PRICING):")
     print(scen_df.to_string(index=False))
     print("=" * 80)
 
