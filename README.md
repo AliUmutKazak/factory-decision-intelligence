@@ -277,3 +277,11 @@ Bu projede geliştirme, sürekli entegrasyon (CI) ve referans üretim koşumu i�
 | **CI Test Fixture** | Sentetik / Mock Fixture | 1,825 gün/SKU | 2017-01-01 → 2017-12-31 (veya mock) | **~100 dk** | Hızlı GitHub Actions testleri, birim/entegrasyon doğrulamaları (<2 sn) |
 
 > ⚠️ **Önemli Not:** `data/raw/train.csv` dosyası dosya boyutu nedeniyle repoda sürüm kontrolü dışındaysa veya sıfırdan sentetik ortamda çalıştırılıyorsa, pipeline otomatik olarak test fixture'ını tetikler ve küçültülmüş bir çizelge (~100 dk makespan) üretir. Raporda ve dokümantasyonda sunulan kanonik metrikler (9,482 dk makespan, 20,875.3 kWh enerji) **Reference Full Run** rejimine aittir.
+
+---
+
+## 🔬 Çözücü Tekrarlanabilirliği (Solver Reproducibility)
+
+> *“The reference configuration uses fixed solver parameters and a fixed random seed to improve run-to-run reproducibility.”* 
+> 
+> Çoklu iş parçacıklı (`num_search_workers > 1`) CP-SAT aramalarında donanım ve işletim sistemi katmanındaki non-deterministic thread yarışları nedeniyle mutlak bit-seviyesinde (%100 bit-identical) eşitsizlikler olabilse de, sabit `random_seed` ve parametre yapılandırması çalıştırmalar arası sonuç stabilitesini ve tekrarlanabilirliği büyük ölçüde güvence altına alır.
