@@ -104,25 +104,39 @@ def compute_energy_analytics():
 
         for m_id, specs in machine_specs.items():
             m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
+            
+            # 15 dakikalık aralıkta tüketilen toplam enerji (kW * dakika)
+            interval_energy_kw_min = 0.0
+            accounted_min = 0.0
 
-            active_proc = m_tasks[
-                (m_tasks["start_min"] < t_end) & (m_tasks["end_min"] > t)
-            ]
+            # 1. İşlem (Processing) örtüşmeleri
+            for _, row in m_tasks.iterrows():
+                o_start = max(t, row["start_min"])
+                o_end = min(t_end, row["end_min"])
+                if o_end > o_start:
+                    dur = o_end - o_start
+                    interval_energy_kw_min += dur * row["proc_power_kw"]
+                    accounted_min += dur
 
-            if len(active_proc) > 0:
-                total_power_kw += active_proc["proc_power_kw"].mean()
-            else:
-                in_setup = False
-                for _, row in m_tasks.iterrows():
-                    s_dur = row.get("setup_before_min", 0)
-                    if s_dur > 0:
-                        s_start = row["start_min"] - s_dur
-                        s_end = row["start_min"]
-                        if (s_start < t_end) and (s_end > t):
-                            in_setup = True
-                            break
+            # 2. Setup örtüşmeleri
+            for _, row in m_tasks.iterrows():
+                s_dur = row.get("setup_before_min", 0)
+                if s_dur > 0:
+                    s_start = row["start_min"] - s_dur
+                    s_end = row["start_min"]
+                    o_start = max(t, s_start)
+                    o_end = min(t_end, s_end)
+                    if o_end > o_start:
+                        dur = o_end - o_start
+                        interval_energy_kw_min += dur * specs["setup_kw"]
+                        accounted_min += dur
 
-                total_power_kw += specs["setup_kw"] if in_setup else specs["idle_kw"]
+            # 3. Kalan süre boşta bekleme (Idle)
+            idle_dur = max(0.0, step_min - accounted_min)
+            interval_energy_kw_min += idle_dur * specs["idle_kw"]
+
+            # Makinenin 15 dakikalık aralıktaki ortalama gücü (kW)
+            total_power_kw += interval_energy_kw_min / step_min
 
         profile_records.append({
             "time_min": t,
