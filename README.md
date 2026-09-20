@@ -260,3 +260,7 @@ This platform bridges tactical operational research and discrete-event schedulin
    Kaggle Store Item Demand Forecasting Dataset (10 stores, 50 items daily sales history), adapted for multi-echelon industrial manufacturing research.
 6. **Electricity Emission Factor Benchmark:**  
    European Environment Agency (EEA) / IEA Greenhouse Gas Emission Factors for National Electricity Grids (standard baseline range: $0.400 - 0.480\text{ kgCO}_2\text{e/kWh}$).
+
+### ⚙️ Çizelgeleme Granülerliği ve Modelleme Tercihleri (Lot Streaming vs. Consolidated Lots)
+- **Referans Çizelgeleme Katmanı:** Haftalık planlanan SKU talepleri hesaplama karmaşıklığını kontrol altında tutmak ve global optimumu kesinleştirmek amacıyla SKU başına tekil üretim lotu () olarak modellenmiştir.
+- **Operasyonel Davranış:** Operasyonlar arası transfer partileri (sub-lot/transfer batch streaming) yerine parti tamamlama önceliği (strict precedence) esas alınmıştır. Bu sayede CP-SAT çözücüsü  tabanlı sıra bağımlı hazırlık kısıtlarıyla saniyeler içinde kanıtlanmış optimal makespan'e ulaşmaktadır.

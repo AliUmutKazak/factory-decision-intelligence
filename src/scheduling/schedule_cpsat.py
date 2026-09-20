@@ -58,6 +58,10 @@ def run_cpsat_scheduling():
         
         # Her SKU için 1 ana üretim lotu oluşturuyoruz (Taktik Plan Uyumu)
         lot_id = f"LOT_{pid}"
+            # Modelleme Tercihi: SKU bazında tekil konsolide lot (one production lot per SKU).
+    # Lot streaming / transfer batching yerine kesin parti onceligi uygulanir.
+            # Modelleme Tercihi: SKU bazında tekil konsolide lot (One consolidated lot per SKU).
+    # Lot streaming / transfer batching yerine kesin parti önceliği uygulanır.
         lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
         
         for _, op in lot_routings.iterrows():
