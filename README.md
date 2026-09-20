@@ -27,6 +27,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
 | **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.413 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (9.185 t) dengelendi. Birim emisyon: 1.141 kgCO₂e / adet. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir.
+> **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, iletim ($0.436$) ve dağıtım ($0.469\text{ tCO}_2\text{e/MWh}$) tüketim noktaları resmi göstergeleri aralığında kabul edilmiş **temsili/sentetik şebeke emisyon faktörüdür (Assumed Grid Emission Factor)**.
 
 ---
 
