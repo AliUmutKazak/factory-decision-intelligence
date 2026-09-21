@@ -1,14 +1,28 @@
 import os
+from pathlib import Path
 import pandas as pd
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SYNTHETIC_DIR = PROJECT_ROOT / "data" / "synthetic"
+SYNTHETIC_DIR.mkdir(parents=True, exist_ok=True)
+
 directories = [
-    "data/raw", "data/processed", "data/synthetic",
-    "notebooks", "src/data", "src/forecasting", "src/planning",
-    "src/inventory", "src/scheduling", "src/energy", "src/carbon",
-    "dashboard", "tests"
+    PROJECT_ROOT / "data" / "raw",
+    PROJECT_ROOT / "data" / "processed",
+    SYNTHETIC_DIR,
+    PROJECT_ROOT / "notebooks",
+    PROJECT_ROOT / "src" / "data",
+    PROJECT_ROOT / "src" / "forecasting",
+    PROJECT_ROOT / "src" / "planning",
+    PROJECT_ROOT / "src" / "inventory",
+    PROJECT_ROOT / "src" / "scheduling",
+    PROJECT_ROOT / "src" / "energy",
+    PROJECT_ROOT / "src" / "carbon",
+    PROJECT_ROOT / "dashboard",
+    PROJECT_ROOT / "tests",
 ]
 for d in directories:
-    os.makedirs(d, exist_ok=True)
+    d.mkdir(parents=True, exist_ok=True)
 
 # A. Makineler
 machines_data = {
@@ -18,7 +32,7 @@ machines_data = {
     "operating_cost_per_hour": [650.0, 520.0, 780.0],
     "max_daily_hours": [16, 16, 16]
 }
-pd.DataFrame(machines_data).to_csv("data/synthetic/machines.csv", index=False)
+pd.DataFrame(machines_data).to_csv(str(SYNTHETIC_DIR / "machines.csv"), index=False)
 
 # B. Ürünler ve Hiyerarşik Aileler (Hax & Meal için Family A ve Family B)
 products_data = {
@@ -32,7 +46,7 @@ products_data = {
     "holding_cost_per_week": [12.0, 18.0, 25.0, 10.0, 15.0],
     "late_penalty_per_day": [150.0, 220.0, 300.0, 120.0, 200.0]
 }
-pd.DataFrame(products_data).to_csv("data/synthetic/products.csv", index=False)
+pd.DataFrame(products_data).to_csv(str(SYNTHETIC_DIR / "products.csv"), index=False)
 
 # C. Hammaddeler
 materials_data = {
@@ -44,7 +58,7 @@ materials_data = {
     "lead_time_days": [7, 7, 12, 4],
     "min_order_qty": [500, 400, 250, 50]
 }
-pd.DataFrame(materials_data).to_csv("data/synthetic/materials.csv", index=False)
+pd.DataFrame(materials_data).to_csv(str(SYNTHETIC_DIR / "materials.csv"), index=False)
 
 # D. Ürün Ağacı (BOM)
 bom_data = {
@@ -58,7 +72,7 @@ bom_data = {
     ],
     "qty_per_unit": [2.8, 0.15, 4.2, 0.20, 5.5, 1.4, 3.1, 0.18]
 }
-pd.DataFrame(bom_data).to_csv("data/synthetic/bom.csv", index=False)
+pd.DataFrame(bom_data).to_csv(str(SYNTHETIC_DIR / "bom.csv"), index=False)
 
 # E. Rota ve Enerji
 routing_data = {
@@ -68,7 +82,7 @@ routing_data = {
     "processing_time_min": [18, 12, 15, 24, 16, 20, 35, 10, 14, 12, 22, 14, 18],
     "variable_kwh_per_unit": [0.65, 0.45, 1.20, 0.90, 0.60, 1.45, 1.40, 0.35, 0.50, 0.95, 0.80, 0.50, 1.30]
 }
-pd.DataFrame(routing_data).to_csv("data/synthetic/routing.csv", index=False)
+pd.DataFrame(routing_data).to_csv(str(SYNTHETIC_DIR / "routing.csv"), index=False)
 
 # F. Hazırlık Matrisi
 changeover_records = []
@@ -87,6 +101,6 @@ for f_p in products:
             "from_product": f_p, "to_product": t_p,
             "setup_time_min": time_m, "setup_cost": cost_m
         })
-pd.DataFrame(changeover_records).to_csv("data/synthetic/changeover_matrix.csv", index=False)
+pd.DataFrame(changeover_records).to_csv(str(SYNTHETIC_DIR / "changeover_matrix.csv"), index=False)
 
 print("[OK] Master data şartnameye uygun olarak güncellendi.")
