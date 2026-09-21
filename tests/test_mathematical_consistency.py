@@ -263,9 +263,9 @@ def test_forecast_output_integrity():
 
 def test_hierarchical_capacity_decomposition():
     """
-    HPP Teoremi: Agrega LP yalnızca saf işlem süresini (processing) kısıtlar;
-    Sıra bağımlı hazırlık (changeover) süreleri operasyonel katmanda eklenir.
-    Processing <= LP Max Allowed Capacity şartı tüm tezgahlarda sağlanmalıdır.
+    HPP Teoremi: Agrega LP yalnizca saf islem suresini (processing) kisitlar;
+    Sira bagimli hazirlik (changeover) sureleri operasyonel katmanda eklenir.
+    Processing <= LP Max Allowed Capacity sarti tum tezgahlarda saglanmalidir.
     """
     import pandas as pd
     from pathlib import Path
@@ -273,28 +273,39 @@ def test_hierarchical_capacity_decomposition():
     cap_path = Path("data/processed/machine_capacity_plan.csv")
     sched_path = Path("data/processed/production_schedule.csv")
     
-    if not cap_path.exists() or not sched_path.exists():
-        return
+    assert cap_path.exists(), "machine_capacity_plan.csv dosyasi bulunamadi."
+    assert sched_path.exists(), "production_schedule.csv dosyasi bulunamadi."
         
     cap_df = pd.read_csv(cap_path)
     sched_df = pd.read_csv(sched_path)
     
     w1_cap = cap_df[cap_df["period_week"] == 1]
+    assert not w1_cap.empty, "machine_capacity_plan.csv icinde 1. hafta tanimi yok."
     
+    tolerance = 0.05
+
     for m_id in sched_df["machine_id"].unique():
         m_sched = sched_df[sched_df["machine_id"] == m_id]
         m_cap = w1_cap[w1_cap["machine_id"] == m_id]
+        assert not m_cap.empty, f"{m_id} icin W1 kapasitesi tanimlanmamis."
         
         lp_max_hr = float(m_cap["total_capacity_hours"].iloc[0])
         proc_hr = float((m_sched["end_min"] - m_sched["start_min"]).sum() / 60.0)
         setup_hr = float(m_sched["setup_before_min"].sum() / 60.0)
         total_hr = proc_hr + setup_hr
-        
-        # 1. Saf işlem süresi taktik LP tavanını asla aşamaz
-        
-        # 2. Eğer toplam iş yükü LP tavanını aşıyorsa, bu aşım hazırlık süresinden büyük olamaz
+
+        # 1. LP yalnizca islem suresini sinirlar
+        assert proc_hr <= lp_max_hr + tolerance, (
+            f"{m_id} makinesinde operasyonel islem suresi ({proc_hr:.2f}h), "
+            f"LP kapasite tavanini ({lp_max_hr:.2f}h) asiyor."
+        )
+
+        # 2. Asim varsa bunun tamamen setup kaynakli oldugunu dogrula
         if total_hr > lp_max_hr:
-            overrun = total_hr - lp_max_hr
+            assert total_hr - lp_max_hr <= setup_hr + tolerance, (
+                f"{m_id} tezgahindaki kapasite asimi ({total_hr - lp_max_hr:.2f}h), "
+                f"toplam setup suresini ({setup_hr:.2f}h) asamaz."
+            )
 
 
 def test_explicit_setup_intervals_physical_integrity():
