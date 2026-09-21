@@ -52,6 +52,7 @@ def run_mrp_engine():
         unit_cost = float(mat_info["unit_cost"])
 
         mat_gross = gross_df[gross_df["material_id"] == mid]
+        # Simplified deterministic MRP approximation: gross requirement dispersion across planning horizon
         sigma_w = mat_gross["gross_requirement"].std() if len(mat_gross) > 1 else 100.0
         safety_stock = int(round(MRP_SERVICE_LEVEL_Z * sigma_w * np.sqrt(lead_time_weeks)))
 
