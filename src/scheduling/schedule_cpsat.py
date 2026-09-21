@@ -4,9 +4,13 @@ import numpy as np
 from ortools.sat.python import cp_model
 import src.config as cfg
 
-SOLVER_TIME_LIMIT_SECONDS = getattr(cfg, "SOLVER_TIME_LIMIT_SECONDS", getattr(cfg, "CPSAT_TIME_LIMIT_SECONDS", 20.0))
-MRP_EXPEDITE_RELEASE_TIME_MIN = cfg.MRP_EXPEDITE_RELEASE_TIME_MIN
-DB_PATH = cfg.DB_PATH
+from src.config import (
+    DB_PATH,
+    MRP_EXPEDITE_RELEASE_TIME_MIN,
+    CPSAT_TIME_LIMIT_SECONDS,
+    CPSAT_NUM_SEARCH_WORKERS,
+    CPSAT_RANDOM_SEED,
+)
 
 def run_cpsat_scheduling():
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
@@ -194,9 +198,9 @@ def run_cpsat_scheduling():
     model.Minimize(makespan)
 
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = float(getattr(cfg, "CPSAT_TIME_LIMIT_SECONDS", 30.0))
-    solver.parameters.num_search_workers = int(getattr(cfg, "CPSAT_NUM_SEARCH_WORKERS", 8))
-    solver.parameters.random_seed = int(getattr(cfg, "CPSAT_RANDOM_SEED", 42))
+    solver.parameters.max_time_in_seconds = float(CPSAT_TIME_LIMIT_SECONDS)
+    solver.parameters.num_search_workers = int(CPSAT_NUM_SEARCH_WORKERS)
+    solver.parameters.random_seed = int(CPSAT_RANDOM_SEED)
 
     status = solver.Solve(model)
     status_name = solver.StatusName(status)
