@@ -246,6 +246,8 @@ def run_cpsat_scheduling():
             if last_prod is not None and last_prod != curr_prod:
                 setup_val = setup_dict.get((mid, last_prod, curr_prod), 0)
             item["setup_before_min"] = setup_val
+            item["setup_end_min"] = float(item["start_min"])
+            item["setup_start_min"] = float(item["start_min"]) - float(setup_val)
             last_prod = curr_prod
             schedule_rows.append(item)
 

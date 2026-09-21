@@ -310,8 +310,8 @@ def test_explicit_setup_intervals_physical_integrity():
     if not sched_path.exists():
         return
     df = pd.read_csv(sched_path)
-    if "setup_start_min" not in df.columns:
-        return
+    assert "setup_start_min" in df.columns, "setup_start_min kolonu schedule ciktisinda bulunamadi."
+    assert "setup_end_min" in df.columns, "setup_end_min kolonu schedule ciktisinda bulunamadi."
     for mid, group in df.groupby("machine_id"):
         sorted_g = group.sort_values("start_min").reset_index(drop=True)
         for idx in range(len(sorted_g)):
