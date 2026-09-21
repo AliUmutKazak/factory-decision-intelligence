@@ -1,11 +1,11 @@
 import os
 import pandas as pd
 from pathlib import Path
-from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR
+from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR
 
 def run_preprocessing():
     raw_path = RAW_DATA_DIR / "train.csv"
-    fixture_path = Path("data/fixtures/demand_fixture.csv")
+    fixture_path = RAW_DATA_DIR.parent / "fixtures" / "demand_fixture.csv"
     output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
 
     if os.path.exists(raw_path):
