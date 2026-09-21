@@ -5,7 +5,7 @@ from ortools.sat.python import cp_model
 import src.config as cfg
 
 SOLVER_TIME_LIMIT_SECONDS = getattr(cfg, "SOLVER_TIME_LIMIT_SECONDS", getattr(cfg, "CPSAT_TIME_LIMIT_SECONDS", 20.0))
-MRP_EXPEDITE_RELEASE_TIME_MIN = getattr(cfg, "MRP_EXPEDITE_RELEASE_TIME_MIN", 480)
+MRP_EXPEDITE_RELEASE_TIME_MIN = cfg.MRP_EXPEDITE_RELEASE_TIME_MIN
 DB_PATH = cfg.DB_PATH
 
 def run_cpsat_scheduling():
@@ -49,7 +49,7 @@ def run_cpsat_scheduling():
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
     tasks = []
     task_counter = 0
-    batch_size = getattr(cfg, "BATCH_SIZE", 25)
+    batch_size = cfg.PRODUCTION_BATCH_SIZE
 
     for _, row in sku_plan.iterrows():
         pid = row["product_id"]

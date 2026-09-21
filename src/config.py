@@ -66,3 +66,10 @@ DB_PATH = DATA_DIR / "factory.db"
 CPSAT_TIME_LIMIT_SECONDS = 30.0
 CPSAT_NUM_SEARCH_WORKERS = 8
 CPSAT_RANDOM_SEED = 42
+
+# 4. Detaylı Çizelgeleme & Parti Parametreleri (CP-SAT SSOT)
+MRP_EXPEDITE_RELEASE_TIME_MIN = 480       # Malzeme gecikmesi durumundaki erken teslim release time (dk)
+PRODUCTION_BATCH_SIZE = 25               # Referans parti büyüklüğü (adet)
+CPSAT_TIME_LIMIT_SECONDS = 30.0          # Çözücü zaman limiti (sn)
+CPSAT_NUM_SEARCH_WORKERS = 8             # Arama iş parçacığı sayısı
+CPSAT_RANDOM_SEED = 42                   # Tekrarlanabilirlik tohum değeri
