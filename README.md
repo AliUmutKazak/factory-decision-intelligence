@@ -94,7 +94,7 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
    $$\sum_{f \in F} a_{f,m,t} P_{f,t} \le C_{m,t} + OT_{m,t} \quad \forall m, \forall t$$
    $$OT_{m,t} \le OT_{\max, m, t} \quad \forall m, \forall t$$
 
-* **Dinamik Gölge Fiyatlar (Dual Values):** M01 tezgâhının kapasite kısıtının marjinal gevşeme değeri Hafta 1 için **-8,716.76 $/saat**, Hafta 2 için **-8,758.38 $/saat** seviyesindedir. Bu değer doğrudan mesai maliyeti değil; darboğaz olan M01 tezgâhının kapasitesinin 1 birim artırılmasının toplam sistem maliyetindeki marjinal tasarruf potansiyelini ifade eder.
+* **Dinamik Gölge Fiyatlar (Dual Values):** M01 tezgâhının kapasite kısıtının marjinal gevşeme değeri Hafta 1 için **-9,249.39 $/saat**, Hafta 2 için **-9,290.16 $/saat** seviyesindedir. Bu değer doğrudan mesai maliyeti değil; darboğaz olan M01 tezgâhının kapasitesinin 1 birim artırılmasının toplam sistem maliyetindeki marjinal tasarruf potansiyelini ifade eder.
 
 ---
 
@@ -150,16 +150,16 @@ $$NR_t = \max\left(0, GR_t + SS - I_{t-1}^{\text{proj}} - SR_t\right)$$
 ### 15-Dakikalık Tesis Yük Profili
 $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\text{setup}}(t) + P_{m}^{\text{idle}}(t) \right)$$
 
-* **Tepe Yük (Peak Load):** $248.23\text{ kW}$
-* **Ortalama Yük (Avg Load):** $140.53\text{ kW}$
-* **Yük Faktörü (Load Factor):** $0.566$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
-* **Toplam Enerji Tüketimi:** $20,848.2\text{ kWh}$ (%99.2 İşleme, %0.1 Setup, %0.8 Bekleme)
-* **Birim Tüketim:** $2.527\text{ kWh / bitmiş ürün}$
+* **Tepe Yük (Peak Load):** $244.87\text{ kW}$
+* **Ortalama Yük (Avg Load):** $132.09\text{ kW}$
+* **Yük Faktörü (Load Factor):** $0.539$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
+* **Toplam Enerji Tüketimi:** $20,875.3\text{ kWh}$ (%99.1 İşleme, %0.1 Setup, %0.8 Bekleme)
+* **Birim Tüketim:** $2.530\text{ kWh / bitmiş ürün}$
 
 ### Sera Gazı Emisyonları (GHG Protocol Scope 1 & 2)
 1. **Kapsam 1 (Doğrudan):** Forklift dizel tüketimi (85 L $\times$ 2.68 kg CO₂e/L = 0.228 tCO₂e)
 2. **Kapsam 2 (Dolaylı):** Şebeke elektrik tüketimi ($0.440\text{ kg CO}_2\text{e/kWh}$ emisyon faktörüyle 9.173 tCO₂e)
-3. **Toplam Karbon Ayak İzi:** **9.401 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
+3. **Toplam Karbon Ayak İzi:** **9.429 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
 
 #### Dahili Karbon Fiyatlama (Internal Carbon Pricing) Senaryoları
 | Karbon Fiyatı (€/tCO₂e) | Toplam Karbon Maruziyeti (€) | Birim Ürün Başı Ek Karbon Maliyeti (€/adet) |
@@ -174,34 +174,40 @@ $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\t
 
 ## 📂 Proje Dizin Yapısı
 
+```text
 ├── dashboard/
-│   └── app.py                     # Streamlit karar destek arayüzü
+│   └── app.py                      # Streamlit karar destek arayüzü
 ├── data/
-│   ├── raw/                       # Ham sipariş verisi (train.csv)
-│   ├── processed/                 # Boru hattı çıktı CSV dosyaları
-│   └── factory.db                 # SQLite tekil gerçeklik kaynağı (SSOT)
+│   ├── raw/
+│   │   └── .gitkeep                # Ham veri dizini (train.csv sürüm kontrolü dışındadır)
+│   ├── fixtures/
+│   │   └── demand_fixture.csv      # Tekrarlanabilir test ve CI fixture verisi
+│   ├── processed/                  # Boru hattı çıktı CSV dosyaları
+│   └── factory.db                  # SQLite tekil gerçeklik kaynağı (SSOT)
+├── docs/                           # Metodolojik dokümantasyon ve mimari diyagramlar
+├── scripts/                        # Yardımcı otomasyon ve veri hazırlama scriptleri
 ├── src/
-│   ├── config.py                  # Parametreler, yollar ve varsayılan sabitler
+│   ├── config.py                   # Parametreler, yollar ve varsayılan sabitler
 │   ├── data/
-│   │   ├── preprocessing.py       # Ham talep konsolidasyonu
+│   │   ├── preprocessing.py        # Ham talep konsolidasyonu
 │   │   └── build_database_and_eda.py # SQLite master-data yükleme ve EDA
 │   ├── forecasting/
-│   │   └── train_forecast.py      # Recursive LightGBM & Holt-Winters motoru
+│   │   └── train_forecast.py       # Recursive LightGBM & Holt-Winters motoru
 │   ├── planning/
-│   │   └── aggregate_planning.py  # Talep ağırlıklı LP ve SKU ayrıştırma
+│   │   └── aggregate_planning.py   # Talep ağırlıklı LP ve SKU ayrıştırma
 │   ├── inventory/
-│   │   └── bom_mrp.py             # Zaman fazlı MRP-I motoru
+│   │   └── bom_mrp.py              # Zaman fazlı MRP-I motoru
 │   ├── scheduling/
-│   │   └── schedule_cpsat.py      # OR-Tools CP-SAT detaylı çizelgeleme
+│   │   └── schedule_cpsat.py       # OR-Tools CP-SAT detaylı çizelgeleme
 │   ├── energy/
-│   │   └── energy_analytics.py    # SQLite SSOT ve 15 dk yük profili analitiği
+│   │   └── energy_analytics.py     # SQLite SSOT ve 15 dk yük profili analitiği
 │   └── carbon/
-│       └── carbon_analytics.py    # GHG Kapsam 1-2 ve dahili karbon simülasyonu
+│       └── carbon_analytics.py     # GHG Kapsam 1-2 ve dahili karbon simülasyonu
 ├── tests/
-│   ├── test_pipeline.py           # Uçtan uca boru hattı entegrasyon testleri
-│   └── test_mathematical_consistency.py # Matematiksel/fiziksel kural denetimleri
-├── main.py                        # Uçtan uca boru hattı orkestrasyonu
-├── requirements.txt               # Kütüphane bağımlılıkları
+│   ├── test_pipeline.py            # Uçtan uca boru hattı entegrasyon testleri
+│   └── test_system_consistency.py  # Matematiksel ve fiziksel tutarlılık denetimleri
+├── main.py                         # Uçtan uca boru hattı orkestrasyonu
+├── requirements.txt                # Kütüphane bağımlılıkları
 └── README.md
 
 ---
