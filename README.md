@@ -242,7 +242,10 @@ This platform bridges tactical operational research and discrete-event schedulin
 * **Nominal 96-Hour Two-Shift Capacity Benchmark:** Machine regular capacity is modeled against a nominal 2-shift schedule ($16\text{ h/day} \times 6\text{ days} = 96\text{ hours/week}$) buffered at 10% for unscheduled maintenance, with up to 48 hours/week overtime ceiling.
 * **Internal Carbon Price & Exposure Scenarios:** Financial carbon liabilities evaluate Internal Carbon Price scenarios (shadow pricing) at €0, €50, €80, €100, and €120 per $\text{tCO}_2\text{e}$ to model potential marginal regulatory exposure (e.g. CBAM/ETS proxy).
 * **Baseline Grid Emission Factor (Synthetic Midpoint Assumption):** Scope 2 indirect emissions assume an electricity emission factor of /usr/bin/bash.440	ext{ tCO}_2	ext{e/MWh}$ (/usr/bin/bash.440	ext{ kgCO}_2	ext{e/kWh}$). This value reflects a synthetic midpoint assumption benchmarked directly against official Turkish Ministry of Energy and Natural Resources (ETKB) electricity consumption emission factor ranges (transmission-connected: /usr/bin/bash.436	ext{ tCO}_2	ext{e/MWh}$; distribution-connected: /usr/bin/bash.469	ext{ tCO}_2	ext{e/MWh}$).
-
+### 7.3. Enerji Muhasebesi ve Simülasyon Ufku Sınır Şartları (Horizon vs. Calendar Discretization)
+- **Sürekli Simülasyon Ufku (Elapsed Horizon Baseline):** Enerji analitiği motoru, çizelgeleme makespan değerini kesintisiz bir operasyonel ufuk ($[0, C_{\max}]$) olarak modeller. Makine güç tüketimleri operasyonel düzeyde **PROCESSING**, **SETUP** ve **IDLE** durumları üzerinden anlık güç profiline yansıtılır.
+- **Konservatif Boşta Bekleme Yaklaşımı (Conservative Standby Allocation):** Vardiyalar arası geçişler ve planlı duruş pencereleri, tesis içi ekipmanların şebekeden tam izolasyonu (**OFF / 0 kW**) yerine hazırda bekleme rejiminde (**IDLE / Standby**) kaldığı muhafazakâr bir senaryo ile hesaplanır. Bu tercih, ani yeniden devreye alma (cold-start) kayıplarını minimize eden endüstriyel tesis pratiklerini yansıtır.
+- **Mimari Yol Haritası:** Çok vardiyalı operasyonlarda takvim-bağımlı güç tüketimini ayrıştırmak adına, makine çalışma takvimlerinin (Machine Work Calendar) dinamik bir durum değişkeni olarak entegrasyonu sistem yol haritasına dahil edilmiştir.
 ---
 
 ---
