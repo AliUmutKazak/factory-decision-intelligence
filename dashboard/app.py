@@ -69,13 +69,26 @@ with tab_summary:
         f"{w1_planned_units:,} Adet",
         help="LP Modeli tarafından 1. hafta için optimize edilen net üretim miktarı"
     )
-    overtime_hrs = max(0.0, e_kpi['makespan_hours'] - float(WEEKLY_HOURS_PER_MACHINE))
+    # Makine bazlı fiili yük (İşlem + Setup) hesaplama
+    if not sched_df.empty:
+        setup_col = "setup_before_min" if "setup_before_min" in sched_df.columns else "setup_min"
+        mach_work = sched_df.groupby("machine_id").apply(
+            lambda g: (g["duration_min"].sum() + (g[setup_col].sum() if setup_col in g else 0.0)) / 60.0
+        )
+        bottleneck_machine = mach_work.idxmax()
+        bottleneck_hours = float(mach_work.max())
+        bottleneck_overtime = max(0.0, bottleneck_hours - float(WEEKLY_HOURS_PER_MACHINE))
+    else:
+        bottleneck_machine = "-"
+        bottleneck_hours = 0.0
+        bottleneck_overtime = 0.0
+
     col2.metric(
         "Çizelge Makespan",
         f"{e_kpi['makespan_hours']:.1f} Saat",
-        delta=f"+{overtime_hrs:.1f} sa (Kapasite Aşımı)" if overtime_hrs > 0 else "Kapasite İçi",
-        delta_color="inverse",
-        help=f"CP-SAT tarafından bulunan toplam parti tamamlanma süresi (Standart kapasite: {WEEKLY_HOURS_PER_MACHINE} saat)"
+        delta=f"Darboğaz: {bottleneck_machine} (+{bottleneck_overtime:.1f} sa)" if bottleneck_overtime > 0 else "Nominal Kapasite İçi",
+        delta_color="inverse" if bottleneck_overtime > 0 else "normal",
+        help=f"Toplam takvim makespan süresi: {e_kpi['makespan_hours']:.1f} saat. Darboğaz makine ({bottleneck_machine}) fiili yükü: {bottleneck_hours:.1f} saat (Nominal sınır: {WEEKLY_HOURS_PER_MACHINE} saat)."
     )
     col3.metric(
         "Toplam Enerji Tüketimi",
@@ -113,16 +126,26 @@ with tab_summary:
             f"**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
             f"480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
         )
-       # En yüksek iş yüküne sahip darboğaz tezgahı dinamik tespit et
-        mach_workload = sched_df.groupby("machine_id")["duration_min"].sum()
-        bottleneck_mach = mach_workload.idxmax() if not mach_workload.empty else "M01"
-        b_hours = mach_workload.max() / 60.0 if not mach_workload.empty else 0.0
-        overrun_hrs = max(0.0, b_hours - 96.0)
+       # 1. Taktik Seviye: LP Kısıt Bağlayıcılığı (Binding Machine)
+        lp_bottleneck_machines = []
+        if not mach_cap_df.empty and "is_bottleneck" in mach_cap_df.columns:
+            lp_bottleneck_machines = mach_cap_df[mach_cap_df["is_bottleneck"] == "YES"]["machine_id"].unique().tolist()
+        lp_bottleneck_str = ", ".join(lp_bottleneck_machines) if lp_bottleneck_machines else "Yok"
+
+        # 2. Operasyonel Seviye: Çizelgeleme Fiili İş Yükü (Processing + Setup)
+        setup_col = "setup_before_min" if "setup_before_min" in sched_df.columns else "setup_min"
+        mach_workload = sched_df.groupby("machine_id").apply(
+            lambda g: (g["duration_min"].sum() + (g[setup_col].sum() if setup_col in g else 0.0)) / 60.0
+        )
+        highest_workload_mach = mach_workload.idxmax() if not mach_workload.empty else "-"
+        highest_workload_hrs = float(mach_workload.max()) if not mach_workload.empty else 0.0
+        workload_overrun = max(0.0, highest_workload_hrs - float(WEEKLY_HOURS_PER_MACHINE))
 
         st.info(
-            f"**Kapasite & Darboğaz:** LP dual analizi ve çizelgeleme yükü doğrultusunda **{bottleneck_mach}** "
-            f"tezgâhı en bağlayıcı darboğaz olarak gerçekleşti. Tezgâh iş yükü ({b_hours:.1f} sa) standart nominal "
-            f"96 saati aşarak **+{overrun_hrs:.1f} saat Nominal Kapasite Aşımı (Overrun)** oluşturdu."
+            f"**Darboğaz Analizi Ayrışımı:**\n"
+            f"- **LP Binding Tezgah(lar) [Taktik Plan]:** **{lp_bottleneck_str}** (Kapasite kısıtı bağlayıcı / gölge fiyat üreten tezgahlar)\n"
+            f"- **En Yüksek Çizelge Yükü [Operasyonel]:** **{highest_workload_mach}** — Toplam Fiili Yük: **{highest_workload_hrs:.1f} sa** "
+            f"(İşlem + Setup | Nominal 96 sa üzeri aşım: **+{workload_overrun:.1f} sa**)"
         )
         st.info(
             f"**Sürdürülebilirlik:** Tesis tepe yükü **{e_kpi['peak_load_kw']:.1f} kW** olarak fiziksel kuralı doğruladı; "

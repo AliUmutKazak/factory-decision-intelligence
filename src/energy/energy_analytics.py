@@ -40,9 +40,44 @@ def load_machine_specs() -> dict:
         }
     return specs
 
-def compute_energy_analytics():
-    schedule_df, machines_df = load_data()
+def compute_energy_analytics(schedule_df=None, machines_df=None):
+    if schedule_df is None or machines_df is None:
+        loaded_sched, loaded_mach = load_data()
+        if schedule_df is None:
+            schedule_df = loaded_sched
+        if machines_df is None:
+            machines_df = loaded_mach
     machine_specs = load_machine_specs()
+    if schedule_df.empty or len(schedule_df) == 0:
+        # Madde 12: 0 Uretim durumunda fiziksel sifir enerji dengesi
+        facility_kpis = {
+            "makespan_hours": 0.0,
+            "total_units_produced": 0,
+            "processing_kwh": 0.0,
+            "setup_kwh": 0.0,
+            "idle_kwh": 0.0,
+            "grand_total_kwh": 0.0,
+            "kwh_per_unit": 0.0,
+            "avg_load_kw": 0.0,
+            "peak_load_kw": 0.0,
+            "load_factor": 0.0
+        }
+        machine_kpis = []
+        for m_id in machines_df["machine_id"].unique():
+            machine_kpis.append({
+                "machine_id": m_id,
+                "processing_hours": 0.0,
+                "setup_hours": 0.0,
+                "idle_hours": 0.0,
+                "processing_kwh": 0.0,
+                "setup_kwh": 0.0,
+                "idle_kwh": 0.0,
+                "total_kwh": 0.0
+            })
+        kpi_df = pd.DataFrame([facility_kpis])
+        m_kpi_df = pd.DataFrame(machine_kpis)
+        profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
+        return kpi_df, m_kpi_df, profile_df
 
     makespan_min = int(schedule_df["end_min"].max())
     makespan_hours = makespan_min / 60.0
@@ -188,9 +223,12 @@ def compute_energy_analytics():
     pd.DataFrame([kpi_summary]).to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
     profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
 
+    kpi_df = pd.DataFrame([kpi_summary])
+    m_kpi_df = pd.DataFrame(machine_kpis)
+
     conn = sqlite3.connect(DB_PATH)
-    pd.DataFrame([kpi_summary]).to_sql("energy_kpis", conn, index=False, if_exists="replace")
-    pd.DataFrame(machine_kpis).to_sql("energy_machine_kpis", conn, index=False, if_exists="replace")
+    kpi_df.to_sql("energy_kpis", conn, index=False, if_exists="replace")
+    m_kpi_df.to_sql("energy_machine_kpis", conn, index=False, if_exists="replace")
     profile_df.to_sql("energy_profile_15min", conn, index=False, if_exists="replace")
     conn.close()
 
@@ -198,6 +236,6 @@ def compute_energy_analytics():
     print(f"[OK] 15 Dakikalık Yük Profili Kaydedildi: {OUTPUT_PROFILE_PATH}")
     print(f"[OK] SQLite 'energy_kpis' ve 'energy_profile_15min' tabloları güncellendi.")
     print("=" * 85)
-
+    return kpi_df, m_kpi_df, profile_df
 if __name__ == "__main__":
     compute_energy_analytics()

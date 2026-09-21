@@ -12,12 +12,13 @@ from src.config import (
     CPSAT_RANDOM_SEED,
 )
 
-def run_cpsat_scheduling():
+def run_cpsat_scheduling(sku_plan=None):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = sqlite3.connect(DB_PATH)
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
-    sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
+    if sku_plan is None:
+        sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     changeover_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
@@ -51,41 +52,65 @@ def run_cpsat_scheduling():
         expedite_products = set(crit_boms["product_id"].unique())
 
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
+    # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
     tasks = []
     task_counter = 0
-    batch_size = cfg.PRODUCTION_BATCH_SIZE
+    batch_size = getattr(cfg, "PRODUCTION_BATCH_SIZE", 25)
+    enable_streaming = getattr(cfg, "ENABLE_LOT_STREAMING", True)
+    max_sub_batches = getattr(cfg, "MAX_SUB_LOT_BATCHES", 40)
 
     for _, row in sku_plan.iterrows():
         pid = row["product_id"]
         total_batches = int(row["planned_batches"])
         total_units = int(row["planned_units"])
         
-        # Her SKU için 1 ana üretim lotu oluşturuyoruz (Taktik Plan Uyumu)
-        lot_id = f"LOT_{pid}"
-            # Modelleme Tercihi: SKU bazında tekil konsolide lot (one production lot per SKU).
-    # Lot streaming / transfer batching yerine kesin parti onceligi uygulanir.
-            # Modelleme Tercihi: SKU bazında tekil konsolide lot (One consolidated lot per SKU).
-    # Lot streaming / transfer batching yerine kesin parti önceliği uygulanır.
-        lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
-        
-        for _, op in lot_routings.iterrows():
-            seq = int(op["operation_seq"])
-            mid = op["machine_id"]
-            # processing_time_min 1 batch (25 adet) içindir. Toplam süre = batch sayısı * süre
-            proc_time_per_batch = float(op["processing_time_min"])
-            duration = int(round(total_batches * proc_time_per_batch))
-            
-            tasks.append({
-                "task_id": task_counter,
-                "lot_id": lot_id,
-                "product_id": pid,
-                "lot_qty": total_units,
-                "operation_seq": seq,
-                "machine_id": mid,
-                "duration": duration,
-            })
-            task_counter += 1
+        # SIFIR MİKTARLI HAYALET İŞLERİ ENGELLE
+        if total_batches <= 0 or total_units <= 0:
+            continue
 
+        # Alt lot (sub-lot) paketlerini belirle
+        sub_batches_list = []
+        if enable_streaming and total_batches > max_sub_batches:
+            rem = total_batches
+            while rem > 0:
+                alloc = min(rem, max_sub_batches)
+                sub_batches_list.append(alloc)
+                rem -= alloc
+        else:
+            sub_batches_list = [total_batches]
+
+        lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
+
+        for sub_idx, sub_b_qty in enumerate(sub_batches_list, start=1):
+            sub_lot_id = f"LOT_{pid}_L{sub_idx}" if len(sub_batches_list) > 1 else f"LOT_{pid}"
+            sub_units = sub_b_qty * batch_size
+
+            for _, op in lot_routings.iterrows():
+                seq = int(op["operation_seq"])
+                mid = op["machine_id"]
+                proc_time_per_batch = float(op["processing_time_min"])
+                duration = int(round(sub_b_qty * proc_time_per_batch))
+
+                tasks.append({
+                    "task_id": task_counter,
+                    "lot_id": sub_lot_id,
+                    "parent_lot_id": f"LOT_{pid}",
+                    "sub_lot_index": sub_idx,
+                    "product_id": pid,
+                    "lot_qty": sub_units,
+                    "batch_qty": sub_b_qty,
+                    "operation_seq": seq,
+                    "machine_id": mid,
+                    "duration": duration,
+                })
+                task_counter += 1
+    if not tasks:
+        empty_cols = [
+            "task_id", "lot_id", "product_id", "operation_id", "machine_id",
+            "start_min", "end_min", "duration_min", "setup_before_min",
+            "setup_start_min", "setup_end_min", "batch_units"
+        ]
+        return pd.DataFrame(columns=empty_cols)
     tasks_df = pd.DataFrame(tasks)
 
     # -------------------------------------------------------------
@@ -131,7 +156,16 @@ def run_cpsat_scheduling():
             if prev_tid is not None:
                 model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["end"])
             prev_tid = curr_tid
-
+# Alt Lotlar Arası Sıralama (FIFO): Aynı SKU'nun sub_k+1 partisi aynı operasyonda sub_k partisinden önce başlayamaz
+    for (pid, op_seq), grp in tasks_df.groupby(["product_id", "operation_seq"]):
+        if len(grp) > 1:
+            sorted_subs = grp.sort_values("sub_lot_index")
+            prev_tid = None
+            for _, sub_row in sorted_subs.iterrows():
+                curr_tid = sub_row["task_id"]
+                if prev_tid is not None:
+                    model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["start"])
+                prev_tid = curr_tid
     # 2. MRP Serbest Bırakma Kısıtı (Dynamic Release Time: r_j >= 480 dk)
     for tid, t_info in all_tasks.items():
         if t_info["operation_seq"] == 1 and t_info["product_id"] in expedite_products:
@@ -233,6 +267,7 @@ def run_cpsat_scheduling():
                 "operation_seq": all_tasks[tid]["operation_seq"],
                 "machine_id": mid,
                 "lot_qty": all_tasks[tid]["lot_qty"],
+                "batch_qty": all_tasks[tid].get("batch_qty", 1),
                 "duration_min": all_tasks[tid]["duration"],
                 "start_min": s_val,
                 "end_min": e_val,

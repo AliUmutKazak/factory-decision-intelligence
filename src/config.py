@@ -57,6 +57,9 @@ AGGREGATE_INITIAL_INVENTORY = {
 # 4. Detaylı Çizelgeleme & Parti Parametreleri (CP-SAT SSOT)
 MRP_EXPEDITE_RELEASE_TIME_MIN = 480       # Malzeme gecikmesi durumundaki erken teslim release time (dk)
 PRODUCTION_BATCH_SIZE = 25               # Referans parti büyüklüğü (adet)
+# Lot Streaming / Transfer Batching Ayarları
+ENABLE_LOT_STREAMING = True           # Dev partileri alt transfer lotlarına bölerek overlap sağla
+MAX_SUB_LOT_BATCHES = 40              # Bir alt transfer lotunun alabileceği maksimum batch sayısı
 CPSAT_TIME_LIMIT_SECONDS = 30.0          # Çözücü zaman limiti (sn)
 CPSAT_NUM_SEARCH_WORKERS = 8             # Arama iş parçacığı sayısı
 CPSAT_RANDOM_SEED = 42                   # Tekrarlanabilirlik tohum değeri
