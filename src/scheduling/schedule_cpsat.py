@@ -42,14 +42,37 @@ def run_cpsat_scheduling(sku_plan=None):
         for m in machines:
             setup_dict[(m, f_p, t_p)] = s_val
 
-    # EXPEDITE malzeme kısıtları
-    expedite_materials = set(
-        mrp_df[mrp_df["action_message"].str.contains("EXPEDITE", na=False)]["material_id"]
-    )
-    expedite_products = set()
-    if expedite_materials:
-        crit_boms = bom_df[bom_df["material_id"].isin(expedite_materials)]
-        expedite_products = set(crit_boms["product_id"].unique())
+    # -------------------------------------------------------------
+    # Closed-Loop MRP -> CP-SAT: Dinamik Malzeme Hazır Oluş Zamanı
+    # r_lot = max_{m in BOM} t_availability,m
+    # -------------------------------------------------------------
+    # MRP'de 1. hafta teslimatı acil olan (EXPEDITE) malzemeler için dinamik tedarik gecikmesi
+    # planned_release_week <= 0 veya past due olan kalemlerin tedarik gecikme ofseti (dakika)
+    mat_availability = {}
+    if "material_id" in mrp_df.columns and "action_message" in mrp_df.columns:
+        w1_mrp = mrp_df[mrp_df["period_week"] == 1]
+        for _, m_row in w1_mrp.iterrows():
+            m_id = m_row["material_id"]
+            action = str(m_row.get("action_message", ""))
+            rel_week = int(m_row.get("planned_release_week", 1))
+            
+            if "EXPEDITE" in action:
+                # Gecikme derinliğine göre dinamik varış süresi:
+                # rel_week = 0 -> 480 dk (1 vardiya ekspres teslimat)
+                # rel_week < 0 -> her negatif hafta için +480 dk ek tedarik gecikmesi
+                delay_min = 480 + max(0, -rel_week) * 480
+                mat_availability[m_id] = delay_min
+            else:
+                mat_availability[m_id] = 0
+
+    # Her SKU için BOM bileşenlerinin en geç varış anını (max availability) belirle
+    sku_release_times = {}
+    for pid in sku_plan["product_id"].unique():
+        prod_materials = bom_df[bom_df["product_id"] == pid]["material_id"].unique()
+        if len(prod_materials) > 0:
+            sku_release_times[pid] = max(mat_availability.get(mid, 0) for mid in prod_materials)
+        else:
+            sku_release_times[pid] = 0
 
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
@@ -166,10 +189,13 @@ def run_cpsat_scheduling(sku_plan=None):
                 if prev_tid is not None:
                     model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["start"])
                 prev_tid = curr_tid
-    # 2. MRP Serbest Bırakma Kısıtı (Dynamic Release Time: r_j >= 480 dk)
+    # 2. Closed-Loop MRP Serbest Bırakma Kısıtı (r_j = max_{m in BOM} t_availability,m)
     for tid, t_info in all_tasks.items():
-        if t_info["operation_seq"] == 1 and t_info["product_id"] in expedite_products:
-            model.Add(t_info["start"] >= MRP_EXPEDITE_RELEASE_TIME_MIN)
+        if t_info["operation_seq"] == 1:
+            pid = t_info["product_id"]
+            r_j = sku_release_times.get(pid, 0)
+            if r_j > 0:
+                model.Add(all_tasks[tid]["start"] >= r_j)
 
     # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri (AddCircuit + OptionalInterval)
     for mid, tids in machine_to_tasks.items():
