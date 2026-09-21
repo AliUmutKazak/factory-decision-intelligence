@@ -10,6 +10,7 @@ BASE_DIR = SRC_DIR.parent
 DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 PROCESSED_DATA_DIR = DATA_DIR / "processed"
+SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
 DB_PATH = DATA_DIR / "factory.db"
 
 # 1. Ortak Fabrika Çalışma Takvimi (Madde 7 Düzeltmesi)
@@ -53,20 +54,6 @@ AGGREGATE_INITIAL_INVENTORY = {
     "FAM_A": 40.0,
     "FAM_B": 20.0
 }
-# Dizin Hiyerarşisi
-SRC_DIR = Path(__file__).resolve().parent
-BASE_DIR = SRC_DIR.parent
-DATA_DIR = BASE_DIR / "data"
-RAW_DATA_DIR = DATA_DIR / "raw"
-PROCESSED_DATA_DIR = DATA_DIR / "processed"
-SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
-DB_PATH = DATA_DIR / "factory.db"
-
-# CP-SAT Çizelgeleme Çözücü Parametreleri
-CPSAT_TIME_LIMIT_SECONDS = 30.0
-CPSAT_NUM_SEARCH_WORKERS = 8
-CPSAT_RANDOM_SEED = 42
-
 # 4. Detaylı Çizelgeleme & Parti Parametreleri (CP-SAT SSOT)
 MRP_EXPEDITE_RELEASE_TIME_MIN = 480       # Malzeme gecikmesi durumundaki erken teslim release time (dk)
 PRODUCTION_BATCH_SIZE = 25               # Referans parti büyüklüğü (adet)
