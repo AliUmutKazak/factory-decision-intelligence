@@ -26,8 +26,11 @@ def _load_schedule_data():
 def test_schedule_makespan_energy_consistency():
     """
     Test 1: Schedule makespan <-> Energy horizon alignment.
-    Verifies that the scheduled tasks define a valid non-zero operational makespan.
+    Strictly verifies physical alignment between CP-SAT makespan and Energy Analytics KPIs/profiles.
     """
+    import pandas as pd
+    from pathlib import Path
+    
     df = _load_schedule_data()
     if df is None:
         pytest.skip("Production schedule artifact not found.")
@@ -35,8 +38,31 @@ def test_schedule_makespan_energy_consistency():
     end_col = next((c for c in ["end_min", "end_time", "finish_min", "end"] if c in df.columns), None)
     assert end_col is not None, f"End time column not found in schedule. Available columns: {list(df.columns)}"
 
-    makespan = df[end_col].max()
-    assert makespan > 0, f"Schedule makespan must be strictly positive, got {makespan}"
+    sched_makespan_min = float(df[end_col].max())
+    assert sched_makespan_min > 0, f"Schedule makespan must be strictly positive, got {sched_makespan_min}"
+    sched_makespan_hr = sched_makespan_min / 60.0
+
+    # 1. Energy KPIs Mutabakati
+    kpis_path = Path("data/processed/energy_kpis.csv")
+    kpis_df = pd.read_csv(kpis_path)
+    
+    energy_makespan_hr = float(kpis_df["makespan_hours"].iloc[0])
+    diff_hr = abs(sched_makespan_hr - energy_makespan_hr)
+    assert diff_hr <= 0.2, (
+        f"Fiziksel tutarsizlik: Schedule makespan ({sched_makespan_hr:.2f}h) "
+        f"ile Energy makespan ({energy_makespan_hr:.2f}h) uyusmuyor! Fark: {diff_hr:.3f}h"
+    )
+
+    # 2. 15-Dakikalik Enerji Profili Horizon Mutabakati
+    prof_path = Path("data/processed/energy_profile_15min.csv")
+    if prof_path.exists():
+        prof_df = pd.read_csv(prof_path)
+        if "time_min" in prof_df.columns:
+            prof_max_min = float(prof_df["time_min"].max())
+            # Enerji profili son 15 dakikalik araligi icerecek sekilde cizelgeyi tam kapsamali
+            assert prof_max_min >= sched_makespan_min - 15.0, (
+                f"Enerji profili ufku ({prof_max_min} min) "
+            )
 
 
 def test_machine_capacity_consistency():
