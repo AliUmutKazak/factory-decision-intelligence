@@ -301,7 +301,7 @@ Bu projede geliştirme, sürekli entegrasyon (CI) ve referans üretim koşumu i�
 
 | Rejim | Veri Kaynağı | Talep Kaydı | Kapsam | Tipik Makespan | Kullanım Amacı |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Reference Full Run** | `data/raw/train.csv` (Tam Kaggle Verisi) | 9,130 gün/SKU | 2013-01-01 → 2017-12-31 | **9,482 dk** (~158 saat) | Portföy referans sonuçları, kapasite ve enerji fizibilite analizleri |
+| **Reference Full Run** | `data/raw/train.csv` (Tam Kaggle Verisi) | 1,826 gün × 5 SKU = 9,130 SKU-days | 2013-01-01 → 2017-12-31 (kapsayıcı) | **9,482 dk** (~158 saat) | Portföy referans sonuçları, kapasite ve enerji fizibilite analizleri |
 | **CI Test Fixture** | Sentetik / Mock Fixture | 1,825 gün/SKU | 2017-01-01 → 2017-12-31 (veya mock) | **~100 dk** | Hızlı GitHub Actions testleri, birim/entegrasyon doğrulamaları (<2 sn) |
 
 > ⚠️ **Önemli Not:** `data/raw/train.csv` dosyası dosya boyutu nedeniyle repoda sürüm kontrolü dışındaysa veya sıfırdan sentetik ortamda çalıştırılıyorsa, pipeline otomatik olarak test fixture'ını tetikler ve küçültülmüş bir çizelge (~100 dk makespan) üretir. Raporda ve dokümantasyonda sunulan kanonik metrikler (9,482 dk makespan, 20,875.3 kWh enerji) **Reference Full Run** rejimine aittir.
