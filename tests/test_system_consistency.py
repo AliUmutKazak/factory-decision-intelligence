@@ -67,36 +67,37 @@ def test_schedule_makespan_energy_consistency():
 
 def test_machine_capacity_consistency():
     """
-    Test 2: Machine capacity consistency check.
-    For each machine: UtilizedHours <= RegularCapacity + OvertimeCeiling
-    Catches LP-to-CP-SAT capacity infeasibility or over-allocation drift.
+    Test 2: Machine capacity consistency check (HPP Tactical LP vs Operational CP-SAT).
+    Verifies that for Week 1, the scheduled processing hours on each machine
+    do not exceed the tactical LP capacity ceiling (total_capacity_hours)
+    defined in machine_capacity_plan.csv within numerical tolerance.
     """
+    import pandas as pd
+    from pathlib import Path
+
     df = _load_schedule_data()
     if df is None:
         pytest.skip("Production schedule artifact not found.")
 
-    machine_col = next((c for c in ["machine_id", "machine", "Machine"] if c in df.columns), None)
-    duration_col = next((c for c in ["duration_min", "duration", "processing_time_min", "proc_time"] if c in df.columns), None)
+    cap_path = Path("data/processed/machine_capacity_plan.csv")
+    assert cap_path.exists(), "machine_capacity_plan.csv dosyasi bulunamadi."
+    cap_df = pd.read_csv(cap_path)
+    w1_cap = cap_df[cap_df["period_week"] == 1]
+    assert not w1_cap.empty, "machine_capacity_plan.csv icinde 1. hafta verisi bulunamadi."
 
-    assert machine_col is not None, f"Machine ID column not found in schedule. Columns: {list(df.columns)}"
-
-    # Süre kolonu yoksa end - start farkından türet
-    if duration_col is None:
-        start_col = next((c for c in ["start_min", "start_time", "start"] if c in df.columns), None)
-        end_col = next((c for c in ["end_min", "end_time", "end"] if c in df.columns), None)
-        assert start_col and end_col, "Cannot determine task duration from schedule columns."
-        df["task_duration"] = df[end_col] - df[start_col]
-        duration_col = "task_duration"
-
-    # 4 haftalık toplam nominal + fazla mesai tavanı (dakika)
-    max_weekly_minutes = WEEKLY_MINUTES_PER_MACHINE + (AGGREGATE_MAX_OVERTIME_HOURS * 60)
-    horizon_capacity_limit_min = max_weekly_minutes * 4
-
-    machine_usage = df.groupby(machine_col)[duration_col].sum()
-    for m_id, used_min in machine_usage.items():
-        assert used_min <= horizon_capacity_limit_min, (
-            f"Machine {m_id} utilized minutes ({used_min}) exceeded "
-            f"horizon capacity limit ({horizon_capacity_limit_min} min)."
+    for m_id in sorted(df["machine_id"].unique()):
+        m_sched = df[df["machine_id"] == m_id]
+        m_cap_row = w1_cap[w1_cap["machine_id"] == m_id]
+        assert not m_cap_row.empty, f"{m_id} icin W1 kapasite plani tanimi yok."
+        
+        lp_allowed_max_hr = float(m_cap_row["total_capacity_hours"].iloc[0])
+        # Saf islem suresi (processing hours)
+        proc_hours = round(float((m_sched["end_min"] - m_sched["start_min"]).sum() / 60.0), 2)
+        
+        # LP agrega modeli saf islem suresini kisitlar: proc_hours <= lp_allowed_max_hr (+ 0.05 h tolerans)
+        assert proc_hours <= lp_allowed_max_hr + 0.05, (
+            f"{m_id} makinesinde operasyonel islem suresi ({proc_hours:.2f}h), "
+            f"taktik LP kapasite sinirini ({lp_allowed_max_hr:.2f}h) asiyor."
         )
 
 
