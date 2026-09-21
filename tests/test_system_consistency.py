@@ -104,13 +104,36 @@ def test_machine_capacity_consistency():
 def test_carbon_energy_balance():
     """
     Test 3: Carbon-energy balance check (First Law consistency).
-    Sum of individual machine energy consumption must approximate facility electricity:
-    sum(E_m) approx E_total
+    Strictly verifies that the sum of individual machine energy consumption
+    from energy_machine_kpis equals grand_total_kwh in energy_kpis.
     """
-    mock_machine_energy = {"M01": 8420.5, "M02": 5310.2, "M03": 7117.5}
-    total_facility_energy = 20848.2
+    import sqlite3
+    import pandas as pd
+    from pathlib import Path
+    from src.config import DB_PATH
 
-    sum_m = sum(mock_machine_energy.values())
-    assert np.isclose(sum_m, total_facility_energy, rtol=1e-3), (
-        f"Energy balance mismatch: Sum of machines ({sum_m}) != Facility total ({total_facility_energy})"
+    # 1. SQLite veritabanindan ya da islenmis CSV artefaktlarindan gercek verileri cek
+    if Path(DB_PATH).exists():
+        conn = sqlite3.connect(DB_PATH)
+        m_kpis = pd.read_sql("SELECT machine_id, total_kwh FROM energy_machine_kpis", conn)
+        f_kpis = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
+        conn.close()
+    else:
+        m_path = Path("data/processed/energy_machine_kpis.csv")
+        f_path = Path("data/processed/energy_kpis.csv")
+        assert m_path.exists() and f_path.exists(), "Enerji KPI artefaktlari bulunamadi."
+        m_kpis = pd.read_csv(m_path)
+        f_kpis = pd.read_csv(f_path)
+
+    assert not m_kpis.empty, "energy_machine_kpis tablosu bos olamaz."
+    assert not f_kpis.empty, "energy_kpis tablosu bos olamaz."
+
+    sum_machine_kwh = float(m_kpis["total_kwh"].sum())
+    facility_grand_total_kwh = float(f_kpis["grand_total_kwh"].iloc[0])
+
+    # 2. Termodinamik Enerji Korunumu Mutabakati (Sum of machines == Facility total)
+    assert np.isclose(sum_machine_kwh, facility_grand_total_kwh, atol=0.5), (
+        f"Enerji korunum dengesizligi: Makinelerin toplami ({sum_machine_kwh:.2f} kWh) "
+        f"ile Tesis toplami ({facility_grand_total_kwh:.2f} kWh) eslesmiyor."
     )
+
