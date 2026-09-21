@@ -284,7 +284,7 @@ def test_hierarchical_capacity_decomposition():
     
     tolerance = 0.05
 
-    for m_id in sched_df["machine_id"].unique():
+    for m_id in sorted(sched_df["machine_id"].unique()):
         m_sched = sched_df[sched_df["machine_id"] == m_id]
         m_cap = w1_cap[w1_cap["machine_id"] == m_id]
         assert not m_cap.empty, f"{m_id} icin W1 kapasitesi tanimlanmamis."
@@ -294,11 +294,18 @@ def test_hierarchical_capacity_decomposition():
         setup_hr = float(m_sched["setup_before_min"].sum() / 60.0)
         total_hr = proc_hr + setup_hr
 
-        # 1. LP yalnizca islem suresini sinirlar
+        # 1. Agrega LP yalnizca net islem suresini sinirlar
         assert proc_hr <= lp_max_hr + tolerance, (
             f"{m_id} makinesinde operasyonel islem suresi ({proc_hr:.2f}h), "
             f"LP kapasite tavanini ({lp_max_hr:.2f}h) asiyor."
         )
+
+        # 2. Toplam yuk LP sinirini asiyorsa, fark tamamen setup kaynakli olmalidir
+        if total_hr > lp_max_hr:
+            assert total_hr - lp_max_hr <= setup_hr + tolerance, (
+                f"{m_id} tezgahindaki kapasite asimi ({total_hr - lp_max_hr:.2f}h), "
+                f"toplam setup suresini ({setup_hr:.2f}h) asamaz."
+            )
 
         # 2. Asim varsa bunun tamamen setup kaynakli oldugunu dogrula
         if total_hr > lp_max_hr:
