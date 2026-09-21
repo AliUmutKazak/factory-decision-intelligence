@@ -245,6 +245,26 @@ This platform bridges tactical operational research and discrete-event schedulin
 
 ---
 
+---
+
+## Execution & Result Layers Architecture
+
+Platform sonuçları ve yürütme akışları üç ana operasyonel katmana ayrılmıştır:
+
+```text
+REFERENCE ANALYSIS (Benchmark Baseline)
+ └── Full dataset pipeline execution (CI Run #20)
+ └── Verified Results: 9,482 min makespan | 20,875.1 kWh energy | 9.413 tCO2e emissions
+
+CI VALIDATION (Deterministic Verification)
+ └── Isolated test fixtures & mock schemas
+ └── Fast unit & integration test suites (22 passing tests)
+
+LIVE / LOCAL RUN (Hybrid Adaptive Execution)
+ ├── IF data/raw/train.csv exists ──> Executes full production pipeline
+ └── ELSE ──────────────────────────> Graceful fallback to synthetic benchmark fixtures
+```
+
 ## 8. Academic & Methodological References
 
 1. **Hierarchical Production Planning:**  
