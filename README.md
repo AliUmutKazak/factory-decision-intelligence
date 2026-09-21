@@ -266,7 +266,7 @@ REFERENCE ANALYSIS (Benchmark Baseline)
  └── Verified Results: 9,482 min makespan | 20,875.1 kWh energy | 9.413 tCO2e emissions
 
 CI VALIDATION (Deterministic Verification)
- └── Isolated test fixtures & mock schemas
+ └── Fixture-based end-to-end validation + consistency test suite
  └── Fast unit & integration test suites (22 passing tests)
 
 LIVE / LOCAL RUN (Hybrid Adaptive Execution)
