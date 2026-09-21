@@ -203,9 +203,11 @@ def run_cpsat_scheduling():
     print(f"CP-SAT Çözücü Durumu: {status_name}")
 
     if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        print("Çözüm bulunamadı!")
         conn.close()
-        return
+        raise RuntimeError(
+            f"CP-SAT scheduling failed to find a feasible solution. "
+            f"Solver status: {status_name}. Pipeline terminated immediately."
+        )
 
     best_makespan = int(solver.ObjectiveValue())
     best_bound = int(solver.BestObjectiveBound())
