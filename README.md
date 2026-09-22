@@ -19,13 +19,13 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
 |---|---|---|---|
 | **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
-| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **9,482 dk (158.03 sa)** | 1 takvim haftalık kesintisiz akış süresi sınırında (168 saat calendar week elapsed time) tüm SKU lotları tamamlandı. |
-| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 9,482 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
+| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **8,962 dk (158.03 sa)** | 1 takvim haftalık kesintisiz akış süresi sınırında (168 saat calendar week elapsed time) tüm SKU lotları tamamlandı. |
+| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 8,962 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
 | **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.92 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.07 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
-| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,875.1 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.413 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (9.185 t) dengelendi. Birim emisyon: 1.141 kgCO₂e / adet. |
+| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,853.0 kWh / 244.87 kW** | Ortalama yük 132.09 kW, yük faktörü 0.539 olarak fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **9.403 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (9.185 t) dengelendi. Birim emisyon: 1.141 kgCO₂e / adet. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
 > **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
 > **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
@@ -107,13 +107,13 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 | **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
 | **Veri Üretim Modeli** | `generate_raw_data.py` ile otomatik üretilen sentetik hafif veri | 5 yıllık tam ölçekli fabrika talep geçmişi ve nominal parti boyutları |
 | **İşlem Hacmi (Lot/Birim)** | Test ölçeğinde mikro talep | 8,250 birim disk üretimi (konsolide fabrika haftalık planı) |
-| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **9,482 dakika (158.03 saat)** |
+| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **8,962 dakika (158.03 saat)** |
 | **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Matematiksel olarak kanıtlanmış global optimum) |
 | **Repo / Versiyon Durumu** | Varsayılan repo koduyla doğrudan çalışır (`python main.py`) | Ağır ham veriler `.gitignore` kapsamındadır; analiz metrikleri dondurulmuştur |
 
-> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. Dokümantasyondaki 9,482 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
+> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. Dokümantasyondaki 8,962 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
 
-> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. README genelindeki 9,482 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
+> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. README genelindeki 8,962 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
 
 Operasyonel düzeyde, 1. hafta SKU üretim partilerinin tezgâhlar üzerindeki operasyonları sıra bağımlı hazırlık süreleri ve malzeme temin kısıtlarıyla modellenir.
 
@@ -182,13 +182,13 @@ $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\t
 * **Tepe Yük (Peak Load):** $244.87\text{ kW}$
 * **Ortalama Yük (Avg Load):** $132.09\text{ kW}$
 * **Yük Faktörü (Load Factor):** $0.539$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
-* **Toplam Enerji Tüketimi:** $20,875.3\text{ kWh}$ (%99.1 İşleme, %0.1 Setup, %0.8 Bekleme)
+* **Toplam Enerji Tüketimi:** $20,853.0\text{ kWh}$ (%99.1 İşleme, %0.1 Setup, %0.8 Bekleme)
 * **Birim Tüketim:** $2.530\text{ kWh / bitmiş ürün}$
 
 ### Sera Gazı Emisyonları (GHG Protocol Scope 1 & 2)
 1. **Kapsam 1 (Doğrudan):** Forklift dizel tüketimi (85 L $\times$ 2.68 kg CO₂e/L = 0.228 tCO₂e)
 2. **Kapsam 2 (Dolaylı):** Şebeke elektrik tüketimi ($0.440\text{ kg CO}_2\text{e/kWh}$ emisyon faktörüyle 9.173 tCO₂e)
-3. **Toplam Karbon Ayak İzi:** **9.429 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
+3. **Toplam Karbon Ayak İzi:** **9.403 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
 
 #### Dahili Karbon Fiyatlama (Internal Carbon Pricing) Senaryoları
 > **Finansal Modelleme ve Karbon Metodolojisi Notu:**
@@ -294,7 +294,7 @@ Platform sonuçları ve yürütme akışları üç ana operasyonel katmana ayrı
 ```text
 REFERENCE ANALYSIS (Benchmark Baseline)
  └── Full dataset pipeline execution (CI Run #20)
- └── Verified Results: 9,482 min makespan | 20,875.1 kWh energy | 9.413 tCO2e emissions
+ └── Verified Results: 8,962 min makespan | 20,853.0 kWh energy | 9.403 tCO2e emissions
 
 CI VALIDATION (Deterministic Verification)
  └── Fixture-based end-to-end validation + consistency test suite
@@ -333,10 +333,10 @@ Bu projede geliştirme, sürekli entegrasyon (CI) ve referans üretim koşumu i�
 
 | Rejim | Veri Kaynağı | Talep Kaydı | Kapsam | Tipik Makespan | Kullanım Amacı |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Reference Full Run** | `data/raw/train.csv` (Tam Kaggle Verisi) | 1,826 gün × 5 SKU = 9,130 SKU-days | 2013-01-01 → 2017-12-31 (kapsayıcı) | **9,482 dk** (~158 saat) | Portföy referans sonuçları, kapasite ve enerji fizibilite analizleri |
+| **Reference Full Run** | `data/raw/train.csv` (Tam Kaggle Verisi) | 1,826 gün × 5 SKU = 9,130 SKU-days | 2013-01-01 → 2017-12-31 (kapsayıcı) | **8,962 dk** (~158 saat) | Portföy referans sonuçları, kapasite ve enerji fizibilite analizleri |
 | **CI Test Fixture** | Sentetik / Mock Fixture | 1,825 gün/SKU | 2017-01-01 → 2017-12-31 (veya mock) | **~100 dk** | Hızlı GitHub Actions testleri, birim/entegrasyon doğrulamaları (<2 sn) |
 
-> ⚠️ **Önemli Not:** `data/raw/train.csv` dosyası dosya boyutu nedeniyle repoda sürüm kontrolü dışındaysa veya sıfırdan sentetik ortamda çalıştırılıyorsa, pipeline otomatik olarak test fixture'ını tetikler ve küçültülmüş bir çizelge (~100 dk makespan) üretir. Raporda ve dokümantasyonda sunulan kanonik metrikler (9,482 dk makespan, 20,875.3 kWh enerji) **Reference Full Run** rejimine aittir.
+> ⚠️ **Önemli Not:** `data/raw/train.csv` dosyası dosya boyutu nedeniyle repoda sürüm kontrolü dışındaysa veya sıfırdan sentetik ortamda çalıştırılıyorsa, pipeline otomatik olarak test fixture'ını tetikler ve küçültülmüş bir çizelge (~100 dk makespan) üretir. Raporda ve dokümantasyonda sunulan kanonik metrikler (8,962 dk makespan, 20,853.0 kWh enerji) **Reference Full Run** rejimine aittir.
 
 ---
 
