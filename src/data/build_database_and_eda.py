@@ -40,6 +40,125 @@ def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
 
     return stats
 
+def validate_master_data(data_dict):
+    """
+    Kritik Master Data Validasyon Motoru (Fail-Fast).
+    Şema, null, tekillik, negatif değer, ilişkisel bütünlük ve BOM/Routing kapsamını doğrular.
+    """
+    # 1. Zorunlu Kolon Haritası
+    required_cols = {
+        "machines": ["machine_id", "machine_name", "base_power_kw", "operating_cost_per_hour", "max_daily_hours"],
+        "products": ["product_id", "product_name", "family_id"],
+        "materials": ["material_id", "material_name"],
+        "bom": ["product_id", "material_id", "qty_per_unit"],
+        "routing": ["product_id", "operation_seq", "machine_id", "processing_time_min"],
+        "changeover_matrix": ["from_product", "to_product", "setup_time_min"]
+    }
+
+    # 2. Şema, Null ve Negatif Değer Kontrolleri
+    for tbl_name, req_list in required_cols.items():
+        df = data_dict[tbl_name]
+        missing = [c for c in req_list if c not in df.columns]
+        if missing:
+            raise ValueError(f"[MASTER DATA ERROR] '{tbl_name}' tablosunda zorunlu sütunlar eksik: {missing}")
+        
+        # Null kontrolü
+        null_counts = df[req_list].isnull().sum()
+        if null_counts.any():
+            raise ValueError(f"[MASTER DATA ERROR] '{tbl_name}' tablosunda boş (null) değer tespit edildi:\n{null_counts[null_counts > 0]}")
+
+    # 3. Sayısal Alanlarda Negatif Değer Kontrolü
+    num_checks = [
+        ("machines", ["base_power_kw", "operating_cost_per_hour", "max_daily_hours"]),
+        ("bom", ["qty_per_unit"]),
+        ("routing", ["processing_time_min"]),
+        ("changeover_matrix", ["setup_time_min"])
+    ]
+    for tbl_name, cols in num_checks:
+        df = data_dict[tbl_name]
+        for c in cols:
+            if (df[c] < 0).any():
+                raise ValueError(f"[MASTER DATA ERROR] '{tbl_name}.{c}' alanında negatif değer tespit edildi!")
+
+    # 4. Tekil Anahtar Kontrolü (Duplicate Keys)
+    if data_dict["machines"]["machine_id"].duplicated().any():
+        dups = data_dict["machines"]["machine_id"][data_dict["machines"]["machine_id"].duplicated()].tolist()
+        raise ValueError(f"[MASTER DATA ERROR] 'machines' tablosunda yinelenen machine_id: {dups}")
+    
+    if data_dict["products"]["product_id"].duplicated().any():
+        dups = data_dict["products"]["product_id"][data_dict["products"]["product_id"].duplicated()].tolist()
+        raise ValueError(f"[MASTER DATA ERROR] 'products' tablosunda yinelenen product_id: {dups}")
+
+    # 5. İlişkisel Bütünlük (Referential Integrity)
+    valid_products = set(data_dict["products"]["product_id"])
+    valid_machines = set(data_dict["machines"]["machine_id"])
+    valid_materials = set(data_dict["materials"]["material_id"])
+    # BOM -> Products & Materials
+    bom_products = set(data_dict["bom"]["product_id"])
+    bom_materials = set(data_dict["bom"]["material_id"])
+    if not bom_products.issubset(valid_products):
+        raise ValueError(f"[MASTER DATA ERROR] 'bom' içinde tanımsız product_id: {bom_products - valid_products}")
+    if not bom_materials.issubset(valid_materials):
+        raise ValueError(f"[MASTER DATA ERROR] 'bom' içinde tanımsız material_id: {bom_materials - valid_materials}")
+
+    # Routing -> Products & Machines
+    routing_products = set(data_dict["routing"]["product_id"])
+    routing_machines = set(data_dict["routing"]["machine_id"])
+    if not routing_products.issubset(valid_products):
+        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}")
+    if not routing_machines.issubset(valid_machines):
+        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}")
+
+    # 6. Kapsama Doğrulamaları (Coverage & Completeness)
+    missing_bom = valid_products - bom_products
+    if missing_bom:
+        raise ValueError(f"[MASTER DATA ERROR] Şu ürünler için BOM tanımı bulunamadı: {missing_bom}")
+
+    missing_routing = valid_products - routing_products
+    if missing_routing:
+        raise ValueError(f"[MASTER DATA ERROR] Şu ürünler için Rota tanımı bulunamadı: {missing_routing}")
+
+    # Changeover matrix completeness (her ürün çifti matriste tanımlı mı?)
+    co_df = data_dict["changeover_matrix"]
+    existing_pairs = set(zip(co_df["from_product"], co_df["to_product"]))
+    all_pairs = {(p1, p2) for p1 in valid_products for p2 in valid_products}
+    missing_pairs = all_pairs - existing_pairs
+    if missing_pairs:
+        raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
+
+    # BOM -> Products & Materials
+    bom_products = set(data_dict["bom"]["product_id"])
+    bom_materials = set(data_dict["bom"]["material_id"])
+    if not bom_products.issubset(valid_products):
+        raise ValueError(f"[MASTER DATA ERROR] 'bom' içinde tanımsız product_id: {bom_products - valid_products}")
+    if not bom_materials.issubset(valid_materials):
+        raise ValueError(f"[MASTER DATA ERROR] 'bom' içinde tanımsız material_id: {bom_materials - valid_materials}")
+
+    # Routing -> Products & Machines
+    routing_products = set(data_dict["routing"]["product_id"])
+    routing_machines = set(data_dict["routing"]["machine_id"])
+    if not routing_products.issubset(valid_products):
+        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}")
+    if not routing_machines.issubset(valid_machines):
+        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}")
+
+    # 6. Kapsama Doğrulamaları (Coverage & Completeness)
+    missing_bom = valid_products - bom_products
+    if missing_bom:
+        raise ValueError(f"[MASTER DATA ERROR] Şu ürünler için BOM tanımı bulunamadı: {missing_bom}")
+
+    missing_routing = valid_products - routing_products
+    if missing_routing:
+        raise ValueError(f"[MASTER DATA ERROR] Şu ürünler için Rota (Routing) tanımı bulunamadı: {missing_routing}")
+
+    # Changeover matrix completeness (her ikili var mı?)
+    co_df = data_dict["changeover_matrix"]
+    eexisting_pairs = set(zip(co_df["from_product"], co_df["to_product"]))
+    all_pairs = {(p1, p2) for p1 in valid_products for p2 in valid_products}
+    missing_pairs = all_pairs - existing_pairs
+    if missing_pairs:
+        raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
+
 def initialize_database():
     import gc
     gc.collect()
@@ -64,7 +183,7 @@ def initialize_database():
     orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     orders_df.to_sql("orders", conn, index=False, if_exists="replace")
 
-    # 2. Sentetik fabrika ana veri tablolarını aktar
+    # 2. Sentetik fabrika ana veri tablolarını oku ve fail-fast doğrula
     synthetic_tables = [
         "machines",
         "products",
@@ -74,11 +193,18 @@ def initialize_database():
         "changeover_matrix",
     ]
 
+    loaded_data = {}
     for table in synthetic_tables:
         csv_file = SYNTHETIC_DATA_DIR / f"{table}.csv"
-        if os.path.exists(csv_file):
-            tdf = pd.read_csv(csv_file)
-            tdf.to_sql(table, conn, index=False, if_exists="replace")
+        if not os.path.exists(csv_file):
+            raise FileNotFoundError(f"Missing mandatory master data: {table}.csv")
+        loaded_data[table] = pd.read_csv(csv_file)
+
+    # Master-data bütünlük denetimi (Fail-Fast)
+    validate_master_data(loaded_data)
+
+    for table, tdf in loaded_data.items():
+        tdf.to_sql(table, conn, index=False, if_exists="replace")
 
     conn.commit()
 
