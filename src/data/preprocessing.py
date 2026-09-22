@@ -27,7 +27,7 @@ def run_preprocessing():
     pilot_df["product_id"] = pilot_df["item"].map(product_mapping)
     pilot_df["order_date"] = pd.to_datetime(pilot_df["date"])
 
-    # 10 Mağaza talebini konsolide fabrika çekme talebine dönüştür: D_{i,t} = sum(Sales)
+    # N Mağaza talebini konsolide fabrika çekme talebine dönüştür: D_{i,t} = sum(Sales)
     n_stores = pilot_df['store'].nunique() if 'store' in pilot_df.columns else (df['store'].nunique() if 'store' in df.columns else 10)
     print(f"[2/3] {n_stores} mağaza talebi tek fabrika çekme talebine konsolide ediliyor...")
     factory_demand = (
