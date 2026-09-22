@@ -306,10 +306,11 @@ with tab_sustainability:
         st.plotly_chart(fig_pie, use_container_width=True)
 
     with col_s2:
-        st.markdown("### 💶 Dahili Karbon Fiyat Simülatörü")
+        st.markdown("### 💶 Dahili Karbon Fiyat Simülatörü (Internal Carbon Pricing)")
         user_c_price = st.slider(
-            "İçsel Karbon Fiyat Senaryosu (€/tCO₂e):",
-            min_value=0, max_value=200, value=80, step=10
+            "Dahili Karbon Fiyat Senaryosu / Internal Carbon Price Scenario (€/tCO₂e):",
+            min_value=0, max_value=200, value=80, step=10,
+            help="Bu simülasyon bir emisyon piyasası takası değil, Exposure = Carbon × InternalCarbonPrice formülüne dayalı içsel gölge fiyatlandırma (Shadow Pricing) senaryosudur."
         )
         sim_exposure = c_kpi["total_tco2e"] * user_c_price
         st.metric("Hesaplanan Toplam Karbon Maliyeti", f"€{sim_exposure:,.2f}")
