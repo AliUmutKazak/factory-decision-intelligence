@@ -112,14 +112,33 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
 
     for m_id, specs in machine_specs.items():
         m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-        proc_time_m = m_tasks["duration_min"].sum()
-        m_proc_kwh = m_tasks["total_proc_energy_kwh"].sum()
-
+        proc_time_m = m_tasks["duration_min"].sum() if "duration_min" in m_tasks.columns else m_tasks["duration"].sum()
         m_setup_time = m_tasks["setup_before_min"].sum() if "setup_before_min" in m_tasks.columns else 0
-        m_idle_time = max(0, makespan_min - (proc_time_m + m_setup_time))
 
+        # Gerçek Fabrika Durum Ayrımı: OFF (Vardiya Dışı/Tatil) vs IDLE (Açık Vardiyada Bekleme)
+        # makespan_min içindeki planlı duruş dakikalarını hesapla
+        total_days_spanned = int(makespan_min // 1440) + 1
+        m_off_time = 0
+        for day in range(min(total_days_spanned, 7)):
+            if day < 6:
+                # Pzt-Cmt: Her gün 16. saatten sonraki 8 saat (dakika 960 -> 1440) duruş
+                night_start = day * 1440 + 16 * 60
+                night_end = (day + 1) * 1440
+                if makespan_min > night_start:
+                    m_off_time += min(makespan_min, night_end) - night_start
+            else:
+                # 7. Gün: Pazar günü tam duruş (dakika 8640 -> 10080)
+                sun_start = 6 * 1440
+                sun_end = 7 * 1440
+                if makespan_min > sun_start:
+                    m_off_time += min(makespan_min, sun_end) - sun_start
+
+        # Operasyonel IDLE: Sadece açık vardiyalarda iş/setup dışındaki bekleme süresi
+        m_idle_time = max(0, makespan_min - (proc_time_m + m_setup_time + m_off_time))
+        m_proc_kwh = m_tasks["total_proc_energy_kwh"].sum() if "total_proc_energy_kwh" in m_tasks.columns else (proc_time_m / 60.0) * specs["power_kw"]
         m_setup_kwh = (m_setup_time / 60.0) * specs["setup_kw"]
         m_idle_kwh = (m_idle_time / 60.0) * specs["idle_kw"]
+        # OFF durumunda güç tüketimi 0 kW'tır
         m_total_kwh = m_proc_kwh + m_setup_kwh + m_idle_kwh
 
         total_setup_kwh += m_setup_kwh
