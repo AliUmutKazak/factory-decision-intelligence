@@ -169,6 +169,8 @@ BOM ağacı üzerinden her hammadde için dinamik stok projeksiyonu:
 
 $$I_{t}^{\text{proj}} = I_{t-1}^{\text{proj}} + SR_t - GR_t$$
 $$NR_t = \max\left(0, GR_t + SS - I_{t-1}^{\text{proj}} - SR_t\right)$$
+> **Emniyet Stoku Metodolojisi ve Kısıtı (Simplified MRP Approximation):**
+> Modeldeki emniyet stoku ($SS$), 4 haftalık planlama ufkundaki brüt ihtiyaç dağılımının standart sapması ($\sigma_{GR} = \text{std}(\text{gross\_requirement})$) üzerinden hesaplanan deterministik bir operasyonel yaklaşımdır (`simplified MRP approximation`). Bu metrik doğrudan talep tahmin belirsizliğini ($\sigma_{\text{demand}}$ veya tahmin hatası $\text{RMSE}$) modellemez; bağımlı talebin planlama ufkundaki dalgalanmasını baz alır. Klasik stok teorisindeki $SS = z \cdot \sigma_{\text{demand}} \cdot \sqrt{LT}$ kapalı çevrim stok ayrıştırması ilerideki stokastik genişletmelere bırakılmıştır.
 
 * **Tedarik Eylem Mesajları:** Temin süresi geriye ötelendiğinde cari periyodun gerisine düşen ($t - L \le 0$) siparişler otomatik olarak **`EXPEDITE (Past Due)`** mesajı üretir (Örn. `RAW_ALLOY_ROD` 1. ve 2. hafta siparişleri). Bu parçaları tüketen ürün lotları CP-SAT çizelgesinde 480 dakikalık malzeme serbest bırakma eşiğine kilitlenir. Gelecek dönemler ise **`RELEASE ORDER`** olarak planlanır.
 
