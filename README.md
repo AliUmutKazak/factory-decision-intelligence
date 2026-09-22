@@ -302,6 +302,7 @@ LIVE / LOCAL RUN (Hybrid Adaptive Execution)
    European Environment Agency (EEA) / IEA Greenhouse Gas Emission Factors for National Electricity Grids (standard baseline range: $0.400 - 0.480\text{ kgCO}_2\text{e/kWh}$).
 
 ### ⚙️ Çizelgeleme Granülerliği ve Modelleme Tercihleri (Lot Streaming vs. Consolidated Lots)
+- **Hazırlık (Setup) Zamanlaması ve Enerji Kuplajı:** CP-SAT modelinde tezgâh geçişleri $\text{Start}_j \ge \text{End}_i + \text{Setup}_{ij}$ kısıtıyla çözülmektedir. İki ardışık iş arasındaki boşluklarda hazırlık operasyonu, Yalın Üretim ilkelerine uygun olarak bir sonraki işin hemen öncesine (Just-in-Time Setup: $[\text{Start}_j - \text{Setup}_{ij}, \text{Start}_j]$) ötelenerek enerji yük profiline yansıtılır. İleri sürümlerde hazırlık sürelerinin tezgâh üzerinde bağımsız birer `OptionalIntervalVar` olarak çözücüye optimize ettirilmesi yol haritasına alınmıştır.
 - **Referans Çizelgeleme Katmanı:** Haftalık planlanan SKU talepleri, NP-Hard arama uzayını kontrol altında tutmak ve matematiksel global optimumu kesinleştirmek amacıyla SKU başına tekil üretim lotu (**one production lot per SKU for the reference scheduling layer**) olarak modellenmiştir.
 - **Operasyonel Davranış:** Operasyonlar arası transfer partileri (sub-lot / transfer batch streaming) yerine parti tamamlama önceliği (strict precedence) esas alınmıştır. Bu sayede CP-SAT çözücüsü `AddCircuit` tabanlı sıra bağımlı hazırlık kısıtlarıyla saniyeler içinde kanıtlanmış optimal makespan'e ulaşmaktadır.
 
