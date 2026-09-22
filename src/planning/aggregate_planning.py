@@ -302,6 +302,54 @@ def disaggregate_to_sku(family_plan_df, sku_weekly):
             })
 
     return pd.DataFrame(sku_plan)
+def validate_and_repair_disaggregation(sku_plan_df, routing_df, machines_df):
+    """
+    Closed-Loop Disaggregation Feasibility & Capacity Consistency Check.
+    Ayrıştırma sonrası SKU miksinin makine kapasite sınırlarını (Normal + Max Overtime)
+    aşıp aşmadığını teyit eder. Olası kapasite aşımında partileri sınırlar (repair).
+    """
+    repaired_df = sku_plan_df.copy()
+    
+    # Her ürün ve makine için parti işlem süresi (saat): processing_time_min / 60.0
+    proc_col = "processing_time_min" if "processing_time_min" in routing_df.columns else "cycle_time_min"
+    cycle_map = {(row["product_id"], row["machine_id"]): float(row[proc_col]) / 60.0 
+                 for _, row in routing_df.iterrows()}
+    
+    # LP ile birebir aynı tezgâh azami kullanılabilir kapasite sınırı
+    effective_cap = WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER)
+    max_cap = effective_cap + AGGREGATE_MAX_OVERTIME_HOURS
+    
+    weeks = sorted(repaired_df["period_week"].unique())
+    machines = list(machines_df["machine_id"].unique())
+    
+    for w in weeks:
+        week_mask = repaired_df["period_week"] == w
+        w_df = repaired_df[week_mask]
+        
+        for m in machines:
+            # Haftalık bu makinedeki toplam yükü hesapla
+            load = sum(row["planned_batches"] * cycle_map.get((row["product_id"], m), 0.0) 
+                       for _, row in w_df.iterrows())
+            
+            if load > max_cap + 1e-4:
+                overload = load - max_cap
+                print(f"[CLOSED-LOOP ALERT] Hafta {w}, Tezgâh {m} kapasite aşımı: {load:.2f}h > {max_cap:.2f}h. Otomatik onarım devrede.")
+                candidate_indices = [idx for idx, row in w_df.iterrows() if cycle_map.get((row["product_id"], m), 0.0) > 0]
+                candidate_indices.sort(key=lambda idx: cycle_map.get((repaired_df.loc[idx, "product_id"], m), 0.0), reverse=True)
+                
+                for c_idx in candidate_indices:
+                    c_time = cycle_map.get((repaired_df.loc[c_idx, "product_id"], m), 0.0)
+                    batches = repaired_df.loc[c_idx, "planned_batches"]
+                    if batches > 0 and c_time > 0:
+                        reducible_batches = min(batches, int(np.ceil(overload / c_time)))
+                        repaired_df.loc[c_idx, "planned_batches"] -= reducible_batches
+                        repaired_df.loc[c_idx, "planned_units"] = int(repaired_df.loc[c_idx, "planned_batches"] * UNITS_PER_BATCH)
+                        overload -= reducible_batches * c_time
+                        if overload <= 1e-4:
+                            break
+                print(f"[CLOSED-LOOP REPAIR] Hafta {w}, Tezgâh {m} için parti miktarları kapasite sınırına onarıldı.")
+
+    return repaired_df
 
 def run_planning_pipeline():
     forecast_df, products_df, routing_df, machines_df = load_data()
@@ -309,7 +357,8 @@ def run_planning_pipeline():
 
     family_plan_df, shadow_prices, machine_capacity_df = solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df)
     sku_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
-
+    # Kapalı Devre (Closed-Loop) Fizibilite Doğrulama ve Onarımı
+    sku_plan_df = validate_and_repair_disaggregation(sku_plan_df, routing_df, machines_df)
     print("=" * 85)
     print("      AŞAMA 4: HİYERARŞİK TAKTİK PLANLAMA (LEVEL 1: FAMILY AGGREGATE LP)      ")
     print("=" * 85)
