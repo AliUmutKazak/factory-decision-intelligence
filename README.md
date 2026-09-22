@@ -117,6 +117,18 @@ $$\min C_{\max}$$
 
 * **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
 * **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini 40.0 saat aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
+* **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
+
+#### ⚖️ Hiyerarşik Kapasite Mutabakatı & Hazırlık Yükü (HPP Design Principle)
+Agrega LP (Taktik Seviye) ile CP-SAT (Operasyonel Seviye) arasındaki kapasite tanımı, Hiyerarşik Üretim Planlama (HPP) metodolojisine uygun olarak iki aşamalı modellenmiştir:
+* **Taktik Seviye (LP):** Sıra bağımlı hazırlık (sequence-dependent setup) süreleri iş sıralaması bilinmediğinden dahil edilmez; saf işlem süreleri azami nominal + fazla mesai tavanına ($134.4\text{ saat}$) göre kısıtlanır.
+* **Operasyonel Seviye (CP-SAT):** Partiler ardışık tezgâhlara dizildiğinde sıra bağımlı hazırlık süreleri eklenir. Darboğaz tezgâhı M01'de gerçekleşen hazırlık süresi ($2.83\text{ saat}$) ve oluşan $2.58\text{ saatlik}$ fark (`setup_overrun_hr`), hazırlık yükünün operasyonel aşamada eklenmesinden kaynaklanan doğal bir varyans olarak açıkça mutabakat tablosunda raporlanır:
+
+| Tezgâh (Machine) | LP İzin Verilen Tavan (`lp_max_allowed_hr`) | İşlem Süresi (`proc_hours`) | Hazırlık Süresi (`setup_hours`) | Toplam Yük (`total_workload_hr`) | Hazırlık Aşımı (`setup_overrun_hr`) |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **M01** | **134.40 sa** | 134.15 sa | 2.83 sa | **136.98 sa** | **2.58 sa** |
+| **M02** | **86.40 sa** | 64.37 sa | 3.50 sa | **67.87 sa** | **0.00 sa** |
+| **M03** | **86.40 sa** | 72.47 sa | 2.58 sa | **75.05 sa** | **0.00 sa** |
 
 ---
 
