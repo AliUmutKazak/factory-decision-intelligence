@@ -102,6 +102,8 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 
 ### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
 
+### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
+
 | Kriter | CI Test Fixture (Sentetik Fikstür) | Reference Analysis Dataset (Referans Koşum) |
 | :--- | :--- | :--- |
 | **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
@@ -110,6 +112,8 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 | **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **9,482 dakika (158.03 saat)** |
 | **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Matematiksel olarak kanıtlanmış global optimum) |
 | **Repo / Versiyon Durumu** | Varsayılan repo koduyla doğrudan çalışır (`python main.py`) | Ağır ham veriler `.gitignore` kapsamındadır; analiz metrikleri dondurulmuştur |
+
+> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. Dokümantasyondaki 9,482 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
 
 > **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. README genelindeki 9,482 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
 
@@ -130,7 +134,7 @@ $$\min C_{\max}$$
 
 * **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
 * **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini 40.0 saat aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
-* **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
+
 
 #### ⚖️ Hiyerarşik Kapasite Mutabakatı & Hazırlık Yükü (HPP Design Principle)
 Agrega LP (Taktik Seviye) ile CP-SAT (Operasyonel Seviye) arasındaki kapasite tanımı, Hiyerarşik Üretim Planlama (HPP) metodolojisine uygun olarak iki aşamalı modellenmiştir:
