@@ -191,6 +191,8 @@ $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\t
 3. **Toplam Karbon Ayak İzi:** **9.429 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
 
 #### Dahili Karbon Fiyatlama (Internal Carbon Pricing) Senaryoları
+> **Finansal Modelleme ve Karbon Metodolojisi Notu:**
+> Sistemde hesaplanan karbon maliyetleri bir piyasa tahsisat uyumu (EU ETS compliance allowance trading) olmayıp, kurumsal **Dahili Karbon Fiyatlandırması (Internal Carbon Pricing / Shadow Pricing)** metodolojisine dayanır. Maruziyet hesabı doğrudan $\text{Exposure} = \text{Carbon (tCO}_2\text{e)} \times \text{InternalCarbonPrice (€/tCO}_2\text{e)}$ formülüyle senaryo bazlı analiz edilir[cite: 8].
 | Karbon Fiyatı (€/tCO₂e) | Toplam Karbon Maruziyeti (€) | Birim Ürün Başı Ek Karbon Maliyeti (€/adet) |
 |:---:|:---:|:---:|
 | **0** | 0.00 | 0.0000 |
