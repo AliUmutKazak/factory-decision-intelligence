@@ -100,6 +100,19 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 
 ### 2. Detaylı Çizelgeleme (Google OR-Tools CP-SAT)
 
+### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
+
+| Kriter | CI Test Fixture (Sentetik Fikstür) | Reference Analysis Dataset (Referans Koşum) |
+| :--- | :--- | :--- |
+| **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
+| **Veri Üretim Modeli** | `generate_raw_data.py` ile otomatik üretilen sentetik hafif veri | 5 yıllık tam ölçekli fabrika talep geçmişi ve nominal parti boyutları |
+| **İşlem Hacmi (Lot/Birim)** | Test ölçeğinde mikro talep | 8,250 birim disk üretimi (konsolide fabrika haftalık planı) |
+| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **9,482 dakika (158.03 saat)** |
+| **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Matematiksel olarak kanıtlanmış global optimum) |
+| **Repo / Versiyon Durumu** | Varsayılan repo koduyla doğrudan çalışır (`python main.py`) | Ağır ham veriler `.gitignore` kapsamındadır; analiz metrikleri dondurulmuştur |
+
+> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. README genelindeki 9,482 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
+
 Operasyonel düzeyde, 1. hafta SKU üretim partilerinin tezgâhlar üzerindeki operasyonları sıra bağımlı hazırlık süreleri ve malzeme temin kısıtlarıyla modellenir.
 
 #### Amaç Fonksiyonu:
