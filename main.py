@@ -19,6 +19,9 @@ from src.carbon.carbon_analytics import compute_carbon_analytics
 
 def run_end_to_end_pipeline():
     start_total = time.time()
+# Aşama 8: Industrial Decision Lineage & Audit Trail Kaydı
+    meta = record_pipeline_run_metadata()
+    print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Git: {meta['git_sha'][:7]})")
     print("\n" + "#" * 85)
     print("      FABRİKA KARAR DESTEK PLATFORMU: UÇTAN UCA ENTEGRE ÇALIŞTIRMA      ")
     print("#" * 85 + "\n")
@@ -48,3 +51,4 @@ def run_end_to_end_pipeline():
 
 if __name__ == "__main__":
     run_end_to_end_pipeline()
+from src.utils.lineage import record_pipeline_run_metadata
