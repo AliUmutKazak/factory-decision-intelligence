@@ -317,8 +317,8 @@ LIVE / LOCAL RUN (Hybrid Adaptive Execution)
    Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., & Liu, T. Y. (2017). *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 3146–3154.
 5. **Demand Dataset Source:**  
    Kaggle Store Item Demand Forecasting Dataset (10 stores, 50 items daily sales history), adapted for multi-echelon industrial manufacturing research.
-6. **Electricity Emission Factor Benchmark:**  
-   European Environment Agency (EEA) / IEA Greenhouse Gas Emission Factors for National Electricity Grids (standard baseline range: $0.400 - 0.480\text{ kgCO}_2\text{e/kWh}$).
+6. **Electricity Emission Factor Benchmark (Scope 2):**  
+   T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) Güncel Elektrik Şebeke Emisyon Faktörleri (İletim: $0.436\text{ tCO}_2\text{e/MWh}$, Dağıtım: $0.469\text{ tCO}_2\text{e/MWh}$) referans alınarak kurgulanmış sentetik orta nokta varsayımı ($0.440\text{ tCO}_2\text{e/MWh}$)[cite: 1]. Uluslararası karşılaştırmalarda European Environment Agency (EEA) ve IEA sera gazı metodolojileriyle parametrik olarak uyumludur.
 
 ### ⚙️ Çizelgeleme Granülerliği ve Modelleme Tercihleri (Lot Streaming vs. Consolidated Lots)
 - **Hazırlık (Setup) Zamanlaması ve Enerji Kuplajı:** CP-SAT modelinde tezgâh geçişleri $\text{Start}_j \ge \text{End}_i + \text{Setup}_{ij}$ kısıtıyla çözülmektedir. İki ardışık iş arasındaki boşluklarda hazırlık operasyonu, Yalın Üretim ilkelerine uygun olarak bir sonraki işin hemen öncesine (Just-in-Time Setup: $[\text{Start}_j - \text{Setup}_{ij}, \text{Start}_j]$) ötelenerek enerji yük profiline yansıtılır. İleri sürümlerde hazırlık sürelerinin tezgâh üzerinde bağımsız birer `OptionalIntervalVar` olarak çözücüye optimize ettirilmesi yol haritasına alınmıştır.
