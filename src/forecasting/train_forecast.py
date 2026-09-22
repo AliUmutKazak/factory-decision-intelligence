@@ -167,7 +167,6 @@ def run_forecast_benchmark():
 
         # En düşük WAPE'e sahip adil kazananı seç
         best_name = min(models, key=lambda k: models[k][0])
-        best_pred = models[best_name][3]
 
         for m_name, (w, r, b, _) in models.items():
             benchmark_summary.append({
@@ -179,7 +178,51 @@ def run_forecast_benchmark():
                 "Kazanan": "✓" if m_name == best_name else ""
             })
 
-        for d, q in zip(test_raw["order_date"], best_pred):
+        # --- OPERASYONEL GELECEK TAHMİNİ (PRODUCTION REFIT & OUT-OF-SAMPLE FORECAST) ---
+        # Kazanan modeli tüm geçmiş veriyle (pdf) refit edip gerçek geleceğe tahmin üretiyoruz
+        last_date = pd.to_datetime(pdf["order_date"].max())
+        future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=HORIZON_DAYS, freq="D")
+
+        if best_name == "Naive":
+            future_preds = np.repeat(pdf["demand"].iloc[-1], HORIZON_DAYS)
+
+        elif best_name == "Seasonal Naive":
+            last_7 = pdf["demand"].iloc[-7:].values
+            future_preds = np.tile(last_7, int(np.ceil(HORIZON_DAYS / 7)))[:HORIZON_DAYS]
+
+        elif best_name == "Moving Average":
+            future_preds = np.repeat(pdf["demand"].iloc[-7:].mean(), HORIZON_DAYS)
+
+        elif best_name == "Holt-Winters":
+            hw_prod = ExponentialSmoothing(
+                pdf["demand"].astype(float),
+                trend="add",
+                seasonal="add",
+                seasonal_periods=7
+            ).fit()
+            future_preds = hw_prod.forecast(HORIZON_DAYS).values
+            future_preds = np.maximum(0, future_preds)
+
+        elif best_name == "LightGBM":
+            prod_train_matrix = build_training_matrix(pdf)
+            lgb_prod_train = lgb.Dataset(prod_train_matrix[feature_cols], label=prod_train_matrix["demand"])
+            gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=150)
+
+            prod_sim_history = pdf.copy()
+            future_preds_list = []
+            for f_date in future_dates:
+                feat_step = extract_features_for_row(prod_sim_history, f_date)
+                feat_df = pd.DataFrame([feat_step])[feature_cols]
+                p_val = max(0.0, float(gbm_prod.predict(feat_df)[0]))
+                future_preds_list.append(p_val)
+                prod_sim_history = pd.concat([
+                    prod_sim_history,
+                    pd.DataFrame([{"order_date": f_date, "product_id": pid, "demand": p_val}])
+                ], ignore_index=True)
+            future_preds = np.array(future_preds_list)
+
+        # Gerçek operasyonel gelecek kayıtlarını yaz
+        for d, q in zip(future_dates, future_preds):
             final_forecast_records.append({
                 "forecast_date": d.strftime("%Y-%m-%d"),
                 "product_id": pid,

@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -136,7 +137,6 @@ def run_cpsat_scheduling(sku_plan=None):
         ]
         empty_df = pd.DataFrame(columns=canonical_cols)
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-        import os
         os.makedirs("data/processed", exist_ok=True)
         empty_df.to_csv("data/processed/production_schedule.csv", index=False)
         return empty_df
@@ -319,15 +319,26 @@ def run_cpsat_scheduling(sku_plan=None):
             schedule_rows.append(item)
 
     sched_df = pd.DataFrame(schedule_rows)
-    sched_df["batch_id"] = sched_df["lot_id"]
-    sched_df["batch_qty"] = sched_df["lot_qty"]
 
-    sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-    
-    # Repodaki CSV dosyasini SQLite ile senkronize tut
-    import os
+    if not sched_df.empty:
+        sched_df["batch_id"] = sched_df["lot_id"]
+        sched_df["production_units"] = sched_df["lot_qty"]
+        if "sub_b_qty" in sched_df.columns:
+            sched_df["batch_qty"] = sched_df["sub_b_qty"]
+            sched_df["sub_batch_qty"] = sched_df["sub_b_qty"]
+        elif "sub_batch_qty" in sched_df.columns:
+            sched_df["batch_qty"] = sched_df["sub_batch_qty"]
+    else:
+        for col in ["batch_id", "production_units", "batch_qty", "sub_batch_qty"]:
+            if col not in sched_df.columns:
+                sched_df[col] = []
+
     os.makedirs('data/processed', exist_ok=True)
     sched_df.to_csv('data/processed/production_schedule.csv', index=False)
+
+    conn = sqlite3.connect('data/factory.db')
+    sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+    conn.close()
     print('✓ production_schedule.csv guncellendi.')
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)

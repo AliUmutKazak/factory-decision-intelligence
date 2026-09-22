@@ -5,10 +5,17 @@ from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR
 
 def run_preprocessing():
     raw_path = RAW_DATA_DIR / "train.csv"
-    fixture_path = RAW_DATA_DIR.parent / "fixtures" / "demand_fixture.csv"
+    fixture_name = os.environ.get("USE_FIXTURE", "demand_fixture.csv")
+    if not fixture_name.endswith(".csv"):
+        fixture_name = "demand_fixture.csv"
+    fixture_path = RAW_DATA_DIR.parent / "fixtures" / fixture_name
     output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
 
-    if os.path.exists(raw_path):
+    # USE_FIXTURE ortam değişkeni varsa veya raw_path yoksa fixture kullan
+    if "USE_FIXTURE" in os.environ and os.path.exists(fixture_path):
+        data_source = fixture_path
+        print(f"[1/3] CI test senaryo fixture kullanılıyor ({fixture_path})...")
+    elif os.path.exists(raw_path):
         data_source = raw_path
         print(f"[1/3] Ham veri seti okunuyor ({raw_path})...")
     elif os.path.exists(fixture_path):

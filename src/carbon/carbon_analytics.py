@@ -32,13 +32,13 @@ def compute_carbon_analytics():
     # Ham hassasiyetle hesapla (Raw Precision - First-Law Closed Loop)
     machine_total_kwh = float(machine_kpis_df["total_kwh"].sum())
     raw_scope_2 = (machine_kpis_df["total_kwh"] / 1000.0) * GRID_EMISSION_FACTOR
-    
-    # Oranı makinelerin fiili toplamına bağla (erken yuvarlama sapmalarını %100 normalize eder)
-    raw_share = (machine_kpis_df["total_kwh"] / machine_total_kwh) * 100.0 if machine_total_kwh > 0 else 0.0
+
+    if machine_total_kwh > 0:
+        machine_kpis_df["carbon_share_pct"] = ((machine_kpis_df["total_kwh"] / machine_total_kwh) * 100.0).round(2)
+    else:
+        machine_kpis_df["carbon_share_pct"] = 0.0
 
     machine_kpis_df["scope_2_tco2e"] = raw_scope_2.round(4)
-    machine_kpis_df["carbon_share_pct"] = raw_share.round(2)
-    machine_kpis_df["raw_carbon_share_pct"] = raw_share
 
     total_tco2e = scope_1_tco2e + scope_2_tco2e
     kgco2e_per_unit = (total_tco2e * 1000.0) / total_units if total_units > 0 else 0.0

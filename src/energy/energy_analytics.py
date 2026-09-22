@@ -76,7 +76,18 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
             })
         kpi_df = pd.DataFrame([facility_kpis])
         m_kpi_df = pd.DataFrame(machine_kpis)
-        profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
+        profile_df = pd.DataFrame(columns=["interval_15min", "start_min", "end_min", "load_kw"])
+
+        os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
+        kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
+        profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
+
+        conn = sqlite3.connect(DB_PATH)
+        kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
+        profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
+        m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
+        conn.close()
+
         return kpi_df, m_kpi_df, profile_df
 
     makespan_min = int(schedule_df["end_min"].max())
@@ -220,22 +231,28 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
     print("=" * 85)
 
     os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
-    pd.DataFrame([kpi_summary]).to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
-    profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
-
     kpi_df = pd.DataFrame([kpi_summary])
     m_kpi_df = pd.DataFrame(machine_kpis)
 
+    # 1. CSV Kayıtları
+    os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
+    kpi_df = pd.DataFrame([kpi_summary])
+    m_kpi_df = pd.DataFrame(machine_kpis)
+
+    # Normal calisma CSV kayitlari
+    kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
+    profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
+
+    # Normal calisma SQLite veritabani kayitlari
     conn = sqlite3.connect(DB_PATH)
-    kpi_df.to_sql("energy_kpis", conn, index=False, if_exists="replace")
-    m_kpi_df.to_sql("energy_machine_kpis", conn, index=False, if_exists="replace")
-    profile_df.to_sql("energy_profile_15min", conn, index=False, if_exists="replace")
+    kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
+    profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
+    m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
     conn.close()
 
-    print(f"[OK] Enerji KPI'ları Kaydedildi: {OUTPUT_ENERGY_KPI_PATH}")
-    print(f"[OK] 15 Dakikalık Yük Profili Kaydedildi: {OUTPUT_PROFILE_PATH}")
-    print(f"[OK] SQLite 'energy_kpis' ve 'energy_profile_15min' tabloları güncellendi.")
+    print(f"[OK] Enerji KPI'lari Kaydedildi: {OUTPUT_ENERGY_KPI_PATH}")
+    print(f"[OK] 15 Dakikalik Yuk Profili Kaydedildi: {OUTPUT_PROFILE_PATH}")
+    print("[OK] SQLite 'energy_kpis' ve 'energy_profile_15min' tablolari guncellendi.")
     print("=" * 85)
-    return kpi_df, m_kpi_df, profile_df
-if __name__ == "__main__":
-    compute_energy_analytics()
+
+    return kpi_summary

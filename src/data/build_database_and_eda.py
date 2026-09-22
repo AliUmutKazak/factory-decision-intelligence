@@ -41,8 +41,21 @@ def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
     return stats
 
 def initialize_database():
+    import gc
+    gc.collect()
+
     if os.path.exists(DB_PATH):
-        os.remove(DB_PATH)
+        try:
+            os.remove(DB_PATH)
+        except PermissionError:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            cur.execute("PRAGMA writable_schema = 1;")
+            cur.execute("DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');")
+            cur.execute("PRAGMA writable_schema = 0;")
+            conn.commit()
+            cur.execute("VACUUM;")
+            conn.close()
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
