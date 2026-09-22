@@ -146,7 +146,9 @@ def run_cpsat_scheduling(sku_plan=None):
     # CP-SAT MODEL TANIMI
     # -------------------------------------------------------------
     model = cp_model.CpModel()
-    horizon = int(tasks_df["duration"].sum() + len(tasks_df) * 120 + 5000)
+    # 7 Günlük Gerçek Takvim Ufku (168 saat = 10,080 dakika) ve iş yükü payı
+    CALENDAR_HORIZON_MIN = 7 * 24 * 60
+    horizon = int(max(CALENDAR_HORIZON_MIN, tasks_df["duration"].sum() + len(tasks_df) * 120 + 5000))
 
     all_tasks = {}
     machine_to_tasks = {}
@@ -261,9 +263,25 @@ def run_cpsat_scheduling(sku_plan=None):
                     model.Add(s_end == all_tasks[t2]["start"]).OnlyEnforceIf(lit)
                 else:
                     model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"]).OnlyEnforceIf(lit)
+        # Gerçek Fabrika Takvim Duruşları (Non-working Shifts / Breaks)
+        # Pzt-Cmt: Her gün 16. saatten sonra 8 saat duruş (gece 00:00 - 08:00)
+        break_intervals = []
+        for day in range(6):
+            b_start = day * 1440 + 16 * 60   # Vardiya sonu
+            b_dur = 8 * 60                   # 8 saat gece duruşu
+            b_end = b_start + b_dur
+            b_int = model.NewIntervalVar(b_start, b_dur, b_end, f"night_break_{mid}_d{day}")
+            break_intervals.append(b_int)
+
+        # 7. Gün: Pazar günü tam gün duruş (24 saat = 1440 dakika)
+        sunday_start = 6 * 1440
+        sunday_dur = 24 * 60
+        sunday_end = sunday_start + sunday_dur
+        sunday_int = model.NewIntervalVar(sunday_start, sunday_dur, sunday_end, f"sunday_break_{mid}")
+        break_intervals.append(sunday_int)
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
-        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals)
+        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
         model.AddCircuit(circuit_arcs)
 
 
