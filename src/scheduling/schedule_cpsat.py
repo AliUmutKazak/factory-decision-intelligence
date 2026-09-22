@@ -128,12 +128,18 @@ def run_cpsat_scheduling(sku_plan=None):
                 })
                 task_counter += 1
     if not tasks:
-        empty_cols = [
-            "task_id", "lot_id", "product_id", "operation_id", "machine_id",
-            "start_min", "end_min", "duration_min", "setup_before_min",
-            "setup_start_min", "setup_end_min", "batch_units"
+        canonical_cols = [
+            "task_id", "lot_id", "product_id", "operation_id", "operation_seq",
+            "machine_id", "start_min", "end_min", "duration_min", "lot_qty",
+            "setup_before_min", "setup_end_min", "setup_start_min",
+            "batch_id", "batch_qty"
         ]
-        return pd.DataFrame(columns=empty_cols)
+        empty_df = pd.DataFrame(columns=canonical_cols)
+        empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+        import os
+        os.makedirs("data/processed", exist_ok=True)
+        empty_df.to_csv("data/processed/production_schedule.csv", index=False)
+        return empty_df
     tasks_df = pd.DataFrame(tasks)
 
     # -------------------------------------------------------------
