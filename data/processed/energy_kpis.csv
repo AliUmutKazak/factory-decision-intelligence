@@ -1,2 +1,2 @@
 makespan_hours,total_units_produced,processing_kwh,setup_kwh,idle_kwh,grand_total_kwh,kwh_per_unit,avg_load_kw,peak_load_kw,load_factor
-149.4,8250,20671.9,16.2,165.9,20853.9,2.528,139.62,248.2,0.563
+149.4,8250,20671.8817,17.925,165.1757,20854.9823,2.528,139.62,251.95,0.554
