@@ -182,7 +182,12 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
             )
 
     model.solve(pulp.PULP_CBC_CMD(msg=False))
-
+    solver_status = pulp.LpStatus[model.status]
+    if solver_status != "Optimal":
+        raise RuntimeError(
+            f"Agrega LP optimizasyonu başarısız oldu! "
+            f"Beklenen: 'Optimal', Alınan Durum: '{solver_status}'"
+        )
     plan_records = []
     for t in periods:
         # Hafta bazında maksimum fazla mesai yapan makinenin süresi
