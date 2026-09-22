@@ -57,6 +57,8 @@ AGGREGATE_INITIAL_INVENTORY = {
 # 4. Detaylı Çizelgeleme & Parti Parametreleri (CP-SAT SSOT)
 MRP_EXPEDITE_RELEASE_TIME_MIN = 480       # Malzeme gecikmesi durumundaki erken teslim release time (dk)
 PRODUCTION_BATCH_SIZE = 25               # Referans parti büyüklüğü (adet)
+ENABLE_LOT_STREAMING = True
+MAX_SUB_LOT_BATCHES = 40
 # Lot Streaming / Transfer Batching Ayarları
 ENABLE_LOT_STREAMING = True           # Dev partileri alt transfer lotlarına bölerek overlap sağla
 MAX_SUB_LOT_BATCHES = 40              # Bir alt transfer lotunun alabileceği maksimum batch sayısı

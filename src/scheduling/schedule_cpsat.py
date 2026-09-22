@@ -78,9 +78,9 @@ def run_cpsat_scheduling(sku_plan=None):
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
     tasks = []
     task_counter = 0
-    batch_size = getattr(cfg, "PRODUCTION_BATCH_SIZE", 25)
-    enable_streaming = getattr(cfg, "ENABLE_LOT_STREAMING", True)
-    max_sub_batches = getattr(cfg, "MAX_SUB_LOT_BATCHES", 40)
+    batch_size = cfg.PRODUCTION_BATCH_SIZE
+    enable_streaming = cfg.ENABLE_LOT_STREAMING
+    max_sub_batches = cfg.MAX_SUB_LOT_BATCHES
 
     for _, row in sku_plan.iterrows():
         pid = row["product_id"]
