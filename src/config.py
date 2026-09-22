@@ -30,8 +30,10 @@ OVERTIME_MULTIPLIER = 1.5       # Fazla mesai katsayısı
 LABOR_COST_OVERTIME_HR = LABOR_COST_STANDARD_HR * OVERTIME_MULTIPLIER  # 675.0 $/saat
 
 # 3. Çevre & Sürdürülebilirlik Parametreleri (GHG Protocol & Internal Carbon Pricing)
-GRID_EMISSION_FACTOR = 0.440        # tCO2e / MWh (Synthetic / Assumed Grid Emission Factor; TR İletim 0.436 - Dağıtım 0.469 tCO2e/MWh aralığı temsili referansı - Kapsam 2)
-DIESEL_EMISSION_FACTOR = 0.00268   # tCO2e / Litre dizel (Kapsam 1)
+# 0.440 tCO2e/MWh: T.C. ETKB elektrik emisyon faktörleri (iletim: 0.436, dağıtım: 0.469) aralığındaki sentetik orta nokta varsayımıdır (Synthetic Midpoint Assumption).
+# Uluslararası GHG Protocol / CBAM simülasyonları için parametrik olarak güncellenebilir.
+GRID_EMISSION_FACTOR = 0.440        # tCO2e / MWh (Scope 2 Synthetic Baseline)
+DIESEL_EMISSION_FACTOR = 0.00268   # tCO2e / Litre dizel (Scope 1)
 DEFAULT_FORKLIFT_LITERS = 85.0     # Tesis içi lojistik dizel tüketimi (Litre/hafta)
 CARBON_PRICE_SCENARIOS_EUR = [0, 50, 80, 100, 120]  # Dahili karbon fiyat senaryoları (€/tCO2e - Internal Carbon Pricing)
 
