@@ -113,10 +113,14 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
                     fallback_min = merged_mix["processing_time_min"].mean()
                     fam_mach_hours_per_period[(f, m, t)] = (fallback_min / 60.0) if not pd.isna(fallback_min) else 0.0
 
-    # İşçilik maliyeti için genel aile-makine saatleri (statik toplamlar için ortalama)
-    fam_mach_hours_avg = (
-        routing_extended.groupby(["family_id", "machine_id"])["processing_time_min"].mean() / 60.0
-    ).to_dict()
+    # İşçilik maliyeti için genel aile-makine saatleri (rotasız ürünler 0.0 kabul edilerek aile ortalaması)
+    fam_mach_hours_avg = {}
+    for f in families:
+        f_skus_all = products_df[products_df["family_id"] == f]["product_id"].unique()
+        num_skus = len(f_skus_all) if len(f_skus_all) > 0 else 1
+        for m in machines:
+            m_times = routing_extended[(routing_extended["family_id"] == f) & (routing_extended["machine_id"] == m)]
+            fam_mach_hours_avg[(f, m)] = (m_times["processing_time_min"].sum() / num_skus) / 60.0
 
     family_total_hours = {
         f: sum(fam_mach_hours_avg.get((f, m), 0.0) for m in machines)
