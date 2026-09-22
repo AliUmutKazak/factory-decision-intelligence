@@ -102,8 +102,6 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 
 ### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
 
-### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
-
 | Kriter | CI Test Fixture (Sentetik Fikstür) | Reference Analysis Dataset (Referans Koşum) |
 | :--- | :--- | :--- |
 | **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
@@ -300,7 +298,7 @@ REFERENCE ANALYSIS (Benchmark Baseline)
 
 CI VALIDATION (Deterministic Verification)
  └── Fixture-based end-to-end validation + consistency test suite
- └── Fast unit & integration test suites (22 passing tests)
+ └── Fast unit & integration test suites (23 passing tests)
 
 LIVE / LOCAL RUN (Hybrid Adaptive Execution)
  ├── IF data/raw/train.csv exists ──> Executes full production pipeline
