@@ -69,3 +69,10 @@ MAX_SUB_LOT_BATCHES = 40                 # Bir alt transfer lotunun alabileceği
 CPSAT_TIME_LIMIT_SECONDS = 30.0          # Çözücü zaman limiti (sn)
 CPSAT_NUM_SEARCH_WORKERS = 8             # Arama iş parçacığı sayısı
 CPSAT_RANDOM_SEED = 42                   # Tekrarlanabilirlik tohum değeri
+# Initial Machine Setup State (Planlama ufku başında tezgâhlarda takılı olan ürün/kalıp)
+# None verilirse ilk iş için ilave setup gerekmez (soğuk başlangıç/hazır varsayımı)
+INITIAL_MACHINE_STATE = {
+    "M01": "P01",
+    "M02": "P02",
+    "M03": "P04",
+}

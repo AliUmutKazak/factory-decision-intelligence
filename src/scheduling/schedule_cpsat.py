@@ -214,10 +214,20 @@ def run_cpsat_scheduling(sku_plan=None):
         circuit_arcs = []
         machine_setup_intervals = []
 
-        # 1) Dummy -> Task (Günün ilk işi): Başlangıç setup süresi 0
+        # 1) Dummy -> Task (Günün ilk işi): Tezgâh başlangıç durumuna (Initial State) göre setup
+        p_init = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
         for i, tid in enumerate(tids):
-            lit = model.NewBoolVar(f"arc_start_{mid}_{tid}")
+            lit = model.NewBoolVar(f"first_{mid}_{tid}")
             circuit_arcs.append((dummy, i, lit))
+            
+            p_first = all_tasks[tid]["product_id"]
+            s_init = int(setup_dict.get((mid, p_init, p_first), 0)) if p_init else 0
+            if s_init > 0:
+                s_start = model.NewIntVar(0, horizon, f"init_setup_start_{mid}_{tid}")
+                s_end = model.NewIntVar(0, horizon, f"init_setup_end_{mid}_{tid}")
+                s_interval = model.NewOptionalIntervalVar(s_start, s_init, s_end, lit, f"init_setup_int_{mid}_{tid}")
+                machine_setup_intervals.append(s_interval)
+                model.Add(s_end <= all_tasks[tid]["start"]).OnlyEnforceIf(lit)
 
         # 2) Task -> Dummy (Günün son işi)
         for i, tid in enumerate(tids):
@@ -306,11 +316,11 @@ def run_cpsat_scheduling(sku_plan=None):
             })
         
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
-        last_prod = None
+        last_prod = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
         for item in m_tasks:
             curr_prod = item["product_id"]
             setup_val = 0
-            if last_prod is not None and last_prod != curr_prod:
+            if last_prod is not None:
                 setup_val = setup_dict.get((mid, last_prod, curr_prod), 0)
             item["setup_before_min"] = setup_val
             item["setup_end_min"] = float(item["start_min"])
