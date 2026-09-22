@@ -159,29 +159,58 @@ def validate_master_data(data_dict):
     if missing_pairs:
         raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
 
-def initialize_database():
+def initialize_database(force_recreate: bool = False):
+    """
+    Veritabanını SSOT (Single Source of Truth) ilkelerine uygun şekilde başlatır ve eşitler.
+    Dosyayı tamamen silmek yerine idempotent tablo senkronizasyonu yapar ve
+    her icra için 'pipeline_runs' denetim kaydı oluşturur.
+    """
+    import uuid
+    from datetime import datetime
     import gc
     gc.collect()
 
-    if os.path.exists(DB_PATH):
+    if force_recreate and os.path.exists(DB_PATH):
         try:
             os.remove(DB_PATH)
         except PermissionError:
-            conn = sqlite3.connect(DB_PATH)
-            cur = conn.cursor()
+            conn_temp = sqlite3.connect(DB_PATH)
+            cur = conn_temp.cursor()
             cur.execute("PRAGMA writable_schema = 1;")
             cur.execute("DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');")
             cur.execute("PRAGMA writable_schema = 0;")
-            conn.commit()
+            conn_temp.commit()
             cur.execute("VACUUM;")
-            conn.close()
+            conn_temp.close()
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
+    # 0. SSOT Denetim Çizelgesi (Pipeline Run Audit Log)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            run_id TEXT PRIMARY KEY,
+            timestamp TEXT NOT NULL,
+            trigger_source TEXT NOT NULL,
+            orders_count INTEGER NOT NULL,
+            status TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
     # 1. İşlenmiş sipariş verisini aktar
+    if not os.path.exists(PROCESSED_ORDERS_PATH):
+        raise FileNotFoundError(f"Missing mandatory order data: {PROCESSED_ORDERS_PATH}")
     orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     orders_df.to_sql("orders", conn, index=False, if_exists="replace")
+
+    # Yeni çalıştırmayı audit tablosuna kaydet
+    run_id = str(uuid.uuid4())[:8]
+    cursor.execute(
+        "INSERT INTO pipeline_runs (run_id, timestamp, trigger_source, orders_count, status) VALUES (?, ?, ?, ?, ?)",
+        (run_id, datetime.now().isoformat(), "pipeline_execution", len(orders_df), "INITIALIZED")
+    )
+    conn.commit()
 
     # 2. Sentetik fabrika ana veri tablolarını oku ve fail-fast doğrula
     synthetic_tables = [
