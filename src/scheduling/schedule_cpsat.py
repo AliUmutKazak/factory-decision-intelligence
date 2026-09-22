@@ -29,17 +29,22 @@ def run_cpsat_scheduling(sku_plan=None):
     setup_dict = {}
     machines = routing_df["machine_id"].unique()
     
-    # Kolonları dinamik yakala
-    f_col = [c for c in changeover_df.columns if "from" in c][0]
-    t_col = [c for c in changeover_df.columns if "to" in c][0]
-    val_cols = [c for c in changeover_df.columns if c not in (f_col, t_col)]
-    time_col = val_cols[0] if val_cols else changeover_df.columns[-1]
+    # Sıkı Veri Sözleşmesi: Setup süresi doğrudan dakika cinsinden okunur (setup_time_min)
+    f_col = "from_product" if "from_product" in changeover_df.columns else [c for c in changeover_df.columns if "from" in c][0]
+    t_col = "to_product" if "to_product" in changeover_df.columns else [c for c in changeover_df.columns if "to" in c][0]
+    
+    if "setup_time_min" in changeover_df.columns:
+        time_col = "setup_time_min"
+    else:
+        # Fallback: time içeren kolon veya ilk numerik olmayan f/t dışındaki kolon
+        time_candidates = [c for c in changeover_df.columns if "time" in c]
+        time_col = time_candidates[0] if time_candidates else [c for c in changeover_df.columns if c not in (f_col, t_col)][0]
 
     for _, row in changeover_df.iterrows():
         f_p = row[f_col]
         t_p = row[t_col]
-        raw_val = float(row[time_col])
-        s_val = int(round(raw_val * 60)) if raw_val < 5.0 else int(round(raw_val))
+        # Sezgisel saat/dakika dönüşümü kaldırıldı; değer doğrudan dakika kabul edilir
+        s_val = int(round(float(row[time_col])))
         for m in machines:
             setup_dict[(m, f_p, t_p)] = s_val
 
