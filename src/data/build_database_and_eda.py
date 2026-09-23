@@ -176,10 +176,14 @@ def initialize_database(force_recreate=True, run_id=None):
         except PermissionError:
             conn_temp = sqlite3.connect(DB_PATH)
             cur = conn_temp.cursor()
-            cur.execute("PRAGMA writable_schema = 1;")
-            cur.execute("DELETE FROM sqlite_master WHERE type IN ('table', 'index', 'trigger');")
-            cur.execute("PRAGMA writable_schema = 0;")
+            cur.execute("PRAGMA foreign_keys = OFF;")
+            # Sistem tabloları hariç tüm kullanıcı view ve tablolarını güvenle topla
+            cur.execute("SELECT type, name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%';")
+            objects_to_drop = cur.fetchall()
+            for obj_type, obj_name in objects_to_drop:
+                cur.execute(f"DROP {obj_type.upper()} IF EXISTS \"{obj_name}\";")
             conn_temp.commit()
+            cur.execute("PRAGMA foreign_keys = ON;")
             cur.execute("VACUUM;")
             conn_temp.close()
 
