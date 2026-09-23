@@ -327,7 +327,11 @@ with tab_plan:
 
     st.markdown("---")
     st.subheader("Zaman Fazlı Malzeme İhtiyaç Planlaması (MRP-I)")
-
+    st.caption(
+        "ℹ️ **Mimari Not:** Bu modül analitik bir **MRP-I Planlama Motorudur** (BOM Patlatma, Lot Sizing, Temin Süresi Kaydırma). "
+        "Canlı sipariş yürütme, tedarikçi kapasite kısıtları ve fiili mal kabul takipleri işletmenin ana ERP sistemine (örn. IFS ERP) delege edilir."
+    )
+    
     if mrp_df.empty:
         st.info("MRP plan verisi bulunamadı.")
     else:
