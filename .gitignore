@@ -1,6 +1,16 @@
+# Raw Data & Database
 data/raw/*.csv
-!data/raw/.gitkeep  
-data/*.db  
-.vscode/ 
-__pycache__/ 
-*.pyc 
+!data/raw/.gitkeep
+data/*.db
+
+# Runtime Processed Outputs (Madde 25: Mutable Artifacts)
+data/processed/*.csv
+!data/processed/.gitkeep
+runs/
+
+# Python & Environment
+.vscode/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
