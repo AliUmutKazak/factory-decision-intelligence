@@ -130,8 +130,10 @@ $$\min C_{\max}$$
 4. **MRP Malzeme Hazırlık Kısıtı (Dynamic Release Time):**
    $$\text{Start}(o_{b, 1}) \ge r_b \quad (r_b = 480\text{ dk if material is EXPEDITE, else } 0)$$
 
-* **Çizelgeleme Bulgusu:** Model, M01 tezgâhını birincil darboğaz olarak belirlemiş; malzeme gecikme kısıtına rağmen sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** sağlayarak iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır (30 saniyelik çözücü süresiyle OPTIMAL/FEASIBLE statüsü, CPSAT_TIME_LIMIT_SECONDS = 30.0).
-* **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini 40.0 saat aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
+* **Çizelgeleme Mimarisi ve Model Evrimi (v1 vs. v2):**
+  * **Mimari v1 (Consolidated Single-Lot Baseline):** Operasyonlar arası transfer partileme olmaksızın SKU başına tekil üretim partisi varsayımı altında, CP-SAT çözücüsü sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** ile iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır.
+  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında canonical çizelgeleme makespan değeri **14,683 dakika (~244.7 saat)** olarak mühürlenmiştir.
+* **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
 
 
 #### ⚖️ Hiyerarşik Kapasite Mutabakatı & Hazırlık Yükü (HPP Design Principle)
