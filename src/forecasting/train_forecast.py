@@ -79,6 +79,59 @@ def build_training_matrix(train_raw):
         records.append(feat)
     return pd.DataFrame(records)
 
+def evaluate_fold_model(model_name, train_data, test_data, horizon):
+    """
+    Belirli bir CV katlamasında (fold) verilen modeli eğitir ve test seti üzerinde metrikleri döner.
+    """
+    y_test = test_data["demand"].values
+    if model_name == "Naive":
+        pred = np.repeat(train_data["demand"].iloc[-1], horizon)
+    elif model_name == "Seasonal Naive":
+        last_7 = train_data["demand"].iloc[-7:].values
+        pred = np.tile(last_7, int(np.ceil(horizon / 7)))[:horizon]
+    elif model_name == "Moving Average":
+        pred = np.repeat(train_data["demand"].iloc[-7:].mean(), horizon)
+    elif model_name == "Holt-Winters":
+        try:
+            hw = ExponentialSmoothing(
+                train_data["demand"].astype(float),
+                trend="add",
+                seasonal="add",
+                seasonal_periods=7
+            ).fit()
+            pred = np.maximum(0, hw.forecast(horizon).values)
+        except Exception:
+            pred = np.repeat(train_data["demand"].iloc[-7:].mean(), horizon)
+    elif model_name == "LightGBM":
+        train_matrix = build_training_matrix(train_data)
+        feature_cols = [c for c in train_matrix.columns if c != "demand"]
+        lgb_train = lgb.Dataset(train_matrix[feature_cols], label=train_matrix["demand"])
+        params = {
+            "objective": "regression",
+            "metric": "rmse",
+            "learning_rate": 0.05,
+            "num_leaves": 31,
+            "verbose": -1,
+            "seed": 42
+        }
+        gbm = lgb.train(params, lgb_train, num_boost_round=100)
+        sim_history = train_data.copy()
+        pred_lgb = []
+        for step in range(horizon):
+            target_date = test_data["order_date"].iloc[step]
+            feat_step = extract_features_for_row(sim_history, target_date)
+            feat_df = pd.DataFrame([feat_step])[feature_cols]
+            p_val = max(0.0, float(gbm.predict(feat_df)[0]))
+            pred_lgb.append(p_val)
+            sim_history = pd.concat([
+                sim_history,
+                pd.DataFrame([{"order_date": target_date, "demand": p_val}])
+            ], ignore_index=True)
+        pred = np.array(pred_lgb)
+    else:
+        pred = np.zeros(horizon)
+    return evaluate_metrics(y_test, pred)
+
 def run_forecast_benchmark():
     df_all = load_factory_demand()
     products = sorted(df_all["product_id"].unique())
@@ -94,94 +147,43 @@ def run_forecast_benchmark():
     for pid in products:
         pdf = df_all[df_all["product_id"] == pid].sort_values("order_date").reset_index(drop=True)
 
-        # Kronolojik Train / Test Ayrımı
-        train_raw = pdf.iloc[:-HORIZON_DAYS].copy().reset_index(drop=True)
-        test_raw = pdf.iloc[-HORIZON_DAYS:].copy().reset_index(drop=True)
-        y_test = test_raw["demand"].values
+        # Rolling-Origin (Expanding Window) Cross-Validation (K=4 Katlama)
+        num_folds = 4
+        total_len = len(pdf)
+        candidate_models = ["Naive", "Seasonal Naive", "Moving Average", "Holt-Winters", "LightGBM"]
+        cv_scores = {m: {"wape": [], "rmse": [], "bias": []} for m in candidate_models}
 
-        # 1. Naive Model (Son günün talebi)
-        pred_naive = np.repeat(train_raw["demand"].iloc[-1], HORIZON_DAYS)
-        w_naive, r_naive, b_naive = evaluate_metrics(y_test, pred_naive)
+        fold_cutoffs = [total_len - (num_folds - f) * HORIZON_DAYS for f in range(num_folds)]
+        for f_idx, cutoff in enumerate(fold_cutoffs):
+            train_sub = pdf.iloc[:cutoff].copy().reset_index(drop=True)
+            test_sub = pdf.iloc[cutoff:cutoff + HORIZON_DAYS].copy().reset_index(drop=True)
+            for m_name in candidate_models:
+                w, r, b = evaluate_fold_model(m_name, train_sub, test_sub, HORIZON_DAYS)
+                cv_scores[m_name]["wape"].append(w)
+                cv_scores[m_name]["rmse"].append(r)
+                cv_scores[m_name]["bias"].append(b)
 
-        # 2. Seasonal Naive Model (Son 7 günün haftalık döngüsü)
-        last_7_days = train_raw["demand"].iloc[-7:].values
-        pred_snaive = np.tile(last_7_days, int(np.ceil(HORIZON_DAYS / 7)))[:HORIZON_DAYS]
-        w_snaive, r_snaive, b_snaive = evaluate_metrics(y_test, pred_snaive)
+        # Katlamalar boyunca ortalama/dağılım performansına göre model seçimi
+        model_performance = {}
+        for m_name in candidate_models:
+            avg_w = float(np.mean(cv_scores[m_name]["wape"]))
+            avg_r = float(np.mean(cv_scores[m_name]["rmse"]))
+            avg_b = float(np.mean(cv_scores[m_name]["bias"]))
+            model_performance[m_name] = (avg_w, avg_r, avg_b)
 
-        # 3. Moving Average (Son 7 gün ortalaması)
-        pred_ma = np.repeat(train_raw["demand"].iloc[-7:].mean(), HORIZON_DAYS)
-        w_ma, r_ma, b_ma = evaluate_metrics(y_test, pred_ma)
+        best_name = min(model_performance, key=lambda k: model_performance[k][0])
 
-        # 4. Holt-Winters (Exponential Smoothing)
-        hw_model = ExponentialSmoothing(
-            train_raw["demand"].astype(float),
-            trend="add",
-            seasonal="add",
-            seasonal_periods=7
-        ).fit()
-        pred_hw = hw_model.forecast(HORIZON_DAYS).values
-        pred_hw = np.maximum(0, pred_hw)
-        w_hw, r_hw, b_hw = evaluate_metrics(y_test, pred_hw)
-
-        # 5. LightGBM (Sızıntısız, Özyinelemeli / Recursive Çok Adımlı Tahmin)
-        train_matrix = build_training_matrix(train_raw)
-        feature_cols = [c for c in train_matrix.columns if c != "demand"]
-
-        lgb_train = lgb.Dataset(train_matrix[feature_cols], label=train_matrix["demand"])
-        params = {
-            "objective": "regression",
-            "metric": "rmse",
-            "learning_rate": 0.05,
-            "num_leaves": 31,
-            "verbose": -1,
-            "seed": 42
-        }
-        gbm = lgb.train(params, lgb_train, num_boost_round=150)
-
-        # 28 Günlük Özyinelemeli (Autoregressive) Simülasyon Döngüsü
-        sim_history = train_raw.copy()
-        pred_lgb = []
-
-        for step in range(HORIZON_DAYS):
-            target_date = test_raw["order_date"].iloc[step]
-            feat_step = extract_features_for_row(sim_history, target_date)
-            feat_df = pd.DataFrame([feat_step])[feature_cols]
-            pred_val = max(0.0, float(gbm.predict(feat_df)[0]))
-            pred_lgb.append(pred_val)
-
-            # Bir sonraki günün lag hesapları için kendi tahminini geçmişe ekler
-            sim_history = pd.concat([
-                sim_history,
-                pd.DataFrame([{"order_date": target_date, "product_id": pid, "demand": pred_val}])
-            ], ignore_index=True)
-
-        pred_lgb = np.array(pred_lgb)
-        w_lgb, r_lgb, b_lgb = evaluate_metrics(y_test, pred_lgb)
-
-        # Model Kıyaslama Havuzu
-        models = {
-            "Naive": (w_naive, r_naive, b_naive, pred_naive),
-            "Seasonal Naive": (w_snaive, r_snaive, b_snaive, pred_snaive),
-            "Moving Average": (w_ma, r_ma, b_ma, pred_ma),
-            "Holt-Winters": (w_hw, r_hw, b_hw, pred_hw),
-            "LightGBM": (w_lgb, r_lgb, b_lgb, pred_lgb)
-        }
-
-        # En düşük WAPE'e sahip adil kazananı seç
-        best_name = min(models, key=lambda k: models[k][0])
-
-        for m_name, (w, r, b, _) in models.items():
+        for m_name, (w, r, b) in model_performance.items():
             benchmark_summary.append({
                 "SKU": pid,
                 "Model": m_name,
-                "WAPE": f"{w:.4f}",
-                "RMSE": f"{r:.2f}",
-                "Bias": f"{b:.1f}",
+                "Backtest_WAPE": f"{w:.4f}",
+                "Backtest_RMSE": f"{r:.2f}",
+                "Backtest_Bias": f"{b:.1f}",
                 "Kazanan": "✓" if m_name == best_name else ""
             })
 
         # --- OPERASYONEL GELECEK TAHMİNİ (PRODUCTION REFIT & OUT-OF-SAMPLE FORECAST) ---
-        # Kazanan modeli tüm geçmiş veriyle (pdf) refit edip gerçek geleceğe tahmin üretiyoruz
         last_date = pd.to_datetime(pdf["order_date"].max())
         future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=HORIZON_DAYS, freq="D")
 
@@ -207,23 +209,31 @@ def run_forecast_benchmark():
 
         elif best_name == "LightGBM":
             prod_train_matrix = build_training_matrix(pdf)
+            feature_cols = [c for c in prod_train_matrix.columns if c != "demand"]
             lgb_prod_train = lgb.Dataset(prod_train_matrix[feature_cols], label=prod_train_matrix["demand"])
-            gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=150)
+            params = {
+                "objective": "regression",
+                "metric": "rmse",
+                "learning_rate": 0.05,
+                "num_leaves": 31,
+                "verbose": -1,
+                "seed": 42
+            }
+            gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=120)
 
-            prod_sim_history = pdf.copy()
+            prod_sim = pdf.copy()
             future_preds_list = []
             for f_date in future_dates:
-                feat_step = extract_features_for_row(prod_sim_history, f_date)
+                feat_step = extract_features_for_row(prod_sim, f_date)
                 feat_df = pd.DataFrame([feat_step])[feature_cols]
                 p_val = max(0.0, float(gbm_prod.predict(feat_df)[0]))
                 future_preds_list.append(p_val)
-                prod_sim_history = pd.concat([
-                    prod_sim_history,
-                    pd.DataFrame([{"order_date": f_date, "product_id": pid, "demand": p_val}])
+                prod_sim = pd.concat([
+                    prod_sim,
+                    pd.DataFrame([{"order_date": f_date, "demand": p_val}])
                 ], ignore_index=True)
             future_preds = np.array(future_preds_list)
 
-        # Gerçek operasyonel gelecek kayıtlarını yaz
         for d, q in zip(future_dates, future_preds):
             final_forecast_records.append({
                 "forecast_date": d.strftime("%Y-%m-%d"),
@@ -232,40 +242,40 @@ def run_forecast_benchmark():
                 "model_used": best_name
             })
 
-        # Model Governance / Lineage Kaydı (Madde 23)
+        # Model Governance / Lineage Standartları (B. Eleştirisi: backtest_wape, backtest_rmse)
         competing_scores = {
-            m_name: {"wape": round(float(vals[0]), 4), "rmse": round(float(vals[1]), 2), "bias": round(float(vals[2]), 2)}
-            for m_name, vals in models.items()
+            m: {
+                "backtest_wape": round(vals[0], 4),
+                "backtest_rmse": round(vals[1], 2),
+                "backtest_bias": round(vals[2], 2)
+            }
+            for m, vals in model_performance.items()
         }
-        
-        model_params = {}
-        if best_name == "LightGBM":
-            model_params = params
-        elif best_name == "Holt-Winters":
-            model_params = {"trend": "add", "seasonal": "add", "seasonal_periods": 7}
-        elif best_name == "Moving Average":
-            model_params = {"window": 7}
-        elif best_name in ["Naive", "Seasonal Naive"]:
-            model_params = {"lag": 7 if best_name == "Seasonal Naive" else 1}
 
-        best_wape_val = models[best_name][0]
-        best_rmse_val = models[best_name][1]
+        best_wape, best_rmse, best_bias = model_performance[best_name]
+        backtest_start_dt = str(pdf.iloc[fold_cutoffs[0]]["order_date"])[:10]
+        backtest_end_dt = str(pdf.iloc[-1]["order_date"])[:10]
 
         model_lineage_records.append({
             "product_id": pid,
             "selected_model": best_name,
-            "model_version": "v2.0-recursive",
+            "model_version": "v3.0-rolling-origin-cv",
             "feature_version": "v1.2-lag-calendar",
             "forecast_origin": str(pdf["order_date"].max())[:10],
             "training_start": str(pdf["order_date"].min())[:10],
             "training_end": str(pdf["order_date"].max())[:10],
-            "backtest_start": str(test_raw["order_date"].min())[:10] if 'test_raw' in locals() else "2017-12-04",
-            "backtest_end": str(test_raw["order_date"].max())[:10] if 'test_raw' in locals() else "2017-12-31",
-            "validation_score_wape": round(float(best_wape_val), 4),
-            "test_score_rmse": round(float(best_rmse_val), 2),
-            "hyperparameters": json.dumps(model_params),
+            "backtest_start": backtest_start_dt,
+            "backtest_end": backtest_end_dt,
+            # Yeni Governance Standartları
+            "backtest_wape": round(float(best_wape), 4),
+            "backtest_rmse": round(float(best_rmse), 2),
+            "backtest_bias": round(float(best_bias), 2),
+            # Mevcut test paketiyle tam geriye dönük uyumluluk
+            "validation_score_wape": round(float(best_wape), 4),
+            "test_score_rmse": round(float(best_rmse), 2),
+            "hyperparameters": json.dumps({"folds": num_folds, "horizon": HORIZON_DAYS, "cv_type": "rolling_origin_expanding"}),
             "competing_models": json.dumps(competing_scores),
-            "selection_reason": f"Selected '{best_name}' due to minimum out-of-sample holdout WAPE ({best_wape_val:.4f})."
+            "selection_reason": f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f})."
         })
 
     # Benchmark Raporunu Ekrana Bas
