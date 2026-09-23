@@ -25,7 +25,51 @@ def load_factory_demand():
     df = pd.read_sql(query, conn)
     conn.close()
     df["order_date"] = pd.to_datetime(df["order_date"])
+    df = reconcile_continuous_calendar(df)
     return df
+    
+def reconcile_continuous_calendar(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Madde 9: Gerçek veri kalite kontrolleri ve kesintisiz günlük takvim rekonstrüksiyonu.
+    - Mükerrer SKU/Tarih kayıtlarını toplulaştırır (Duplicate resolution).
+    - Negatif satış/talep anormalliklerini 0 ile sınırlar (Negative demand clipping).
+    - Eksik takvim günlerini tespit eder ve talep=0 olarak doldurur (Missing date imputation).
+    """
+    clean_records = []
+    
+    # Global tarih sınırları
+    min_date = df["order_date"].min()
+    max_date = df["order_date"].max()
+    full_calendar = pd.date_range(start=min_date, end=max_date, freq="D")
+    expected_days = len(full_calendar)
+
+    print(f"\n[DATA QUALITY] Kesintisiz Takvim Denetimi ({min_date.strftime('%Y-%m-%d')} - {max_date.strftime('%Y-%m-%d')} | {expected_days} gün):")
+
+    for pid in sorted(df["product_id"].unique()):
+        sub_df = df[df["product_id"] == pid].copy()
+        
+        # 1. Negatif Değer Kontrolü
+        neg_count = (sub_df["demand"] < 0).sum()
+        if neg_count > 0:
+            print(f"  [{pid}] {neg_count} adet negatif talep kaydı tespit edildi ve 0'a eşitlendi.")
+            sub_df["demand"] = sub_df["demand"].clip(lower=0)
+            
+        # 2. Duplicate Date/SKU Toplulaştırma
+        sub_df = sub_df.groupby("order_date", as_index=False)["demand"].sum()
+
+        # 3. Kesintisiz Takvim (Missing Dates Imputation)
+        sub_df = sub_df.set_index("order_date").reindex(full_calendar, fill_value=0.0).reset_index()
+        sub_df.rename(columns={"index": "order_date"}, inplace=True)
+        sub_df["product_id"] = pid
+        
+        # Denetim istatistikleri
+        zero_days = (sub_df["demand"] == 0).sum()
+        print(f"  [{pid}] Tam takvim: {len(sub_df)} gün | Sıfır talep günleri: {zero_days} ({(zero_days / expected_days) * 100:.1f}%)")
+
+        clean_records.append(sub_df)
+
+    reconciled_df = pd.concat(clean_records, ignore_index=True)
+    return reconciled_df
 
 def evaluate_metrics(actual, pred):
     actual = np.array(actual, dtype=float)
