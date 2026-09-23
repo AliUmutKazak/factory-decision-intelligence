@@ -1,11 +1,11 @@
 {
-    "run_id": "RUN-20260923-16556f",
-    "run_timestamp": "2026-09-23T18:32:24.984376",
-    "git_sha": "f4e970bd8f6fd1336035236e79a94cdd834909e4",
+    "run_id": "RUN-20260923-141cdf",
+    "run_timestamp": "2026-09-23T20:55:41.411148",
+    "git_sha": "90efe48199c6940f3aa2a00158c7f5aa1e4baccf",
     "data_source": "factory_orders.csv",
     "forecast_origin": "LightGBM_Recursive_Direct",
-    "config_hash": "2879d038b3d0917d",
-    "status": "COMPLETED",
+    "config_hash": "7e692d15e7613031",
+    "status": "SUCCESS",
     "orders_count": 0,
     "environment": {
         "python_version": "3.11.16",

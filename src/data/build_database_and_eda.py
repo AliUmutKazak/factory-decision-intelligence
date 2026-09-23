@@ -185,6 +185,23 @@ def initialize_database(force_recreate=True, run_id=None):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    # Downstream türetilmiş işlem tablolarını temizle (stale data önleme)
+    downstream_tables = [
+        "forecast_demand",
+        "aggregate_plan",
+        "sku_production_plan",
+        "machine_capacity_plan",
+        "mrp_plan",
+        "production_schedule",
+        "energy_kpis",
+        "energy_profile_15min",
+        "carbon_kpis",
+        "carbon_machine_kpis",
+        "carbon_price_scenarios"
+    ]
+    for dt in downstream_tables:
+        cursor.execute(f"DROP TABLE IF EXISTS {dt}")
+    conn.commit()
 
     # 0. SSOT Denetim Çizelgesi (Pipeline Run Audit Log) - Bütünleşik Şema
     cursor.execute("""

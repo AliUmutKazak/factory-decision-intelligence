@@ -22,7 +22,7 @@ def run_end_to_end_pipeline():
     run_id = generate_run_id()
 
     print("\n" + "#" * 85)
-    print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE KOŞUMU ({run_id})")
+    print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE BAŞLATILDI (Run ID: {run_id})")
     print("#" * 85)
 
     steps = [
@@ -36,21 +36,44 @@ def run_end_to_end_pipeline():
         ("Aşama 7B: Kurumsal Karbon Muhasebesi (GHG Protocol)", compute_carbon_analytics),
     ]
 
-    for idx, (name, func) in enumerate(steps, 1):
-        step_start = time.time()
-        print(f"\n>>> [{idx}/{len(steps)}] {name} başlatılıyor...")
-        func()
-        elapsed = time.time() - step_start
-        print(f">>> [OK] {name} tamamlandı ({elapsed:.2f} sn).\n")
+    try:
+        for idx, (name, func) in enumerate(steps, 1):
+            step_start = time.time()
+            print(f"\n>>> [{idx}/{len(steps)}] {name} başlatılıyor...")
+            func()
+            elapsed = time.time() - step_start
+            print(f">>> [OK] {name} tamamlandı ({elapsed:.2f} sn).\n")
 
-    # Pipeline başarıyla tamamlandığında aynı run_id ile audit trail ve DB kaydı
-    meta = record_pipeline_run_metadata(run_id=run_id, status="COMPLETED")
-    print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Git: {meta['git_sha'][:7]})")
+        # Başarıyla tamamlandığında SUCCESS durumu kaydet
+        meta = record_pipeline_run_metadata(run_id=run_id, status="SUCCESS")
+        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: SUCCESS)")
+
+        import sqlite3
+        from src.config import DB_PATH
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("UPDATE pipeline_runs SET status = 'SUCCESS' WHERE run_id = ?", (run_id,))
+            conn.commit()
+
+    except Exception as exc:
+        print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)
+        
+        # Hata durumunda FAILED durumu kaydet
+        record_pipeline_run_metadata(run_id=run_id, status="FAILED")
+        try:
+            import sqlite3
+            from src.config import DB_PATH
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute("UPDATE pipeline_runs SET status = 'FAILED' WHERE run_id = ?", (run_id,))
+                conn.commit()
+        except Exception:
+            pass
+        raise exc
 
     total_time = time.time() - start_total
-    print("#" * 85)
+    print("\n" + "#" * 85)
     print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_time:.2f} saniye")
-    print("#" * 85 + "\n")
+    print("#" * 85)
+
 
 if __name__ == "__main__":
     run_end_to_end_pipeline()

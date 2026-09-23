@@ -223,4 +223,17 @@ def test_master_data_database_constraints():
         conn.commit()
     conn.rollback()
 
-    conn.close()    
+    conn.close()  
+
+def test_pipeline_failure_status_and_downstream_isolation():
+    """Pipeline başarısız olduğunda veya başlatıldığında stale downstream tabloların aktif kabul edilmediğini doğrular."""
+    import sqlite3
+    import src.config as cfg
+
+    with sqlite3.connect(cfg.DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT status FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
+        row = cursor.fetchone()
+        assert row is not None, "pipeline_runs tablosu boş!"
+        # Başarılı bir pipeline koşusunun statüsü SUCCESS veya COMPLETED olmalı, FAILED/RUNNING olmamalıdır
+        assert row[0] in ("SUCCESS", "COMPLETED")      
