@@ -171,3 +171,21 @@ def test_transfer_batching_precedence_and_flow():
                     f"start ({row[start_col]}) < prev end ({prev_end})"
                 )
                 prev_end = row[end_col]
+
+def test_cpsat_solver_metadata_workers():
+    """CP-SAT metadata dosyasında worker sayılarının doğru kaydedildiğini doğrular."""
+    import json
+    from pathlib import Path
+    import src.config as cfg
+
+    project_root = Path(__file__).resolve().parent.parent
+    meta_path = getattr(cfg, "REPORTS_DIR", project_root / "reports") / "schedule_solver_metadata.json"
+    assert meta_path.exists(), "schedule_solver_metadata.json bulunamadı!"
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+
+    expected_workers = int(cfg.CPSAT_NUM_SEARCH_WORKERS)
+    assert meta.get("configured_num_search_workers") == expected_workers
+    assert meta.get("effective_num_search_workers") == expected_workers
+    assert meta.get("num_workers") == expected_workers
