@@ -324,9 +324,6 @@ def run_forecast_benchmark():
 
     # Benchmark Raporunu Ekrana Bas
     summary_df = pd.DataFrame(benchmark_summary)
-
-    # Benchmark Raporunu Ekrana Bas
-    summary_df = pd.DataFrame(benchmark_summary)
     print(summary_df.to_string(index=False))
     print("-" * 85)
 

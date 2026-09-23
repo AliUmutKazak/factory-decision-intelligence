@@ -278,10 +278,6 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
     print(pd.DataFrame(machine_kpis).to_string(index=False))
     print("=" * 85)
 
-    os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
-    kpi_df = pd.DataFrame([kpi_summary])
-    m_kpi_df = pd.DataFrame(machine_kpis)
-
     # 1. CSV Kayıtları
     os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
     kpi_df = pd.DataFrame([kpi_summary])
