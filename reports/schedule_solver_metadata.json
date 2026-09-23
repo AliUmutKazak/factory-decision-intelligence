@@ -5,7 +5,7 @@
   "objective_value_min": 13698.0,
   "best_bound_min": 13698.0,
   "optimality_gap_pct": 0.0,
-  "solve_time_seconds": 0.5643,
+  "solve_time_seconds": 0.572,
   "configured_num_search_workers": 8,
   "effective_num_search_workers": 8,
   "num_workers": 8,
