@@ -32,3 +32,36 @@ Projede `data/factory.db` uzerinde kosan SQLite veritabani:
   - Canli ERP (IFS, SAP) ve MES sistemlerinden gercek zamanli veri akisi,
   - Cok kullanicili eszamanli web paneli sorgulari.
   Bu operasyonel hedefler icin veri erisim katmani (Repository Pattern / SQLAlchemy / Database Connector), baglanti dizesi (Connection String) degisikligi ile **PostgreSQL** veya **Microsoft SQL Server** gibi ACID uyumlu merkezi bir RDBMS'e gecise hazir soyutlama standartlarinda tasarlanmalidir.
+
+
+## 6. Veri Semantigi: Parti Boyutlandirma (Batch vs. Lot Sizing)
+
+Endustriyel planlama ve cizelgeleme asamalarinda olusan kavram karmasasini onlemek amaciyla veri semantigi su sekilde sabitlenmistir:
+
+- **`planned_units` (Net Uretim Adedi):** Taktik LP ve SKU Disaggregation tarafindan belirlenen, donem icinde uretilmesi gereken brüt/net toplam parca sayisidir.
+- **`batch_qty` / `sub_batch_qty` (Operasyonel Cizelgeleme Partisi):** CP-SAT detayli cizelgeleme motoruna aktarilan is parcalarinin fiziksel transfer veya operasyonel partilenme buyuklugudur (ornek: 25 veya 50 adetlik kasalar/paletler). Agrega seviyedeki toplam talep parcalanarak tezgahlar arasinda bu alt partiler halinde akar.
+- **`batch_id`:** Belirli bir `product_id` icin cizelgelenen tekil operasyonel parti kimligidir.
+
+## 7. Talep Tahmini Mimarisi: Backtest vs. Production Forecast
+
+Sistemin uretim gercekciligi icin modelleme iki ayrik ufuk (horizon) uzerinde kurgulanmistir:
+
+1. **Model Dogrulama & Backtest Ufku (Evaluation Horizon):**
+   - Gecmis veri setinin son 28 gunluk dilimini kapsar.
+   - Modeller (Naive, Seasonal Naive, Moving Average, Holt-Winters, LightGBM) bu gecmis pencere uzerinde WAPE, RMSE ve Bias metriklerine gore test edilir.
+   - En dusuk WAPE degerine ulasan model o SKU icin kazanan (champion) model secilir.
+2. **Ileriye Donuk Uretim Ufku (Production Forecast Horizon):**
+   - Kazanan model, verinin son gununden itibaren ileriye dogru 28 gunluk operasyonel talep projeksiyonunu uretir.
+   - Taktik agregasyon (LP) ve malzeme planlamasi (MRP) yalnizca bu ileri projeksiyon serisi uzerinden calisir; backtest tahminleri uretim planina karistirilmaz.
+
+## 8. Run Lineage ve Yonetisim Semasi (Data Governance)
+
+Her analitik kosumun tekrarlanabilirligi ve izlenebilirligi icin merkezi yonetisim su alanlarla denetlenir:
+
+- **`run_id`**: Her pipeline kosumu icin uretilen benzersiz UUID veya zaman damgasi.
+- **`git_sha`**: Kodun calistirildigi commit hash degeri.
+- **`config_hash`**: Model ve solver hiperparametrelerinin MD5 ozeti.
+- **`data_source`**: Calistirilan veri kaynagi veya test fixture adi (orn: fixture_normal.csv).
+- **`forecast_origin`**: Tahminin basladigi referans tarihi (T_0).
+- **`solver_status` & `gap`**: CP-SAT cozucunun ulastigi durum (OPTIMAL / FEASIBLE) ve son optimality gap yuzdesi.
+- **`timestamps`**: Baslangic ve bitis zaman damgalari.
