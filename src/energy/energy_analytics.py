@@ -201,8 +201,31 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
                         interval_energy_kw_min += dur * float(specs["setup_kw"])
                         accounted_min += dur
 
-            idle_dur = max(0.0, actual_interval - accounted_min)
-            interval_energy_kw_min += idle_dur * float(specs["idle_kw"])
+            # Gercek Takvim Durum Modeli: OFF araliklarinda 0 kW, yalnizca acik vardiyada IDLE
+
+
+            day_idx = int(t // 1440) % 7
+
+
+            day_minute = t % 1440
+
+
+            is_off_window = (day_idx == 6) or (day_minute >= 960)
+
+
+            if is_off_window:
+
+
+                idle_dur = 0.0
+
+
+            else:
+
+
+                idle_dur = max(0.0, actual_interval - accounted_min)
+
+
+                interval_energy_kw_min += idle_dur * float(specs["idle_kw"])
 
             if actual_interval > 0:
                 total_power_kw += interval_energy_kw_min / actual_interval

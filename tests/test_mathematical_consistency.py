@@ -228,7 +228,7 @@ def test_energy_integrals_reconciliation():
 
     # Profil integrali ile operasyonel KPI toplamı tutarlılığı (off-shift baz yük farkı toleransı ile)
     ratio = profile_total_kwh / kpi_total_kwh
-    assert 0.85 <= ratio <= 1.25, (
+    assert 0.98 <= ratio <= 1.02, (
         f"Enerji İntegral Tutarsızlığı: Profil Toplamı {profile_total_kwh:.2f} kWh != KPI {kpi_total_kwh:.2f} kWh (Oran: {ratio:.2f})"
     )
 
