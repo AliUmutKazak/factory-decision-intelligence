@@ -62,7 +62,8 @@ def test_mathematical_reconciliation_family_sku_schedule(db_conn):
     sched_df = pd.read_sql("SELECT * FROM production_schedule WHERE operation_seq = 1", db_conn)
     
     total_sku_units = sku_df["planned_units"].sum()
-    total_sched_units = sched_df["batch_qty"].sum()
+    # Gerçek üretilen parça adedi 'production_units' kolonundadır
+    total_sched_units = sched_df["production_units"].sum() if "production_units" in sched_df.columns else sched_df["lot_qty"].sum()
 
     assert total_sku_units == total_sched_units, (
         f"Matematiksel Adet Uyuşmazlığı: SKU Plan ({total_sku_units}) != Schedule ({total_sched_units})"

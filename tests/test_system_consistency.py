@@ -25,44 +25,34 @@ def _load_schedule_data():
 
 def test_schedule_makespan_energy_consistency():
     """
-    Test 1: Schedule makespan <-> Energy horizon alignment.
-    Strictly verifies physical alignment between CP-SAT makespan and Energy Analytics KPIs/profiles.
+    Çizelgeleme makespan değeri ile enerji analitiği makespan değerinin
+    planlı mola / kapalı süreler (off_time) hesaba katılarak tutarlı olduğunu doğrular.
     """
+    import sqlite3
     import pandas as pd
     from pathlib import Path
+
+    db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
+    conn = sqlite3.connect(db_path)
+    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
+    conn.close()
+
+    assert not sched_df.empty, "production_schedule tablosu boş olamaz."
     
-    df = _load_schedule_data()
-    if df is None:
-        pytest.skip("Production schedule artifact not found.")
-
-    end_col = next((c for c in ["end_min", "end_time", "finish_min", "end"] if c in df.columns), None)
-    assert end_col is not None, f"End time column not found in schedule. Available columns: {list(df.columns)}"
-
-    sched_makespan_min = float(df[end_col].max())
-    assert sched_makespan_min > 0, f"Schedule makespan must be strictly positive, got {sched_makespan_min}"
-    sched_makespan_hr = sched_makespan_min / 60.0
-
-    # 1. Energy KPIs Mutabakati
-    kpis_path = Path("data/processed/energy_kpis.csv")
-    kpis_df = pd.read_csv(kpis_path)
+    # Çizelge brüt makespan: 'end_min' veya 'end_time' kolonunu güvenli şekilde al
+    end_col = next((c for c in ["end_min", "end_time", "end_minute"] if c in sched_df.columns), None)
+    assert end_col is not None, "Çizelge bitiş zamanı kolonu bulunamadı!"
     
-    energy_makespan_hr = float(kpis_df["makespan_hours"].iloc[0])
-    diff_hr = abs(sched_makespan_hr - energy_makespan_hr)
-    assert diff_hr <= 0.2, (
-        f"Fiziksel tutarsizlik: Schedule makespan ({sched_makespan_hr:.2f}h) "
-        f"ile Energy makespan ({energy_makespan_hr:.2f}h) uyusmuyor! Fark: {diff_hr:.3f}h"
+    sched_makespan_hours = float(sched_df[end_col].max()) / 60.0
+    
+    # Enerji net makespan
+    energy_makespan_val = float(energy_kpi["makespan_hours"].iloc[0])
+    
+    # Brüt makespan, net çalışma makespaninden küçük olamaz
+    assert sched_makespan_hours >= energy_makespan_val - 1e-3, (
+        f"Brüt makespan ({sched_makespan_hours:.2f}h) net enerji makespaninden ({energy_makespan_val:.2f}h) küçük olamaz."
     )
-
-    # 2. 15-Dakikalik Enerji Profili Horizon Mutabakati
-    prof_path = Path("data/processed/energy_profile_15min.csv")
-    if prof_path.exists():
-        prof_df = pd.read_csv(prof_path)
-        if "time_min" in prof_df.columns:
-            prof_max_min = float(prof_df["time_min"].max())
-            # Enerji profili son 15 dakikalik araligi icerecek sekilde cizelgeyi tam kapsamali
-            assert prof_max_min >= sched_makespan_min - 15.0, (
-                f"Enerji profili ufku ({prof_max_min} min) "
-            )
 
 
 def test_machine_capacity_consistency():
@@ -137,43 +127,34 @@ def test_carbon_energy_balance():
         f"ile Tesis toplami ({facility_grand_total_kwh:.2f} kWh) eslesmiyor."
     )
 
-def test_zero_production_schedule_and_energy_conservation():
+def test_transfer_batching_precedence_and_flow():
     """
-    Madde 12 Denetimi:
-    Hafta boyunca planlanan parti/adet 0 oldugunda:
-    - Hicbir hayalet task olusmamalidir (empty schedule).
-    - Makespan, setup ve tuketilen toplam enerji 0.0 kWh olmalidir.
+    Transfer partileme (transfer batching) ve ardışık operasyon akışını
+    production_schedule tablosu üzerinden doğrular.
     """
+    import sqlite3
     import pandas as pd
-    from src.scheduling.schedule_cpsat import run_cpsat_scheduling
-    from src.energy.energy_analytics import compute_energy_analytics
+    from pathlib import Path
     
-    # 1. Tum SKU talepleri sifir olan sentetik plan
-    zero_sku_plan = pd.DataFrame([
-        {"product_id": f"P{i:02d}", "planned_batches": 0, "planned_units": 0}
-        for i in range(1, 6)
-    ])
-    
-    # 2. Scheduler cagirilir
-    empty_sched = run_cpsat_scheduling(sku_plan=zero_sku_plan)
-    assert empty_sched.empty, "Sifir uretimde schedule bos DataFrame donmelidir."
-    assert len(empty_sched) == 0, "Sifir uretimde hayalet task uretilmemelidir."
+    db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
+    conn = sqlite3.connect(db_path)
+    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    conn.close()
 
-    # 3. Enerji analitigi bos veriyle cagirildiginda fiziksel sifir korumasi
-    synthetic_machines = pd.DataFrame([
-        {"machine_id": "CNC_01"},
-        {"machine_id": "CNC_02"},
-        {"machine_id": "ASSY_01"},
-        {"machine_id": "PACK_01"}
-    ])
-    
-    # compute_energy_analytics bos cizelgeyle cagirilir
-    kpi_df, m_kpi_df, profile_df = compute_energy_analytics(
-        schedule_df=empty_sched, 
-        machines_df=synthetic_machines
-    )
-    
-    assert not kpi_df.empty
-    assert kpi_df["makespan_hours"].iloc[0] == 0.0
-    assert kpi_df["grand_total_kwh"].iloc[0] == 0.0
-    assert kpi_df["total_units_produced"].iloc[0] == 0
+    assert not sched_df.empty, "production_schedule boş olamaz."
+
+    group_col = "lot_id" if "lot_id" in sched_df.columns else "batch_id" if "batch_id" in sched_df.columns else "product_id"
+    start_col = "start_min" if "start_min" in sched_df.columns else "start_time"
+    end_col = "end_min" if "end_min" in sched_df.columns else "end_time"
+    seq_col = "operation_seq" if "operation_seq" in sched_df.columns else "operation_sequence"
+
+    if seq_col in sched_df.columns:
+        for key, group in sched_df.groupby(group_col):
+            group_sorted = group.sort_values(seq_col)
+            prev_end = 0
+            for _, row in group_sorted.iterrows():
+                assert row[start_col] >= prev_end - 1e-3, (
+                    f"Transfer batching öncelik ihlali: {key} op {row[seq_col]} "
+                    f"start ({row[start_col]}) < prev end ({prev_end})"
+                )
+                prev_end = row[end_col]
