@@ -292,23 +292,28 @@ This platform bridges tactical operational research and discrete-event schedulin
 
 ---
 
-## Execution & Result Layers Architecture
+## 📌 Current Validated Reference Snapshot
 
-Platform sonuçları ve yürütme akışları üç ana operasyonel katmana ayrılmıştır:
+| Metrik / Parametre | Değer / Detay |
+| :--- | :--- |
+| **Run ID** | `RUN-20260923-38242d` |
+| **Git SHA** | `d2d6d055e32e98699b44a042d3a293fd8a468c91` |
+| **Data version** | 5-Year Consolidated Factory Demand (`factory_orders.csv`, 9,130 SKU-days) |
+| **Solver version** | Google OR-Tools CP-SAT `v9.15.6755` / PuLP `v3.3.2` |
+| **Solver status** | `OPTIMAL` (Optimality Gap: %0.00) |
+| **Makespan** | **13,698 dk (228.30 saat)** |
+| **Production units** | **11,525 adet** (Planlanan: 11,525 / Mutabakat: %100) |
+| **Energy** | **20,869.51 kWh** (Ortalama: 114.77 kW, Tepe: 248.20 kW, Yük Faktörü: 0.462) |
+| **Carbon** | **10.917 tCO₂e** (Kapsam 1: 0.228 t, Kapsam 2: 10.689 t) |
 
-```text
-REFERENCE ANALYSIS (Benchmark Baseline)
- └── Full dataset pipeline execution (CI Run #20)
- └── Verified Results: 13,698 min makespan | 20,869.5 kWh energy | 10.917 tCO2e emissions
+> Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları `artifacts/reference/` dizininde ve `reference_run_metadata.json` dosyasında dondurulmuştur.
 
-CI VALIDATION (Deterministic Verification)
- └── Fixture-based end-to-end validation + consistency test suite
- └── Fast unit & integration test suites (23 passing tests)
+### 📜 Historical Baselines & Model Evolution
+Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarihsel referanslar arşiv amaçlı aşağıda listelenmiştir:
+- **v1 Single-Lot Baseline:** Operasyonlar arası transfer partileme olmaksızın çözülen ilk model (Makespan: ~8,962 dk, 8,250 mikro birim, 1,642 kWh enerji hesabı).
+- **v2 Transfer-Batched Pre-SSOT:** İlk alt-parti ve acil malzeme kısıtları entegrasyonu (Makespan: 14,105 – 14,683 dk denemeleri).
+- **v2.1 Canonical Reference (Current):** Fiziksel birim mutabakatı (11,525 birim), takvim/TPM uyumlu CP-SAT ve dinamik termodinamik enerji hesabını içeren mühürlenmiş nihai koşum (13,698 dk).
 
-LIVE / LOCAL RUN (Hybrid Adaptive Execution)
- ├── IF data/raw/train.csv exists ──> Executes full production pipeline
- └── ELSE ──────────────────────────> Graceful fallback to synthetic benchmark fixtures
-```
 
 ## 8. Academic & Methodological References
 
@@ -323,26 +328,7 @@ LIVE / LOCAL RUN (Hybrid Adaptive Execution)
 5. **Demand Dataset Source:**  
    Kaggle Store Item Demand Forecasting Dataset (10 stores, 50 items daily sales history), adapted for multi-echelon industrial manufacturing research.
 6. **Electricity Emission Factor Benchmark (Scope 2):**  
-   T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) Güncel Elektrik Şebeke Emisyon Faktörleri (İletim: $0.436\text{ tCO}_2\text{e/MWh}$, Dağıtım: $0.469\text{ tCO}_2\text{e/MWh}$) referans alınarak kurgulanmış sentetik orta nokta varsayımı ($0.440\text{ tCO}_2\text{e/MWh}$)[cite: 1]. Uluslararası karşılaştırmalarda European Environment Agency (EEA) ve IEA sera gazı metodolojileriyle parametrik olarak uyumludur.
-
-### ⚙️ Çizelgeleme Granülerliği ve Modelleme Mimarisi (Transfer Batching & Sub-lots)
-- **Transfer Partileme (Transfer Batching / Lot Streaming):** Üretim operasyonları tekil hantal partiler yerine alt partilere (`sub-lot`) ayrılarak modellenmiştir. İstasyonlar arası parça akışı FIFO prensibiyle ve transfer partisi düzeyinde ardışıklık kısıtlarıyla ($\text{Start}_{op+1, b} \ge \text{End}_{op, b}$) yönetilerek bekleme süreleri minimize edilir.
-- **Çözücü Ölçeklenebilirliği (`MAX_SUB_LOT_BATCHES = 40`):** NP-Hard karmaşıklığı dengelemek ve CP-SAT çözücüsünün global optimuma yakınsama süresini garanti etmek için maksimum alt parti katsayısı üst sınırı (`MAX_SUB_LOT_BATCHES = 40`) ile sınırlandırılmıştır.
-- **Hazırlık (Setup) Zamanlaması ve Enerji Kuplajı:** CP-SAT modelinde tezgâh geçişleri sıra bağımlı hazırlık matrisi ile çözülür; iki iş arasındaki geçişler Just-in-Time Setup mantığıyla dinamik olarak enerji yük profiline entegre edilir.
-- **Referans / Canonical Run Tanımı:** Projede raporlanan tüm KPI'lar ve veritabanı durumu, `reports/run_metadata.json` ve `pipeline_runs` tablosunda Git SHA, seed ve konfigürasyon hash'i ile mühürlenmiş olan **Canonical Pipeline Run** çıktısını temsil eder.
-
----
-
-## 📊 Veri Kümeleri ve Çalıştırma Rejimleri (Execution Modes)
-
-Bu projede geliştirme, sürekli entegrasyon (CI) ve referans üretim koşumu için iki farklı veri rejimi bulunmaktadır:
-
-| Rejim | Veri Kaynağı | Talep Kaydı | Kapsam | Tipik Makespan | Kullanım Amacı |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Reference Full Run** | `data/raw/train.csv` (Tam Kaggle Verisi) | 1,826 gün × 5 SKU = 9,130 SKU-days | 2013-01-01 → 2017-12-31 (kapsayıcı) | **13,698 dk** (~228 saat) | Portföy referans sonuçları, kapasite ve enerji fizibilite analizleri |
-| **CI Test Fixture** | Sentetik / Mock Fixture | 1,825 gün/SKU | 2017-01-01 → 2017-12-31 (veya mock) | **~100 dk** | Hızlı GitHub Actions testleri, birim/entegrasyon doğrulamaları (<2 sn) |
-
-> ⚠️ **Önemli Not:** `data/raw/train.csv` dosyası dosya boyutu nedeniyle repoda sürüm kontrolü dışındaysa veya sıfırdan sentetik ortamda çalıştırılıyorsa, pipeline otomatik olarak test fixture'ını tetikler ve küçültülmüş bir çizelge (~100 dk makespan) üretir. Raporda ve dokümantasyonda sunulan kanonik metrikler (13,698 dk makespan, 20,869.5 kWh enerji) **Reference Full Run** rejimine aittir.
+   T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) Güncel Elektrik Şebeke Emisyon Faktörleri (İletim: $0.436\text{ tCO}_2\text{e/MWh}$, Dağıtım: $0.469\text{ tCO}_2\text{e/MWh}$) referans alınarak kurgulanmış sentetik orta nokta varsayımı ($0.440\text{ tCO}_2\text{e/MWh}$). Uluslararası karşılaştırmalarda European Environment Agency (EEA) ve IEA sera gazı metodolojileriyle parametrik olarak uyumludur.
 
 ---
 
