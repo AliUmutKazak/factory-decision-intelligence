@@ -47,34 +47,84 @@ def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
 
 def determine_system_status(tables: dict) -> tuple[str, str, str]:
     """
-    Sistem durumunu belirler:
+    Sistem durumunu kurumsal seviyede doğrular (Madde 16):
     - NO RUN: Veritabanı yok ya da temel tablolar boş
-    - PARTIAL: Tahmin/plan var fakat downstream çizelgeleme veya sürdürülebilirlik boş
-    - DATA STALE: Veritabanı dosyası 7 günden eski
-    - READY: Baştan uca tüm pipeline başarıyla tamamlanmış
+    - PIPELINE FAILED: Son pipeline yürütmesi hata ile sonuçlanmış
+    - SOLVER INFEASIBLE: Matematiksel modeller / CP-SAT uygun çözüm bulamamış
+    - DATA MISMATCH: Çizelgeleme ve downstream (enerji/karbon) modelleri arasında mutabakatsızlık
+    - PARTIAL: Upstream hazır ancak downstream adımlar eksik
+    - DATA STALE: Çıktılar veya veritabanı 7 günden eski
+    - READY: Tüm aşamalar SUCCESS, çözücüler geçerli ve modeller tam tutarlı
     """
     db_file = Path(DB_PATH)
     if not db_file.exists():
         return "NO RUN", "error", "Veritabanı dosyası (factory.db) bulunamadı. Pipeline henüz çalıştırılmamış."
 
-    # Dosya güncelliği kontrolü (7 günden eskiyse STALE)
+    # 1. Pipeline Run & Lineage Metadata Doğrulaması
+    metadata_path = Path("reports/run_metadata.json")
+    if metadata_path.exists():
+        try:
+            with open(metadata_path, "r", encoding="utf-8") as f:
+                run_meta = json.load(f)
+            
+            # Pipeline en son başarılı mı bitti?
+            if run_meta.get("status") != "SUCCESS":
+                return "PIPELINE FAILED", "error", f"Son pipeline çalıştırması başarısız (Run: {run_meta.get('run_id')}). Modeller güvensiz."
+            
+            # Çözücü durumları geçerli mi?
+            opt_metrics = run_meta.get("optimization_metrics", {})
+            agg_status = str(opt_metrics.get("aggregate_lp_status", "")).upper()
+            cpsat_status = str(opt_metrics.get("cpsat_solver_status", "")).upper()
+            
+            if "INFEASIBLE" in agg_status or "INFEASIBLE" in cpsat_status:
+                return "SOLVER INFEASIBLE", "error", f"Optimizasyon çözücü hatası: LP={agg_status}, CP-SAT={cpsat_status}."
+        except Exception:
+            pass
+
+    # 2. Solver Metadata Doğrulaması (reports/schedule_solver_metadata.json)
+    solver_meta_path = Path("reports/schedule_solver_metadata.json")
+    if solver_meta_path.exists():
+        try:
+            with open(solver_meta_path, "r", encoding="utf-8") as f:
+                s_meta = json.load(f)
+            s_status = str(s_meta.get("solver_status", "")).upper()
+            if s_status in ["INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]:
+                return "SOLVER INFEASIBLE", "error", f"CP-SAT Çizelgeleme çözücüsü başarısız: {s_status}."
+        except Exception:
+            pass
+
+    # 3. Dosya Güncelliği (7 günden eskiyse STALE)
     mtime = datetime.fromtimestamp(db_file.stat().st_mtime, tz=timezone.utc)
     age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
+    if age_hours > (24 * 7):
+        return "DATA STALE", "warning", f"Pipeline çıktıları güncel değil (Son güncelleme: {age_hours / 24:.1f} gün önce)."
 
+    # 4. Tablo Doluluk Kontrolleri
     core_upstream = ["forecast_demand", "sku_production_plan", "mrp_plan"]
     downstream = ["production_schedule", "energy_kpis", "carbon_kpis"]
 
-    upstream_empty = any(tables[k].empty for k in core_upstream)
-    downstream_empty = any(tables[k].empty for k in downstream)
+    upstream_empty = any(tables[k].empty for k in core_upstream if k in tables)
+    downstream_empty = any(tables[k].empty for k in downstream if k in tables)
 
     if upstream_empty and downstream_empty:
         return "NO RUN", "error", "Pipeline tablolarının tamamı boş. Veri üretimi yapılmamış."
     elif downstream_empty:
         return "PARTIAL", "warning", "Taktik planlama hazır ancak operasyonel çizelgeleme veya enerji/karbon adımları henüz tamamlanmamış."
-    elif age_hours > (24 * 7):
-        return "DATA STALE", "warning", f"Pipeline çıktıları güncel değil (Son güncelleme: {age_hours / 24:.1f} gün önce)."
-    
-    return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) tam tutarlılıkla hazır."
+
+    # 5. Core Reconciliation (Schedule vs Energy/Carbon Mutabakatı)
+    sched_df = tables.get("production_schedule", pd.DataFrame())
+    energy_df = tables.get("energy_kpis", pd.DataFrame())
+    carbon_df = tables.get("carbon_kpis", pd.DataFrame())
+
+    if not sched_df.empty:
+        if energy_df.empty or carbon_df.empty:
+            return "DATA MISMATCH", "error", "Çizelge mevcut fakat enerji/karbon metrikleri hesaplanmamış."
+        
+        # Çizelgede üretilen parti var ama enerji tüketimi 0 ise tutarsızlık
+        if "energy_kwh" in energy_df.columns and energy_df["energy_kwh"].sum() <= 0:
+            return "DATA MISMATCH", "error", "Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh)."
+
+    return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır."
 
 # Başlık ve Üst Bilgi
 st.title("🏭 Factory Decision Intelligence Platform")
@@ -100,7 +150,10 @@ status_colors = {
     "READY": "background-color: #28a745; color: white;",
     "PARTIAL": "background-color: #ffc107; color: black;",
     "NO RUN": "background-color: #dc3545; color: white;",
-    "DATA STALE": "background-color: #fd7e14; color: white;"
+    "PIPELINE FAILED": "background-color: #dc3545; color: white;",
+    "SOLVER INFEASIBLE": "background-color: #dc3545; color: white;",
+    "DATA MISMATCH": "background-color: #dc3545; color: white;",
+    "DATA STALE": "background-color: #fd7e14; color: white;",
 }
 
 st.markdown(
