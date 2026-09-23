@@ -19,19 +19,23 @@ Bu platformdaki Malzeme Ihtiyac Planlamasi modulu, **MRP-I Analitik Planlama Mot
 **Sonuc:** Platform, canli bir kurumsal ERP (ornegin IFS ERP, SAP) yerine gecme amaci tasimaz; bu sistemlerle cift yonlu entegre calisacak sekilde kurgulanmis **Ileri Planlama ve Analitik Karar Destek (Advanced Planning & Decision Intelligence)** katmanidir.
 
 
-## 5. Veritabani Mimarisi ve Olceklenebilirlik Vizyonu (Database Architecture & Roadmap)
+## 5. Veritabanı Mimarisi ve Ölçeklenebilirlik Vizyonu (Database Architecture & Roadmap)
 
-Projede `data/factory.db` uzerinde kosan SQLite veritabani:
+Projede `data/factory.db` üzerinde koşan SQLite veritabanı:
 
 > **"SQLite is the local analytical reference implementation."**
 
-### Mimari Rol ve Konumlandirma:
-- **Mevcut Kapsam (Local Analytical Engine):** Deterministik boru hatti (pipeline) yurutumu, CI/CD test kosumlari, sifir bagimlilikli yerel gelistirme ve tek kullanicili taktik/operasyonel karar destek senaryolari icin Single Source of Truth (SSOT) olarak gorev yapar.
-- **Kurumsal Olceklenebilirlik Siniri (Enterprise Production Target):**
-  - Coklu planlamaci (Multi-planner concurrency) ve eszamanli senaryo calistirma,
-  - Canli ERP (IFS, SAP) ve MES sistemlerinden gercek zamanli veri akisi,
-  - Cok kullanicili eszamanli web paneli sorgulari.
-  Bu operasyonel hedefler icin veri erisim katmani (Repository Pattern / SQLAlchemy / Database Connector), baglanti dizesi (Connection String) degisikligi ile **PostgreSQL** veya **Microsoft SQL Server** gibi ACID uyumlu merkezi bir RDBMS'e gecise hazir soyutlama standartlarinda tasarlanmalidir.
+### Mimari Rol ve Mevcut Durum (Current Implementation):
+- **Local Analytical Engine:** Deterministik boru hattı (pipeline) yürütümü, CI/CD test koşumları, sıfır bağımlılıklı yerel geliştirme ve tek kullanıcılı analitik karar destek senaryoları için Single Source of Truth (SSOT) olarak görev yapar.
+- **Mevcut Veri Erişim Katmanı:** Kod tabanında veri erişimi doğrudan standart `sqlite3` sürücüsü (`sqlite3.connect`) üzerinden sağlanmaktadır. Projede mevcut durumda soyutlanmış bir ORM katmanı (SQLAlchemy) veya Repository Pattern mimarisi bulunmamaktadır.
+
+### Kurumsal Geçiş Yol Haritası (Enterprise Migration Roadmap):
+Üretim ortamına (Production) geçişte çoklu kullanıcı ve canlı fabrika entegrasyonu gereksinimleri doğduğunda izlenecek yol haritası:
+1. **Concurrency & Real-Time Entegrasyon:**
+   - Çoklu planlamacı eşzamanlılığı (Multi-planner concurrency) ve canlı ERP (IFS, SAP)/MES sistemlerinden asenkron veri beslemeleri için **PostgreSQL** veya **Microsoft SQL Server** gibi merkezi bir RDBMS hedeflenmektedir.
+2. **Mimari Refactoring Hedefi (Geçiş Aşaması):**
+   - Kod tabanındaki doğrudan `sqlite3.connect` çağrılarının, veritabanı motorundan bağımsız bir Veri Erişim Katmanına (Repository Pattern / Database Connector / SQLAlchemy Engine) taşınması planlanmıştır.
+   - Bu soyutlama sağlandığında ortam değişkenleri (`DATABASE_URL`) üzerinden PostgreSQL/SQL Server bağlantısı dinamik hale getirilecektir.
 
 
 ## 6. Veri Semantigi: Parti Boyutlandirma (Batch vs. Lot Sizing)
