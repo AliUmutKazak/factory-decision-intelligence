@@ -23,7 +23,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 8,962 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
 | **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.92 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.07 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
-| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **WAPE: %6.12 – %10.41** | 28 günlük tarihsel simülasyon (holdout) testinde SKU bazlı en düşük hata. |
+| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük (Ocak 2018) operasyonel üretim ufku tahmini. |
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **1,639.2 kWh / 18.99 kW** | Ortalama yük ile tepe yük dengesi fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
 | **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **0.949 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (0.721 t) dengelendi. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
@@ -42,8 +42,9 @@ Sistem, Hax & Meal hiyerarşik planlama mimarisini modern veri mühendisliği ve
                ▼
  ┌──────────────────────────────────────────────────┐
  │  1. TALEP TAHMİNLEME (LightGBM vs Holt-Winters)  │
- │     - 28 Günlük Tarihsel Ufuk (Holdout Testi)    │
+ │     - 28 Günlük Tarihsel Backtest (Holdout)      │
  │     - WAPE Bazlı SKU Başı Model Seçimi           │
+ │     - 28 Günlük Gelecek Üretim Ufku (Ocak 2018)  │
  └────────────────────────┬─────────────────────────┘
                           │ Günlük SKU Talebi
                           ▼
@@ -149,9 +150,11 @@ Agrega LP (Taktik Seviye) ile CP-SAT (Operasyonel Seviye) arasındaki kapasite t
 
 ---
 
-## 🔬 Talep Tahmini & Doğrulama Metrikleri
+## 🔬 Talep Tahmini: Tarihsel Backtest ve Gelecek Ufku Mimarisi
 
-5 pilot SKU için 28 günlük tarihsel simülasyon (holdout) talebi, çok adımlı özyinelemeli (recursive) **LightGBM Regressor** ve **Holt-Winters Üstel Düzleştirme** modelleriyle kıyaslanmıştır.
+Tahminleme motoru iki aşamalı endüstriyel standart bir metodoloji ile çalışmaktadır:
+1. **28-Day Historical Backtest (Model Validasyonu & Seçim):** Pilot 5 SKU için geçmiş 28 günlük (`2017-12-04` – `2017-12-31`) out-of-sample holdout test penceresinde çok adımlı özyinelemeli (recursive) **LightGBM Regressor** ve **Holt-Winters Üstel Düzleştirme** modelleri yarıştırılmıştır. En düşük test WAPE skoruna sahip model SKU bazında operasyona atanmıştır.
+2. **28-Day Production Horizon Forecast (Operasyonel Besleme):** Seçilen en iyi modeller tüm geçmiş veriyle güncellenerek fabrikaya intikal eden Ocak 2018 (`2018-01-01` – `2018-01-28`) 4 haftalık operasyonel ufkun talebini üretmiştir (`forecast_demand`). Bu çıktılar Agregat Planlama (LP) ve CP-SAT çizelgeleyicinin birincil girdisini oluşturur.
 
 | SKU Kodu | Ürün Ailesi | Kazanan Model | Test WAPE | Test RMSE | Bias | Karakteristik |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---|
