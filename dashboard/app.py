@@ -381,13 +381,19 @@ with tab_schedule:
                 "product_id": "Ürün"
             }
         )
-        fig_gantt.add_vline(
-            x=8.0,
-            line_dash="dot",
-            line_color="orange",
-            annotation_text="Synthetic Expedite Release (8. sa)",
-            annotation_position="top right"
-        )
+        # Madde 15: Model dinamik malzeme gecikme çizgisi (Hardcoded 8. saat yerine)
+        if "release_time_min" in sched_copy.columns:
+            max_rel_min = sched_copy["release_time_min"].max()
+            if pd.notna(max_rel_min) and max_rel_min > 0:
+                max_rel_hr = max_rel_min / 60.0
+                fig_gantt.add_vline(
+                    x=max_rel_hr,
+                    line_dash="dot",
+                    line_color="orange",
+                    annotation_text=f"Dinamik Malzeme Release ({max_rel_hr:.1f}. sa)",
+                    annotation_position="top right"
+                )
+
         fig_gantt.update_layout(xaxis_title="Simülasyon Zamanı (Saat)", yaxis_title="Tezgâh")
         fig_gantt.update_yaxes(autorange="reversed")
         st.plotly_chart(fig_gantt, use_container_width=True)

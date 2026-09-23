@@ -147,7 +147,7 @@ def run_cpsat_scheduling(sku_plan=None):
             "task_id", "lot_id", "product_id", "operation_id", "operation_seq",
             "machine_id", "start_min", "end_min", "duration_min", "lot_qty",
             "setup_before_min", "setup_end_min", "setup_start_min",
-            "batch_id", "batch_qty"
+            "batch_id", "batch_qty", "release_time_min"
         ]
         empty_df = pd.DataFrame(columns=canonical_cols)
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
@@ -377,6 +377,7 @@ def run_cpsat_scheduling(sku_plan=None):
                   "duration_min": all_tasks[tid]["duration"],
                   "start_min": s_val,
                   "end_min": e_val,
+                  "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
               })
         
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
