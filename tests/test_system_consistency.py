@@ -1,3 +1,4 @@
+import sqlite3
 import pytest
 import pandas as pd
 import numpy as np
@@ -10,17 +11,17 @@ from src.config import (
 )
 
 def _load_schedule_data():
-    candidate_paths = [
-        PROCESSED_DATA_DIR / "production_schedule.csv",
-        SYNTHETIC_DATA_DIR / "production_schedule.csv",
-        PROCESSED_DATA_DIR / "schedule_tasks.csv",
-        SYNTHETIC_DATA_DIR / "schedule_tasks.csv",
-    ]
-    for p in candidate_paths:
-        if p.exists():
-            df = pd.read_csv(p)
-            if not df.empty:
-                return df
+    db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
+    if not db_path.exists():
+        return None
+    try:
+        conn = sqlite3.connect(db_path)
+        df = pd.read_sql("SELECT * FROM production_schedule", conn)
+        conn.close()
+        if not df.empty:
+            return df
+    except Exception:
+        pass
     return None
 
 def test_schedule_makespan_energy_consistency():
@@ -69,11 +70,13 @@ def test_machine_capacity_consistency():
     if df is None:
         pytest.skip("Production schedule artifact not found.")
 
-    cap_path = Path("data/processed/machine_capacity_plan.csv")
-    assert cap_path.exists(), "machine_capacity_plan.csv dosyasi bulunamadi."
-    cap_df = pd.read_csv(cap_path)
+    db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
+    assert db_path.exists(), "factory.db not found"
+    conn = sqlite3.connect(db_path)
+    cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
+    conn.close()
     w1_cap = cap_df[cap_df["period_week"] == 1]
-    assert not w1_cap.empty, "machine_capacity_plan.csv icinde 1. hafta verisi bulunamadi."
+    assert not w1_cap.empty, "machine_capacity_plan tablosu icinde 1. hafta verisi bulunamadi"
 
     for m_id in sorted(df["machine_id"].unique()):
         m_sched = df[df["machine_id"] == m_id]
@@ -102,18 +105,11 @@ def test_carbon_energy_balance():
     from pathlib import Path
     from src.config import DB_PATH
 
-    # 1. SQLite veritabanindan ya da islenmis CSV artefaktlarindan gercek verileri cek
-    if Path(DB_PATH).exists():
-        conn = sqlite3.connect(DB_PATH)
-        m_kpis = pd.read_sql("SELECT machine_id, total_kwh FROM energy_machine_kpis", conn)
-        f_kpis = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
-        conn.close()
-    else:
-        m_path = Path("data/processed/energy_machine_kpis.csv")
-        f_path = Path("data/processed/energy_kpis.csv")
-        assert m_path.exists() and f_path.exists(), "Enerji KPI artefaktlari bulunamadi."
-        m_kpis = pd.read_csv(m_path)
-        f_kpis = pd.read_csv(f_path)
+    assert Path(DB_PATH).exists(), f"Veritabani bulunamadi: {DB_PATH}"
+    conn = sqlite3.connect(DB_PATH)
+    m_kpis = pd.read_sql("SELECT machine_id, total_kwh FROM energy_machine_kpis", conn)
+    f_kpis = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
+    conn.close()
 
     assert not m_kpis.empty, "energy_machine_kpis tablosu bos olamaz."
     assert not f_kpis.empty, "energy_kpis tablosu bos olamaz."

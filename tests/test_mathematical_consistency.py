@@ -1,4 +1,5 @@
 import sys
+import os
 from pathlib import Path
 
 # Proje ana dizinini arama yoluna ekler
@@ -276,16 +277,14 @@ def test_hierarchical_capacity_decomposition():
     """
     import pandas as pd
     from pathlib import Path
-    
-    cap_path = Path("data/processed/machine_capacity_plan.csv")
-    sched_path = Path("data/processed/production_schedule.csv")
-    
-    assert cap_path.exists(), "machine_capacity_plan.csv dosyasi bulunamadi."
-    assert sched_path.exists(), "production_schedule.csv dosyasi bulunamadi."
-        
-    cap_df = pd.read_csv(cap_path)
-    sched_df = pd.read_csv(sched_path)
-    
+
+    db_path = os.path.join("data", "factory.db")
+    assert os.path.exists(db_path), "factory.db veritabani dosyasi bulunamadi"
+    conn = sqlite3.connect(db_path)
+    cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
+    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    conn.close()
+
     w1_cap = cap_df[cap_df["period_week"] == 1]
     assert not w1_cap.empty, "machine_capacity_plan.csv icinde 1. hafta tanimi yok."
     
@@ -331,11 +330,15 @@ def test_explicit_setup_intervals_physical_integrity():
     """
     import pandas as pd
     from pathlib import Path
-    sched_path = Path("data/processed/production_schedule.csv")
-    if not sched_path.exists():
+
+    db_path = os.path.join("data", "factory.db")
+    if not os.path.exists(db_path):
         return
-    df = pd.read_csv(sched_path)
-    assert "setup_start_min" in df.columns, "setup_start_min kolonu schedule ciktisinda bulunamadi."
+    conn = sqlite3.connect(db_path)
+    df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    conn.close()
+
+    assert "setup_start_min" in df.columns, "setup_start_min kolonu schedule..."
     assert "setup_end_min" in df.columns, "setup_end_min kolonu schedule ciktisinda bulunamadi."
     for mid, group in df.groupby("machine_id"):
         sorted_g = group.sort_values("start_min").reset_index(drop=True)
