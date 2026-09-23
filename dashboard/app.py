@@ -246,10 +246,10 @@ with tab_summary:
         help="1. hafta çizelgesindeki 3 tezgâhın toplam işlem, hazırlık ve boşta bekleme enerjisi"
     )
     col4.metric(
-        "Toplam Karbon Ayak İzi",
+        "Modellenen Üretim Kapsam 1–2 Emisyonu",
         f"{float(c_kpi.get('total_tco2e', 0.0)):.3f} tCO₂e",
         delta=f"{float(c_kpi.get('kgco2e_per_unit', 0.0)):.3f} kgCO₂e/adet",
-        help="Kapsam 1 (Forklift dizel) ve Kapsam 2 (Şebeke elektriği) toplam emisyonu"
+        help="Modeled Production-System Scope 1–2 Footprint: Yalnızca modellenen üretim tezgâhlarının elektrik tüketimi (Scope 2 - Location-Based şebeke) ve tezgâhlar arası iç hat forklift dizeli (Scope 1) dahildir. Tesis geneli HVAC, ofis, aydınlatma ve yardımcı işletmeler kapsam dışıdır."
     )
 
     st.markdown("---")

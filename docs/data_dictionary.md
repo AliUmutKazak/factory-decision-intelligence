@@ -58,7 +58,19 @@ Sistemin uretim gercekciligi icin modelleme iki ayrik ufuk (horizon) uzerinde ku
    - Kazanan model, verinin son gununden itibaren ileriye dogru 28 gunluk operasyonel talep projeksiyonunu uretir.
    - Taktik agregasyon (LP) ve malzeme planlamasi (MRP) yalnizca bu ileri projeksiyon serisi uzerinden calisir; backtest tahminleri uretim planina karistirilmaz.
 
-## 8. Run Lineage ve Yonetisim Semasi (Data Governance)
+## 8. Sürdürülebilirlik & Sera Gazı Modelleme Sınırları (GHG Scope 1 & 2 System Boundaries)
+
+Platformdaki karbon emisyon hesabı, tüm fabrikanın toplam kurumsal ayak izini değil, **operasyonel üretim hücresi sınırlarını** temsil eder:
+
+- **Kapsam İçi (Modeled Production-System Boundary):**
+  - **Scope 1 (Doğrudan):** Yalnızca tezgâhlar ve hatlar arası malzeme transferinde tüketilen iç lojistik dizel miktarı (Forklift operasyonu).
+  - **Scope 2 (Dolaylı):** Çizelgelenen tezgâhların (M01, M02, M03) işleme, hazırlık (setup) ve rölanti durumlarında tükettiği elektrik enerjisi[cite: 3].
+- **Kapsam Dışı Unsurlar (Excluded Facility Loads):**
+  - Tesis genel aydınlatması, HVAC (iklimlendirme/havalandırma), merkezi kompresör hattı kayıpları, idari bina tüketimleri ve yardımcı işletmeler (utilities)[cite: 3].
+- **Emisyon Hesaplama Yaklaşımı:**
+  - Scope 2 elektrik tüketimi **Grid Location-Based** (şebeke ortalama faktörü: $0.440\text{ kg CO}_2\text{e/kWh}$) esasına göre hesaplanmaktadır[cite: 3]. İlerleyen fazlarda yeşil enerji tedariki (I-REC / PPA) senaryoları için **Market-Based** ayrıştırmasına uygun parametrik mimari hedeflenmektedir[cite: 3].   
+
+## 9. Run Lineage ve Yonetisim Semasi (Data Governance)
 
 Her analitik kosumun tekrarlanabilirligi ve izlenebilirligi icin merkezi yonetisim su alanlarla denetlenir:
 

@@ -25,7 +25,7 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku (Ocak 2018) tahmini. |
 | **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,869.5 kWh / 248.2 kW** | Ortalama yük (114.77 kW) ile tepe yük dengesi fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$, Yük Faktörü: 0.462). |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **10.917 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (0.722 t) dengelendi. |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **10.917 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (10.689 t) dengelendi. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
 > **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
 > **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
@@ -190,10 +190,12 @@ $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\t
 * **Toplam Enerji Tüketimi:** $20,869.51\text{ kWh}$ (%86.5 İşlem, %1.2 Setup, %12.3 Boşta Bekleme)
 * **Kapsam 1 + Kapsam 2 Emisyonu:** $10.917\text{ tCO}_2\text{e}$
 
-### Sera Gazı Emisyonları (GHG Protocol Scope 1 & 2)
+### Sera Gazı Emisyonları (Modeled Production-System Scope 1 & 2)
+> **Sistem Sınırı Notu:** Bu metrik tesis geneli yardımcı işletmeleri (HVAC, aydınlatma, ofis vb.) kapsamaz; doğrudan çizelgelenen tezgâh elektrik tüketimini (Scope 2 - Location-Based) ve iç lojistik forklift dizelini (Scope 1) modeller[cite: 3].
+
 1. **Kapsam 1 (Doğrudan):** Forklift dizel tüketimi (85 L $\times$ 2.68 kg CO₂e/L = 0.228 tCO₂e)
-2. **Kapsam 2 (Dolaylı):** Şebeke elektrik tüketimi ($0.440\text{ kg CO}_2\text{e/kWh}$ emisyon faktörüyle 9.173 tCO₂e)
-3. **Toplam Karbon Ayak İzi:** **9.403 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
+2. **Kapsam 2 (Dolaylı - Location-Based):** Şebeke elektrik tüketimi ($0.440\text{ kg CO}_2\text{e/kWh}$ emisyon faktörüyle tezgâh tüketimleri)
+3. **Modellenen Üretim Karbon Ayak İzi:** **10.917 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
 
 #### Dahili Karbon Fiyatlama (Internal Carbon Pricing) Senaryoları
 > **Finansal Modelleme ve Karbon Metodolojisi Notu:**
