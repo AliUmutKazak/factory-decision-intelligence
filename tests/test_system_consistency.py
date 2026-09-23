@@ -189,3 +189,38 @@ def test_cpsat_solver_metadata_workers():
     assert meta.get("configured_num_search_workers") == expected_workers
     assert meta.get("effective_num_search_workers") == expected_workers
     assert meta.get("num_workers") == expected_workers
+
+def test_master_data_database_constraints():
+    """DB seviyesindeki UNIQUE / PRIMARY KEY kısıtlarının mükerrer kaydı reddettiğini doğrular."""
+    import sqlite3
+    import pytest
+    import src.config as cfg
+
+    conn = sqlite3.connect(cfg.DB_PATH)
+    cur = conn.cursor()
+
+    # 1. materials.material_id PRIMARY KEY ihlali
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute("INSERT INTO materials (material_id, material_name) VALUES ('RAW_STEEL_A', 'Duplicate Material')")
+        conn.commit()
+    conn.rollback()
+
+    # 2. bom (product_id, material_id) PRIMARY KEY ihlali
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute("INSERT INTO bom (product_id, material_id, qty_per_unit) VALUES ('P01', 'RAW_STEEL_A', 99.0)")
+        conn.commit()
+    conn.rollback()
+
+    # 3. routing (product_id, operation_seq) PRIMARY KEY ihlali
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute("INSERT INTO routing (product_id, operation_seq, machine_id, processing_time_min) VALUES ('P01', 1, 'M01', 5.0)")
+        conn.commit()
+    conn.rollback()
+
+    # 4. changeover_matrix (from_product, to_product) PRIMARY KEY ihlali
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute("INSERT INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES ('P01', 'P01', 10.0)")
+        conn.commit()
+    conn.rollback()
+
+    conn.close()    

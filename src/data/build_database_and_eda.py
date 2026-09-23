@@ -151,9 +151,9 @@ def validate_master_data(data_dict):
     if missing_routing:
         raise ValueError(f"[MASTER DATA ERROR] Şu ürünler için Rota (Routing) tanımı bulunamadı: {missing_routing}")
 
-    # Changeover matrix completeness (her ikili var mı?)
+    # Changeover matrix completeness
     co_df = data_dict["changeover_matrix"]
-    eexisting_pairs = set(zip(co_df["from_product"], co_df["to_product"]))
+    existing_pairs = set(zip(co_df["from_product"], co_df["to_product"]))
     all_pairs = {(p1, p2) for p1 in valid_products for p2 in valid_products}
     missing_pairs = all_pairs - existing_pairs
     if missing_pairs:
@@ -250,11 +250,83 @@ def initialize_database(force_recreate=True, run_id=None):
             raise FileNotFoundError(f"Missing mandatory master data: {table}.csv")
         loaded_data[table] = pd.read_csv(csv_file)
 
+    # Master data tablolarını açık kısıtlarla oluştur
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS machines (
+            machine_id TEXT PRIMARY KEY,
+            machine_name TEXT NOT NULL,
+            base_power_kw REAL,
+            operating_cost_per_hour REAL,
+            max_daily_hours REAL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            product_id TEXT PRIMARY KEY,
+            family_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            unit_sale_price REAL,
+            holding_cost_per_week REAL,
+            late_penalty_per_day REAL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS materials (
+            material_id TEXT PRIMARY KEY,
+            material_name TEXT NOT NULL,
+            unit TEXT,
+            unit_cost REAL,
+            supplier_id TEXT,
+            lead_time_days REAL,
+            min_order_qty REAL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bom (
+            product_id TEXT NOT NULL,
+            material_id TEXT NOT NULL,
+            qty_per_unit REAL NOT NULL,
+            PRIMARY KEY (product_id, material_id),
+            FOREIGN KEY (product_id) REFERENCES products(product_id),
+            FOREIGN KEY (material_id) REFERENCES materials(material_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS routing (
+            product_id TEXT NOT NULL,
+            operation_seq INTEGER NOT NULL,
+            machine_id TEXT NOT NULL,
+            processing_time_min REAL NOT NULL,
+            variable_kwh_per_unit REAL,
+            PRIMARY KEY (product_id, operation_seq),
+            FOREIGN KEY (product_id) REFERENCES products(product_id),
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS changeover_matrix (
+            from_product TEXT NOT NULL,
+            to_product TEXT NOT NULL,
+            setup_time_min REAL NOT NULL,
+            setup_cost REAL,
+            PRIMARY KEY (from_product, to_product),
+            FOREIGN KEY (from_product) REFERENCES products(product_id),
+            FOREIGN KEY (to_product) REFERENCES products(product_id)
+        )
+    """)
+    conn.commit()
+
     # Master-data bütünlük denetimi (Fail-Fast)
     validate_master_data(loaded_data)
 
     for table, tdf in loaded_data.items():
-        tdf.to_sql(table, conn, index=False, if_exists="replace")
+        cursor.execute(f"DELETE FROM {table}")
+        tdf.to_sql(table, conn, index=False, if_exists="append")
 
     conn.commit()
 
