@@ -92,8 +92,10 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
 
     makespan_min = int(schedule_df["end_min"].max())
     makespan_hours = makespan_min / 60.0
-    total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["batch_qty"].sum()
-
+    if "production_units" in schedule_df.columns:
+        total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["production_units"].sum()
+    else:
+        total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["batch_qty"].sum() * 25
     # 1. İşlem Enerjisi (Processing Energy): İki Bileşenli Termodinamik Model
     # NOT (Fiziksel Doğrulama & Çift Sayım Önleme):
     # - base_energy_kwh: Makine 'Running' durumundayken çekilen sabit taban güçtür (soğutma, CNC, hidrolik).
@@ -103,7 +105,8 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
     schedule_df["base_energy_kwh"] = schedule_df.apply(
         lambda r: r["proc_hours"] * machine_specs[r["machine_id"]]["base_kw"], axis=1
     )
-    schedule_df["variable_energy_kwh"] = schedule_df["batch_qty"] * schedule_df["kwh_unit"]
+    prod_col = "production_units" if "production_units" in schedule_df.columns else "lot_qty"
+    schedule_df["variable_energy_kwh"] = schedule_df[prod_col] * schedule_df["kwh_unit"]
     schedule_df["total_proc_energy_kwh"] = schedule_df["base_energy_kwh"] + schedule_df["variable_energy_kwh"]
     schedule_df["proc_power_kw"] = schedule_df["total_proc_energy_kwh"] / schedule_df["proc_hours"].replace(0, 1.0)
     total_proc_kwh = float(schedule_df["total_proc_energy_kwh"].sum())

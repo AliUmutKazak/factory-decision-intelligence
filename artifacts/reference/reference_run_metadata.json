@@ -1,1 +1,28 @@
-{\`n  "reference_run": "post-lp-fix",\`n  "solver_status": "OPTIMAL",\`n  "makespan_min": 8962,\`n  "energy_kwh": 20853.01,\`n  "emissions_tco2e": 9.403,\`n  "ortools": "9.15.6755",\`n  "seed": 42\`n}
+{
+    "run_id": "RUN-20260923-38242d",
+    "run_timestamp": "2026-09-23T17:24:13.089605",
+    "git_sha": "d2d6d055e32e98699b44a042d3a293fd8a468c91",
+    "data_source": "factory_orders.csv",
+    "forecast_origin": "LightGBM_Recursive_Direct",
+    "config_hash": "2879d038b3d0917d",
+    "status": "COMPLETED",
+    "orders_count": 0,
+    "environment": {
+        "python_version": "3.11.16",
+        "pandas_version": "3.0.5",
+        "ortools_version": "9.15.6755",
+        "pulp_version": "3.3.2"
+    },
+    "optimization_metrics": {
+        "aggregate_lp_status": "OPTIMAL",
+        "cpsat_solver_status": "OPTIMAL_OR_FEASIBLE",
+        "notes": "End-to-end execution completed successfully"
+    },
+    "kpis": {
+        "makespan_minutes": 13698,
+        "makespan_hours": 228.3,
+        "total_units_produced": 11525,
+        "total_energy_kwh": 24293.3163,
+        "total_emissions_tco2e": 10.9169
+    }
+}

@@ -1,0 +1,2 @@
+solver_name,solver_status,is_optimal,objective_value_min,best_bound_min,optimality_gap_pct,solve_time_seconds,num_workers,random_seed,max_time_in_seconds,tasks_scheduled,total_scheduled_units
+Google OR-Tools CP-SAT,OPTIMAL,True,13698.0,13698.0,0.0,0.5384,0,42,30.0,32,28075

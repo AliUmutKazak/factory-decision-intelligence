@@ -1,3 +1,8 @@
+import sys
+import os
+
+# Proje kök dizinini sys.path'e ekle
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import sqlite3
 import pytest
 from pathlib import Path
