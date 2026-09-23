@@ -33,8 +33,17 @@ def test_schedule_makespan_energy_consistency():
     import pandas as pd
     from pathlib import Path
 
+    from src.energy.energy_analytics import compute_energy_analytics
+
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
     conn = sqlite3.connect(db_path)
+    
+    # Tablo henüz oluşmamışsa analitiği çalıştırıp tabloyu oluştur
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='energy_kpis'")
+    if not cur.fetchone():
+        compute_energy_analytics()
+
     sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
     conn.close()
@@ -105,8 +114,16 @@ def test_carbon_energy_balance():
     from pathlib import Path
     from src.config import DB_PATH
 
+    from src.energy.energy_analytics import compute_energy_analytics
+
     assert Path(DB_PATH).exists(), f"Veritabani bulunamadi: {DB_PATH}"
     conn = sqlite3.connect(DB_PATH)
+    
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='energy_machine_kpis'")
+    if not cur.fetchone():
+        compute_energy_analytics()
+
     m_kpis = pd.read_sql("SELECT machine_id, total_kwh FROM energy_machine_kpis", conn)
     f_kpis = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
     conn.close()

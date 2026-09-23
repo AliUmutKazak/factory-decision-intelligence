@@ -159,7 +159,7 @@ def validate_master_data(data_dict):
     if missing_pairs:
         raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
 
-def initialize_database(force_recreate: bool = False):
+def initialize_database(force_recreate=True, run_id=None):
     """
     Veritabanını SSOT (Single Source of Truth) ilkelerine uygun şekilde başlatır ve eşitler.
     Dosyayı tamamen silmek yerine idempotent tablo senkronizasyonu yapar ve
@@ -186,16 +186,37 @@ def initialize_database(force_recreate: bool = False):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    # 0. SSOT Denetim Çizelgesi (Pipeline Run Audit Log)
+    # 0. SSOT Denetim Çizelgesi (Pipeline Run Audit Log) - Bütünleşik Şema
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_runs (
             run_id TEXT PRIMARY KEY,
             timestamp TEXT NOT NULL,
-            trigger_source TEXT NOT NULL,
-            orders_count INTEGER NOT NULL,
+            trigger_source TEXT,
+            orders_count INTEGER,
+            git_sha TEXT,
+            config_hash TEXT,
+            data_source TEXT,
             status TEXT NOT NULL
         )
     """)
+    conn.commit()
+
+    # 1. İşlenmiş sipariş verisini aktar
+    if not os.path.exists(PROCESSED_ORDERS_PATH):
+        raise FileNotFoundError(f"Missing mandatory order data: {PROCESSED_ORDERS_PATH}")
+    orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
+    orders_df.to_sql("orders", conn, index=False, if_exists="replace")
+
+    # Standart Run ID yoksa lineage modülünden üret
+    if not run_id:
+        from src.utils.lineage import generate_run_id
+        run_id = generate_run_id()
+
+    cursor.execute("""
+        INSERT OR REPLACE INTO pipeline_runs 
+        (run_id, timestamp, trigger_source, orders_count, status) 
+        VALUES (?, ?, ?, ?, ?)
+    """, (run_id, datetime.now().isoformat(), "pipeline_execution", len(orders_df), "INITIALIZED"))
     conn.commit()
 
     # 1. İşlenmiş sipariş verisini aktar

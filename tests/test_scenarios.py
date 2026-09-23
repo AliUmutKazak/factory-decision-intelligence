@@ -86,6 +86,9 @@ def test_scenario_capacity_stress(monkeypatch):
     run_planning_pipeline()
     run_mrp_engine()
     solve_cpsat_schedule()
+    compute_energy_analytics()
+    from src.carbon.carbon_analytics import compute_carbon_analytics
+    compute_carbon_analytics()
 
     conn = sqlite3.connect(PROJECT_ROOT / "data" / "factory.db")
     agg_plan = pd.read_sql("SELECT * FROM aggregate_plan", conn)

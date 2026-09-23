@@ -1,0 +1,21 @@
+{
+    "run_id": "RUN-20260923-ef8771",
+    "run_timestamp": "2026-09-23T17:07:46.378184",
+    "git_sha": "9aa023c9a2420d924dda4cb9329430b2dd612ff4",
+    "data_source": "factory_orders.csv",
+    "forecast_origin": "LightGBM_Recursive_Direct",
+    "config_hash": "2879d038b3d0917d",
+    "status": "COMPLETED",
+    "orders_count": 0,
+    "environment": {
+        "python_version": "3.11.16",
+        "pandas_version": "3.0.5",
+        "ortools_version": "9.15.6755",
+        "pulp_version": "3.3.2"
+    },
+    "optimization_metrics": {
+        "aggregate_lp_status": "OPTIMAL",
+        "cpsat_solver_status": "OPTIMAL_OR_FEASIBLE",
+        "notes": "End-to-end execution completed successfully"
+    }
+}
