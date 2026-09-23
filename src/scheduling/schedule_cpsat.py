@@ -444,7 +444,7 @@ def run_cpsat_scheduling(sku_plan=None):
     with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:
         json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
 
-    conn = sqlite3.connect('data/factory.db')
+    conn = sqlite3.connect(DB_PATH)
     sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
     solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
     conn.close()
