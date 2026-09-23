@@ -16,6 +16,7 @@ from src.inventory.bom_mrp import run_mrp_engine
 from src.scheduling.schedule_cpsat import solve_cpsat_schedule
 from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
+from src.utils.lineage import record_pipeline_run_metadata
 
 def run_end_to_end_pipeline():
     start_total = time.time()

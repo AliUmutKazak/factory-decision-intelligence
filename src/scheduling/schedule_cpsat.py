@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import pandas as pd
@@ -367,12 +368,47 @@ def run_cpsat_scheduling(sku_plan=None):
                 sched_df[col] = []
 
     os.makedirs('data/processed', exist_ok=True)
+    os.makedirs('reports', exist_ok=True)
     sched_df.to_csv('data/processed/production_schedule.csv', index=False)
+
+    # -------------------------------------------------------------
+    # Madde 24: CP-SAT Optimization Solver Metadata & Proof Lineage
+    # -------------------------------------------------------------
+    obj_val = float(solver.ObjectiveValue()) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
+    best_bound = float(solver.BestObjectiveBound()) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
+
+    # Gap hesabı: (|Objective - Bound| / max(1.0, |Objective|)) * 100
+    if obj_val is not None and best_bound is not None:
+        optimality_gap = abs(obj_val - best_bound) / max(1.0, abs(obj_val)) * 100.0
+    else:
+        optimality_gap = None
+
+    solver_metadata = [{
+        "solver_name": "Google OR-Tools CP-SAT",
+        "solver_status": status_name,
+        "is_optimal": bool(status == cp_model.OPTIMAL),
+        "objective_value_min": obj_val,
+        "best_bound_min": best_bound,
+        "optimality_gap_pct": round(optimality_gap, 4) if optimality_gap is not None else None,
+        "solve_time_seconds": round(float(solver.WallTime()), 4),
+        "num_workers": int(getattr(solver.parameters, "num_workers", 0)),
+        "random_seed": int(CPSAT_RANDOM_SEED),
+        "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 30.0)),
+        "tasks_scheduled": len(sched_df),
+        "total_scheduled_units": int(sched_df["production_units"].sum()) if "production_units" in sched_df.columns else None
+    }]
+
+    solver_meta_df = pd.DataFrame(solver_metadata)
+    solver_meta_df.to_csv('data/processed/schedule_solver_metadata.csv', index=False)
+
+    with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:
+        json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
 
     conn = sqlite3.connect('data/factory.db')
     sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+    solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
     conn.close()
-    print('✓ production_schedule.csv guncellendi.')
+    print('✓ production_schedule.csv ve schedule_solver_metadata güncellendi.')
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
     print()

@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import pandas as pd
@@ -84,6 +85,7 @@ def run_forecast_benchmark():
 
     benchmark_summary = []
     final_forecast_records = []
+    model_lineage_records = []
 
     print("=" * 85)
     print("      AŞAMA 3: TALEP TAHMİNLEME & MODEL KIYASLAMA (BENCHMARK)      ")
@@ -230,19 +232,70 @@ def run_forecast_benchmark():
                 "model_used": best_name
             })
 
+        # Model Governance / Lineage Kaydı (Madde 23)
+        competing_scores = {
+            m_name: {"wape": round(float(vals[0]), 4), "rmse": round(float(vals[1]), 2), "bias": round(float(vals[2]), 2)}
+            for m_name, vals in models.items()
+        }
+        
+        model_params = {}
+        if best_name == "LightGBM":
+            model_params = params
+        elif best_name == "Holt-Winters":
+            model_params = {"trend": "add", "seasonal": "add", "seasonal_periods": 7}
+        elif best_name == "Moving Average":
+            model_params = {"window": 7}
+        elif best_name in ["Naive", "Seasonal Naive"]:
+            model_params = {"lag": 7 if best_name == "Seasonal Naive" else 1}
+
+        best_wape_val = models[best_name][0]
+        best_rmse_val = models[best_name][1]
+
+        model_lineage_records.append({
+            "product_id": pid,
+            "selected_model": best_name,
+            "model_version": "v2.0-recursive",
+            "feature_version": "v1.2-lag-calendar",
+            "forecast_origin": str(pdf["order_date"].max())[:10],
+            "training_start": str(pdf["order_date"].min())[:10],
+            "training_end": str(pdf["order_date"].max())[:10],
+            "backtest_start": str(test_raw["order_date"].min())[:10] if 'test_raw' in locals() else "2017-12-04",
+            "backtest_end": str(test_raw["order_date"].max())[:10] if 'test_raw' in locals() else "2017-12-31",
+            "validation_score_wape": round(float(best_wape_val), 4),
+            "test_score_rmse": round(float(best_rmse_val), 2),
+            "hyperparameters": json.dumps(model_params),
+            "competing_models": json.dumps(competing_scores),
+            "selection_reason": f"Selected '{best_name}' due to minimum out-of-sample holdout WAPE ({best_wape_val:.4f})."
+        })
+
+    # Benchmark Raporunu Ekrana Bas
+    summary_df = pd.DataFrame(benchmark_summary)
+
     # Benchmark Raporunu Ekrana Bas
     summary_df = pd.DataFrame(benchmark_summary)
     print(summary_df.to_string(index=False))
     print("-" * 85)
 
-    # SQLite ve CSV'ye Kaydetme
+    # SQLite, Lineage ve CSV'ye Kaydetme
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    os.makedirs("reports", exist_ok=True)
+    
     forecast_df = pd.DataFrame(final_forecast_records)
     forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
 
+    lineage_df = pd.DataFrame(model_lineage_records)
+    lineage_df.to_csv(os.path.join(PROCESSED_DATA_DIR, "forecast_model_lineage.csv"), index=False)
+    
+    with open("reports/forecast_model_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(model_lineage_records, f, indent=2, ensure_ascii=False)
+
     conn = sqlite3.connect(DB_PATH)
     forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
+    lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
     conn.close()
+
+    print(f"[OK] 28 Günlük Gelecek Tahminleri Yazıldı: {OUTPUT_FORECAST_PATH}")
+    print(f"[OK] Model Governance Metadata Kaydedildi: forecast_model_lineage tablosu & reports/forecast_model_metadata.json")
 
     print(f"[OK] 28 Günlük Tahminler Dosyaya Yazıldı: {OUTPUT_FORECAST_PATH}")
     print(f"[OK] SQLite 'forecast_demand' tablosu güncellendi.")

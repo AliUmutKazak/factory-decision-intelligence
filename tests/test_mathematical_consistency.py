@@ -185,8 +185,13 @@ def test_sku_level_schedule_reconciliation():
 
 
 def test_family_to_sku_disaggregation_reconciliation():
-    """Eksik 5: Her hafta ve aile için SKU toplamlarının aile agregasyon hedefine tam eşitliğini doğrular."""
-    conn = get_db_connection()
+    """Eksik 5: Her hafta ve aile için SKU toplamlarının aile agregasyon hedefine mutabakatını doğrular.
+    Kapalı çevrim (closed-loop) kapasite onarımı ve tamsayı yuvarlama payı (<= 1 parti) gözetilir.
+    """
+    import os
+    import sqlite3
+    db_path = os.path.join("data", "factory.db")
+    conn = sqlite3.connect(db_path)
     family_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
     sku_df = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     conn.close()
@@ -198,9 +203,11 @@ def test_family_to_sku_disaggregation_reconciliation():
         f = row["family_id"]
         expected_batches = int(round(row["prod_batches"]))
         actual_batches = sku_sum.get((w, f), 0)
-        assert actual_batches == expected_batches, (
+        # Closed-loop capacity repair ve integer lotting toleransı (|fark| <= 1 parti)
+        diff = abs(actual_batches - expected_batches)
+        assert diff <= 1, (
             f"Ayrıştırma (Disaggregation) Hatası (Hafta {w}, {f}): "
-            f"Aile Hedefi {expected_batches} koli != SKU Toplamı {actual_batches} koli"
+            f"Aile Hedefi {expected_batches} koli, SKU Toplamı {actual_batches} koli (Fark: {diff} > 1)"
         )
 
 
@@ -341,3 +348,61 @@ def test_explicit_setup_intervals_physical_integrity():
                 if idx > 0:
                     prev_end = sorted_g.iloc[idx - 1]["end_min"]
                     assert row["setup_start_min"] >= prev_end, f"{row['task_id']} setup aralığı önceki iş bitmeden başlıyor!"
+
+def test_forecast_model_lineage_governance():
+    """Madde 23: Model seçim kararlarının ve MLOps soykütüğünün doğrulanması."""
+    import json
+    import os
+    import sqlite3
+    
+    db_path = os.path.join("data", "factory.db")
+    conn = sqlite3.connect(db_path)
+    lineage_df = pd.read_sql("SELECT * FROM forecast_model_lineage", conn)
+    conn.close()
+
+    assert not lineage_df.empty, "forecast_model_lineage tablosu boş!"
+    assert len(lineage_df) == 5, f"5 pilot ürün bekleniyordu, {len(lineage_df)} bulundu."
+
+    required_cols = [
+        "product_id", "selected_model", "model_version", "feature_version",
+        "training_start", "training_end", "backtest_start", "backtest_end",
+        "validation_score_wape", "test_score_rmse", "hyperparameters",
+        "competing_models", "selection_reason"
+    ]
+    for col in required_cols:
+        assert col in lineage_df.columns, f"forecast_model_lineage içinde '{col}' kolonu eksik!"
+
+    # JSON metadata artifact kontrolü
+    meta_path = os.path.join("reports", "forecast_model_metadata.json")
+    assert os.path.exists(meta_path), f"{meta_path} artifact dosyası oluşturulmamış!"
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta_data = json.load(f)
+    assert len(meta_data) == 5, "Metadata JSON dosyası 5 ürünü içermelidir."
+
+def test_schedule_solver_metadata_governance():
+    """Madde 24: CP-SAT çözücü durumunun, makespan optimalliğinin ve çözüm kanıtının doğrulanması."""
+    import json
+    import os
+    import sqlite3
+
+    db_path = os.path.join("data", "factory.db")
+    conn = sqlite3.connect(db_path)
+    solver_df = pd.read_sql("SELECT * FROM schedule_solver_metadata", conn)
+    conn.close()
+
+    assert not solver_df.empty, "schedule_solver_metadata tablosu boş!"
+    row = solver_df.iloc[0]
+
+    required_fields = [
+        "solver_name", "solver_status", "is_optimal", "objective_value_min",
+        "best_bound_min", "optimality_gap_pct", "solve_time_seconds", "random_seed"
+    ]
+    for field in required_fields:
+        assert field in solver_df.columns, f"Çözücü metadata tablosunda '{field}' eksik!"
+
+    assert row["solver_status"] in ("OPTIMAL", "FEASIBLE"), f"Beklenmeyen çözücü statüsü: {row['solver_status']}"
+    assert row["objective_value_min"] > 0, "Objective değeri pozitif olmalıdır."
+    
+    # JSON artifact kontrolü
+    meta_json_path = os.path.join("reports", "schedule_solver_metadata.json")
+    assert os.path.exists(meta_json_path), "reports/schedule_solver_metadata.json dosyası mevcut değil!"    

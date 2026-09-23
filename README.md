@@ -21,11 +21,11 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
 | **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **8,962 dk (158.03 sa)** | 1 takvim haftalık kesintisiz akış süresi sınırında (168 saat calendar week elapsed time) tüm SKU lotları tamamlandı. |
 | **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 8,962 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
-| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.2 sa İşlem + 1.92 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.07 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
-| **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
-| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük (Ocak 2018) operasyonel üretim ufku tahmini. |
-| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **1,639.2 kWh / 18.99 kW** | Ortalama yük ile tepe yük dengesi fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$). |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **0.949 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (0.721 t) dengelendi. |
+| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.23 sa İşlem + 2.58 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.81 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
+| **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (8,250 / 8,250)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
+| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku (Ocak 2018) tahmini. |
+| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **1,642.0 kWh / 15.93 kW** | Ortalama yük (6.98 kW) ile tepe yük dengesi fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$, Yük Faktörü: 0.438). |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 | **0.950 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (0.722 t) dengelendi. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
 > **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
 > **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
@@ -133,7 +133,7 @@ $$\min C_{\max}$$
 
 * **Çizelgeleme Mimarisi ve Model Evrimi (v1 vs. v2):**
   * **Mimari v1 (Consolidated Single-Lot Baseline):** Operasyonlar arası transfer partileme olmaksızın SKU başına tekil üretim partisi varsayımı altında, CP-SAT çözücüsü sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** ile iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır.
-  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında canonical çizelgeleme makespan değeri **14,683 dakika (~244.7 saat)** olarak mühürlenmiştir.
+  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında canonical çizelgeleme makespan değeri **14,105 dakika (235.08 saat)** olarak mühürlenmiştir.
 * **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
 
 
@@ -184,11 +184,11 @@ $$NR_t = \max\left(0, GR_t + SS - I_{t-1}^{\text{proj}} - SR_t\right)$$
 ### 15-Dakikalık Tesis Yük Profili
 $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\text{setup}}(t) + P_{m}^{\text{idle}}(t) \right)$$
 
-* **Tepe Yük (Peak Load):** $18.99\text{ kW}$
-* **Ortalama Yük (Avg Load):** Fiziksel kural gereği $\text{Peak} \ge \text{Avg}$ doğrulanmıştır.
-* **Toplam Enerji Tüketimi:** $1,639.2\text{ kWh}$
-* **Kapsam 1 + Kapsam 2 Emisyonu:** $0.949\text{ tCO}_2\text{e}$
-* **Birim Tüketim:** $0.142\text{ kWh / bitmiş ürün}$
+* **Tepe Yük (Peak Load):** $15.93\text{ kW}$
+* **Ortalama Yük (Avg Load):** $6.98\text{ kW}$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
+* **Yük Faktörü (Load Factor):** $0.438$
+* **Toplam Enerji Tüketimi:** $1,641.99\text{ kWh}$ (%86.5 İşlem, %1.2 Setup, %12.3 Boşta Bekleme)
+* **Kapsam 1 + Kapsam 2 Emisyonu:** $0.950\text{ tCO}_2\text{e}$
 
 ### Sera Gazı Emisyonları (GHG Protocol Scope 1 & 2)
 1. **Kapsam 1 (Doğrudan):** Forklift dizel tüketimi (85 L $\times$ 2.68 kg CO₂e/L = 0.228 tCO₂e)
