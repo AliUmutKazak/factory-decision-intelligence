@@ -130,10 +130,22 @@ def test_7_reference_manifest_integrity():
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     assert "files" in manifest and len(manifest["files"]) > 0
+
+    mismatches = []
+    missing_files = []
+
     for fname, meta in manifest["files"].items():
         fpath = os.path.join("artifacts/reference", fname)
-        assert os.path.exists(fpath), f"Artefakt dosyasi eksik: {fname}"
+        if not os.path.exists(fpath):
+            missing_files.append(fname)
+            continue
         curr_sha = hashlib.sha256(open(fpath, "rb").read()).hexdigest()
-        assert (
-            curr_sha == meta["sha256"]
-        ), f"{fname} dosyasinin SHA-256 ozeti manifest ile uyusmuyor"
+        if curr_sha != meta["sha256"]:
+            mismatches.append(
+                f"{fname} -> Beklenen: {meta['sha256'][:8]}..., Gercek: {curr_sha[:8]}..."
+            )
+
+    assert not missing_files, f"Eksik dosyalar var: {missing_files}"
+    assert (
+        not mismatches
+    ), "SHA-256 uyumsuzluklari tespit edildi:\n" + "\n".join(mismatches)

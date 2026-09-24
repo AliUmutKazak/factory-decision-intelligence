@@ -1,2 +1,2 @@
 solver_name,solver_status,is_optimal,objective_value_min,best_bound_min,optimality_gap_pct,solve_time_seconds,configured_num_search_workers,effective_num_search_workers,num_workers,random_seed,max_time_in_seconds,tasks_scheduled,total_scheduled_units,run_id
-Google OR-Tools CP-SAT,OPTIMAL,True,11285.0,11285.0,0.0,3.5973,8,8,8,42,30.0,29,21925,RUN-20260924-699e42
+Google OR-Tools CP-SAT,OPTIMAL,True,11285.0,11285.0,0.0,3.5801,8,8,8,42,30.0,29,21925,RUN-20260924-87c8fc
