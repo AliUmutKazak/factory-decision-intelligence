@@ -22,8 +22,9 @@ def compute_carbon_analytics(run_id=None):
     total_kwh = float(energy_kpi["grand_total_kwh"])
     total_units = int(energy_kpi["total_units_produced"])
 
-    # 1. Kapsam 1 Doğrudan Emisyonlar (Tesis İçi Forklift / Lojistik)
-    scope_1_tco2e = DEFAULT_FORKLIFT_LITERS * DIESEL_EMISSION_FACTOR
+    # 1. Kapsam 1 Doğrudan Emisyonlar (Model B: Lojistik / Üretim Aktivitesine Bağlı Forklift Tüketimi)
+    actual_forklift_liters = DEFAULT_FORKLIFT_LITERS if total_units > 0 else 0.0
+    scope_1_tco2e = actual_forklift_liters * DIESEL_EMISSION_FACTOR
 
     # 2. Kapsam 2 Dolaylı Emisyonlar (Satın Alınan Elektrik & Makine Ayrıştırması)
     total_mwh = total_kwh / 1000.0
@@ -59,7 +60,7 @@ def compute_carbon_analytics(run_id=None):
     print("=" * 80)
     print("            AŞAMA 7B: KURUMSAL KARBON ANALİTİĞİ (GHG PROTOCOL)            ")
     print("=" * 80)
-    print(f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik)")
+    print(f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik - {actual_forklift_liters:.1f} L)")
     print(f"Kapsam 2 Dolaylı Emisyonlar (Scope 2)   : {scope_2_tco2e:.3f} tCO2e (Şebeke Elektriği)")
     print(f"Toplam Karbon Ayak İzi (Total tCO2e)   : {total_tco2e:.3f} tCO2e")
     print(f"Birim Karbon Yoğunluğu                 : {kgco2e_per_unit:.3f} kgCO2e / adet")
