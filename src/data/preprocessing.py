@@ -93,7 +93,13 @@ def run_preprocessing():
     fixture_path = RAW_DATA_DIR.parent / "fixtures" / fixture_name
     output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
 
-    if "USE_FIXTURE" in os.environ and os.path.exists(fixture_path):
+    # Veri kaynağı seçimi (Fail-Fast prensibiyle CI izolasyonu)
+    if "USE_FIXTURE" in os.environ:
+        if not os.path.exists(fixture_path):
+            raise FileNotFoundError(
+                f"[CRITICAL CI FAIL-FAST] USE_FIXTURE='{os.environ.get('USE_FIXTURE')}' olarak belirtildi "
+                f"ancak fixture dosyası bulunamadı: {fixture_path}. Ham veriye geri düşüş engellendi!"
+            )
         data_source = fixture_path
         print(f"[1/3] CI test senaryo fixture kullanılıyor ({fixture_path})...")
     elif os.path.exists(raw_path):
@@ -101,10 +107,10 @@ def run_preprocessing():
         print(f"[1/3] Ham veri seti okunuyor ({raw_path})...")
     elif os.path.exists(fixture_path):
         data_source = fixture_path
-        print(f"[1/3] Ham veri bulunamadı, CI test fixture kullanılıyor ({fixture_path})...")
+        print(f"[1/3] Ham veri bulunamadı, varsayılan test fixture kullanılıyor ({fixture_path})...")
     else:
         raise FileNotFoundError(
-            f"Ne ham veri ({raw_path}) ne de test fixture ({fixture_path}) bulunabildi!"
+            f"Ne ham veri ({raw_path}) ne de varsayılan test fixture ({fixture_path}) bulunabildi!"
         )
 
     adapter = KaggleRetailDemandAdapter()
@@ -123,4 +129,3 @@ def run_preprocessing():
     print(f"Toplam Günlük Fabrika Talep Kaydı : {len(factory_demand):,} gün/ürün")
     print(f"Tarih Aralığı                     : {factory_demand['order_date'].min().date()} -> {factory_demand['order_date'].max().date()}")
     print("=" * 65)
-    
