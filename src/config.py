@@ -15,6 +15,7 @@ SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
 
 _custom_db_path = os.getenv("FACTORY_DB_PATH")
 DB_PATH = Path(_custom_db_path) if _custom_db_path else DATA_DIR / "factory.db"
+CONFIG_PATH = SRC_DIR / "config.py"
 
 # 1. Ortak Fabrika Çalışma Takvimi (Madde 7 Düzeltmesi)
 WORK_DAYS_PER_WEEK = 6          # Haftada 6 iş günü (Pazar planlı bakım/tatil)
