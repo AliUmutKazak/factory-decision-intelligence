@@ -122,7 +122,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     machine_ot_hours = {}
     try:
         conn = sqlite3.connect(DB_PATH)
-        cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan", conn)
+        cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", conn)
         conn.close()
         for _, r in cap_df.iterrows():
             machine_ot_hours[str(r["machine_id"])] = float(r["overtime_hours"])
