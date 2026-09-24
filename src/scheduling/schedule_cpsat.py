@@ -135,8 +135,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     "parent_lot_id": f"LOT_{pid}",
                     "sub_lot_index": sub_idx,
                     "product_id": pid,
-                    "lot_qty": sub_units,
-                    "batch_qty": sub_b_qty,
+                    "batch_count": sub_b_qty,
+                    "batch_size_units": batch_size,
+                    "production_units": sub_units,
                     "operation_seq": seq,
                     "machine_id": mid,
                     "duration": duration,
@@ -144,10 +145,11 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 task_counter += 1
     if not tasks:
         canonical_cols = [
-            "task_id", "lot_id", "product_id", "operation_id", "operation_seq",
-            "machine_id", "start_min", "end_min", "duration_min", "lot_qty",
+            "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
+            "machine_id", "batch_count", "batch_size_units", "production_units",
+            "start_min", "end_min", "duration_min",
             "setup_before_min", "setup_end_min", "setup_start_min",
-            "batch_id", "batch_qty", "release_time_min"
+            "is_overtime", "calendar_shift", "release_time_min"
         ]
         empty_df = pd.DataFrame(columns=canonical_cols)
         if run_id:
@@ -183,11 +185,13 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
               "end": end_var,
               "interval": interval_var,
               "lot_id": t["lot_id"],
+              "parent_lot_id": t.get("parent_lot_id", t["lot_id"]),
               "product_id": t["product_id"],
               "operation_seq": t["operation_seq"],
               "machine_id": t["machine_id"],
-              "lot_qty": t["lot_qty"],
-              "batch_qty": t.get("batch_qty", 1),
+              "batch_count": t["batch_count"],
+              "batch_size_units": t["batch_size_units"],
+              "production_units": t["production_units"],
               "sub_lot_index": t.get("sub_lot_index", 0),
               "duration": t["duration"],
           }
@@ -281,49 +285,47 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     model.Add(s_end == all_tasks[t2]["start"]).OnlyEnforceIf(lit)
                 else:
                     model.Add(all_tasks[t2]["start"] >= all_tasks[t1]["end"]).OnlyEnforceIf(lit)
-        # Gerçek Fabrika Takvim Duruşları (Non-working Shifts / Breaks) - Periyodik & OT Uyumlu Takvim
+        # ---------------------------------------------------------------------
+        # 2. Fiziksel Takvim Modeli: 96h Regular + Explicit OT Pencereleri
+        # ---------------------------------------------------------------------
+        # Hafta İçi (Pzt-Cmt): 08:00-24:00 (16h Regular) -> 6 x 16 = 96h Regular
+        #                     00:00-08:00 (8h Explicit OT Penceresi) -> 6 x 8 = 48h Max OT
+        # Pazar (Gün 6, 13..): 24h Kesin Kapalı Duruş / Bakım (Hard Break)
+        # ---------------------------------------------------------------------
         break_intervals = []
-        ot_budget_min = int(machine_ot_hours.get(str(mid), 0.0) * 60)
-        total_days = (horizon // 1440) + 2  # Horizonu kapsayacak gün sayısı
+        allowed_ot_min = int(machine_ot_hours.get(str(mid), 0.0) * 60)
+        total_days = (horizon // 1440) + 2
 
+        # Pazar günleri ve planlı duruşlar kesin kapalıdır
         for day in range(total_days):
             day_of_week = day % 7
-            if day_of_week < 6:
-                # Hafta içi ve Cumartesi: 16 saat normal çalışma, 8 saat gece penceresi
-                night_start = day * 1440 + 16 * 60
-                full_night_dur = 8 * 60
-                
-                # 1. Hafta içindeysek (day < 6) LP'den gelen OT bütçesi kadar gece molasını aç/kısalt
-                actual_closed_dur = full_night_dur
-                if day < 6 and ot_budget_min > 0:
-                    ot_used_today = min(ot_budget_min, full_night_dur)
-                    ot_budget_min -= ot_used_today
-                    actual_closed_dur = full_night_dur - ot_used_today
-                
-                # Kalan kapalı süre varsa mola intervali ekle
-                if actual_closed_dur > 0 and night_start < horizon:
-                    closed_start = night_start + (full_night_dur - actual_closed_dur)
-                    closed_end = closed_start + actual_closed_dur
-                    b_int = model.NewIntervalVar(
-                        closed_start, 
-                        min(actual_closed_dur, max(0, horizon - closed_start)), 
-                        min(closed_end, horizon), 
-                        f"night_break_{mid}_d{day}"
-                    )
-                    break_intervals.append(b_int)
-            else:
-                # Pazar günleri tam gün (24 saat) planlı bakım / duruş (Kesin tatil)
+            if day_of_week == 6:
+                # Pazar günü tam gün (24 saat) kapalı
                 sun_start = day * 1440
                 sun_dur = 24 * 60
                 sun_end = sun_start + sun_dur
                 if sun_start < horizon:
                     sun_int = model.NewIntervalVar(
-                        sun_start, 
-                        min(sun_dur, max(0, horizon - sun_start)), 
-                        min(sun_end, horizon), 
+                        sun_start,
+                        min(sun_dur, max(0, horizon - sun_start)),
+                        min(sun_end, horizon),
                         f"sunday_break_{mid}_d{day}"
                     )
                     break_intervals.append(sun_int)
+            else:
+                # Eğer makineye taktik LP hiç fazla mesai (OT) vermemişse gece pencereleri kapalıdır.
+                # Eğer OT verilmişse gece pencereleri (00:00-08:00) açık mesai alanı olarak kullanılabilir.
+                if allowed_ot_min == 0:
+                    night_start = day * 1440
+                    night_dur = 8 * 60
+                    if night_start < horizon:
+                        n_int = model.NewIntervalVar(
+                            night_start,
+                            min(night_dur, max(0, horizon - night_start)),
+                            min(night_start + night_dur, horizon),
+                            f"night_break_closed_{mid}_d{day}"
+                        )
+                        break_intervals.append(n_int)
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
@@ -366,21 +368,21 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             s_val = int(solver.Value(all_tasks[tid]["start"]))
             e_val = int(solver.Value(all_tasks[tid]["end"]))
             m_tasks.append({
-                  "task_id": tid,
-                  "lot_id": all_tasks[tid]["lot_id"],
-                  "product_id": all_tasks[tid]["product_id"],
-                  "operation_seq": all_tasks[tid]["operation_seq"],
-                  "machine_id": mid,
-                  "lot_qty": all_tasks[tid]["lot_qty"],
-                  "production_units": all_tasks[tid]["lot_qty"],
-                  "batch_qty": all_tasks[tid].get("batch_qty", 1),
-                  "batch_count": all_tasks[tid].get("batch_qty", 1),
-                  "sub_lot_index": all_tasks[tid].get("sub_lot_index", 0),
-                  "duration_min": all_tasks[tid]["duration"],
-                  "start_min": s_val,
-                  "end_min": e_val,
-                  "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
-              })
+                "task_id": tid,
+                "lot_id": all_tasks[tid]["lot_id"],
+                "parent_lot_id": all_tasks[tid].get("parent_lot_id", all_tasks[tid]["lot_id"]),
+                "sub_lot_index": all_tasks[tid].get("sub_lot_index", 0),
+                "product_id": all_tasks[tid]["product_id"],
+                "operation_seq": all_tasks[tid]["operation_seq"],
+                "machine_id": mid,
+                "batch_count": all_tasks[tid]["batch_count"],
+                "batch_size_units": all_tasks[tid]["batch_size_units"],
+                "production_units": all_tasks[tid]["production_units"],
+                "duration_min": all_tasks[tid]["duration"],
+                "start_min": s_val,
+                "end_min": e_val,
+                "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
+            })
         
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
         last_prod = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
@@ -393,22 +395,28 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             item["setup_end_min"] = float(item["start_min"])
             item["setup_start_min"] = float(item["start_min"]) - float(setup_val)
             last_prod = curr_prod
+
+            # Takvim & Fazla Mesai (OT) Penceresi Tespiti (00:00 - 08:00 arası OT penceresidir)
+            day_min = item["start_min"] % 1440
+            is_in_ot_window = 1 if (0 <= day_min < 480) else 0
+            item["is_overtime"] = is_in_ot_window
+            item["calendar_shift"] = "OVERTIME" if is_in_ot_window else "REGULAR"
+
             schedule_rows.append(item)
 
     sched_df = pd.DataFrame(schedule_rows)
 
-    if not sched_df.empty:
-        sched_df["batch_id"] = sched_df["lot_id"]
-        sched_df["production_units"] = sched_df["lot_qty"]
-        if "sub_b_qty" in sched_df.columns:
-            sched_df["batch_qty"] = sched_df["sub_b_qty"]
-            sched_df["sub_batch_qty"] = sched_df["sub_b_qty"]
-        elif "sub_batch_qty" in sched_df.columns:
-            sched_df["batch_qty"] = sched_df["sub_batch_qty"]
-    else:
-        for col in ["batch_id", "production_units", "batch_qty", "sub_batch_qty"]:
-            if col not in sched_df.columns:
-                sched_df[col] = []
+    # 3. Madde: batch_qty veri sözleşmesi gereği kanonik şema kontrolü
+    canonical_schedule_cols = [
+        "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
+        "machine_id", "batch_count", "batch_size_units", "production_units",
+        "duration_min", "start_min", "end_min",
+        "setup_before_min", "setup_start_min", "setup_end_min",
+        "is_overtime", "calendar_shift", "release_time_min"
+    ]
+    for col in canonical_schedule_cols:
+        if col not in sched_df.columns:
+            sched_df[col] = 0 if "min" in col or "units" in col or "count" in col else ""
 
     os.makedirs('data/processed', exist_ok=True)
     os.makedirs('reports', exist_ok=True)
@@ -491,9 +499,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         print()
 
     # Mutabakat
-    sched_summary = sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["lot_qty"].sum().reset_index()
+    sched_summary = sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["production_units"].sum().reset_index()
     merged_audit = pd.merge(sku_plan[["product_id", "planned_units"]], sched_summary, on="product_id", how="left").fillna(0)
-    merged_audit.rename(columns={"lot_qty": "scheduled_units"}, inplace=True)
+    merged_audit.rename(columns={"production_units": "scheduled_units"}, inplace=True)
     merged_audit["diff"] = merged_audit["planned_units"] - merged_audit["scheduled_units"]
 
     print("\n--- SKU Plan ve Çizelge Mutabakatı (Audit) ---")

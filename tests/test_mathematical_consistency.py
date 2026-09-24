@@ -176,7 +176,7 @@ def test_sku_level_schedule_reconciliation():
     conn.close()
 
     plan_by_sku = sku_plan_df.groupby("product_id")["planned_units"].sum().to_dict()
-    sched_by_sku = sched_df.groupby("product_id")["lot_qty"].sum().to_dict()
+    sched_by_sku = sched_df.groupby("product_id")["production_units"].sum().to_dict()
 
     for pid, plan_units in plan_by_sku.items():
         sched_units = sched_by_sku.get(pid, 0)
@@ -426,7 +426,7 @@ def test_batch_conservation_invariant():
     batch_size = cfg.PRODUCTION_BATCH_SIZE
 
     # Her satırda production_units, batch_qty * batch_size değerine tam eşit olmalı
-    expected_units = sched["batch_qty"] * batch_size
+    expected_units = sched["batch_count"] * batch_size
     diff = (sched["production_units"] - expected_units).abs()
     assert (diff < 1e-5).all(), (
         f"Batch conservation ihlali! production_units != batch_qty * batch_size. "

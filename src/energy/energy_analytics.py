@@ -98,10 +98,9 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
 
     makespan_min = int(schedule_df["end_min"].max())
     makespan_hours = makespan_min / 60.0
-    if "production_units" in schedule_df.columns:
-        total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["production_units"].sum()
-    else:
-        total_units_produced = schedule_df[schedule_df["operation_seq"] == 1]["batch_qty"].sum() * 25
+    # 3. Madde: batch_qty veri sözleşmesi - Doğrudan canonical production_units kullanımı
+    total_units_produced = int(schedule_df[schedule_df["operation_seq"] == 1]["production_units"].sum())
+
     # 1. İşlem Enerjisi (Processing Energy): İki Bileşenli Termodinamik Model
     # NOT (Fiziksel Doğrulama & Çift Sayım Önleme):
     # - base_energy_kwh: Makine 'Running' durumundayken çekilen sabit taban güçtür (soğutma, CNC, hidrolik).
@@ -111,142 +110,137 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     schedule_df["base_energy_kwh"] = schedule_df.apply(
         lambda r: r["proc_hours"] * machine_specs[r["machine_id"]]["base_kw"], axis=1
     )
-    prod_col = "production_units" if "production_units" in schedule_df.columns else "lot_qty"
-    schedule_df["variable_energy_kwh"] = schedule_df[prod_col] * schedule_df["kwh_unit"]
+    schedule_df["variable_energy_kwh"] = schedule_df["production_units"] * schedule_df["kwh_unit"]
     schedule_df["total_proc_energy_kwh"] = schedule_df["base_energy_kwh"] + schedule_df["variable_energy_kwh"]
     schedule_df["proc_power_kw"] = schedule_df["total_proc_energy_kwh"] / schedule_df["proc_hours"].replace(0, 1.0)
     total_proc_kwh = float(schedule_df["total_proc_energy_kwh"].sum())
 
-    # 2. Fiili Setup (CP-SAT Çıktısı) ve Boşta Bekleme (Idle) Ayrıştırması
-    machine_kpis = []
-    total_setup_kwh = 0.0
-    total_idle_kwh = 0.0
+    # ---------------------------------------------------------------------
+    # 4. Madde: Tekil State Machine (PROC, SETUP, IDLE, OFF) & Kusursuz Profil Integrasyonu
+    # ---------------------------------------------------------------------
+    # Taktik LP'den makine OT saatlerini oku
+    machine_ot_hours = {}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan", conn)
+        conn.close()
+        for _, r in cap_df.iterrows():
+            machine_ot_hours[str(r["machine_id"])] = float(r["overtime_hours"])
+    except Exception:
+        pass
 
-    for m_id, specs in machine_specs.items():
-        m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-        proc_time_m = m_tasks["duration_min"].sum() if "duration_min" in m_tasks.columns else m_tasks["duration"].sum()
-        m_setup_time = m_tasks["setup_before_min"].sum() if "setup_before_min" in m_tasks.columns else 0
-
-        # Gerçek Fabrika Durum Ayrımı: OFF (Vardiya Dışı/Tatil) vs IDLE (Açık Vardiyada Bekleme)
-        # makespan_min içindeki planlı duruş dakikalarını hesapla
-        total_days_spanned = int(makespan_min // 1440) + 1
-        m_off_time = 0
-        for day in range(min(total_days_spanned, 7)):
-            if day < 6:
-                # Pzt-Cmt: Her gün 16. saatten sonraki 8 saat (dakika 960 -> 1440) duruş
-                night_start = day * 1440 + 16 * 60
-                night_end = (day + 1) * 1440
-                if makespan_min > night_start:
-                    m_off_time += min(makespan_min, night_end) - night_start
-            else:
-                # 7. Gün: Pazar günü tam duruş (dakika 8640 -> 10080)
-                sun_start = 6 * 1440
-                sun_end = 7 * 1440
-                if makespan_min > sun_start:
-                    m_off_time += min(makespan_min, sun_end) - sun_start
-
-        # Operasyonel IDLE: Sadece açık vardiyalarda iş/setup dışındaki bekleme süresi
-        m_idle_time = max(0, makespan_min - (proc_time_m + m_setup_time + m_off_time))
-        m_proc_kwh = m_tasks["total_proc_energy_kwh"].sum() if "total_proc_energy_kwh" in m_tasks.columns else (proc_time_m / 60.0) * specs["power_kw"]
-        m_setup_kwh = (m_setup_time / 60.0) * specs["setup_kw"]
-        m_idle_kwh = (m_idle_time / 60.0) * specs["idle_kw"]
-        # OFF durumunda güç tüketimi 0 kW'tır
-        m_total_kwh = m_proc_kwh + m_setup_kwh + m_idle_kwh
-
-        total_setup_kwh += m_setup_kwh
-        total_idle_kwh += m_idle_kwh
-
-        machine_kpis.append({
-            "machine_id": m_id,
-            "processing_hours": round(proc_time_m / 60.0, 4),
-            "setup_hours": round(m_setup_time / 60.0, 4),
-            "idle_hours": round(m_idle_time / 60.0, 4),
-            "processing_kwh": float(m_proc_kwh),
-            "setup_kwh": float(m_setup_kwh),
-            "idle_kwh": float(m_idle_kwh),
-            "total_kwh": float(m_total_kwh)
-        })
-
-    grand_total_kwh = total_proc_kwh + total_setup_kwh + total_idle_kwh
-    avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
-
-                    # 3. 15 Dakikalık Yük Profili Simülasyonu (Exact Boundary-Condition & Float Precision)
     step_min = 15
     time_points = list(range(0, makespan_min, step_min))
+    
+    # Her makine icin kumulatif sayaclar
+    m_proc_kwh = {m: 0.0 for m in machine_specs}
+    m_setup_kwh = {m: 0.0 for m in machine_specs}
+    m_idle_kwh = {m: 0.0 for m in machine_specs}
+    m_proc_min = {m: 0.0 for m in machine_specs}
+    m_setup_min = {m: 0.0 for m in machine_specs}
+    m_idle_min = {m: 0.0 for m in machine_specs}
+
     profile_records = []
 
     for t in time_points:
         actual_interval = min(float(step_min), float(makespan_min - t))
         t_end = t + actual_interval
-        total_power_kw = 0.0
+        total_slice_load_kw = 0.0
+
+        day_idx = int(t // 1440) % 7
+        day_min = t % 1440
+        is_sunday = (day_idx == 6)
+        is_night_ot_window = (0 <= day_min < 480)
 
         for m_id, specs in machine_specs.items():
             m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
+            allowed_ot = machine_ot_hours.get(str(m_id), 0.0)
 
-            interval_energy_kw_min = 0.0
-            accounted_min = 0.0
-
+            # 1. PROC suresi ve enerjisi
+            proc_dur = 0.0
+            proc_kw_min = 0.0
             for _, row in m_tasks.iterrows():
                 o_start = max(float(t), float(row["start_min"]))
                 o_end = min(t_end, float(row["end_min"]))
                 if o_end > o_start:
-                    dur = o_end - o_start
-                    interval_energy_kw_min += dur * float(row["proc_power_kw"])
-                    accounted_min += dur
+                    d = o_end - o_start
+                    proc_dur += d
+                    proc_kw_min += d * float(row["proc_power_kw"])
 
+            # 2. SETUP suresi ve enerjisi
+            setup_dur = 0.0
+            setup_kw_min = 0.0
             for _, row in m_tasks.iterrows():
-                s_dur = float(row.get("setup_before_min", 0))
-                if s_dur > 0:
-                    # CP-SAT tarafından kesin olarak takvimlenmiş fiziksel interval
-                    s_start = float(row.get("setup_start_min", float(row["start_min"]) - s_dur))
+                s_val = float(row.get("setup_before_min", 0))
+                if s_val > 0:
+                    s_start = float(row.get("setup_start_min", float(row["start_min"]) - s_val))
                     s_end = float(row.get("setup_end_min", float(row["start_min"])))
                     o_start = max(float(t), s_start)
                     o_end = min(t_end, s_end)
                     if o_end > o_start:
-                        dur = o_end - o_start
-                        interval_energy_kw_min += dur * float(specs["setup_kw"])
-                        accounted_min += dur
+                        d = o_end - o_start
+                        setup_dur += d
+                        setup_kw_min += d * float(specs["setup_kw"])
 
-            # Gercek Takvim Durum Modeli: OFF araliklarinda 0 kW, yalnizca acik vardiyada IDLE
+            # 3. Kalan sure: IDLE mi, OFF mu?
+            rem_dur = max(0.0, actual_interval - (proc_dur + setup_dur))
+            idle_dur = 0.0
+            idle_kw_min = 0.0
 
+            # State Machine: Pazar kapali (OFF), OT hakki yoksa gece kapali (OFF)
+            is_machine_off = is_sunday or (is_night_ot_window and allowed_ot <= 0.0)
 
-            day_idx = int(t // 1440) % 7
+            if not is_machine_off and rem_dur > 0.0:
+                idle_dur = rem_dur
+                idle_kw_min = idle_dur * float(specs["idle_kw"])
 
+            # Kumulatif makine toplamlarina ekle
+            m_proc_min[m_id] += proc_dur
+            m_setup_min[m_id] += setup_dur
+            m_idle_min[m_id] += idle_dur
 
-            day_minute = t % 1440
+            slice_m_proc_kwh = proc_kw_min / 60.0
+            slice_m_setup_kwh = setup_kw_min / 60.0
+            slice_m_idle_kwh = idle_kw_min / 60.0
 
+            m_proc_kwh[m_id] += slice_m_proc_kwh
+            m_setup_kwh[m_id] += slice_m_setup_kwh
+            m_idle_kwh[m_id] += slice_m_idle_kwh
 
-            is_off_window = (day_idx == 6) or (day_minute >= 960)
-
-
-            if is_off_window:
-
-
-                idle_dur = 0.0
-
-
-            else:
-
-
-                idle_dur = max(0.0, actual_interval - accounted_min)
-
-
-                interval_energy_kw_min += idle_dur * float(specs["idle_kw"])
-
-            if actual_interval > 0:
-                total_power_kw += interval_energy_kw_min / actual_interval
+            total_slice_load_kw += (proc_kw_min + setup_kw_min + idle_kw_min) / actual_interval if actual_interval > 0 else 0.0
 
         profile_records.append({
             "time_min": t,
             "time_hour": round(t / 60.0, 4),
             "interval_min": round(float(actual_interval), 2),
-            "total_load_kw": float(total_power_kw)
+            "total_load_kw": float(total_slice_load_kw)
         })
 
+    # Makine KPI Tablosunu dogrudan dilim integrallerinden uret
+    machine_kpis = []
+    total_setup_kwh = 0.0
+    total_idle_kwh = 0.0
+    total_proc_kwh_integrated = 0.0
 
+    for m_id, specs in machine_specs.items():
+        total_setup_kwh += m_setup_kwh[m_id]
+        total_idle_kwh += m_idle_kwh[m_id]
+        total_proc_kwh_integrated += m_proc_kwh[m_id]
+        tot_kwh = m_proc_kwh[m_id] + m_setup_kwh[m_id] + m_idle_kwh[m_id]
 
+        machine_kpis.append({
+            "machine_id": m_id,
+            "processing_hours": round(m_proc_min[m_id] / 60.0, 4),
+            "setup_hours": round(m_setup_min[m_id] / 60.0, 4),
+            "idle_hours": round(m_idle_min[m_id] / 60.0, 4),
+            "processing_kwh": float(m_proc_kwh[m_id]),
+            "setup_kwh": float(m_setup_kwh[m_id]),
+            "idle_kwh": float(m_idle_kwh[m_id]),
+            "total_kwh": float(tot_kwh)
+        })
 
-
+    grand_total_kwh = total_proc_kwh_integrated + total_setup_kwh + total_idle_kwh
+    avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
     profile_df = pd.DataFrame(profile_records)
     raw_peak_kw = profile_df["total_load_kw"].max()
     peak_kw = round(raw_peak_kw, 2)
