@@ -361,7 +361,7 @@ def validate_and_repair_disaggregation(sku_plan_df, family_plan_df, machine_capa
         print('[CLOSED-LOOP FEEDBACK] Aggregate Family tablosu SKU gerçekliğiyle mutabık kılındı.')
     return repaired_df, updated_family_df
 
-def run_planning_pipeline():
+def run_planning_pipeline(run_id=None):
     forecast_df, products_df, routing_df, machines_df = load_data()
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
@@ -384,6 +384,12 @@ def run_planning_pipeline():
     print("=" * 85)
 
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+
+    if run_id:
+        family_plan_df["run_id"] = run_id
+        sku_plan_df["run_id"] = run_id
+        machine_capacity_df["run_id"] = run_id
+
     family_plan_df.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
     sku_plan_df.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
     machine_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)

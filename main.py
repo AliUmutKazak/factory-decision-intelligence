@@ -28,12 +28,12 @@ def run_end_to_end_pipeline():
     steps = [
         ("Aşama 1: Veri Ön İşleme & Temizlik", run_preprocessing),
         ("Aşama 2: SQLite Veritabanı Kurulumu", lambda: initialize_database(run_id=run_id)),
-        ("Aşama 3: ML Talep Tahmini (LightGBM)", run_forecast_benchmark),
-        ("Aşama 4: Hiyerarşik Taktik Planlama & SKU Ayrıştırma", run_planning_pipeline),
-        ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", run_mrp_engine),
-        ("Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)", solve_cpsat_schedule),
-        ("Aşama 7A: Enerji Analitiği & Yük Profili", compute_energy_analytics),
-        ("Aşama 7B: Kurumsal Karbon Muhasebesi (GHG Protocol)", compute_carbon_analytics),
+        ("Aşama 3: ML Talep Tahmini (LightGBM)", lambda: run_forecast_benchmark(run_id=run_id)),
+        ("Aşama 4: Hiyerarşik Taktik Planlama & SKU Ayrıştırma", lambda: run_planning_pipeline(run_id=run_id)),
+        ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", lambda: run_mrp_engine(run_id=run_id)),
+        ("Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)", lambda: solve_cpsat_schedule(run_id=run_id)),
+        ("Aşama 7A: Enerji Analitiği & Yük Profili", lambda: compute_energy_analytics(run_id=run_id)),
+        ("Aşama 7B: Kurumsal Karbon Muhasebesi (GHG Protocol)", lambda: compute_carbon_analytics(run_id=run_id)),
     ]
 
     try:

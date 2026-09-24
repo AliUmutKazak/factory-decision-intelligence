@@ -32,7 +32,7 @@ def calculate_gross_requirements(sku_plan, bom):
     )
     return gross_req
 
-def run_mrp_engine():
+def run_mrp_engine(run_id=None):
     sku_plan, bom, materials = load_data()
     gross_df = calculate_gross_requirements(sku_plan, bom)
 
@@ -134,6 +134,10 @@ def run_mrp_engine():
 
     # SQLite ve CSV'ye Aktar
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+
+    if run_id:
+        mrp_df["run_id"] = run_id
+
     mrp_df.to_csv(OUTPUT_MRP_PATH, index=False)
 
     conn = sqlite3.connect(DB_PATH)

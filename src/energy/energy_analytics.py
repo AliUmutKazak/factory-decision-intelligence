@@ -40,7 +40,7 @@ def load_machine_specs() -> dict:
         }
     return specs
 
-def compute_energy_analytics(schedule_df=None, machines_df=None):
+def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     if schedule_df is None or machines_df is None:
         loaded_sched, loaded_mach = load_data()
         if schedule_df is None:
@@ -74,9 +74,15 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
                 "idle_kwh": 0.0,
                 "total_kwh": 0.0
             })
+
         kpi_df = pd.DataFrame([facility_kpis])
         m_kpi_df = pd.DataFrame(machine_kpis)
         profile_df = pd.DataFrame(columns=["interval_15min", "start_min", "end_min", "load_kw"])
+
+        if run_id:
+            kpi_df["run_id"] = run_id
+            m_kpi_df["run_id"] = run_id
+            profile_df["run_id"] = run_id
 
         os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
         kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
@@ -282,6 +288,11 @@ def compute_energy_analytics(schedule_df=None, machines_df=None):
     os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
     kpi_df = pd.DataFrame([kpi_summary])
     m_kpi_df = pd.DataFrame(machine_kpis)
+
+    if run_id:
+        kpi_df["run_id"] = run_id
+        m_kpi_df["run_id"] = run_id
+        profile_df["run_id"] = run_id
 
     # Normal calisma CSV kayitlari
     kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)

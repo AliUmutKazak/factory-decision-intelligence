@@ -14,7 +14,7 @@ from src.config import (
     CPSAT_RANDOM_SEED,
 )
 
-def run_cpsat_scheduling(sku_plan=None):
+def run_cpsat_scheduling(sku_plan=None, run_id=None):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = sqlite3.connect(DB_PATH)
 
@@ -150,6 +150,8 @@ def run_cpsat_scheduling(sku_plan=None):
             "batch_id", "batch_qty", "release_time_min"
         ]
         empty_df = pd.DataFrame(columns=canonical_cols)
+        if run_id:
+            empty_df["run_id"] = run_id
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
         os.makedirs("data/processed", exist_ok=True)
         empty_df.to_csv("data/processed/production_schedule.csv", index=False)
@@ -441,7 +443,13 @@ def run_cpsat_scheduling(sku_plan=None):
         "total_scheduled_units": int(sched_df["production_units"].sum()) if "production_units" in sched_df.columns else None
     }]
 
+    if run_id:
+        sched_df["run_id"] = run_id
+
     solver_meta_df = pd.DataFrame(solver_metadata)
+    if run_id:
+        solver_meta_df["run_id"] = run_id
+
     solver_meta_df.to_csv('data/processed/schedule_solver_metadata.csv', index=False)
 
     with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:

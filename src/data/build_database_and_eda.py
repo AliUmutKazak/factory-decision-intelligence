@@ -207,20 +207,10 @@ def initialize_database(force_recreate=True, run_id=None):
         cursor.execute(f"DROP TABLE IF EXISTS {dt}")
     conn.commit()
 
-    # 0. SSOT Denetim Çizelgesi (Pipeline Run Audit Log) - Bütünleşik Şema
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pipeline_runs (
-            run_id TEXT PRIMARY KEY,
-            timestamp TEXT NOT NULL,
-            trigger_source TEXT,
-            orders_count INTEGER,
-            git_sha TEXT,
-            config_hash TEXT,
-            data_source TEXT,
-            status TEXT NOT NULL
-        )
-    """)
-    conn.commit()
+    # 0. SSOT Merkezi Denetim Şeması (pipeline_runs)
+    from src.utils.lineage import init_pipeline_runs_table, generate_run_id, get_git_sha, compute_file_hash
+    from src.config import CONFIG_PATH
+    init_pipeline_runs_table(conn)
 
     # 1. İşlenmiş sipariş verisini aktar
     if not os.path.exists(PROCESSED_ORDERS_PATH):
@@ -228,30 +218,27 @@ def initialize_database(force_recreate=True, run_id=None):
     orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     orders_df.to_sql("orders", conn, index=False, if_exists="replace")
 
-    # Standart Run ID yoksa lineage modülünden üret
+    # 2. Tek ve Standart Run ID Kaydı (INITIALIZED)
     if not run_id:
-        from src.utils.lineage import generate_run_id
         run_id = generate_run_id()
+
+    git_sha = get_git_sha()
+    cfg_hash = compute_file_hash(CONFIG_PATH)
 
     cursor.execute("""
         INSERT OR REPLACE INTO pipeline_runs 
-        (run_id, timestamp, trigger_source, orders_count, status) 
-        VALUES (?, ?, ?, ?, ?)
-    """, (run_id, datetime.now().isoformat(), "pipeline_execution", len(orders_df), "INITIALIZED"))
-    conn.commit()
-
-    # 1. İşlenmiş sipariş verisini aktar
-    if not os.path.exists(PROCESSED_ORDERS_PATH):
-        raise FileNotFoundError(f"Missing mandatory order data: {PROCESSED_ORDERS_PATH}")
-    orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
-    orders_df.to_sql("orders", conn, index=False, if_exists="replace")
-
-    # Yeni çalıştırmayı audit tablosuna kaydet
-    run_id = str(uuid.uuid4())[:8]
-    cursor.execute(
-        "INSERT INTO pipeline_runs (run_id, timestamp, trigger_source, orders_count, status) VALUES (?, ?, ?, ?, ?)",
-        (run_id, datetime.now().isoformat(), "pipeline_execution", len(orders_df), "INITIALIZED")
-    )
+        (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        run_id,
+        datetime.now().isoformat(),
+        "pipeline_execution",
+        len(orders_df),
+        git_sha,
+        cfg_hash,
+        "factory_orders.csv",
+        "INITIALIZED"
+    ))
     conn.commit()
 
     # 2. Sentetik fabrika ana veri tablolarını oku ve fail-fast doğrula

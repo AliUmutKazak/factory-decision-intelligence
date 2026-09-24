@@ -13,7 +13,7 @@ from src.config import (
 OUTPUT_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_analytics.csv"
 OUTPUT_MACHINE_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_machine_kpis.csv"
 
-def compute_carbon_analytics():
+def compute_carbon_analytics(run_id=None):
     conn = sqlite3.connect(DB_PATH)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn).iloc[0]
     machine_kpis_df = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
@@ -79,11 +79,18 @@ def compute_carbon_analytics():
     }
 
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
-    pd.DataFrame([carbon_summary]).to_csv(OUTPUT_CARBON_PATH, index=False)
+    carbon_kpis_df = pd.DataFrame([carbon_summary])
+
+    if run_id:
+        carbon_kpis_df["run_id"] = run_id
+        machine_kpis_df["run_id"] = run_id
+        scen_df["run_id"] = run_id
+
+    carbon_kpis_df.to_csv(OUTPUT_CARBON_PATH, index=False)
     machine_kpis_df.to_csv(OUTPUT_MACHINE_CARBON_PATH, index=False)
 
     conn = sqlite3.connect(DB_PATH)
-    pd.DataFrame([carbon_summary]).to_sql("carbon_kpis", conn, index=False, if_exists="replace")
+    carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="replace")
     machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="replace")
     scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="replace")
     conn.close()

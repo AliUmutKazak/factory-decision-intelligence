@@ -176,7 +176,7 @@ def evaluate_fold_model(model_name, train_data, test_data, horizon):
         pred = np.zeros(horizon)
     return evaluate_metrics(y_test, pred)
 
-def run_forecast_benchmark():
+def run_forecast_benchmark(run_id=None):
     df_all = load_factory_demand()
     products = sorted(df_all["product_id"].unique())
 
@@ -332,9 +332,13 @@ def run_forecast_benchmark():
     os.makedirs("reports", exist_ok=True)
     
     forecast_df = pd.DataFrame(final_forecast_records)
-    forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
-
     lineage_df = pd.DataFrame(model_lineage_records)
+
+    if run_id:
+        forecast_df["run_id"] = run_id
+        lineage_df["run_id"] = run_id
+
+    forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
     lineage_df.to_csv(os.path.join(PROCESSED_DATA_DIR, "forecast_model_lineage.csv"), index=False)
     
     with open("reports/forecast_model_metadata.json", "w", encoding="utf-8") as f:
