@@ -4,6 +4,8 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
+import statsmodels
+from src.utils.db import get_db_connection
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from src.config import (
@@ -300,6 +302,38 @@ def run_forecast_benchmark(run_id=None):
         backtest_start_dt = str(pdf.iloc[fold_cutoffs[0]]["order_date"])[:10]
         backtest_end_dt = str(pdf.iloc[-1]["order_date"])[:10]
 
+        # Denetim / Reproducibility: Kazanan modelin gerçek hiperparametrelerini ve kütüphane sürümünü hazırla
+        cv_spec = {"folds": num_folds, "horizon": HORIZON_DAYS, "cv_type": "rolling_origin_expanding"}
+        
+        if best_name == "LightGBM":
+            model_params = {
+                **cv_spec,
+                "model_family": "LightGBM",
+                "library_version": getattr(lgb, "__version__", "unknown"),
+                "objective": "regression",
+                "metric": "rmse",
+                "learning_rate": 0.05,
+                "num_leaves": 31,
+                "num_boost_round": 100,
+                "random_seed": 42,
+                "boosting_type": "gbdt"
+            }
+        elif best_name == "Holt-Winters":
+            model_params = {
+                **cv_spec,
+                "model_family": "ExponentialSmoothing",
+                "library_version": getattr(statsmodels, "__version__", "unknown"),
+                "trend": "add",
+                "seasonal": "add",
+                "seasonal_periods": 7,
+                "initialization_method": "estimated"
+            }
+        else:
+            model_params = {
+                **cv_spec,
+                "model_family": best_name
+            }
+
         model_lineage_records.append({
             "product_id": pid,
             "selected_model": best_name,
@@ -317,7 +351,7 @@ def run_forecast_benchmark(run_id=None):
             # Mevcut test paketiyle tam geriye dönük uyumluluk
             "validation_score_wape": round(float(best_wape), 4),
             "test_score_rmse": round(float(best_rmse), 2),
-            "hyperparameters": json.dumps({"folds": num_folds, "horizon": HORIZON_DAYS, "cv_type": "rolling_origin_expanding"}),
+            "hyperparameters": json.dumps(model_params),
             "competing_models": json.dumps(competing_scores),
             "selection_reason": f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f})."
         })
@@ -330,24 +364,33 @@ def run_forecast_benchmark(run_id=None):
     # SQLite, Lineage ve CSV'ye Kaydetme
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     os.makedirs("reports", exist_ok=True)
-    
+
     forecast_df = pd.DataFrame(final_forecast_records)
     lineage_df = pd.DataFrame(model_lineage_records)
 
-    if run_id:
-        forecast_df["run_id"] = run_id
-        lineage_df["run_id"] = run_id
+    from src.utils.db import get_db_connection
+
+    active_run_id = run_id
+    if not active_run_id:
+        try:
+            with get_db_connection(DB_PATH) as _conn:
+                row = _conn.execute("SELECT run_id FROM pipeline_runs ORDER BY id DESC LIMIT 1").fetchone()
+                active_run_id = row[0] if row else "STANDALONE_RUN"
+        except Exception:
+            active_run_id = "STANDALONE_RUN"
+
+    forecast_df["run_id"] = active_run_id
+    lineage_df["run_id"] = active_run_id
 
     forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
     lineage_df.to_csv(os.path.join(PROCESSED_DATA_DIR, "forecast_model_lineage.csv"), index=False)
-    
+
     with open("reports/forecast_model_metadata.json", "w", encoding="utf-8") as f:
         json.dump(model_lineage_records, f, indent=2, ensure_ascii=False)
 
-    conn = sqlite3.connect(DB_PATH)
-    forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
-    lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
-    conn.close()
+    with get_db_connection(DB_PATH) as conn:
+        forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
+        lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
 
     print(f"[OK] 28 Günlük Gelecek Tahminleri Yazıldı: {OUTPUT_FORECAST_PATH}")
     print(f"[OK] Model Governance Metadata Kaydedildi: forecast_model_lineage tablosu & reports/forecast_model_metadata.json")
