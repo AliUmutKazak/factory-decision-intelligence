@@ -1,9 +1,91 @@
 import os
+import sqlite3
 import pandas as pd
 from pathlib import Path
-from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR
+from typing import Dict, Any, Optional
+from abc import ABC, abstractmethod
+from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DB_PATH
+from src.utils.db import get_db_connection
+
+
+class DemandSourceAdapter(ABC):
+    """
+    Dış sistemlerden (Kaggle CSV, ERP MES, SAP, IFS) gelen sipariş verilerini 
+    standart Fabrika Çekme Talebi formatına dönüştüren temel adaptör arayüzü.
+    """
+    @abstractmethod
+    def adapt(self, source_path: Path) -> pd.DataFrame:
+        """
+        Dönüşüm çıktısı en az şu standart kolonları içermelidir:
+        ['order_date', 'product_id', 'order_qty']
+        """
+        pass
+
+
+def get_erp_product_mapping(db_path: Path = DB_PATH) -> Dict[Any, str]:
+    """
+    ERP Product Master tablosundan ürün listesini dinamik olarak sorgular.
+    Eğer veritabanı veya eşleme tablosu henüz ilklendirilmemişse
+    standart pilot SKU master eşlemesine geri döner.
+    """
+    fallback_mapping = {1: "P01", 2: "P02", 3: "P03", 4: "P04", 5: "P05"}
+    
+    if not os.path.exists(db_path):
+        return fallback_mapping
+
+    try:
+        with get_db_connection(db_path) as conn:
+            products_df = pd.read_sql("SELECT product_id FROM products ORDER BY product_id", conn)
+            if not products_df.empty:
+                return {idx + 1: pid for idx, pid in enumerate(products_df["product_id"].tolist())}
+    except Exception:
+        pass
+
+    return fallback_mapping
+
+
+class KaggleRetailDemandAdapter(DemandSourceAdapter):
+    """
+    Perakende mağaza talep veri kümesini (Kaggle/Store Item Demand şeması:
+    ['date', 'store', 'item', 'sales']) konsolide fabrika çekme talebine 
+    dönüştüren prototip adaptör.
+    """
+    def __init__(self, product_mapping: Optional[Dict[Any, str]] = None):
+        self.product_mapping = product_mapping or get_erp_product_mapping()
+        self.col_date = "date"
+        self.col_item = "item"
+        self.col_store = "store"
+        self.col_sales = "sales"
+
+    def adapt(self, source_path: Path) -> pd.DataFrame:
+        df = pd.read_csv(source_path)
+
+        required_cols = {self.col_date, self.col_item, self.col_sales}
+        if not required_cols.issubset(df.columns):
+            raise ValueError(f"Kaynak şema geçersiz. Gerekli kolonlar eksik: {required_cols - set(df.columns)}")
+
+        pilot_df = df[df[self.col_item].isin(self.product_mapping.keys())].copy()
+        pilot_df["product_id"] = pilot_df[self.col_item].map(self.product_mapping)
+        pilot_df["order_date"] = pd.to_datetime(pilot_df[self.col_date])
+
+        n_stores = pilot_df[self.col_store].nunique() if self.col_store in pilot_df.columns else 1
+        print(f"[2/3] {n_stores} mağaza talebi tek fabrika çekme talebine konsolide ediliyor...")
+
+        factory_demand = (
+            pilot_df.groupby(["order_date", "product_id"])[self.col_sales]
+            .sum()
+            .reset_index()
+            .rename(columns={self.col_sales: "order_qty"})
+        )
+        return factory_demand
+
 
 def run_preprocessing():
+    """
+    Veri Ön İşleme Aşaması (Core Business Logic):
+    Adaptör aracılığıyla standartlaştırılan sipariş verisine takvim öznitelikleri
+    ekler ve üretim veritabanı için hazır hale getirir.
+    """
     raw_path = RAW_DATA_DIR / "train.csv"
     fixture_name = os.environ.get("USE_FIXTURE", "demand_fixture.csv")
     if not fixture_name.endswith(".csv"):
@@ -11,7 +93,6 @@ def run_preprocessing():
     fixture_path = RAW_DATA_DIR.parent / "fixtures" / fixture_name
     output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
 
-    # USE_FIXTURE ortam değişkeni varsa veya raw_path yoksa fixture kullan
     if "USE_FIXTURE" in os.environ and os.path.exists(fixture_path):
         data_source = fixture_path
         print(f"[1/3] CI test senaryo fixture kullanılıyor ({fixture_path})...")
@@ -26,25 +107,9 @@ def run_preprocessing():
             f"Ne ham veri ({raw_path}) ne de test fixture ({fixture_path}) bulunabildi!"
         )
 
-    df = pd.read_csv(data_source)
+    adapter = KaggleRetailDemandAdapter()
+    factory_demand = adapter.adapt(data_source)
 
-    # 5 Pilot Ürün Eşlemesi
-    product_mapping = {1: "P01", 2: "P02", 3: "P03", 4: "P04", 5: "P05"}
-    pilot_df = df[df["item"].isin(product_mapping.keys())].copy()
-    pilot_df["product_id"] = pilot_df["item"].map(product_mapping)
-    pilot_df["order_date"] = pd.to_datetime(pilot_df["date"])
-
-    # N Mağaza talebini konsolide fabrika çekme talebine dönüştür: D_{i,t} = sum(Sales)
-    n_stores = pilot_df['store'].nunique() if 'store' in pilot_df.columns else (df['store'].nunique() if 'store' in df.columns else 10)
-    print(f"[2/3] {n_stores} mağaza talebi tek fabrika çekme talebine konsolide ediliyor...")
-    factory_demand = (
-        pilot_df.groupby(["order_date", "product_id"])["sales"]
-        .sum()
-        .reset_index()
-        .rename(columns={"sales": "order_qty"})
-    )
-
-    # Takvim öznitelikleri
     factory_demand["year"] = factory_demand["order_date"].dt.year
     factory_demand["month"] = factory_demand["order_date"].dt.month
     factory_demand["day_of_week"] = factory_demand["order_date"].dt.dayofweek
@@ -58,7 +123,4 @@ def run_preprocessing():
     print(f"Toplam Günlük Fabrika Talep Kaydı : {len(factory_demand):,} gün/ürün")
     print(f"Tarih Aralığı                     : {factory_demand['order_date'].min().date()} -> {factory_demand['order_date'].max().date()}")
     print("=" * 65)
-
-if __name__ == "__main__":
-    run_preprocessing()
     
