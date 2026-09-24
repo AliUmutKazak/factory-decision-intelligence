@@ -132,6 +132,8 @@ st.caption("Talep Tahmini • Hiyerarşik Taktik Planlama • Zaman Fazlı MRP �
 
 # Veri Setlerini Yükle
 raw_tables = {
+    "pipeline_runs": get_table("pipeline_runs"),
+    "forecast_model_lineage": get_table("forecast_model_lineage"),
     "energy_kpis": get_table("energy_kpis"),
     "carbon_kpis": get_table("carbon_kpis"),
     "mrp_plan": get_table("mrp_plan"),
@@ -171,6 +173,31 @@ st.markdown(
 if status_code == "NO RUN":
     st.error("⚠️ Gösterilecek aktif çalışma verisi bulunamadı. Lütfen öncelikle veri hattını koşturunuz (`python main.py`).")
     st.stop()
+# --- Kurumsal Denetim & Lineage (Audit Trail) Kartı ---
+df_runs = raw_tables.get("pipeline_runs", pd.DataFrame())
+if not df_runs.empty:
+    latest_run = df_runs.iloc[-1]
+    run_id_val = latest_run.get("run_id", "N/A")
+    run_ts = latest_run.get("timestamp", "N/A")
+    git_sha_val = latest_run.get("git_sha", "N/A")
+    cfg_hash_val = latest_run.get("config_hash", "N/A")
+    trigger_src = latest_run.get("trigger_source", "N/A")
+    
+    with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) — Run: `{run_id_val}`", expanded=False):
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Run ID", run_id_val)
+        c2.metric("Tetikleyici", trigger_src)
+        c3.metric("Git SHA", git_sha_val[:8] if git_sha_val != "N/A" else "N/A")
+        c4.metric("Config Hash", cfg_hash_val[:8] if cfg_hash_val != "N/A" else "N/A")
+        
+        st.caption(f"🕒 **Çalıştırma Zamanı:** `{run_ts}` | **Veri Kaynağı:** `{latest_run.get('data_source', 'N/A')}`")
+        
+        df_model_lineage = raw_tables.get("forecast_model_lineage", pd.DataFrame())
+        if not df_model_lineage.empty:
+            st.markdown("##### 📈 SKU Bazlı Seçilen Tahmin Modelleri & Model Yönetişimi")
+            disp_cols = ["product_id", "selected_model", "backtest_wape", "backtest_rmse", "selection_reason", "run_id"]
+            avail_cols = [c for c in disp_cols if c in df_model_lineage.columns]
+            st.dataframe(df_model_lineage[avail_cols], use_container_width=True, hide_index=True)
 
 # Güvenli Tekil KPI Satırları
 e_kpi = safe_first_row(
