@@ -73,7 +73,15 @@ def record_pipeline_run_metadata(run_id=None, solver_metrics=None, data_source="
         "run_timestamp": datetime.now().isoformat(),
         "git_sha": get_git_sha(),
         "data_source": data_source,
-        "forecast_origin": "LightGBM_Recursive_Direct",
+        "forecast_origin": "2017-12-31",
+        "forecast_method": "Hybrid_Backtest_Selection",
+        "selected_models": {
+            "P01": "LightGBM",
+            "P02": "Holt-Winters",
+            "P03": "LightGBM",
+            "P04": "LightGBM",
+            "P05": "LightGBM"
+        },
         "config_hash": compute_file_hash(CONFIG_PATH),
         "status": status,
         "orders_count": orders_count,
