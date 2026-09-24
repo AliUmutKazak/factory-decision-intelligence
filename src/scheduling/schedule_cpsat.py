@@ -144,14 +144,15 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 })
                 task_counter += 1
     if not tasks:
-        canonical_cols = [
-            "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
-            "machine_id", "batch_count", "batch_size_units", "production_units",
-            "start_min", "end_min", "duration_min",
-            "setup_before_min", "setup_end_min", "setup_start_min",
-            "is_overtime", "calendar_shift", "release_time_min"
-        ]
-        empty_df = pd.DataFrame(columns=canonical_cols)
+        canonical_schedule_cols = [
+        "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
+        "machine_id", "batch_count", "batch_size_units", "production_units",
+        "duration_min", "start_min", "end_min",
+        "regular_minutes", "overtime_minutes",
+        "setup_before_min", "setup_start_min", "setup_end_min",
+        "is_overtime", "calendar_shift", "release_time_min"
+    ]
+        empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         if run_id:
             empty_df["run_id"] = run_id
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
@@ -400,12 +401,13 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             # Bir işin yalnızca gece penceresine düşen dakikaları OT sayılır
             s_min = item["start_min"]
             e_min = item["end_min"]
+            total_duration = item["duration_min"]
             
             ot_duration_in_task = 0
             cur_cursor = s_min
             while cur_cursor < e_min:
                 day_cursor = cur_cursor % 1440
-                if day_cursor < 480:  # 00:00 - 08:00 aralığı
+                if day_cursor < 480:  # 00:00 - 08:00 aralığı (Fazla Mesai Penceresi)
                     step = min(e_min - cur_cursor, 480 - day_cursor)
                     ot_duration_in_task += step
                     cur_cursor += step
@@ -413,9 +415,14 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     step = min(e_min - cur_cursor, 1440 - day_cursor)
                     cur_cursor += step
 
+            regular_duration_in_task = max(0, total_duration - ot_duration_in_task)
+
+            # Denetim Madde 20: Interval Overlap ile hassas OT ve Regular ayrıştırması
             item["overtime_min"] = ot_duration_in_task
+            item["overtime_minutes"] = ot_duration_in_task
+            item["regular_minutes"] = regular_duration_in_task
             item["is_overtime"] = 1 if ot_duration_in_task > 0 else 0
-            item["calendar_shift"] = "OVERTIME" if ot_duration_in_task > (item["duration_min"] / 2) else "REGULAR"
+            item["calendar_shift"] = "OVERTIME" if ot_duration_in_task > (total_duration / 2) else "REGULAR"
 
             schedule_rows.append(item)
 
@@ -426,6 +433,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
         "machine_id", "batch_count", "batch_size_units", "production_units",
         "duration_min", "start_min", "end_min",
+        "regular_minutes", "overtime_minutes",
         "setup_before_min", "setup_start_min", "setup_end_min",
         "is_overtime", "calendar_shift", "release_time_min"
     ]
