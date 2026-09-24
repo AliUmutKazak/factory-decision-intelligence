@@ -14,3 +14,7 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+# Runtime outputs and volatile reports
+/reports/
+/runs/
+staging/

@@ -383,7 +383,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 "end_min": e_val,
                 "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
             })
-        
+
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
         last_prod = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
         for item in m_tasks:
@@ -396,11 +396,26 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             item["setup_start_min"] = float(item["start_min"]) - float(setup_val)
             last_prod = curr_prod
 
-            # Takvim & Fazla Mesai (OT) Penceresi Tespiti (00:00 - 08:00 arası OT penceresidir)
-            day_min = item["start_min"] % 1440
-            is_in_ot_window = 1 if (0 <= day_min < 480) else 0
-            item["is_overtime"] = is_in_ot_window
-            item["calendar_shift"] = "OVERTIME" if is_in_ot_window else "REGULAR"
+            # Takvim & Fazla Mesai (OT) Gerçek Örtüşme Tespiti (00:00 - 08:00 arası OT penceresidir)
+            # Bir işin yalnızca gece penceresine düşen dakikaları OT sayılır
+            s_min = item["start_min"]
+            e_min = item["end_min"]
+            
+            ot_duration_in_task = 0
+            cur_cursor = s_min
+            while cur_cursor < e_min:
+                day_cursor = cur_cursor % 1440
+                if day_cursor < 480:  # 00:00 - 08:00 aralığı
+                    step = min(e_min - cur_cursor, 480 - day_cursor)
+                    ot_duration_in_task += step
+                    cur_cursor += step
+                else:  # 08:00 - 24:00 normal vardiya aralığı
+                    step = min(e_min - cur_cursor, 1440 - day_cursor)
+                    cur_cursor += step
+
+            item["overtime_min"] = ot_duration_in_task
+            item["is_overtime"] = 1 if ot_duration_in_task > 0 else 0
+            item["calendar_shift"] = "OVERTIME" if ot_duration_in_task > (item["duration_min"] / 2) else "REGULAR"
 
             schedule_rows.append(item)
 
@@ -446,9 +461,13 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "effective_num_search_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
         "num_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
         "random_seed": int(CPSAT_RANDOM_SEED),
-        "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 30.0)),
+        "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 0.0)),
         "tasks_scheduled": len(sched_df),
-        "total_scheduled_units": int(sched_df["production_units"].sum()) if "production_units" in sched_df.columns else None
+        "total_scheduled_units": int(sched_df["production_units"].sum()) if "production_units" in sched_df.columns else 0,
+        "week_1_horizon_min": 7 * 24 * 60,
+        "cross_week_spillover_min": max(0, int(obj_val - (7 * 24 * 60))),
+        "cross_week_execution_allowed": 1,
+        "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
     }]
 
     if run_id:
@@ -509,7 +528,32 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     if (merged_audit["diff"] == 0).all():
         print("✓ MUTABAKAT: %100 Eşleşti. Tüm planlanan SKU parti adetleri tam olarak çizelgelendi.")
     else:
-        print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
+            print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
+
+    # Fazla Mesai (OT) Bütçe Uyumu Denetimi
+    actual_ot_min = sched_df[sched_df["machine_id"] == "M01"]["overtime_min"].sum()
+    allowed_ot_min = int(machine_ot_hours.get("M01", 0.0) * 60)
+    print("\n--- Fazla Mesai (OT) Bütçe Denetimi ---")
+    print(f"M01 İzin Verilen OT : {allowed_ot_min} dk ({allowed_ot_min / 60:.2f} saat)")
+    print(f"M01 Fiili Net OT    : {actual_ot_min} dk ({actual_ot_min / 60:.2f} saat)")
+    if actual_ot_min <= allowed_ot_min:
+        print("✓ BÜTÇE UYUMLU: Fiili fazla mesai LP tavan sınırını aşmadı.")
+    else:
+        print("⚠ BÜTÇE AŞIMI: Fiili fazla mesai LP sınırının üzerinde!")
+
+    # Cross-Week Spillover (Hafta Aşımı) Analizi & Model B Mutabakatı
+    WEEK_1_HORIZON_MIN = 7 * 24 * 60  # 10,080 dakika
+    tasks_week1_count = (sched_df["end_min"] <= WEEK_1_HORIZON_MIN).sum()
+    tasks_spillover_count = (sched_df["end_min"] > WEEK_1_HORIZON_MIN).sum()
+    spillover_min = max(0, int(best_makespan - WEEK_1_HORIZON_MIN))
+    
+    print("\n--- Çizelge Zaman Ufku & Hafta Aşımı (Cross-Week Execution) Denetimi ---")
+    print(f"Hafta 1 Nominal Ufuk : {WEEK_1_HORIZON_MIN} dk (168.00 saat)")
+    print(f"Fiili Makespan       : {best_makespan} dk ({best_makespan / 60:.2f} saat)")
+    print(f"Hafta İçi Biten İşler: {tasks_week1_count} görev")
+    print(f"Hafta 2'ye Sarkan    : {tasks_spillover_count} görev | Taşma Süresi: {spillover_min} dk ({spillover_min / 60:.2f} saat)")
+    print("✓ MODEL B PRENSİBİ: Taktik LP agrega yükü belirler; MRP gecikmesi & sıra bağımlı setup nedeniyle")
+    print("                   operasyonel çizelge kesintisiz akışla (rolling horizon) Hafta 2'ye sarkar.")
 
     conn.close()
     print("--- CP-SAT Detaylı Çizelgeleme Tamamlandı ---\n")

@@ -2,6 +2,7 @@ import os
 import sqlite3
 import pandas as pd
 import numpy as np
+from src.utils.db import get_db_connection
 from src.config import (
     DB_PATH,
     PROCESSED_DATA_DIR,
@@ -159,7 +160,7 @@ def validate_master_data(data_dict):
     if missing_pairs:
         raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
 
-def initialize_database(force_recreate=True, run_id=None):
+def initialize_database(force_recreate=False, run_id=None):
     """
     Veritabanını SSOT (Single Source of Truth) ilkelerine uygun şekilde başlatır ve eşitler.
     Dosyayı tamamen silmek yerine idempotent tablo senkronizasyonu yapar ve
@@ -171,23 +172,23 @@ def initialize_database(force_recreate=True, run_id=None):
     gc.collect()
 
     if force_recreate and os.path.exists(DB_PATH):
-        try:
-            os.remove(DB_PATH)
-        except PermissionError:
-            conn_temp = sqlite3.connect(DB_PATH)
-            cur = conn_temp.cursor()
-            cur.execute("PRAGMA foreign_keys = OFF;")
-            # Sistem tabloları hariç tüm kullanıcı view ve tablolarını güvenle topla
-            cur.execute("SELECT type, name FROM sqlite_master WHERE type IN ('table', 'view') AND name NOT LIKE 'sqlite_%';")
-            objects_to_drop = cur.fetchall()
-            for obj_type, obj_name in objects_to_drop:
-                cur.execute(f"DROP {obj_type.upper()} IF EXISTS \"{obj_name}\";")
-            conn_temp.commit()
-            cur.execute("PRAGMA foreign_keys = ON;")
-            cur.execute("VACUUM;")
-            conn_temp.close()
+        conn_temp = get_db_connection(DB_PATH)
+        cur = conn_temp.cursor()
+        cur.execute("PRAGMA foreign_keys = OFF;")
+        # pipeline_runs hariç diğer tabloları temizle (denetim hafızasını koru)
+        cur.execute(
+            "SELECT type, name FROM sqlite_master WHERE type IN ('table', 'view') "
+            "AND name NOT LIKE 'sqlite_%' AND name != 'pipeline_runs';"
+        )
+        objects_to_drop = cur.fetchall()
+        for obj_type, obj_name in objects_to_drop:
+            cur.execute(f'DROP {obj_type.upper()} IF EXISTS "{obj_name}";')
+        conn_temp.commit()
+        cur.execute("PRAGMA foreign_keys = ON;")
+        cur.execute("VACUUM;")
+        conn_temp.close()
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
     # Downstream türetilmiş işlem tablolarını temizle (stale data önleme)
     downstream_tables = [
@@ -331,12 +332,15 @@ def initialize_database(force_recreate=True, run_id=None):
 
     # Master-data bütünlük denetimi (Fail-Fast)
     validate_master_data(loaded_data)
-
+    # Veritabanını temizlerken ve master datayı yeniden yüklerken foreign key kontrollerini
+    # geçici olarak durduruyoruz; yükleme tamamlandığında tekrar aktif hale getiriyoruz.
+    cursor.execute("PRAGMA foreign_keys = OFF;")
     for table, tdf in loaded_data.items():
         cursor.execute(f"DELETE FROM {table}")
         tdf.to_sql(table, conn, index=False, if_exists="append")
 
     conn.commit()
+    cursor.execute("PRAGMA foreign_keys = ON;")
 
     # 3. EDA Özet Tablosu
     eda_summary = analyze_demand_characteristics(orders_df)

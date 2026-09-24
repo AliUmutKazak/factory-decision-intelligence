@@ -1,11 +1,12 @@
 import os, sys, json, uuid, hashlib, sqlite3, subprocess
 from datetime import datetime
 from pathlib import Path
+from src.config import DB_PATH
+from src.utils.db import get_db_connection
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = ROOT_DIR / "src" / "config.py"
 REPORTS_DIR = ROOT_DIR / "reports"
-DB_PATH = ROOT_DIR / "data" / "factory.db"
 METADATA_JSON_PATH = REPORTS_DIR / "run_metadata.json"
 
 def generate_run_id():
@@ -95,7 +96,7 @@ def record_pipeline_run_metadata(run_id=None, solver_metrics=None, data_source="
 
     # SQLite DB denetim kaydı (hata yutulmaz, şema tutarlıdır)
     if os.path.exists(DB_PATH):
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
         cur.execute("""

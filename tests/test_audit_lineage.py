@@ -77,15 +77,18 @@ def test_downstream_run_id_matches_pipeline_runs(db_connection):
             )
 
 def test_run_metadata_report_consistency(db_connection):
-    """reports/run_metadata.json dosyasının veritabanındaki son çalıştırma ile tutarlılığını test eder."""
-    metadata_path = BASE_DIR / "reports" / "run_metadata.json"
+    """run_metadata.json dosyasının veritabanındaki son çalıştırma ile tutarlılığını doğrular."""
+    metadata_path = BASE_DIR / "artifacts" / "reference" / "run_metadata.json"
+    if not metadata_path.exists():
+        metadata_path = BASE_DIR / "reports" / "run_metadata.json"
+
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
-        
+
         assert "run_id" in metadata, "run_metadata.json dosyasında run_id eksik!"
         cursor = db_connection.cursor()
         cursor.execute("SELECT status, git_sha FROM pipeline_runs WHERE run_id = ?", (metadata["run_id"],))
         row = cursor.fetchone()
-        assert row is not None, f"JSON'daki run_id veritabanında bulunamadı: {metadata['run_id']}"
+        assert row is not None, f"JSON'daki run_id veritabanında bulunamadı: {metadata.get('run_id')}"
         assert row[0] == metadata.get("status"), "DB status ile JSON status uyuşmuyor!"
