@@ -1,7 +1,7 @@
 {
-    "run_id": "RUN-20260924-87c8fc",
-    "run_timestamp": "2026-09-24T16:46:33.897760",
-    "git_sha": "799e13442896a6407cece365d971a8466f88ded6",
+    "run_id": "RUN-20260924-98561d",
+    "run_timestamp": "2026-09-24T16:53:34.478497",
+    "git_sha": "8ed15c16993c1441c73980dde4da679f819bb254",
     "data_source": "factory_orders.csv",
     "forecast_origin": "LightGBM_Recursive_Direct",
     "config_hash": "cf15974b475b883b",

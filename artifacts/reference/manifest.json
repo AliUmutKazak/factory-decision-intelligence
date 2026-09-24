@@ -1,29 +1,31 @@
 {
   "version": "1.0",
-  "description": "Deterministic baseline reference artifacts",
+  "description": "Deterministic canonical baseline reference artifacts",
+  "run_id": "RUN-20260924-98561d",
+  "git_sha": "8ed15c16993c1441c73980dde4da679f819bb254",
   "files": {
     "aggregate_plan.csv": {
-      "sha256": "d845d6a2168fd12e83f07b57c616ff932903f1155c742654ee361b69a419b011",
+      "sha256": "64a7df7cad6d6ecf8552fde2028bfefe280a338711eea73a7bc0d892bd59fbfa",
       "bytes": 545
     },
     "carbon_analytics.csv": {
-      "sha256": "110c52fd2e60119999d3535440f3760e4758b0ce4e6fdcb362d3e7fa11e0ae50",
+      "sha256": "6acb569cd2182957af35cc2f860d70b04a9ee6dfaecf3e4b283b651ef5d8be01",
       "bytes": 113
     },
     "carbon_machine_kpis.csv": {
-      "sha256": "0bd57eb52cd776a836d4f05f2a82a96a281ebb6e1fdd0d602433043a560f5eca",
-      "bytes": 515
+      "sha256": "3106d53ee452f199fa19f203197c09aa862eda358c95851796cad1b8e939db57",
+      "bytes": 512
     },
     "energy_kpis.csv": {
-      "sha256": "69a6e29f65dc2b7761977985ea5e6ed16994218736ceecf6e1e6db4c7f6505a2",
-      "bytes": 240
+      "sha256": "02010101ec75f0150287a1bd9da5930e9d360dfe15a78dada05651ff50dbdbfc",
+      "bytes": 238
     },
     "energy_profile_15min.csv": {
-      "sha256": "5eef634162b06d017fd58c110969254adeda39a4c442a775389b99fb1b67ad45",
-      "bytes": 36728
+      "sha256": "1f4882f456dcb3914511287ab0c831a0917e74f90bab77537667ef325b48b543",
+      "bytes": 35672
     },
     "factory.db": {
-      "sha256": "49ac29bdd0fea74bfec1e132a6a7200639944fbaca37bc8cab48e7e311e2039a",
+      "sha256": "d427f5644548c91b297cc92e9f9f4b43b2806e0314082fb5fc037d04b637197c",
       "bytes": 466944
     },
     "factory_orders.csv": {
@@ -31,11 +33,11 @@
       "bytes": 285342
     },
     "forecast_demand.csv": {
-      "sha256": "92d2dec948547fbc09c7f5e227ae5c85bb1b1ef80c14c356aae054ac0dc77749",
+      "sha256": "835fe808d813522e6048b9944af2e978cf1eb1425de87c9b6479333c1411875a",
       "bytes": 7032
     },
     "forecast_model_lineage.csv": {
-      "sha256": "ac31587ed7cfb4a1538a674784437374218f74b1a9dce565b0757e8a5735c123",
+      "sha256": "c53cd3d1fb3999064d9108199709b2cf89265549cf6a297b76a4e0af691de5f8",
       "bytes": 4296
     },
     "forecast_model_metadata.json": {
@@ -43,31 +45,31 @@
       "bytes": 6133
     },
     "machine_capacity_plan.csv": {
-      "sha256": "5e272aaf7cab9ccaee676bcb8218434eaec5b9797ae1e68eedbb429a6f9b1182",
+      "sha256": "900ea495a8abc279d13b2e192b86719404996fdb95d1f851818ba99e0d523f0a",
       "bytes": 895
     },
     "mrp_plan.csv": {
-      "sha256": "5349c64b758c33d98bbb58882616ac36cd8b05b4d29a11901c320d2aa06a561c",
+      "sha256": "6ecbd3c48eaf87111f1c66e3e09de3442614200c2acfa057f320355e331f8c8e",
       "bytes": 2059
     },
     "production_schedule.csv": {
-      "sha256": "c3e702d26f1df0b59b23dff86e6a1963c0ee4ba40e8336e1026248a1f319235f",
-      "bytes": 2859
+      "sha256": "e048bb183cd0b62cadadc6c174d0bdef33f217747d77bd95332be3088ca5c5e8",
+      "bytes": 2855
     },
     "run_metadata.json": {
-      "sha256": "8907a7ace24f1cd1f3b76f4ee17073ac7a47f5ca0eeca2b29a2c09c56084dec7",
+      "sha256": "21ac40233a98f9ea3e0ca623eb850cc6c7b49fa64738b4fa77a755e8de3d28e5",
       "bytes": 717
     },
     "schedule_solver_metadata.csv": {
-      "sha256": "45b680b7da8b6a95c0d9775f2df06912621bc9f122135e55597364f7d07b4274",
+      "sha256": "be8f7bd498754b544aa016ffdd964d982cc758504853d8c152758ee5e62a55d0",
       "bytes": 366
     },
     "schedule_solver_metadata.json": {
-      "sha256": "4d545a77081ec242c8c82c719fc06fa064bcb6681ddc0033ab27b24025b35a5e",
+      "sha256": "aec20405c9d9e460274fe8bbd24a578cbf9358225fcc593c8a7dbe87feadd562",
       "bytes": 442
     },
     "sku_production_plan.csv": {
-      "sha256": "89c4bf0dd8c12055e83da9cc126eafd5c876e5b97f0225d6f040b87b7e3bbe17",
+      "sha256": "4c1444afafd466566e14f84380fc814fd1f02adadab47675c87b4606e91b9975",
       "bytes": 1016
     }
   }
