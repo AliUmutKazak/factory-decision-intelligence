@@ -77,7 +77,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
 
         kpi_df = pd.DataFrame([facility_kpis])
         m_kpi_df = pd.DataFrame(machine_kpis)
-        profile_df = pd.DataFrame(columns=["interval_15min", "start_min", "end_min", "load_kw"])
+        profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
 
         if run_id:
             kpi_df["run_id"] = run_id
