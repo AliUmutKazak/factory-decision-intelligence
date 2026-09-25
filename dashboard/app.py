@@ -1,3 +1,4 @@
+import json
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from src.config import (
     WEEKLY_HOURS_PER_MACHINE,
     LABOR_COST_OVERTIME_HR,
 )
+from src.utils.lineage import get_active_pipeline_run
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -45,16 +47,10 @@ def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
         return df.iloc[0]
     return pd.Series({k: 0.0 for k in default_keys})
 
-def determine_system_status(tables: dict) -> tuple[str, str, str]:
+def determine_system_status(tables):
     """
-    Sistem durumunu kurumsal seviyede doğrular (Madde 16):
-    - NO RUN: Veritabanı yok ya da temel tablolar boş
-    - PIPELINE FAILED: Son pipeline yürütmesi hata ile sonuçlanmış
-    - SOLVER INFEASIBLE: Matematiksel modeller / CP-SAT uygun çözüm bulamamış
-    - DATA MISMATCH: Çizelgeleme ve downstream (enerji/karbon) modelleri arasında mutabakatsızlık
-    - PARTIAL: Upstream hazır ancak downstream adımlar eksik
-    - DATA STALE: Çıktılar veya veritabanı 7 günden eski
-    - READY: Tüm aşamalar SUCCESS, çözücüler geçerli ve modeller tam tutarlı
+    Sistem genel durumunu (READY, PIPELINE FAILED, SOLVER INFEASIBLE, DATA MISMATCH vb.)
+    audit metadata ve veritabanı kısıtlarına göre değerlendirir.
     """
     db_file = Path(DB_PATH)
     if not db_file.exists():
@@ -66,38 +62,50 @@ def determine_system_status(tables: dict) -> tuple[str, str, str]:
         try:
             with open(metadata_path, "r", encoding="utf-8") as f:
                 run_meta = json.load(f)
-            
-            # Pipeline en son başarılı mı bitti?
-            if run_meta.get("status") != "SUCCESS":
-                return "PIPELINE FAILED", "error", f"Son pipeline çalıştırması başarısız (Run: {run_meta.get('run_id')}). Modeller güvensiz."
-            
-            # Çözücü durumları geçerli mi?
-            opt_metrics = run_meta.get("optimization_metrics", {})
-            agg_status = str(opt_metrics.get("aggregate_lp_status", "")).upper()
-            cpsat_status = str(opt_metrics.get("cpsat_solver_status", "")).upper()
-            
-            if "INFEASIBLE" in agg_status or "INFEASIBLE" in cpsat_status:
-                return "SOLVER INFEASIBLE", "error", f"Optimizasyon çözücü hatası: LP={agg_status}, CP-SAT={cpsat_status}."
-        except Exception:
-            pass
+        except Exception as e:
+            return "METADATA CORRUPTED", "error", f"reports/run_metadata.json okunamadı veya bozuk: {e}"
 
-    # 2. Solver Metadata Doğrulaması (reports/schedule_solver_metadata.json)
+        status_val = str(run_meta.get("status", "")).upper()
+        # Standart Pipeline Durum Kontrolü (COMPLETED veya geriye dönük SUCCESS)
+        if status_val not in ("COMPLETED", "SUCCESS"):
+            return "PIPELINE FAILED", "error", f"Son pipeline çalıştırması geçerli değil (Status: {status_val}, Run: {run_meta.get('run_id')}). Modeller güvensiz."
+
+        # Çözücü durumları geçerli mi?
+        opt_metrics = run_meta.get("optimization_metrics", {})
+        agg_status = str(opt_metrics.get("aggregate_lp_status", "")).upper()
+        cpsat_status = str(opt_metrics.get("cpsat_solver_status", "")).upper()
+
+        if "INFEASIBLE" in agg_status or "INFEASIBLE" in cpsat_status:
+            return "SOLVER INFEASIBLE", "error", f"Optimizasyon çözücü hatası: LP={agg_status}, CP-SAT={cpsat_status}."
+
+    # 2. Solver Metadata Doğrulaması
     solver_meta_path = Path("reports/schedule_solver_metadata.json")
     if solver_meta_path.exists():
         try:
             with open(solver_meta_path, "r", encoding="utf-8") as f:
                 s_meta = json.load(f)
-            s_status = str(s_meta.get("solver_status", "")).upper()
-            if s_status in ["INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]:
-                return "SOLVER INFEASIBLE", "error", f"CP-SAT Çizelgeleme çözücüsü başarısız: {s_status}."
-        except Exception:
-            pass
+        except Exception as e:
+            return "METADATA CORRUPTED", "error", f"Solver metadata dosyası bozuk: {e}"
 
-    # 3. Dosya Güncelliği (7 günden eskiyse STALE)
-    mtime = datetime.fromtimestamp(db_file.stat().st_mtime, tz=timezone.utc)
-    age_hours = (datetime.now(timezone.utc) - mtime).total_seconds() / 3600.0
-    if age_hours > (24 * 7):
-        return "DATA STALE", "warning", f"Pipeline çıktıları güncel değil (Son güncelleme: {age_hours / 24:.1f} gün önce)."
+        s_status = str(s_meta.get("solver_status", "")).upper()
+        if s_status in ["INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]:
+            return "SOLVER INFEASIBLE", "error", f"CP-SAT Çizelgeleme çözücüsü başarısız: {s_status}."
+
+    # 3. Enerji & Karbon Metrik Kolon Kontrolü
+    sched_df = tables.get("production_schedule", pd.DataFrame())
+    energy_df = tables.get("energy_kpis", pd.DataFrame())
+    carbon_df = tables.get("carbon_kpis", pd.DataFrame())
+
+    if not sched_df.empty:
+        if energy_df.empty or carbon_df.empty:
+            return "DATA MISMATCH", "error", "Çizelge mevcut fakat enerji/karbon metrikleri hesaplanmamış."
+
+        # Tablodaki gerçek kolon: grand_total_kwh (fallback: energy_kwh)
+        energy_col = "grand_total_kwh" if "grand_total_kwh" in energy_df.columns else ("energy_kwh" if "energy_kwh" in energy_df.columns else None)
+        if energy_col and energy_df[energy_col].sum() <= 0:
+            return "DATA MISMATCH", "error", f"Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh, kolon: {energy_col})."
+
+    return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır."
 
     # 4. Tablo Doluluk Kontrolleri
     core_upstream = ["forecast_demand", "sku_production_plan", "mrp_plan"]
@@ -155,6 +163,7 @@ status_colors = {
     "PIPELINE FAILED": "background-color: #dc3545; color: white;",
     "SOLVER INFEASIBLE": "background-color: #dc3545; color: white;",
     "DATA MISMATCH": "background-color: #dc3545; color: white;",
+    "METADATA CORRUPTED": "background-color: #dc3545; color: white;",
     "DATA STALE": "background-color: #fd7e14; color: white;",
 }
 
@@ -174,30 +183,50 @@ if status_code == "NO RUN":
     st.error("⚠️ Gösterilecek aktif çalışma verisi bulunamadı. Lütfen öncelikle veri hattını koşturunuz (`python main.py`).")
     st.stop()
 # --- Kurumsal Denetim & Lineage (Audit Trail) Kartı ---
+# Denetim Madde 9.4: df_runs.iloc[-1] yerine resmi ve onaylanmış active run'ı çekiyoruz
+active_run = get_active_pipeline_run()
 df_runs = raw_tables.get("pipeline_runs", pd.DataFrame())
-if not df_runs.empty:
-    latest_run = df_runs.iloc[-1]
+
+if active_run:
+    run_id_val = active_run.get("run_id", "N/A")
+    run_ts = active_run.get("timestamp", "N/A")
+    git_sha_val = active_run.get("git_sha", "N/A")
+    cfg_hash_val = active_run.get("config_hash", "N/A")
+    trigger_src = active_run.get("trigger_source", "N/A")
+    data_src_val = active_run.get("data_source", "N/A")
+elif not df_runs.empty:
+    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS"])]
+    latest_run = completed_runs.iloc[-1] if not completed_runs.empty else df_runs.iloc[-1]
     run_id_val = latest_run.get("run_id", "N/A")
     run_ts = latest_run.get("timestamp", "N/A")
     git_sha_val = latest_run.get("git_sha", "N/A")
     cfg_hash_val = latest_run.get("config_hash", "N/A")
     trigger_src = latest_run.get("trigger_source", "N/A")
-    
-    with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) — Run: `{run_id_val}`", expanded=False):
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Run ID", run_id_val)
-        c2.metric("Tetikleyici", trigger_src)
-        c3.metric("Git SHA", git_sha_val[:8] if git_sha_val != "N/A" else "N/A")
-        c4.metric("Config Hash", cfg_hash_val[:8] if cfg_hash_val != "N/A" else "N/A")
-        
-        st.caption(f"🕒 **Çalıştırma Zamanı:** `{run_ts}` | **Veri Kaynağı:** `{latest_run.get('data_source', 'N/A')}`")
-        
-        df_model_lineage = raw_tables.get("forecast_model_lineage", pd.DataFrame())
-        if not df_model_lineage.empty:
-            st.markdown("##### 📈 SKU Bazlı Seçilen Tahmin Modelleri & Model Yönetişimi")
-            disp_cols = ["product_id", "selected_model", "backtest_wape", "backtest_rmse", "selection_reason", "run_id"]
-            avail_cols = [c for c in disp_cols if c in df_model_lineage.columns]
-            st.dataframe(df_model_lineage[avail_cols], use_container_width=True, hide_index=True)
+    data_src_val = latest_run.get("data_source", "N/A")
+else:
+    run_id_val = run_ts = git_sha_val = cfg_hash_val = trigger_src = data_src_val = "N/A"
+
+with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) – Run: `{run_id_val}`", expanded=False):
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Run ID", run_id_val)
+    c2.metric("Tetikleyici", trigger_src)
+    c3.metric("Git SHA", git_sha_val[:8] if git_sha_val != "N/A" else "N/A")
+    c4.metric("Config Hash", cfg_hash_val[:8] if cfg_hash_val != "N/A" else "N/A")
+
+    st.caption(f"⏱ **Çalıştırma Zamanı:** `{run_ts}` | **Veri Kaynağı:** `{data_src_val}`")
+
+    df_model_lineage = raw_tables.get("forecast_model_lineage", pd.DataFrame())
+    if not df_model_lineage.empty:
+        # Aktif koşuma göre filtrele
+        if "run_id" in df_model_lineage.columns and run_id_val != "N/A":
+            df_lineage_filtered = df_model_lineage[df_model_lineage["run_id"] == run_id_val]
+            if not df_lineage_filtered.empty:
+                df_model_lineage = df_lineage_filtered
+
+        st.markdown("##### 📋 SKU Bazlı Seçilen Tahmin Modelleri & Model Yönetişimi")
+        disp_cols = ["product_id", "selected_model", "backtest_wape", "backtest_rmse", "selection_reason", "run_id"]
+        avail_cols = [c for c in disp_cols if c in df_model_lineage.columns]
+        st.dataframe(df_model_lineage[avail_cols], use_container_width=True, hide_index=True)
 
 # Güvenli Tekil KPI Satırları
 e_kpi = safe_first_row(
@@ -209,12 +238,19 @@ c_kpi = safe_first_row(
     ["total_tco2e", "kgco2e_per_unit"]
 )
 
-mrp_df = raw_tables["mrp_plan"]
-forecast_df = raw_tables["forecast_demand"]
-sku_df = raw_tables["sku_production_plan"]
-sched_df = raw_tables["production_schedule"]
-agg_df = raw_tables["aggregate_plan"]
-mach_cap_df = raw_tables["machine_capacity_plan"]
+# Tabloları Aktif Run ID'ye Göre Filtreleme Yardımcısı (Madde 9.4)
+def filter_by_active_run(df, active_id):
+    if not df.empty and "run_id" in df.columns and active_id != "N/A":
+        f_df = df[df["run_id"] == active_id]
+        return f_df if not f_df.empty else df
+    return df
+
+mrp_df = filter_by_active_run(raw_tables["mrp_plan"], run_id_val)
+forecast_df = filter_by_active_run(raw_tables["forecast_demand"], run_id_val)
+sku_df = filter_by_active_run(raw_tables["sku_production_plan"], run_id_val)
+sched_df = filter_by_active_run(raw_tables["production_schedule"], run_id_val)
+agg_df = filter_by_active_run(raw_tables["aggregate_plan"], run_id_val)
+mach_cap_df = filter_by_active_run(raw_tables["machine_capacity_plan"], run_id_val)
 
 tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability = st.tabs([
     "📊 Yönetici Özeti",
