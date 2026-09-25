@@ -248,7 +248,7 @@ def test_pipeline_failure_status_and_downstream_isolation():
     import sqlite3
     import src.config as cfg
 
-    with sqlite3.connect(cfg.DB_PATH) as conn:
+    with get_db_connection(cfg.DB_PATH) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT status FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
         row = cursor.fetchone()
@@ -274,7 +274,7 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     temp_metadata_path = tmp_path / "run_metadata.json"
     monkeypatch.setattr(lineage_mod, "METADATA_JSON_PATH", temp_metadata_path)
 
-    conn = sqlite3.connect(temp_db)
+    conn = get_db_connection(temp_db)
     init_pipeline_runs_table(conn)
     conn.close()
 
@@ -282,7 +282,7 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     run_1 = "RUN-TEST-BOUND-001"
     start_pipeline_run(run_1, db_path=temp_db)
     
-    conn = sqlite3.connect(temp_db)
+    conn = get_db_connection(temp_db)
     c = conn.cursor()
     c.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_1,))
     assert c.fetchone()[0] == "RUNNING", "Pipeline baslatildiginda status RUNNING olmali!"
@@ -315,7 +315,7 @@ def test_lp_cpsat_overtime_reconciliation():
     import pandas as pd
     from src.config import DB_PATH
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     sched_df = pd.read_sql_query("SELECT * FROM production_schedule", conn)
     conn.close()
 
@@ -342,7 +342,7 @@ def test_p0_mes_machine_state_not_overwritten():
     from src.config import DB_PATH
     from src.data.build_database_and_eda import initialize_database
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     cur = conn.cursor()
     
     # 1. Simüle edilmiş MES canlı durumu: M01 tezgâhı en son P05 üretti
@@ -360,14 +360,14 @@ def test_p0_mes_machine_state_not_overwritten():
         initialize_database(force_recreate=False)
 
         # 3. M01 tezgâhının durumunu sorgula; P01'e geri dönmemeli, P05 olarak korunmalı
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT last_product_id FROM machine_state WHERE machine_id = 'M01'")
         current_product = cur.fetchone()[0]
         assert current_product == "P05", f"MES canlı durumu statik veriyle ezildi! Beklenen: P05, Gelen: {current_product}"
     finally:
         # Test İzolasyonu: initialize_database'in açtığı geçici INITIALIZED kaydını temizle
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         cur = conn.cursor()
         if last_run_id_before:
             cur.execute("DELETE FROM pipeline_runs WHERE status = 'INITIALIZED' AND run_id != ?", (last_run_id_before,))
