@@ -326,3 +326,48 @@ def test_lp_cpsat_overtime_reconciliation():
             f"Makine {machine_id} için CP-SAT OT kullanımı ({actual_ot} dk), "
             f"taktik LP izin verilen OT bütçesini ({max_allowed_ot_min} dk) aştı!"
         )    
+
+def test_p0_mes_machine_state_not_overwritten():
+    """
+    P0 Denetim Kanıtı:
+    Gerçek MES snapshot'ı (ör. M01 -> P05) veritabanına yazılmışsa,
+    pipeline yeniden başlatıldığında (initialize_database) bu canlı durum
+    statik seed verisiyle EZİLMEMELİDİR.
+    """
+    import sqlite3
+    from src.config import DB_PATH
+    from src.data.build_database_and_eda import initialize_database
+
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    
+    # 1. Simüle edilmiş MES canlı durumu: M01 tezgâhı en son P05 üretti
+    cur.execute("INSERT OR REPLACE INTO machine_state (machine_id, last_product_id) VALUES ('M01', 'P05')")
+    conn.commit()
+
+    # Test öncesi son run_id'yi al
+    cur.execute("SELECT run_id FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
+    last_run_before = cur.fetchone()
+    last_run_id_before = last_run_before[0] if last_run_before else None
+    conn.close()
+
+    try:
+        # 2. Pipeline veritabanı başlatmasını çalıştır (force_recreate=False)
+        initialize_database(force_recreate=False)
+
+        # 3. M01 tezgâhının durumunu sorgula; P01'e geri dönmemeli, P05 olarak korunmalı
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.execute("SELECT last_product_id FROM machine_state WHERE machine_id = 'M01'")
+        current_product = cur.fetchone()[0]
+        assert current_product == "P05", f"MES canlı durumu statik veriyle ezildi! Beklenen: P05, Gelen: {current_product}"
+    finally:
+        # Test İzolasyonu: initialize_database'in açtığı geçici INITIALIZED kaydını temizle
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        if last_run_id_before:
+            cur.execute("DELETE FROM pipeline_runs WHERE status = 'INITIALIZED' AND run_id != ?", (last_run_id_before,))
+        else:
+            cur.execute("DELETE FROM pipeline_runs WHERE status = 'INITIALIZED'")
+        conn.commit()
+        conn.close()

@@ -347,17 +347,25 @@ def initialize_database(force_recreate=False, run_id=None):
     conn.commit()
     cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # MES Başlangıç Snapshot Verisi (Runtime State Seeding)
-    initial_states = [
-        ("M01", "P01"),
-        ("M02", "P02"),
-        ("M03", "P04"),
-    ]
-    cursor.executemany("""
-        INSERT OR REPLACE INTO machine_state (machine_id, last_product_id)
-        VALUES (?, ?)
-    """, initial_states)
-    conn.commit()
+    # -------------------------------------------------------------------------
+    # P0 Çözümü: MES Runtime Snapshot Bütünlüğü
+    # Eğer tabloda sahadan/önceki koşumdan gelen tezgâh durumları varsa EZİLMEZ (overwrite edilmez).
+    # Sadece tablo tamamen boşsa (Cold-Start / Initial Setup) varsayılan değerlerle tohumlanır.
+    # -------------------------------------------------------------------------
+    cursor.execute("SELECT COUNT(*) FROM machine_state")
+    existing_state_count = cursor.fetchone()[0]
+
+    if existing_state_count == 0 or force_recreate:
+        initial_states = [
+            ("M01", "P01"),
+            ("M02", "P02"),
+            ("M03", "P04"),
+        ]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO machine_state (machine_id, last_product_id)
+            VALUES (?, ?)
+        """, initial_states)
+        conn.commit()
 
     # 3. EDA Özet Tablosu
     eda_summary = analyze_demand_characteristics(orders_df)
