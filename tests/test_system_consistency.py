@@ -283,3 +283,29 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     assert active_run is not None
     assert active_run["run_id"] == run_2
     assert active_run["status"] == "COMPLETED"
+
+def test_lp_cpsat_overtime_reconciliation():
+    """
+    Denetim Madde 2: Taktik LP ve CP-SAT Fazla Mesai (OT) Birebir Mutabakatı.
+    Operasyonel CP-SAT'ın fiili kullandığı toplam OT süresi,
+    taktik modelin tezgâh başına izin verdiği 48 saatlik (2,880 dk) üst sınırı aşamaz.
+    """
+    import sqlite3
+    import pandas as pd
+    from src.config import DB_PATH
+
+    conn = sqlite3.connect(DB_PATH)
+    sched_df = pd.read_sql_query("SELECT * FROM production_schedule", conn)
+    conn.close()
+
+    assert not sched_df.empty, "production_schedule tablosu boş!"
+
+    # Tezgâh bazında toplam OT kullanımını topla (overtime_min sütunu)
+    ot_per_machine = sched_df.groupby("machine_id")["overtime_min"].sum()
+    max_allowed_ot_min = 48 * 60  # 48 saat = 2880 dakika
+
+    for machine_id, actual_ot in ot_per_machine.items():
+        assert actual_ot <= max_allowed_ot_min, (
+            f"Makine {machine_id} için CP-SAT OT kullanımı ({actual_ot} dk), "
+            f"taktik LP izin verilen OT bütçesini ({max_allowed_ot_min} dk) aştı!"
+        )    

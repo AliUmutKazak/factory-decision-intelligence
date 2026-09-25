@@ -126,4 +126,20 @@ def test_historical_run_retention_policy(tmp_path):
     conn.close()
 
     # En son eklenen 3 koşum kalmış olmalı (RUN-007, RUN-008, RUN-009)
-    assert remaining == ["RUN-007", "RUN-008", "RUN-009"]        
+    assert remaining == ["RUN-007", "RUN-008", "RUN-009"]
+
+def test_artifact_manifest_generation():
+    """Denetim Madde 4: Pipeline artifact manifestinin geçerli byte ve SHA-256 ürettiğini doğrular."""
+    from src.utils.lineage import generate_run_manifest
+    import json
+    import os
+
+    manifest = generate_run_manifest(run_id="RUN-MANIFEST-TEST-001")
+    assert manifest["run_id"] == "RUN-MANIFEST-TEST-001"
+    assert manifest["total_artifacts"] > 0
+    assert os.path.exists("reports/run_manifest.json")
+
+    with open("reports/run_manifest.json", "r", encoding="utf-8") as f:
+        loaded = json.load(f)
+    assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
+    assert len(loaded["artifacts"]) > 0        

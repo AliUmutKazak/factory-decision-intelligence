@@ -20,7 +20,8 @@ from src.utils.lineage import (
     generate_run_id, 
     start_pipeline_run, 
     get_active_pipeline_run,
-    apply_run_retention_policy
+    apply_run_retention_policy,
+    generate_run_manifest
 )
 
 def run_end_to_end_pipeline():
@@ -81,6 +82,10 @@ def run_end_to_end_pipeline():
         pruned_count = apply_run_retention_policy(keep_last_n=20)
         if pruned_count > 0:
             print(f"[AUDIT] Retention Policy uygulandı: {pruned_count} adet eski denetim kaydı arşivlendi/temizlendi.")
+
+        # Denetim Madde 4: Artifact Manifest Mühürleme
+        manifest = generate_run_manifest(run_id=run_id)
+        print(f"[AUDIT] Artifact Manifest oluşturuldu -> reports/run_manifest.json ({manifest['total_artifacts']} dosya mühürlendi)")
 
         print("\n" + "#" * 85)
         print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_elapsed:.2f} saniye")

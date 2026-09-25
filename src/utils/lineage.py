@@ -208,3 +208,71 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> in
 
     conn.close()
     return deleted_count
+
+def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
+    """
+    Denetim Madde 4: Artifact Manifest.
+    Pipeline koşumunun ürettiği tüm artifact dosyalarının byte boyutu ve SHA-256 hash'ini mühürler.
+    """
+    import hashlib
+    import src.config as config
+    from pathlib import Path
+
+    root_dir = Path(__file__).resolve().parent.parent.parent
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+
+    files_to_track = [
+        Path(active_db),
+        root_dir / "reports" / "run_metadata.json",
+        root_dir / "reports" / "schedule_solver_metadata.json",
+        root_dir / "reports" / "forecast_model_metadata.json",
+    ]
+
+    # Processed CSV'leri de ekle
+    processed_dir = getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed")
+    if Path(processed_dir).exists():
+        for p in Path(processed_dir).glob("*.csv"):
+            files_to_track.append(p)
+
+    manifest_entries = {}
+    for file_path in files_to_track:
+        if file_path.exists() and file_path.is_file():
+            hasher = hashlib.sha256()
+            size = file_path.stat().st_size
+            with open(file_path, "rb") as f:
+                while chunk := f.read(65536):
+                    hasher.update(chunk)
+            manifest_entries[file_path.name] = {
+                "size_bytes": size,
+                "sha256": hasher.hexdigest(),
+                "relative_path": str(file_path.relative_to(root_dir)) if root_dir in file_path.parents else file_path.name
+            }
+
+    manifest = {
+        "run_id": run_id,
+        "created_at": datetime.now().isoformat(),
+        "total_artifacts": len(manifest_entries),
+        "artifacts": manifest_entries
+    }
+
+    manifest_path = root_dir / "reports" / "run_manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=4, ensure_ascii=False)
+
+    return manifest
+
+def test_artifact_manifest_generation():
+    """Denetim Madde 4: Pipeline artifact manifestinin geçerli byte ve SHA-256 ürettiğini doğrular."""
+    from src.utils.lineage import generate_run_manifest
+    import json
+    import os
+
+    manifest = generate_run_manifest(run_id="RUN-MANIFEST-TEST-001")
+    assert manifest["run_id"] == "RUN-MANIFEST-TEST-001"
+    assert manifest["total_artifacts"] > 0
+    assert os.path.exists("reports/run_manifest.json")
+
+    with open("reports/run_manifest.json", "r", encoding="utf-8") as f:
+        loaded = json.load(f)
+    assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
+    assert len(loaded["artifacts"]) > 0
