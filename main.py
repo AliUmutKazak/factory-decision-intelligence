@@ -19,7 +19,8 @@ from src.utils.lineage import (
     record_pipeline_run_metadata, 
     generate_run_id, 
     start_pipeline_run, 
-    get_active_pipeline_run
+    get_active_pipeline_run,
+    apply_run_retention_policy
 )
 
 def run_end_to_end_pipeline():
@@ -67,14 +68,19 @@ def run_end_to_end_pipeline():
         except Exception:
             pass
 
-        # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet (PROMOTE TO COMPLETED)
+        # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet
         meta = record_pipeline_run_metadata(
             run_id=run_id,
             status="COMPLETED",
             orders_count=actual_orders_count,
             data_source="data/processed/factory_orders.csv"
         )
-        print(f"\n[AUDIT] Run başarıyla terfi ettirildi (PROMOTE) -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: COMPLETED, Orders: {actual_orders_count})")
+        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: COMPLETED, Orders: {actual_orders_count})")
+
+        # Denetim Kapı 5: Historical Run Retention (Son 20 koşumu koru, eskileri tasfiye et)
+        pruned_count = apply_run_retention_policy(keep_last_n=20)
+        if pruned_count > 0:
+            print(f"[AUDIT] Retention Policy uygulandı: {pruned_count} adet eski denetim kaydı arşivlendi/temizlendi.")
 
         print("\n" + "#" * 85)
         print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_elapsed:.2f} saniye")

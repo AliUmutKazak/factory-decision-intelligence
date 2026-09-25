@@ -92,3 +92,38 @@ def test_run_metadata_report_consistency(db_connection):
         row = cursor.fetchone()
         assert row is not None, f"JSON'daki run_id veritabanında bulunamadı: {metadata.get('run_id')}"
         assert row[0] == metadata.get("status"), "DB status ile JSON status uyuşmuyor!"
+
+def test_historical_run_retention_policy(tmp_path):
+    """Denetim Kapı 5: En güncel N koşumun korunduğunu ve eski koşumların temizlendiğini doğrular."""
+    from src.utils.lineage import apply_run_retention_policy, init_pipeline_runs_table
+    import sqlite3
+    from datetime import datetime, timedelta
+
+    temp_db = str(tmp_path / "test_retention.db")
+    conn = sqlite3.connect(temp_db)
+    init_pipeline_runs_table(conn)
+    cur = conn.cursor()
+
+    # 10 adet yapay koşum ekle (kronolojik)
+    base_time = datetime(2026, 1, 1, 10, 0, 0)
+    for i in range(10):
+        t = (base_time + timedelta(hours=i)).isoformat()
+        cur.execute("""
+            INSERT INTO pipeline_runs (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
+            VALUES (?, ?, 'test', 100, 'sha', 'hash', 'test.csv', 'COMPLETED')
+        """, (f"RUN-{i:03d}", t))
+    conn.commit()
+    conn.close()
+
+    # Son 3 koşumu koru, 7 tanesini temizle
+    deleted = apply_run_retention_policy(keep_last_n=3, db_path=temp_db)
+    assert deleted == 7, f"7 eski koşum silinmeliydi, silinen: {deleted}"
+
+    conn = sqlite3.connect(temp_db)
+    cur = conn.cursor()
+    cur.execute("SELECT run_id FROM pipeline_runs ORDER BY timestamp ASC")
+    remaining = [row[0] for row in cur.fetchall()]
+    conn.close()
+
+    # En son eklenen 3 koşum kalmış olmalı (RUN-007, RUN-008, RUN-009)
+    assert remaining == ["RUN-007", "RUN-008", "RUN-009"]        

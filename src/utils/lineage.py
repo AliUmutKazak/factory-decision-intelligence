@@ -174,3 +174,37 @@ def get_active_pipeline_run(db_path: str = None) -> dict:
     if row:
         return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
     return None
+
+def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> int:
+    """
+    Denetim Kapı 5: Historical Run Retention Policy.
+    Üretim veritabanında denetim kütüğünün sınırsız büyümesini engeller.
+    En güncel 'keep_last_n' adet koşumu korur, daha eski veya FAILED yetim kayıtları temizler.
+    Silinen satır sayısını döner.
+    """
+    import src.config as config
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    if not os.path.exists(active_db):
+        return 0
+
+    conn = get_db_connection(active_db)
+    init_pipeline_runs_table(conn)
+    cur = conn.cursor()
+
+    # Saklanacak en yeni N kaydın dışındaki eski run_id'leri bul
+    cur.execute("""
+        SELECT run_id FROM pipeline_runs 
+        ORDER BY timestamp DESC 
+        LIMIT -1 OFFSET ?
+    """, (keep_last_n,))
+    old_runs = [row[0] for row in cur.fetchall()]
+
+    deleted_count = 0
+    if old_runs:
+        placeholders = ",".join("?" for _ in old_runs)
+        cur.execute(f"DELETE FROM pipeline_runs WHERE run_id IN ({placeholders})", old_runs)
+        deleted_count = cur.rowcount
+        conn.commit()
+
+    conn.close()
+    return deleted_count
