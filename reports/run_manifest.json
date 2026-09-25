@@ -1,11 +1,11 @@
 {
     "run_id": "RUN-MANIFEST-TEST-001",
-    "created_at": "2026-09-25T21:37:22.025977",
+    "created_at": "2026-09-25T22:07:25.716536",
     "total_artifacts": 17,
     "artifacts": {
         "factory.db": {
             "size_bytes": 495616,
-            "sha256": "74ab37f5fd458fd93aa9d50c98f624451c86ccfef3f2d71af8d688d51317fb82",
+            "sha256": "87f9845ecf3f91599c7fb501329c9be596218107ddc680ce465992f54ecb94eb",
             "relative_path": "data\\factory.db"
         },
         "run_metadata.json": {
@@ -15,7 +15,7 @@
         },
         "schedule_solver_metadata.json": {
             "size_bytes": 604,
-            "sha256": "4e969baa44802b123b216d9fce2c8320e98d989ea4aa3d83827f7bb122405a14",
+            "sha256": "164cdaf23b968e8bba30f290b6f45faed19e6c5270819bab7e919a3815c6d8b5",
             "relative_path": "reports\\schedule_solver_metadata.json"
         },
         "forecast_model_metadata.json": {
@@ -30,22 +30,22 @@
         },
         "carbon_analytics.csv": {
             "size_bytes": 88,
-            "sha256": "a9538c07fcf73bd6f1e3e6a0e8d2db3974413948cc5018db41449862ab5916db",
+            "sha256": "21098d09d31216ac84c42ad9c116113ca1f5231788046dc2660792f81fe19f99",
             "relative_path": "data\\processed\\carbon_analytics.csv"
         },
         "carbon_machine_kpis.csv": {
-            "size_bytes": 432,
-            "sha256": "5a36ed7d84f7e23469ac8310b12819b504332b761ff49ecb2b1b11490f35a609",
+            "size_bytes": 434,
+            "sha256": "d5c63749341c9da17e539295fa92dce191c52e8a4039c0b5f47b513ee1c44dc0",
             "relative_path": "data\\processed\\carbon_machine_kpis.csv"
         },
         "energy_kpis.csv": {
-            "size_bytes": 211,
-            "sha256": "328649c620bdf77bb23f8982dff535eb78cc5f542a20d6166cc0251b770b054a",
+            "size_bytes": 212,
+            "sha256": "ff4b5e20da9e3af86da3e13a512f8ec235cc2f31ff60e3c3ea3deab55261749a",
             "relative_path": "data\\processed\\energy_kpis.csv"
         },
         "energy_profile_15min.csv": {
-            "size_bytes": 27502,
-            "sha256": "72f51f412d116bb593b1580511057ccb2ba4335566a600191697698848aa566d",
+            "size_bytes": 27406,
+            "sha256": "d71dea25ec07342ea1ecd1842f934380b3cee154b5e5ed5596781d7a2b55cdc4",
             "relative_path": "data\\processed\\energy_profile_15min.csv"
         },
         "factory_orders.csv": {
@@ -74,13 +74,13 @@
             "relative_path": "data\\processed\\mrp_plan.csv"
         },
         "production_schedule.csv": {
-            "size_bytes": 3675,
-            "sha256": "35044528adba8f56aec47412a327e1070a8fb752dd91f309a9a2e16ac605a31e",
+            "size_bytes": 3667,
+            "sha256": "e75a0f81b91178848f313c54526d0d2b272ea1c3a60b9e2684b5f15893f90d41",
             "relative_path": "data\\processed\\production_schedule.csv"
         },
         "schedule_solver_metadata.csv": {
             "size_bytes": 471,
-            "sha256": "c3a61a208f650269974b90ed7bae89d6984aaeab0d278c8662f6d6a7266028cd",
+            "sha256": "5db282f48cea1a632cd138a67fb3cc2cfc4660f1713bdf6db766d38b16f224c1",
             "relative_path": "data\\processed\\schedule_solver_metadata.csv"
         },
         "sku_production_plan.csv": {

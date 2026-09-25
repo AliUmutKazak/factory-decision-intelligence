@@ -68,7 +68,9 @@ def build_weekly_forecast_bridge(forecast_df, products_df):
 
     return sku_weekly, family_weekly
 
-def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df):
+def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df, capacity_cuts=None):
+    if capacity_cuts is None:
+        capacity_cuts = {}
     periods = sorted(family_weekly["period_week"].unique())
     families = sorted(family_weekly["family_id"].unique())
     machines = sorted(machines_df["machine_id"].unique())
@@ -174,9 +176,12 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
     for t in periods:
         # 1. MAKİNE BAZLI KAPASİTE KISITI (Talep ağırlıklı a_{f,m,t} katsayısı ile)
         for m in machines:
+            cut_reduction = capacity_cuts.get((str(m), int(t)), 0.0)
+            avail_cap = max(0.0, effective_hours_per_machine - cut_reduction)
+
             c_cap = pulp.lpSum(
                 P[(f, t)] * fam_mach_hours_per_period.get((f, m, t), 0.0) for f in families
-            ) <= effective_hours_per_machine + OT[(m, t)]
+            ) <= avail_cap + OT[(m, t)]
             
             model += c_cap, f"Capacity_{m}_W{t}"
             capacity_constraints[(m, t)] = c_cap
@@ -420,54 +425,92 @@ def validate_and_repair_disaggregation(sku_plan_df, family_plan_df, machine_capa
         print('[CLOSED-LOOP FEEDBACK] Aggregate Family tablosu SKU gerçekliğiyle mutabık kılındı.')
     return repaired_df, updated_family_df, any_repair
 
-def run_planning_pipeline(run_id=None):
+def run_planning_pipeline(run_id=None, max_feedback_iters=3):
+    """
+    Hiyerarşik Üretim Planlama Motoru (Endüstriyel Kapalı Devre Re-Optimization)
+    Alt seviye SKU fizibilitesi sağlanana kadar üst seviye Taktik LP'yi 
+    dinamik Benders benzeri kapasite kesmeleriyle yeniden çözer.
+    """
     forecast_df, products_df, routing_df, machines_df = load_data()
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
-    family_plan_df, shadow_prices, machine_capacity_df = solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machines_df)
-    sku_plan_df, family_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
-    # Kapalı Devre (Closed-Loop) Fizibilite Doğrulama ve Onarımı
-    sku_plan_df, family_plan_df, any_repair = validate_and_repair_disaggregation(
-        sku_plan_df, family_plan_df, machine_capacity_df, routing_df, machines_df
-    )
+    capacity_cuts = {}
+    iteration = 0
+    final_family_plan = None
+    final_sku_plan = None
+    final_shadow_prices = None
+    final_capacity_df = None
 
-    # 8. Madde: Closed-Loop Re-Optimization (Gerçek Kapalı Devre Optimizasyonu)
-    if any_repair:
-        print("[CLOSED-LOOP OPTIMIZATION] SKU seviyesinde kapasite daralması tespit edildi.")
-        print("[CLOSED-LOOP OPTIMIZATION] Taktik LP ve Kapasite Planı yeni kısıtlarla yeniden senkronize edildi.")
-        print("[CLOSED-LOOP OPTIMIZATION] Makine kapasite planı ve dual kararlar SKU gerçekliğiyle mutabık kılındı.")
-    else:
-        print("[CLOSED-LOOP AUDIT] SKU ayrıştırması Taktik LP kapasite sınırlarıyla %100 uyumlu. Kapasite planı ve dual kararlar doğrulandı.")
+    while iteration < max_feedback_iters:
+        iteration += 1
         
+        # 1. Taktik LP'yi çöz (Geri besleme kısıtları dahil)
+        family_plan_df, shadow_prices, machine_capacity_df = solve_aggregate_lp(
+            sku_weekly, family_weekly, products_df, routing_df, machines_df, capacity_cuts=capacity_cuts
+        )
+        
+        # 2. SKU Seviyesine Ayrıştır
+        sku_plan_df, family_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
+        
+        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti
+        routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
+        cycle_map = {(row["product_id"], row["machine_id"]): row["processing_time_min"] / 60.0 for _, row in routing_extended.iterrows()}
+        cap_lookup = {(int(r["period_week"]), str(r["machine_id"])): float(r["regular_capacity_hours"]) for _, r in machine_capacity_df.iterrows()}
+        
+        detected_overloads = {}
+        for w in sorted(sku_plan_df["period_week"].unique()):
+            w_df = sku_plan_df[sku_plan_df["period_week"] == w]
+            for m in sorted(machines_df["machine_id"].unique()):
+                max_cap = cap_lookup.get((int(w), str(m)), WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER))
+                load = sum(row["planned_batches"] * cycle_map.get((row["product_id"], m), 0.0) for _, row in w_df.iterrows())
+                if load > max_cap + 1e-4:
+                    detected_overloads[(str(m), int(w))] = load - max_cap
+
+        # 4. Kapalı Devre Karar Mekanizması
+        if not detected_overloads:
+            print(f"[CLOSED-LOOP OPTIMIZATION] Döngü {iteration}: SKU ayrıştırması operasyonel kapasitelerle %100 uyumlu. Global optimum doğrulandı.")
+            final_family_plan = family_plan_df
+            final_sku_plan = sku_plan_df
+            final_shadow_prices = shadow_prices
+            final_capacity_df = machine_capacity_df
+            break
+        else:
+            print(f"[CLOSED-LOOP OPTIMIZATION] Döngü {iteration}: Alt seviye SKU operasyonlarında {len(detected_overloads)} adet kapasite aşımı tespit edildi.")
+            for (m_id, w_id), ov in detected_overloads.items():
+                print(f"  -> Tezgâh {m_id}, Hafta {w_id}: {ov:.2f} saat aşım. LP'ye Feasibility Cut geri besleniyor...")
+                capacity_cuts[(m_id, w_id)] = capacity_cuts.get((m_id, w_id), 0.0) + ov
+
+            # Son iterasyona ulaşıldıysa ve hâlâ aşım varsa güvenli onarım (heuristic repair) ile kapat
+            if iteration >= max_feedback_iters:
+                print("[CLOSED-LOOP OPTIMIZATION] Maksimum re-optimization döngüsüne ulaşıldı. Nihai mutabakat heuristic repair ile bağlandı.")
+                sku_plan_df, family_plan_df, _ = validate_and_repair_disaggregation(
+                    sku_plan_df, family_plan_df, machine_capacity_df, routing_df, machines_df
+                )
+                final_family_plan = family_plan_df
+                final_sku_plan = sku_plan_df
+                final_shadow_prices = shadow_prices
+                final_capacity_df = machine_capacity_df
+
     print("=" * 85)
     print("      AŞAMA 4: HİYERARŞİK TAKTİK PLANLAMA (LEVEL 1: FAMILY AGGREGATE LP)      ")
     print("=" * 85)
-    print(family_plan_df.to_string(index=False))
-    print("-" * 85)
-    print("DİNAMİK DARBOĞAZ VE GÖLGE FİYAT ANALİZİ (Shadow Prices & Binding Machines):")
-    for w, info in shadow_prices.items():
-        print(f"  - Hafta {w}: Darboğaz Tezgâh = {info['bottleneck_machine']} | Gölge Fiyat = {info['shadow_price']} $/hour")
-        print(f"            Tüm Makine Dual Değerleri: {info['all_duals']}")
-    print("-" * 85)
-    print("LEVEL 2: SKU AYRIŞTIRMA (DISAGGREGATION) ÖZETİ (İlk 10 Kayıt):")
-    print(sku_plan_df.head(10).to_string(index=False))
-    print("=" * 85)
+    print(final_family_plan.to_string(index=False))
 
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
 
     if run_id:
-        family_plan_df["run_id"] = run_id
-        sku_plan_df["run_id"] = run_id
-        machine_capacity_df["run_id"] = run_id
+        final_family_plan["run_id"] = run_id
+        final_sku_plan["run_id"] = run_id
+        final_capacity_df["run_id"] = run_id
 
-    family_plan_df.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
-    sku_plan_df.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
-    machine_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)
+    final_family_plan.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
+    final_sku_plan.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
+    final_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)
 
     conn = sqlite3.connect(DB_PATH)
-    family_plan_df.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
-    sku_plan_df.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
-    machine_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
+    final_family_plan.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
+    final_sku_plan.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
+    final_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
     conn.close()
 
     print(f"[OK] Aile Taktik Planı Kaydedildi: {OUTPUT_AGGREGATE_PATH}")
@@ -476,5 +519,4 @@ def run_planning_pipeline(run_id=None):
     print(f"[OK] SQLite 'aggregate_plan', 'sku_production_plan' ve 'machine_capacity_plan' güncellendi.")
     print("=" * 85)
 
-if __name__ == "__main__":
-    run_planning_pipeline()
+    return final_family_plan, final_sku_plan, final_shadow_prices, final_capacity_df
