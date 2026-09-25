@@ -190,23 +190,9 @@ def initialize_database(force_recreate=False, run_id=None):
 
     conn = get_db_connection(DB_PATH)
     cursor = conn.cursor()
-    # Downstream türetilmiş işlem tablolarını temizle (stale data önleme)
-    downstream_tables = [
-        "forecast_demand",
-        "aggregate_plan",
-        "sku_production_plan",
-        "machine_capacity_plan",
-        "mrp_plan",
-        "production_schedule",
-        "energy_kpis",
-        "energy_profile_15min",
-        "carbon_kpis",
-        "carbon_machine_kpis",
-        "carbon_price_scenarios"
-    ]
-    for dt in downstream_tables:
-        cursor.execute(f"DROP TABLE IF EXISTS {dt}")
-    conn.commit()
+    # P0 Çözümü: Downstream tablolar pipeline başlangıcında DROP EDİLMEZ.
+    # Önceki başarılı koşumun (RUN_ACTIVE) fiziksel verisi korunur.
+    # Yeni koşum tamamlanıp doğrulanana kadar eski canlı veri lekelenmez.
 
     # 0. SSOT Merkezi Denetim Şeması (pipeline_runs)
     from src.utils.lineage import init_pipeline_runs_table, generate_run_id, get_git_sha, compute_file_hash

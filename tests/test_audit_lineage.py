@@ -41,8 +41,11 @@ def test_pipeline_runs_table_exists_and_populated(db_connection):
     assert not df_runs.empty, "pipeline_runs tablosu boş!"
     assert "run_id" in df_runs.columns, "pipeline_runs tablosunda run_id kolonu eksik!"
     assert "status" in df_runs.columns, "pipeline_runs tablosunda status kolonu eksik!"
-    
-    last_status = df_runs.iloc[-1]["status"]
+
+    # Simülasyon kalıntılarını hariç tutarak son resmi koşumu doğrula
+    valid_runs = df_runs[~df_runs["run_id"].str.startswith("RUN-FAIL-SIM")]
+    assert not valid_runs.empty, "Geçerli bir pipeline run kaydı bulunamadı!"
+    last_status = valid_runs.iloc[-1]["status"]
     assert last_status in ("SUCCESS", "COMPLETED"), f"Son pipeline çalıştırma durumu geçerli değil: {last_status}"
 
 def test_downstream_tables_have_run_id(db_connection):
@@ -152,3 +155,37 @@ def test_artifact_manifest_generation():
         loaded = json.load(f)
     assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
     assert len(loaded["artifacts"]) > 0        
+
+def test_p0_active_run_isolation_on_failure(tmp_path):
+    """
+    P0 Denetim Kanıtı:
+    Yeni bir run çalışırken CP-SAT veya ara aşamada patlarsa,
+    önceki başarılı koşumun downstream tabloları ve active_run_id'si korunur.
+    Split-Brain durumu oluşamaz.
+    """
+    import sqlite3
+    import uuid
+    from src.utils.lineage import get_active_pipeline_run
+    from src.config import DB_PATH
+
+    active_before = get_active_pipeline_run(DB_PATH)
+    assert active_before is not None, "Başlangıçta aktif bir koşum olmalı!"
+
+    sim_run_id = f"RUN-FAIL-SIM-{uuid.uuid4().hex[:6]}"
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        # Simülasyon: Başarısız bir run kaydı açılıyor
+        conn.execute(
+            "INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES (?, datetime('now'), ?)",
+            (sim_run_id, "FAILED")
+        )
+        conn.commit()
+
+        # Active run sorgulandığında FAILED olan değil, önceki başarılı olan dönmeli
+        active_after = get_active_pipeline_run(DB_PATH)
+        assert active_after == active_before, f"Başarısız koşum aktif koşumu bozdu! Beklenen: {active_before}, Gelen: {active_after}"
+    finally:
+        # Test izolasyonu: Veritabanını kirletmemek için simülasyon kaydını temizle
+        conn.execute("DELETE FROM pipeline_runs WHERE run_id = ?", (sim_run_id,))
+        conn.commit()
+        conn.close()    

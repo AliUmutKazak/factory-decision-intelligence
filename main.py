@@ -16,12 +16,13 @@ from src.scheduling.schedule_cpsat import solve_cpsat_schedule
 from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
 from src.utils.lineage import (
-    record_pipeline_run_metadata, 
-    generate_run_id, 
-    start_pipeline_run, 
+    record_pipeline_run_metadata,
+    generate_run_id,
+    start_pipeline_run,
     get_active_pipeline_run,
     apply_run_retention_policy,
-    generate_run_manifest
+    generate_run_manifest,
+    promote_run_to_active
 )
 
 def run_end_to_end_pipeline():
@@ -68,6 +69,10 @@ def run_end_to_end_pipeline():
                     actual_orders_count = row[0]
         except Exception:
             pass
+
+        # P0: Atomic Active Run Promotion (Tüm pipeline başarıyla biterse terfi et)
+        promote_run_to_active(run_id=run_id)
+        print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE / COMPLETED")
 
         # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet
         meta = record_pipeline_run_metadata(

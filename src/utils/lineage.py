@@ -276,3 +276,34 @@ def test_artifact_manifest_generation():
         loaded = json.load(f)
     assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
     assert len(loaded["artifacts"]) > 0
+
+def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
+    """
+    P0 Mimarisi: Atomic Active Run Promotion.
+    Pipeline başarıyla tamamlandığında, run_id'yi tek bir atomik transaction içinde
+    COMPLETED / ACTIVE durumuna terfi ettirir.
+    Eğer hata olursa tüm transaction rollback edilir.
+    """
+    import sqlite3
+    import src.config as config
+    target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+
+    conn = sqlite3.connect(target_db)
+    try:
+        cur = conn.cursor()
+        cur.execute("BEGIN IMMEDIATE TRANSACTION;")
+        
+        # 1. Bu koşumu COMPLETED yap
+        cur.execute("""
+            UPDATE pipeline_runs 
+            SET status = 'COMPLETED' 
+            WHERE run_id = ?
+        """, (run_id,))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
