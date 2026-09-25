@@ -218,8 +218,17 @@ def test_master_data_database_constraints():
     conn.rollback()
 
     # 4. changeover_matrix (from_product, to_product) PRIMARY KEY ihlali
+    cur.execute("SELECT from_product, to_product FROM changeover_matrix LIMIT 1")
+    row = cur.fetchone()
+    if row:
+        fp, tp = row[0], row[1]
+    else:
+        fp, tp = 'P01', 'P01'
+        cur.execute("INSERT OR REPLACE INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES (?, ?, 10.0)", (fp, tp))
+        conn.commit()
+
     with pytest.raises(sqlite3.IntegrityError):
-        cur.execute("INSERT INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES ('P01', 'P01', 10.0)")
+        cur.execute("INSERT INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES (?, ?, 99.0)", (fp, tp))
         conn.commit()
     conn.rollback()
 

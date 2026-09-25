@@ -180,8 +180,11 @@ def test_6_energy_state_machine_and_integral(isolated_db):
 
 
 def test_7_reference_manifest_integrity():
-    manifest_path = "artifacts/reference/manifest.json"
-    assert os.path.exists(manifest_path), "manifest.json bulunamadi"
+    from pathlib import Path
+    base_dir = Path(__file__).resolve().parent.parent
+    manifest_path = base_dir / "artifacts" / "reference" / "manifest.json"
+    assert manifest_path.exists(), f"manifest.json bulunamadı: {manifest_path}"
+    
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
     assert "files" in manifest and len(manifest["files"]) > 0
@@ -190,17 +193,16 @@ def test_7_reference_manifest_integrity():
     missing_files = []
 
     for fname, meta in manifest["files"].items():
-        fpath = os.path.join("artifacts/reference", fname)
-        if not os.path.exists(fpath):
+        fpath = base_dir / "artifacts" / "reference" / fname
+        if not fpath.exists():
             missing_files.append(fname)
             continue
-        curr_sha = hashlib.sha256(open(fpath, "rb").read()).hexdigest()
+        with open(fpath, "rb") as bf:
+            curr_sha = hashlib.sha256(bf.read()).hexdigest()
         if curr_sha != meta["sha256"]:
             mismatches.append(
                 f"{fname} -> Beklenen: {meta['sha256'][:8]}..., Gercek: {curr_sha[:8]}..."
             )
 
     assert not missing_files, f"Eksik dosyalar var: {missing_files}"
-    assert (
-        not mismatches
-    ), "SHA-256 uyumsuzluklari tespit edildi:\n" + "\n".join(mismatches)
+    assert not mismatches, "SHA-256 uyumsuzlukları tespit edildi:\n" + "\n".join(mismatches)
