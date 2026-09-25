@@ -16,6 +16,7 @@ from src.config import (
 
 OUTPUT_FORECAST_PATH = PROCESSED_DATA_DIR / "forecast_demand.csv"
 HORIZON_DAYS = FORECAST_HORIZON_DAYS
+LGBM_NUM_BOOST_ROUND = 100
 
 def load_factory_demand():
     conn = sqlite3.connect(DB_PATH)
@@ -160,7 +161,7 @@ def evaluate_fold_model(model_name, train_data, test_data, horizon):
             "verbose": -1,
             "seed": 42
         }
-        gbm = lgb.train(params, lgb_train, num_boost_round=100)
+        gbm = lgb.train(params, lgb_train, num_boost_round=LGBM_NUM_BOOST_ROUND)
         sim_history = train_data.copy()
         pred_lgb = []
         for step in range(horizon):
@@ -265,7 +266,7 @@ def run_forecast_benchmark(run_id=None):
                 "verbose": -1,
                 "seed": 42
             }
-            gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=120)
+            gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=LGBM_NUM_BOOST_ROUND)
 
             prod_sim = pdf.copy()
             future_preds_list = []
@@ -289,21 +290,33 @@ def run_forecast_benchmark(run_id=None):
             })
 
         # Model Governance / Lineage Standartları (B. Eleştirisi: backtest_wape, backtest_rmse)
-        competing_scores = {
-            m: {
+        competing_scores = {}
+        for m, vals in model_performance.items():
+            competing_scores[m] = {
                 "backtest_wape": round(vals[0], 4),
                 "backtest_rmse": round(vals[1], 2),
-                "backtest_bias": round(vals[2], 2)
+                "backtest_bias": round(vals[2], 2),
+                "fold_metrics": {
+                    f"fold_{f_i + 1}": {
+                        "wape": round(cv_scores[m]["wape"][f_i], 4),
+                        "rmse": round(cv_scores[m]["rmse"][f_i], 2),
+                        "bias": round(cv_scores[m]["bias"][f_i], 2)
+                    }
+                    for f_i in range(num_folds)
+                }
             }
-            for m, vals in model_performance.items()
-        }
 
         best_wape, best_rmse, best_bias = model_performance[best_name]
         backtest_start_dt = str(pdf.iloc[fold_cutoffs[0]]["order_date"])[:10]
         backtest_end_dt = str(pdf.iloc[-1]["order_date"])[:10]
 
         # Denetim / Reproducibility: Kazanan modelin gerçek hiperparametrelerini ve kütüphane sürümünü hazırla
-        cv_spec = {"folds": num_folds, "horizon": HORIZON_DAYS, "cv_type": "rolling_origin_expanding"}
+        cv_spec = {
+    "folds": num_folds,
+    "horizon": HORIZON_DAYS,
+    "cv_type": "rolling_origin_expanding",
+    "fold_metrics": competing_scores[best_name]["fold_metrics"]
+}
         
         if best_name == "LightGBM":
             model_params = {
@@ -314,7 +327,7 @@ def run_forecast_benchmark(run_id=None):
                 "metric": "rmse",
                 "learning_rate": 0.05,
                 "num_leaves": 31,
-                "num_boost_round": 100,
+                "num_boost_round": LGBM_NUM_BOOST_ROUND,
                 "random_seed": 42,
                 "boosting_type": "gbdt"
             }
