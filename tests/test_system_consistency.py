@@ -3,6 +3,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from src.utils.db import get_db_connection
 from src.config import (
     PROCESSED_DATA_DIR,
     SYNTHETIC_DATA_DIR,
@@ -15,7 +16,7 @@ def _load_schedule_data():
     if not db_path.exists():
         return None
     try:
-        conn = sqlite3.connect(db_path)
+        conn = get_db_connection(db_path)
         df = pd.read_sql("SELECT * FROM production_schedule", conn)
         conn.close()
         if not df.empty:
@@ -36,7 +37,7 @@ def test_schedule_makespan_energy_consistency():
     from src.energy.energy_analytics import compute_energy_analytics
 
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     
     # Tablo henüz oluşmamışsa analitiği çalıştırıp tabloyu oluştur
     cur = conn.cursor()
@@ -81,7 +82,7 @@ def test_machine_capacity_consistency():
 
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
     assert db_path.exists(), "factory.db not found"
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
     conn.close()
     w1_cap = cap_df[cap_df["period_week"] == 1]
@@ -117,7 +118,7 @@ def test_carbon_energy_balance():
     from src.energy.energy_analytics import compute_energy_analytics
 
     assert Path(DB_PATH).exists(), f"Veritabani bulunamadi: {DB_PATH}"
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     
     cur = conn.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='energy_machine_kpis'")
@@ -150,7 +151,7 @@ def test_transfer_batching_precedence_and_flow():
     from pathlib import Path
     
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
 
@@ -196,7 +197,7 @@ def test_master_data_database_constraints():
     import pytest
     import src.config as cfg
 
-    conn = sqlite3.connect(cfg.DB_PATH)
+    conn = get_db_connection(cfg.DB_PATH)
     cur = conn.cursor()
 
     # 1. materials.material_id PRIMARY KEY ihlali

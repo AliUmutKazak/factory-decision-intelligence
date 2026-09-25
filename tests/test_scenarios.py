@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import pytest
 import pandas as pd
+from src.utils.db import get_db_connection
 
 import src.config as cfg
 import src.data.preprocessing as prep_mod
@@ -105,7 +106,7 @@ def test_scenario_zero_production(isolated_env, monkeypatch):
     mrp_mod.run_mrp_engine()
     sched_mod.solve_cpsat_schedule()
 
-    conn = sqlite3.connect(isolated_env["db_path"])
+    conn = get_db_connection(isolated_env["db_path"])
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
 
@@ -128,7 +129,7 @@ def test_scenario_expedite_flags(isolated_env, monkeypatch):
     plan_mod.run_planning_pipeline()
     mrp_mod.run_mrp_engine()
 
-    conn = sqlite3.connect(isolated_env["db_path"])
+    conn = get_db_connection(isolated_env["db_path"])
     mrp = pd.read_sql("SELECT * FROM mrp_plan", conn)
     conn.close()
 
@@ -149,7 +150,7 @@ def test_scenario_normal_e2e_reconciliation(isolated_env, monkeypatch):
     energy_mod.compute_energy_analytics()
     carbon_mod.compute_carbon_analytics()
 
-    conn = sqlite3.connect(isolated_env["db_path"])
+    conn = get_db_connection(isolated_env["db_path"])
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     energy = pd.read_sql("SELECT * FROM energy_kpis", conn)
     carbon = pd.read_sql("SELECT * FROM carbon_kpis", conn)
@@ -173,7 +174,7 @@ def test_scenario_capacity_stress(isolated_env, monkeypatch):
     energy_mod.compute_energy_analytics()
     carbon_mod.compute_carbon_analytics()
 
-    conn = sqlite3.connect(isolated_env["db_path"])
+    conn = get_db_connection(isolated_env["db_path"])
     agg_plan = pd.read_sql("SELECT * FROM aggregate_plan", conn)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()

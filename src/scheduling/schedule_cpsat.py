@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 from ortools.sat.python import cp_model
 import src.config as cfg
-
+from src.utils.db import get_db_connection
 from src.config import (
     DB_PATH,
     MRP_EXPEDITE_RELEASE_TIME_MIN,
@@ -34,7 +34,7 @@ def get_initial_machine_states(conn) -> dict:
 
 def run_cpsat_scheduling(sku_plan=None, run_id=None):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     machine_initial_states = get_initial_machine_states(conn)
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
@@ -574,7 +574,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:
         json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
     solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
     conn.close()

@@ -9,12 +9,13 @@ from src.config import (
     DEFAULT_FORKLIFT_LITERS,
     CARBON_PRICE_SCENARIOS_EUR,
 )
+from src.utils.db import get_db_connection
 
 OUTPUT_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_analytics.csv"
 OUTPUT_MACHINE_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_machine_kpis.csv"
 
 def compute_carbon_analytics(run_id=None):
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn).iloc[0]
     machine_kpis_df = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
     conn.close()
@@ -90,7 +91,7 @@ def compute_carbon_analytics(run_id=None):
     carbon_kpis_df.to_csv(OUTPUT_CARBON_PATH, index=False)
     machine_kpis_df.to_csv(OUTPUT_MACHINE_CARBON_PATH, index=False)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="replace")
     machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="replace")
     scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="replace")

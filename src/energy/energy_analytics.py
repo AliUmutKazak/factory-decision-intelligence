@@ -3,12 +3,13 @@ import sqlite3
 import pandas as pd
 import numpy as np
 from src.config import PROCESSED_DATA_DIR, DB_PATH
+from src.utils.db import get_db_connection
 
 OUTPUT_ENERGY_KPI_PATH = PROCESSED_DATA_DIR / "energy_kpis.csv"
 OUTPUT_PROFILE_PATH = PROCESSED_DATA_DIR / "energy_profile_15min.csv"
 
 def load_data():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
     routing_df = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
@@ -25,7 +26,7 @@ def load_data():
     return schedule_df, machines_df
 
 def load_machine_specs() -> dict:
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     df_m = pd.read_sql("SELECT * FROM machines", conn)
     conn.close()
 
@@ -88,7 +89,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
         profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
 
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
         profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
         m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
@@ -121,7 +122,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     # Taktik LP'den makine OT saatlerini oku
     machine_ot_hours = {}
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", conn)
         conn.close()
         for _, r in cap_df.iterrows():
@@ -293,7 +294,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
 
     # Normal calisma SQLite veritabani kayitlari
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
     profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
     m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)

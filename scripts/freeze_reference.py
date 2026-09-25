@@ -18,6 +18,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
+from src.utils.db import get_db_connection
 
 from src.utils.lineage import generate_run_manifest, compute_file_hash
 
@@ -41,7 +42,7 @@ def freeze_reference_atomic():
 
     # 1. Son basarili calismanin run_id ve git_sha bilgisini veritabanindan cek
     db_path = BASE_DIR / "data" / "factory.db"
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     cur = conn.cursor()
     cur.execute("SELECT run_id, git_sha FROM pipeline_runs WHERE status IN ('SUCCESS', 'COMPLETED') ORDER BY timestamp DESC LIMIT 1")
     row = cur.fetchone()

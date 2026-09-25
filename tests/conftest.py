@@ -9,6 +9,7 @@ from pathlib import Path
 from src.config import DB_PATH
 from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
+from src.utils.db import get_db_connection
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_full_pipeline_database():
@@ -17,7 +18,7 @@ def ensure_full_pipeline_database():
     tabloların (energy_kpis, carbon_kpis vb.) mevcut olduğundan emin olur.
     """
     if Path(DB_PATH).exists():
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db_connection(DB_PATH)
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='carbon_kpis'")
         has_carbon = cur.fetchone() is not None

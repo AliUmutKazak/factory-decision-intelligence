@@ -6,7 +6,7 @@ import sqlite3
 import tempfile
 import pandas as pd
 import pytest
-
+from src.utils.db import get_db_connection
 
 @pytest.fixture(scope="module")
 def isolated_db():
@@ -18,7 +18,7 @@ def isolated_db():
     )
     temp_db = os.path.join(temp_dir, "isolated_factory.db")
     shutil.copy2(src_db, temp_db)
-    conn = sqlite3.connect(temp_db)
+    conn = get_db_connection(temp_db)
     yield conn
     conn.close()
     shutil.rmtree(temp_dir)

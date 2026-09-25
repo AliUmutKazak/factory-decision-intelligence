@@ -22,6 +22,7 @@ from src.config import (
     LABOR_COST_OVERTIME_HR,
 )
 from src.utils.lineage import get_active_pipeline_run
+from src.utils.db import get_db_connection
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -36,7 +37,7 @@ def get_table(table_name: str) -> pd.DataFrame:
     if not Path(DB_PATH).exists():
         return pd.DataFrame()
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with get_db_connection(DB_PATH) as conn:
             return pd.read_sql(f"SELECT * FROM {table_name}", conn)
     except Exception:
         return pd.DataFrame()

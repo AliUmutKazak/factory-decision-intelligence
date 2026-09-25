@@ -8,11 +8,12 @@ from src.config import (
     MRP_SERVICE_LEVEL_Z,
     INITIAL_INVENTORY,
 )
+from src.utils.db import get_db_connection
 
 OUTPUT_MRP_PATH = PROCESSED_DATA_DIR / "mrp_plan.csv"
 
 def load_data():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     sku_plan = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     bom = pd.read_sql("SELECT * FROM bom", conn)
     materials = pd.read_sql("SELECT * FROM materials", conn)
@@ -140,7 +141,7 @@ def run_mrp_engine(run_id=None):
 
     mrp_df.to_csv(OUTPUT_MRP_PATH, index=False)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     mrp_df.to_sql("mrp_plan", conn, index=False, if_exists="replace")
     conn.close()
 

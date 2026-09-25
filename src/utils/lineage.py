@@ -288,7 +288,7 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     import src.config as config
     target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
 
-    conn = sqlite3.connect(target_db)
+    conn = get_db_connection(target_db)
     try:
         cur = conn.cursor()
         cur.execute("BEGIN IMMEDIATE TRANSACTION;")

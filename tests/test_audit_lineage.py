@@ -4,6 +4,7 @@ import sqlite3
 import pytest
 import pandas as pd
 from src.config import DB_PATH, BASE_DIR
+from src.utils.db import get_db_connection
 
 DOWNSTREAM_TABLES = [
     "pipeline_runs",
@@ -27,7 +28,7 @@ DOWNSTREAM_TABLES = [
 def db_connection():
     """SQLite veritabanı bağlantı fixture'ı."""
     assert os.path.exists(DB_PATH), f"Veritabanı bulunamadı: {DB_PATH}"
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     yield conn
     conn.close()
 
@@ -132,7 +133,7 @@ def test_frozen_reference_metadata_consistency():
 
     assert "run_id" in ref_metadata, "Reference run_metadata.json dosyasında run_id eksik!"
 
-    with sqlite3.connect(ref_db_path) as conn:
+    with get_db_connection(ref_db_path) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT status, git_sha FROM pipeline_runs WHERE run_id = ?", (ref_metadata["run_id"],))
         row = cursor.fetchone()
@@ -147,7 +148,7 @@ def test_historical_run_retention_policy(tmp_path):
     from datetime import datetime, timedelta
 
     temp_db = str(tmp_path / "test_retention.db")
-    conn = sqlite3.connect(temp_db)
+    conn = get_db_connection(temp_db)
     init_pipeline_runs_table(conn)
     cur = conn.cursor()
 
@@ -166,7 +167,7 @@ def test_historical_run_retention_policy(tmp_path):
     deleted = apply_run_retention_policy(keep_last_n=3, db_path=temp_db)
     assert deleted == 7, f"7 eski koşum silinmeliydi, silinen: {deleted}"
 
-    conn = sqlite3.connect(temp_db)
+    conn = get_db_connection(temp_db)
     cur = conn.cursor()
     cur.execute("SELECT run_id FROM pipeline_runs ORDER BY timestamp ASC")
     remaining = [row[0] for row in cur.fetchall()]
@@ -207,7 +208,7 @@ def test_p0_active_run_isolation_on_failure(tmp_path):
     assert active_before is not None, "Başlangıçta aktif bir koşum olmalı!"
 
     sim_run_id = f"RUN-FAIL-SIM-{uuid.uuid4().hex[:6]}"
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     try:
         # Simülasyon: Başarısız bir run kaydı açılıyor
         conn.execute(

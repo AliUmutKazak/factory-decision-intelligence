@@ -10,6 +10,7 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import pulp
+from src.utils.db import get_db_connection
 
 from src.config import (
     DB_PATH,
@@ -30,7 +31,7 @@ OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
 OUTPUT_MACHINE_CAPACITY_PATH = PROCESSED_DATA_DIR / "machine_capacity_plan.csv"
 
 def load_data():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     forecast_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
     products_df = pd.read_sql("SELECT * FROM products", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
@@ -507,7 +508,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
     final_sku_plan.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
     final_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     final_family_plan.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
     final_sku_plan.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
     final_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")

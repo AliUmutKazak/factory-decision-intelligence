@@ -10,6 +10,8 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+from src.utils.db import get_db_connection
+
 from src.config import (
     DB_PATH,
     PROCESSED_DATA_DIR,
@@ -20,7 +22,7 @@ from src.config import (
 @pytest.fixture(scope="module")
 def db_conn():
     assert DB_PATH.exists(), f"Veritabanı bulunamadı: {DB_PATH}"
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     yield conn
     conn.close()
 

@@ -19,7 +19,7 @@ HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100
 
 def load_factory_demand():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection(DB_PATH)
     query = """
         SELECT order_date, product_id, order_qty as demand
         FROM orders

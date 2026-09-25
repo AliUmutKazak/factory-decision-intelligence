@@ -15,13 +15,12 @@ from src.config import (
     AGGREGATE_MAX_OVERTIME_HOURS,
     AGGREGATE_INITIAL_INVENTORY,
 )
+from src.utils.db import get_db_connection
 
-def get_db_connection():
-    return sqlite3.connect(DB_PATH)
 
 def test_aggregate_inventory_balance():
     """Hax & Meal Envanter Denge Kısıtı Doğrulaması: I_t - B_t == I_{t-1} - B_{t-1} + P_t - D_t"""
-    conn = get_db_connection()
+    conn = get_db_connection(DB_PATH)
     plan_df = pd.read_sql("SELECT * FROM aggregate_plan ORDER BY family_id, period_week", conn)
     conn.close()
 
@@ -192,7 +191,7 @@ def test_family_to_sku_disaggregation_reconciliation():
     import os
     import sqlite3
     db_path = os.path.join("data", "factory.db")
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     family_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
     sku_df = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     conn.close()
@@ -280,7 +279,7 @@ def test_hierarchical_capacity_decomposition():
 
     db_path = os.path.join("data", "factory.db")
     assert os.path.exists(db_path), "factory.db veritabani dosyasi bulunamadi"
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
     sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
@@ -334,7 +333,7 @@ def test_explicit_setup_intervals_physical_integrity():
     db_path = os.path.join("data", "factory.db")
     if not os.path.exists(db_path):
         return
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     df = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
 
@@ -359,7 +358,7 @@ def test_forecast_model_lineage_governance():
     import sqlite3
     
     db_path = os.path.join("data", "factory.db")
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     lineage_df = pd.read_sql("SELECT * FROM forecast_model_lineage", conn)
     conn.close()
 
@@ -389,7 +388,7 @@ def test_schedule_solver_metadata_governance():
     import sqlite3
 
     db_path = os.path.join("data", "factory.db")
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection(db_path)
     solver_df = pd.read_sql("SELECT * FROM schedule_solver_metadata", conn)
     conn.close()
 
@@ -416,7 +415,7 @@ def test_batch_conservation_invariant():
     production_units == batch_count * batch_size (veya batch_qty * batch_size)
     """
     import src.config as cfg
-    conn = sqlite3.connect(cfg.DB_PATH)
+    conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
 
@@ -440,7 +439,7 @@ def test_energy_schedule_production_units_conservation():
     operasyonel çizelgedeki ilk operasyonun tamamlanan toplam adedi tam eşit olmalıdır.
     """
     import src.config as cfg
-    conn = sqlite3.connect(cfg.DB_PATH)
+    conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
     conn.close()
@@ -471,7 +470,7 @@ def test_variable_energy_exact_physics_sum():
     sum(production_units * variable_kwh_per_unit) formülüne birebir uyduğunu doğrular.
     """
     import src.config as cfg
-    conn = sqlite3.connect(cfg.DB_PATH)
+    conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     routing = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
     energy_machines = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
