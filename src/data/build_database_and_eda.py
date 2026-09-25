@@ -317,13 +317,16 @@ def initialize_database(force_recreate=False, run_id=None):
         )
     """)
 
+    # Denetim Madde 22: Tezgâh bağımlı hazırlık matrisi (machine_id opsiyonel bileşik anahtar)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS changeover_matrix (
+            machine_id TEXT DEFAULT NULL,
             from_product TEXT NOT NULL,
             to_product TEXT NOT NULL,
             setup_time_min REAL NOT NULL,
             setup_cost REAL,
-            PRIMARY KEY (from_product, to_product),
+            PRIMARY KEY (machine_id, from_product, to_product),
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id),
             FOREIGN KEY (from_product) REFERENCES products(product_id),
             FOREIGN KEY (to_product) REFERENCES products(product_id)
         )

@@ -70,13 +70,22 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         time_candidates = [c for c in changeover_df.columns if "time" in c]
         time_col = time_candidates[0] if time_candidates else [c for c in changeover_df.columns if c not in (f_col, t_col)][0]
 
+    has_mid_col = "machine_id" in changeover_df.columns
     for _, row in changeover_df.iterrows():
         f_p = row[f_col]
         t_p = row[t_col]
-        # Sezgisel saat/dakika dönüşümü kaldırıldı; değer doğrudan dakika kabul edilir
         s_val = int(round(float(row[time_col])))
-        for m in machines:
-            setup_dict[(m, f_p, t_p)] = s_val
+        row_mid = row["machine_id"] if has_mid_col and pd.notna(row.get("machine_id")) else None
+
+        # Denetim Madde 22: Tezgâh bağımlı setup (machine_id, from_product, to_product)
+        # Eğer makine belirtilmişse yalnızca o makineye, belirtilmemişse genel varsayılan olarak tüm makinelere atanır
+        if row_mid and row_mid in machines:
+            setup_dict[(row_mid, f_p, t_p)] = s_val
+        else:
+            for m in machines:
+                # Makineye özel bir kural daha önce yazılmamışsa genel değeri uygula
+                if (m, f_p, t_p) not in setup_dict:
+                    setup_dict[(m, f_p, t_p)] = s_val
 
     # -------------------------------------------------------------
     # Closed-Loop MRP -> CP-SAT: Dinamik Malzeme Hazır Oluş Zamanı
