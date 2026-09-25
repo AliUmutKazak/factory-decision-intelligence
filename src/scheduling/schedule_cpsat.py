@@ -331,40 +331,82 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         #                     00:00-08:00 (8h Explicit OT Penceresi) -> 6 x 8 = 48h Max OT
         # Pazar (Gün 6, 13..): 24h Kesin Kapalı Duruş / Bakım (Hard Break)
         # ---------------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # P0 DÜZELTMESİ: Hafta Bazlı Sert OT Bütçe Kısıtı (Solver-Enforced OT Budget)
+        # ---------------------------------------------------------------------
         break_intervals = []
         allowed_ot_min = int(machine_ot_hours.get(str(mid), 0.0) * 60)
         total_days = (horizon // 1440) + 2
 
-        # Pazar günleri ve planlı duruşlar kesin kapalıdır
+        # Hafta bazlı gece OT kullanımını biriktirmek için sözlük: {hafta_indeksi: [ot_kullanildi_boolean_değişkenleri]}
+        week_ot_active_vars = {}
+
         for day in range(total_days):
             day_of_week = day % 7
+            week_idx = day // 7
+
             if day_of_week == 6:
-                # Pazar günü tam gün (24 saat) kapalı
+                # Pazar günü: 24 saat kesin kapalı duruş (Hard Break)
                 sun_start = day * 1440
-                sun_dur = 24 * 60
-                sun_end = sun_start + sun_dur
                 if sun_start < horizon:
-                    sun_int = model.NewIntervalVar(
-                        sun_start,
-                        min(sun_dur, max(0, horizon - sun_start)),
-                        min(sun_end, horizon),
-                        f"sunday_break_{mid}_d{day}"
-                    )
-                    break_intervals.append(sun_int)
-            else:
-                # Eğer makineye taktik LP hiç fazla mesai (OT) vermemişse gece pencereleri kapalıdır.
-                # Eğer OT verilmişse gece pencereleri (00:00-08:00) açık mesai alanı olarak kullanılabilir.
-                if allowed_ot_min == 0:
-                    night_start = day * 1440
-                    night_dur = 8 * 60
-                    if night_start < horizon:
-                        n_int = model.NewIntervalVar(
-                            night_start,
-                            min(night_dur, max(0, horizon - night_start)),
-                            min(night_start + night_dur, horizon),
-                            f"night_break_closed_{mid}_d{day}"
+                    sun_end = min(sun_start + 1440, horizon)
+                    sun_dur = sun_end - sun_start
+                    if sun_dur > 0:
+                        sun_int = model.NewIntervalVar(
+                            sun_start,
+                            sun_dur,
+                            sun_end,
+                            f"sunday_break_{mid}_d{day}"
                         )
-                        break_intervals.append(n_int)
+                        break_intervals.append(sun_int)
+            else:
+                # Pazartesi - Cumartesi: Gece penceresi (00:00 - 08:00) = 480 dakika
+                night_start = day * 1440
+                if night_start < horizon:
+                    night_end = min(night_start + 8 * 60, horizon)
+                    night_dur = night_end - night_start
+                    if night_dur > 0:
+                        if allowed_ot_min <= 0:
+                            # LP bu makineye hiç OT vermediyse gece penceresi kesin kapalıdır
+                            n_int = model.NewIntervalVar(
+                                night_start,
+                                night_dur,
+                                night_end,
+                                f"night_break_closed_{mid}_d{day}"
+                            )
+                            break_intervals.append(n_int)
+                        else:
+                            # LP bütçe verdiyse: Gece penceresi koşullu duruştur.
+                            # is_ot_closed = 1 ise gece KAPALIDIR (üretim yapılamaz, OT tüketilmez)
+                            # is_ot_closed = 0 ise gece AÇIKTIR (üretim yapılabilir, 480 dk OT bütçesinden harcanır)
+                            is_ot_closed = model.NewBoolVar(f"ot_closed_{mid}_d{day}")
+                            opt_break = model.NewOptionalIntervalVar(
+                                night_start,
+                                night_dur,
+                                night_end,
+                                is_ot_closed,
+                                f"opt_night_break_{mid}_d{day}"
+                            )
+                            break_intervals.append(opt_break)
+
+                            # Gece açıldıysa (is_ot_active = 1 - is_ot_closed)
+                            is_ot_active = model.NewBoolVar(f"ot_active_{mid}_d{day}")
+                            model.Add(is_ot_active + is_ot_closed == 1)
+
+                            if week_idx not in week_ot_active_vars:
+                                week_ot_active_vars[week_idx] = []
+                            week_ot_active_vars[week_idx].append(is_ot_active)
+
+        # SERT MATEMATİKSEL KISIT (P0 Solver Enforced Overtime Limit):
+        # Hafta 1 için toplam açılan gece süresi <= allowed_ot_min olmalıdır!
+        # Spillover haftaları (week_idx > 0) için LP bütçesi yoksa gece açılamaz.
+        for w_idx, act_vars in week_ot_active_vars.items():
+            if w_idx == 0:
+                # 1. Hafta: LP'den gelen bütçe kısıtı
+                model.Add(sum(act_vars) * 480 <= allowed_ot_min)
+            else:
+                # 2. Hafta ve sonrası (Spillover): İkincil bütçe atanmadığı sürece gece pencereleri açılamaz
+                model.Add(sum(act_vars) == 0)
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
