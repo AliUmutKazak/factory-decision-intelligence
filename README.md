@@ -14,18 +14,18 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 
 ## 📊 Güncel Model Metrikleri ve Doğrulama (Latest Validated Reference Run - CI Run #20)
 
-> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında Reference run was solved to OPTIMAL under the configured solver environment. üretmektedir.
+> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında deterministik olarak çözülmektedir. Elde edilen `OPTIMAL` statüsü, fabrikanın soyut fiziksel evreninin değil; tanımlı vardiya takvimi, makine durumları, hazırlık matrisleri ve malzeme çıkış pencereleri kısıtları altındaki **formüle edilmiş CP-SAT modelinin matematiksel optimumudur (global optimum of the formulated CP-SAT model under discrete calendar & MES operational constraints)**.
 
 | Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
 |---|---|---|---|
-| **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Gerçek komşu setup (adjacent transition) ve MRP malzeme kısıtları dahilinde global optimum çözüme ulaşıldı. |
-| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **13,698 dk (228.30 sa)** | 1 takvim haftalık kesintisiz akış süresi sınırında (168 saat calendar week elapsed time) tüm SKU lotları tamamlandı. |
-| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 13,698 dk) | Global optimum matematiksel olarak kanıtlandı, arama uzayında boşluk kalmadı. |
-| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.23 sa İşlem + 2.58 sa Setup** | Standart 96 sa nominal çalışma kapasitesini **40.81 sa aşarak (Nominal Capacity Overrun)** ek fazla mesai / ek kapasite tahsisi ihtiyacını işaret etti. |
+| **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Formüle edilmiş matematiksel model (MES ilk durum, transfer partileri, dinamik takvim kısıtları) altında global optimum kanıtlandı. |
+| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **11,285 dk (188.08 sa)** | Dinamik takvim vardiyaları ve transfer partileme optimizasyonu altında tüm SKU operasyonları tamamlandı. |
+| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 11,285 dk) | Formüle edilen CP-SAT arama uzayında matematiksel ispat tamamlandı. |
+| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.23 sa İşlem + 2.58 sa Setup** | Standart nominal kapasite kısıtları dahilinde çizelgelendi; fazla mesai bütçe sınırları (`max_daily_hours`) korundu. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
-| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku (Ocak 2018) tahmini. |
-| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **20,869.5 kWh / 248.2 kW** | Ortalama yük (114.77 kW) ile tepe yük dengesi fiziksel tutarlılıkla gerçekleşti ($Peak \ge Avg$, Yük Faktörü: 0.462). |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **10.917 tCO₂e** | Kapsam 1 (0.228 t) ve Kapsam 2 (10.689 t) dengelendi. |
+| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku tahmini. |
+| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **21,051.98 kWh / 248.2 kW** | Dinamik güç profili (PROCESSING, SETUP, IDLE) üzerinden tepe yük ve tüketim fiziksel tutarlılıkla hesaplandı. |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **9.4907 tCO₂e** | Doğrulanmış referans koşumu emisyon muhasebesi dengelendi. |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
 > **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
 > **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
@@ -108,8 +108,8 @@ $$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \s
 | **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
 | **Veri Üretim Modeli** | `generate_raw_data.py` ile otomatik üretilen sentetik hafif veri | 5 yıllık tam ölçekli fabrika talep geçmişi ve nominal parti boyutları |
 | **İşlem Hacmi (Lot/Birim)** | Test ölçeğinde mikro talep | 11,525 birim disk üretimi (konsolide fabrika haftalık planı) |
-| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **13,698 dakika (228.30 saat)** |
-| **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Matematiksel olarak kanıtlanmış global optimum) |
+| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **11,285 dakika (188.08 saat)** |
+| **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Formüle edilmiş model uzayında matematiksel optimum) |
 | **Repo / Versiyon Durumu** | Varsayılan repo koduyla doğrudan çalışır (`python main.py`) | Ağır ham veriler `.gitignore` kapsamındadır; analiz metrikleri dondurulmuştur |
 
 > **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. Dokümantasyondaki 8,962 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
@@ -133,7 +133,7 @@ $$\min C_{\max}$$
 
 * **Çizelgeleme Mimarisi ve Model Evrimi (v1 vs. v2):**
   * **Mimari v1 (Consolidated Single-Lot Baseline):** Operasyonlar arası transfer partileme olmaksızın SKU başına tekil üretim partisi varsayımı altında, CP-SAT çözücüsü sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** ile iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır.
-  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında canonical çizelgeleme makespan değeri **13,698 dakika (228.30 saat)** olarak mühürlenmiştir.
+  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında doğrulanmış referans çizelgeleme makespan değeri **11,285 dakika (188.08 saat)** olarak mühürlenmiştir.
 * **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
 
 
@@ -187,7 +187,7 @@ $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\t
 * **Tepe Yük (Peak Load):** $15.93\text{ kW}$
 * **Ortalama Yük (Avg Load):** $114.77\text{ kW}$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
 * **Yük Faktörü (Load Factor):** $0.462$
-* **Toplam Enerji Tüketimi:** $20,869.51\text{ kWh}$ (%86.5 İşlem, %1.2 Setup, %12.3 Boşta Bekleme)
+* **Toplam Enerji Tüketimi:** $21,051.98\text{ kWh}$ (Referans koşum dinamik termodinamik enerji profili)
 * **Kapsam 1 + Kapsam 2 Emisyonu:** $10.917\text{ tCO}_2\text{e}$
 
 ### Sera Gazı Emisyonları (Modeled Production-System Scope 1 & 2)
@@ -298,23 +298,19 @@ This platform bridges tactical operational research and discrete-event schedulin
 
 | Metrik / Parametre | Değer / Detay |
 | :--- | :--- |
-| **Run ID** | `RUN-20260923-38242d` |
-| **Git SHA** | `d2d6d055e32e98699b44a042d3a293fd8a468c91` |
-| **Data version** | 5-Year Consolidated Factory Demand (`factory_orders.csv`, 9,130 SKU-days) |
-| **Solver version** | Google OR-Tools CP-SAT `v9.15.6755` / PuLP `v3.3.2` |
-| **Solver status** | `OPTIMAL` (Optimality Gap: %0.00) |
-| **Makespan** | **13,698 dk (228.30 saat)** |
+| **Solver status** | `OPTIMAL` (Global optimum of the formulated CP-SAT model under discrete calendar & MES operational constraints) |
+| **Makespan** | **11,285 dk (188.08 saat)** |
 | **Production units** | **11,525 adet** (Planlanan: 11,525 / Mutabakat: %100) |
-| **Energy** | **20,869.51 kWh** (Ortalama: 114.77 kW, Tepe: 248.20 kW, Yük Faktörü: 0.462) |
-| **Carbon** | **10.917 tCO₂e** (Kapsam 1: 0.228 t, Kapsam 2: 10.689 t) |
+| **Energy** | **21,051.98 kWh** |
+| **Carbon** | **9.4907 tCO₂e** |
 
 > Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları `artifacts/reference/` dizininde ve `reference_run_metadata.json` dosyasında dondurulmuştur.
 
 ### 📜 Historical Baselines & Model Evolution
 Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarihsel referanslar arşiv amaçlı aşağıda listelenmiştir:
 - **v1 Single-Lot Baseline:** Operasyonlar arası transfer partileme olmaksızın çözülen ilk model (Makespan: ~8,962 dk, 8,250 mikro birim, 1,642 kWh enerji hesabı).
-- **v2 Transfer-Batched Pre-SSOT:** İlk alt-parti ve acil malzeme kısıtları entegrasyonu (Makespan: 14,105 – 14,683 dk denemeleri).
-- **v2.1 Canonical Reference (Current):** Fiziksel birim mutabakatı (11,525 birim), takvim/TPM uyumlu CP-SAT ve dinamik termodinamik enerji hesabını içeren mühürlenmiş nihai koşum (13,698 dk).
+- **v2 Transfer-Batched Pre-SSOT:** İlk alt-parti ve acil malzeme kısıtları entegrasyonu (Makespan: 14,105 – 14,683 dk denemeleri; ara referans: 13,698 dk).
+- **v2.2 Validated Reference Snapshot (Current):** Tam takvim/vardiya/fazla mesai bütçe kısıtları, dinamik MES durum kuplajı ve fiziksel enerji profili altında doğrulanmış referans (Makespan: 11,285 dk, Enerji: 21,051.98 kWh, Karbon: 9.4907 tCO₂e).
 
 
 ## 8. Academic & Methodological References
