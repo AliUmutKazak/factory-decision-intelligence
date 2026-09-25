@@ -1,75 +1,75 @@
 {
   "version": "1.0",
   "description": "Deterministic canonical baseline reference artifacts",
-  "run_id": "RUN-20260924-98561d",
-  "git_sha": "8ed15c16993c1441c73980dde4da679f819bb254",
+  "run_id": "RUN-20260925-a24f70",
+  "git_sha": "34131ebf0b3987215b9a3520438cbceac13b29f4",
   "files": {
     "aggregate_plan.csv": {
-      "sha256": "64a7df7cad6d6ecf8552fde2028bfefe280a338711eea73a7bc0d892bd59fbfa",
+      "sha256": "e4a78f6afc9a123211ece658d764b860d77253c4feed4140948883368dde65ee",
       "bytes": 545
     },
     "carbon_analytics.csv": {
-      "sha256": "6acb569cd2182957af35cc2f860d70b04a9ee6dfaecf3e4b283b651ef5d8be01",
+      "sha256": "11582d16a7d4c47e9064a95ba78d6524458e10c13a9677389ddc1c5342949257",
       "bytes": 113
     },
     "carbon_machine_kpis.csv": {
-      "sha256": "3106d53ee452f199fa19f203197c09aa862eda358c95851796cad1b8e939db57",
-      "bytes": 512
+      "sha256": "adc69718ed72fe35f85cd297882c1250283ace8b99db3cdc2d19b5a20a156540",
+      "bytes": 510
     },
     "energy_kpis.csv": {
-      "sha256": "02010101ec75f0150287a1bd9da5930e9d360dfe15a78dada05651ff50dbdbfc",
-      "bytes": 238
+      "sha256": "00cc6ea3fc13002016f58a7f958ed7512ff05d810ab4c4fa881ff7ea72472796",
+      "bytes": 240
     },
     "energy_profile_15min.csv": {
-      "sha256": "1f4882f456dcb3914511287ab0c831a0917e74f90bab77537667ef325b48b543",
-      "bytes": 35672
+      "sha256": "2983354abe0eb5e519ea08e3944fd251fb69aff4a7301c896f9f731dc0187583",
+      "bytes": 35828
     },
     "factory.db": {
-      "sha256": "9cc1ebffec3eb3d9ddac6c5291ea51e86cfeaf2418173cb9f8d1f5c78640bf2f",
-      "bytes": 466944
+      "sha256": "13969b9435ae367c9af9b1c892a2c3c95e9126e90bc9cfcf72cf56765fdebc43",
+      "bytes": 495616
     },
     "factory_orders.csv": {
       "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
       "bytes": 285342
     },
     "forecast_demand.csv": {
-      "sha256": "835fe808d813522e6048b9944af2e978cf1eb1425de87c9b6479333c1411875a",
+      "sha256": "c711723f9740545dad789bdab830166086c87bc1d509e5d6a6598c97fa79ec15",
       "bytes": 7032
     },
     "forecast_model_lineage.csv": {
-      "sha256": "c53cd3d1fb3999064d9108199709b2cf89265549cf6a297b76a4e0af691de5f8",
-      "bytes": 4296
+      "sha256": "c294995407bccb377a37d73b1b8584c491d7d86aa27c2947610590ff91667cdb",
+      "bytes": 5435
     },
     "forecast_model_metadata.json": {
-      "sha256": "501710890443708245904ff729c691762fbcc5dc5abfdf85843970c763619bb8",
-      "bytes": 6133
+      "sha256": "974b1d94af833cd41483a5010c14cf18589bb43bc2762c15198ce5b58a45a0eb",
+      "bytes": 7272
     },
     "machine_capacity_plan.csv": {
-      "sha256": "900ea495a8abc279d13b2e192b86719404996fdb95d1f851818ba99e0d523f0a",
+      "sha256": "e86e066781104d35de42491f30454f2b5ee8fb5fb5b16bd73d00a2f871d04b47",
       "bytes": 895
     },
     "mrp_plan.csv": {
-      "sha256": "6ecbd3c48eaf87111f1c66e3e09de3442614200c2acfa057f320355e331f8c8e",
+      "sha256": "2eeecf1d98c9b037db04d0de866c30365b5602a3005a93b4c8fd31a31be6c301",
       "bytes": 2059
     },
     "production_schedule.csv": {
-      "sha256": "e048bb183cd0b62cadadc6c174d0bdef33f217747d77bd95332be3088ca5c5e8",
-      "bytes": 2855
+      "sha256": "31569b034bded8632efe061da2053acfd86cb891dfaedfbc8b02e0516d4a4a3a",
+      "bytes": 3329
     },
     "run_metadata.json": {
-      "sha256": "21ac40233a98f9ea3e0ca623eb850cc6c7b49fa64738b4fa77a755e8de3d28e5",
-      "bytes": 717
+      "sha256": "2fa38b33d0e507a2a7e5339367223c4d87ee7030d814e003cc8ae626fff135df",
+      "bytes": 952
     },
     "schedule_solver_metadata.csv": {
-      "sha256": "be8f7bd498754b544aa016ffdd964d982cc758504853d8c152758ee5e62a55d0",
-      "bytes": 366
+      "sha256": "506fdc378f2c65d27487503e4a8b6ecd08fb5339bc4288d7cb5e1d03fa62d2cd",
+      "bytes": 498
     },
     "schedule_solver_metadata.json": {
-      "sha256": "aec20405c9d9e460274fe8bbd24a578cbf9358225fcc593c8a7dbe87feadd562",
-      "bytes": 442
+      "sha256": "b7525de9223a5756c27af702198feab20a9c4d66c14afbbb4e090718fc53e309",
+      "bytes": 604
     },
     "sku_production_plan.csv": {
-      "sha256": "4c1444afafd466566e14f84380fc814fd1f02adadab47675c87b4606e91b9975",
+      "sha256": "9c2ef20b38f10e48583c52d525f5e64c7e76811e1579a21f5743f724be795cc3",
       "bytes": 1016
     }
   }

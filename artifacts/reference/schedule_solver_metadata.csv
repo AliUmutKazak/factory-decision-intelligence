@@ -1,2 +1,2 @@
-solver_name,solver_status,is_optimal,objective_value_min,best_bound_min,optimality_gap_pct,solve_time_seconds,configured_num_search_workers,effective_num_search_workers,num_workers,random_seed,max_time_in_seconds,tasks_scheduled,total_scheduled_units,run_id
-Google OR-Tools CP-SAT,OPTIMAL,True,11285.0,11285.0,0.0,5.7321,8,8,8,42,30.0,29,21925,RUN-20260924-98561d
+solver_name,solver_status,is_optimal,objective_value_min,best_bound_min,optimality_gap_pct,solve_time_seconds,configured_num_search_workers,effective_num_search_workers,num_workers,random_seed,max_time_in_seconds,tasks_scheduled,total_scheduled_units,week_1_horizon_min,cross_week_spillover_min,cross_week_execution_allowed,execution_policy,run_id
+Google OR-Tools CP-SAT,OPTIMAL,True,11285.0,11285.0,0.0,5.9203,8,8,8,42,30.0,29,21925,10080,1205,1,CROSS_WEEK_SPILLOVER_ALLOWED,RUN-20260925-a24f70
