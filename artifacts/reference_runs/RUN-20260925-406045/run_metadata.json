@@ -1,0 +1,29 @@
+{
+    "run_id": "RUN-20260925-406045",
+    "run_timestamp": "2026-09-25T20:46:55.341056",
+    "git_sha": "e3d833755fba79e473eb1ee03ac105d6fcd4c846",
+    "data_source": "data/processed/factory_orders.csv",
+    "forecast_origin": "2017-12-31",
+    "forecast_method": "Hybrid_Backtest_Selection",
+    "selected_models": {
+        "P01": "LightGBM",
+        "P02": "Holt-Winters",
+        "P03": "LightGBM",
+        "P04": "LightGBM",
+        "P05": "LightGBM"
+    },
+    "config_hash": "cf15974b475b883b",
+    "status": "COMPLETED",
+    "orders_count": 9130,
+    "environment": {
+        "python_version": "3.11.16",
+        "pandas_version": "3.0.5",
+        "ortools_version": "9.15.6755",
+        "pulp_version": "3.3.2"
+    },
+    "optimization_metrics": {
+        "aggregate_lp_status": "OPTIMAL",
+        "cpsat_solver_status": "OPTIMAL_OR_FEASIBLE",
+        "notes": "End-to-end execution completed successfully"
+    }
+}

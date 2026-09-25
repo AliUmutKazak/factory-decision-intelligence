@@ -1,0 +1,20 @@
+{
+  "solver_name": "Google OR-Tools CP-SAT",
+  "solver_status": "OPTIMAL",
+  "is_optimal": true,
+  "objective_value_min": 11285.0,
+  "best_bound_min": 11285.0,
+  "optimality_gap_pct": 0.0,
+  "solve_time_seconds": 7.7285,
+  "configured_num_search_workers": 8,
+  "effective_num_search_workers": 8,
+  "num_workers": 8,
+  "random_seed": 42,
+  "max_time_in_seconds": 30.0,
+  "tasks_scheduled": 29,
+  "total_scheduled_units": 21925,
+  "week_1_horizon_min": 10080,
+  "cross_week_spillover_min": 1205,
+  "cross_week_execution_allowed": 1,
+  "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED"
+}

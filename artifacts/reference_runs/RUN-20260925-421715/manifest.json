@@ -1,0 +1,26 @@
+{
+  "run_id": "RUN-20260925-421715",
+  "git_sha": "e3d833755fba79e473eb1ee03ac105d6fcd4c846",
+  "timestamp": "2026-09-25T20:42:09.083572",
+  "files": {
+    ".gitkeep": "e3b0c44298fc1c14",
+    "aggregate_plan.csv": "2f605d3d7590b345",
+    "carbon_analytics.csv": "6824ec9959d0570e",
+    "carbon_machine_kpis.csv": "2be378adc983314c",
+    "energy_kpis.csv": "188e87fa8c6d0bf5",
+    "energy_profile_15min.csv": "47097e05125e5e4f",
+    "factory.db": "dc8ac188d64886cc",
+    "factory_orders.csv": "97dba5a6cf430c26",
+    "forecast_demand.csv": "7d510f2749559a96",
+    "forecast_model_lineage.csv": "d9b74d71905e6a60",
+    "forecast_model_metadata.json": "974b1d94af833cd4",
+    "machine_capacity_plan.csv": "2a84815bb159a1aa",
+    "mrp_plan.csv": "30cbb76902931e6f",
+    "production_schedule.csv": "2f3f679a6a12b5d7",
+    "reference_run_metadata.json": "62936c80c6463bad",
+    "run_metadata.json": "09b049865ef8eeb5",
+    "schedule_solver_metadata.csv": "6b6d8066f84b7545",
+    "schedule_solver_metadata.json": "be8c97db5ea0ff82",
+    "sku_production_plan.csv": "c191aed2589d600b"
+  }
+}

@@ -1,0 +1,2 @@
+makespan_hours,total_units_produced,processing_kwh,setup_kwh,idle_kwh,grand_total_kwh,kwh_per_unit,avg_load_kw,peak_load_kw,load_factor,run_id
+188.1,8300,20944.8333,15.9133,91.2722,21052.0188,2.536,111.93,246.95,0.453,RUN-20260925-2f9062
