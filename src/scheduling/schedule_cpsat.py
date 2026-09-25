@@ -562,6 +562,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "cross_week_spillover_min": max(0, int(obj_val - (7 * 24 * 60))),
         "cross_week_execution_allowed": 1,
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
+        "objective_type": "MINIMIZE_MAKESPAN",
+        "operational_objectives_backlog": "TARDINESS_OT_SETUP_PRIORITY",
     }]
 
     if run_id:
