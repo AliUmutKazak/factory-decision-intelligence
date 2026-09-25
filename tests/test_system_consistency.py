@@ -269,6 +269,9 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     temp_db = str(tmp_path / "test_boundary.db")
     monkeypatch.setenv("FACTORY_DB_PATH", temp_db)
     monkeypatch.setattr(config, "DB_PATH", temp_db)
+    import src.utils.lineage as lineage_mod
+    temp_metadata_path = tmp_path / "run_metadata.json"
+    monkeypatch.setattr(lineage_mod, "METADATA_JSON_PATH", temp_metadata_path)
 
     conn = sqlite3.connect(temp_db)
     init_pipeline_runs_table(conn)

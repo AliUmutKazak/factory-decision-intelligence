@@ -79,31 +79,66 @@ def test_downstream_run_id_matches_pipeline_runs(db_connection):
                 f"Tablodaki run_id ({run_id}) pipeline_runs tablosunda bulunamadı (Orphan Record): {table}"
             )
 
-def test_run_metadata_report_consistency(db_connection):
-    """run_metadata.json dosyasının veritabanındaki son çalıştırma ile tutarlılığını doğrular."""
+def test_runtime_run_metadata_consistency(db_connection):
+    """
+    Runtime Validation:
+    Canlı pipeline çıktısı olan reports/run_metadata.json dosyasının
+    mevcut runtime DB (data/factory.db) ile tutarlılığını doğrular.
+    """
     metadata_path = BASE_DIR / "reports" / "run_metadata.json"
-    if not metadata_path.exists():
-        metadata_path = BASE_DIR / "artifacts" / "reference" / "run_metadata.json"
+    cursor = db_connection.cursor()
 
+    # 1. Runtime DB'deki son resmi/aktif koşumu al
+    cursor.execute(
+        "SELECT run_id, status FROM pipeline_runs "
+        "WHERE run_id NOT LIKE 'RUN-TEST-%' AND run_id NOT LIKE 'RUN-FAIL-%' "
+        "ORDER BY timestamp DESC LIMIT 1"
+    )
+    latest_db_run = cursor.fetchone()
+    assert latest_db_run is not None, "Runtime DB'de geçerli bir pipeline_run kaydı bulunamadı!"
+    assert latest_db_run[1] in ("SUCCESS", "COMPLETED"), f"Runtime DB status geçerli değil: {latest_db_run[1]}"
+
+    # 2. Metadata JSON varsa doğrula
     if metadata_path.exists():
         with open(metadata_path, "r", encoding="utf-8") as f:
             metadata = json.load(f)
 
         assert "run_id" in metadata, "run_metadata.json dosyasında run_id eksik!"
-        cursor = db_connection.cursor()
-        cursor.execute("SELECT status, git_sha FROM pipeline_runs WHERE run_id = ?", (metadata["run_id"],))
+        json_run_id = metadata["run_id"]
+
+        # Eğer dosya sentetik değilse DB ile birebir eşleşmeli
+        if not json_run_id.startswith(("RUN-TEST-", "RUN-FAIL-")):
+            cursor.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (json_run_id,))
+            row = cursor.fetchone()
+            assert row is not None, f"Runtime DB'de JSON'daki run_id bulunamadı: {json_run_id}"
+            assert row[0] in ("SUCCESS", "COMPLETED"), f"Runtime DB status geçerli değil: {row[0]}"
+
+
+def test_frozen_reference_metadata_consistency():
+    """
+    Reference Validation:
+    artifacts/reference/run_metadata.json dosyasının, dondurulmuş
+    referans veritabanı (artifacts/reference/factory.db) ile kapalı devre tutarlılığını doğrular.
+    """
+    ref_dir = BASE_DIR / "artifacts" / "reference"
+    ref_metadata_path = ref_dir / "run_metadata.json"
+    ref_db_path = ref_dir / "factory.db"
+
+    if not ref_metadata_path.exists() or not ref_db_path.exists():
+        pytest.skip("Frozen reference snapshot mevcut değil, test atlanıyor.")
+
+    with open(ref_metadata_path, "r", encoding="utf-8") as f:
+        ref_metadata = json.load(f)
+
+    assert "run_id" in ref_metadata, "Reference run_metadata.json dosyasında run_id eksik!"
+
+    with sqlite3.connect(ref_db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, git_sha FROM pipeline_runs WHERE run_id = ?", (ref_metadata["run_id"],))
         row = cursor.fetchone()
 
-        # CI ortamında runtime DB yeni bir koşum üretmişse son tamamlanan koşumu doğrula
-        if row is None:
-            cursor.execute("SELECT run_id, status FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
-            latest_row = cursor.fetchone()
-            if latest_row is not None:
-                assert latest_row[1] in ("SUCCESS", "COMPLETED")
-                return
-
-        assert row is not None, f"JSON'daki run_id veritabanında bulunamadı: {metadata.get('run_id')}"
-        assert row[0] in ("SUCCESS", "COMPLETED"), f"DB status beklenen formatta değil: {row[0]}"
+    assert row is not None, f"Frozen reference DB'de referans run_id bulunamadı: {ref_metadata.get('run_id')}"
+    assert row[0] in ("SUCCESS", "COMPLETED"), f"Frozen reference DB status geçerli değil: {row[0]}"
 
 def test_historical_run_retention_policy(tmp_path):
     """Denetim Kapı 5: En güncel N koşumun korunduğunu ve eski koşumların temizlendiğini doğrular."""

@@ -1,0 +1,1 @@
+{\`n  "reference_run": "post-lp-fix",\`n  "solver_status": "OPTIMAL",\`n  "makespan_min": 8962,\`n  "energy_kwh": 20853.01,\`n  "emissions_tco2e": 9.403,\`n  "ortools": "9.15.6755",\`n  "seed": 42\`n}
