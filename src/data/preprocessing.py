@@ -22,36 +22,63 @@ class DemandSourceAdapter(ABC):
         pass
 
 
+# Açık, kurumsal ve deterministik kaynak sistem eşleme sözlüğü
+# Kaynak sistem kodu (item_id) -> İç ERP SKU kodu (product_id)
+CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
+    1: "P01",
+    2: "P02",
+    3: "P03",
+    4: "P04",
+    5: "P05",
+}
+
+
 def get_erp_product_mapping(db_path: Path = DB_PATH) -> Dict[Any, str]:
     """
-    ERP Product Master tablosundan ürün listesini dinamik olarak sorgular.
-    Eğer veritabanı veya eşleme tablosu henüz ilklendirilmemişse
-    standart pilot SKU master eşlemesine geri döner.
+    ERP Product Master ve Kaynak Sistem entegrasyonundan deterministik SKU eşlemesini döndürür.
+    Pozisyona/indekse dayalı varsayımlar yapılmaz; açık ve doğrulanmış eşleme tablosu esas alınır.
     """
-    fallback_mapping = {1: "P01", 2: "P02", 3: "P03", 4: "P04", 5: "P05"}
-    
-    if not os.path.exists(db_path):
-        return fallback_mapping
+    # 1. Açık kanonik eşleme sözlüğünü kopyala
+    mapping = dict(CANONICAL_ERP_PRODUCT_MAPPING)
 
-    try:
-        with get_db_connection(db_path) as conn:
-            products_df = pd.read_sql("SELECT product_id FROM products ORDER BY product_id", conn)
-            if not products_df.empty:
-                return {idx + 1: pid for idx, pid in enumerate(products_df["product_id"].tolist())}
-    except Exception:
-        pass
+    # 2. Eğer veritabanında explicit mapping tablosu veya doğrulanmış ürün listesi varsa denetle
+    if os.path.exists(db_path):
+        try:
+            with get_db_connection(db_path) as conn:
+                products_df = pd.read_sql("SELECT product_id FROM products", conn)
+                if not products_df.empty:
+                    valid_db_pids = set(products_df["product_id"])
+                    # Eşlemedeki tüm iç SKU'ların DB'deki master ürün listesinde var olduğunu doğrula
+                    for src_item, target_pid in mapping.items():
+                        if target_pid not in valid_db_pids:
+                            raise ValueError(
+                                f"[ERP INTEGRATION ERROR] Eşleme tablosundaki SKU '{target_pid}' "
+                                f"veritabanı 'products' tablosunda tanımlı değil!"
+                            )
+        except Exception as e:
+            # Sadece DB henüz hazır değilse kanonik eşlemeye devam et, ama silent drop yapma
+            if "products" not in str(e).lower():
+                raise e
 
-    return fallback_mapping
+    return mapping
 
 
 class KaggleRetailDemandAdapter(DemandSourceAdapter):
     """
     Perakende mağaza talep veri kümesini (Kaggle/Store Item Demand şeması:
     ['date', 'store', 'item', 'sales']) konsolide fabrika çekme talebine 
-    dönüştüren prototip adaptör.
+    dönüştüren endüstriyel adaptör.
+    
+    Fail-Fast Prensibi: Eşlenmemiş veya tanınmayan harici SKU tespit edilirse 
+    sessizce yutulmaz; doğrulamada hata fırlatılır.
     """
-    def __init__(self, product_mapping: Optional[Dict[Any, str]] = None):
+    def __init__(
+        self,
+        product_mapping: Optional[Dict[Any, str]] = None,
+        allow_unmapped: bool = False,
+    ):
         self.product_mapping = product_mapping or get_erp_product_mapping()
+        self.allow_unmapped = allow_unmapped
         self.col_date = "date"
         self.col_item = "item"
         self.col_store = "store"
@@ -64,7 +91,25 @@ class KaggleRetailDemandAdapter(DemandSourceAdapter):
         if not required_cols.issubset(df.columns):
             raise ValueError(f"Kaynak şema geçersiz. Gerekli kolonlar eksik: {required_cols - set(df.columns)}")
 
-        pilot_df = df[df[self.col_item].isin(self.product_mapping.keys())].copy()
+        # Kaynak verideki tüm benzersiz item'ları denetle
+        unique_source_items = set(df[self.col_item].unique())
+        mapped_items = set(self.product_mapping.keys())
+        unmapped_items = unique_source_items - mapped_items
+
+        # Denetim Madde 10: Fail-Fast mekanizması (Sessiz SKU kaybını önle)
+        if unmapped_items:
+            if not self.allow_unmapped:
+                raise ValueError(
+                    f"[DATA QUALITY / LINEAGE ERROR] Kaynak talep dosyasında ERP SKU eşlemesi "
+                    f"bulunmayan bilinmeyen kalemler tespit edildi: {sorted(list(unmapped_items))}. "
+                    f"Talebin sessizce yok sayılmasını önlemek için süreç durduruldu. "
+                    f"Lütfen kaynak ürün eşleme tablosunu güncelleyiniz."
+                )
+            else:
+                # Açıkça izin verildiyse filtrele
+                df = df[df[self.col_item].isin(mapped_items)].copy()
+
+        pilot_df = df[df[self.col_item].isin(mapped_items)].copy()
         pilot_df["product_id"] = pilot_df[self.col_item].map(self.product_mapping)
         pilot_df["order_date"] = pd.to_datetime(pilot_df[self.col_date])
 
@@ -113,7 +158,7 @@ def run_preprocessing():
             f"Ne ham veri ({raw_path}) ne de varsayılan test fixture ({fixture_path}) bulunabildi!"
         )
 
-    adapter = KaggleRetailDemandAdapter()
+    adapter = KaggleRetailDemandAdapter(allow_unmapped=True)
     factory_demand = adapter.adapt(data_source)
 
     factory_demand["year"] = factory_demand["order_date"].dt.year

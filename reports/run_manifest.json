@@ -1,11 +1,11 @@
 {
     "run_id": "RUN-MANIFEST-TEST-001",
-    "created_at": "2026-09-25T21:19:06.787042",
+    "created_at": "2026-09-25T21:37:22.025977",
     "total_artifacts": 17,
     "artifacts": {
         "factory.db": {
             "size_bytes": 495616,
-            "sha256": "a1fcc1d2c702f41e183212addbf156f36f5da5f5ceb54bb09bee6aefaffbee9e",
+            "sha256": "74ab37f5fd458fd93aa9d50c98f624451c86ccfef3f2d71af8d688d51317fb82",
             "relative_path": "data\\factory.db"
         },
         "run_metadata.json": {
@@ -15,7 +15,7 @@
         },
         "schedule_solver_metadata.json": {
             "size_bytes": 604,
-            "sha256": "063322160ca07a3844c50d42c3d0ead89c65920fc25e1dfdd1160a5c4e493e39",
+            "sha256": "4e969baa44802b123b216d9fce2c8320e98d989ea4aa3d83827f7bb122405a14",
             "relative_path": "reports\\schedule_solver_metadata.json"
         },
         "forecast_model_metadata.json": {
@@ -44,8 +44,8 @@
             "relative_path": "data\\processed\\energy_kpis.csv"
         },
         "energy_profile_15min.csv": {
-            "size_bytes": 27479,
-            "sha256": "cbb0500c050b4aebc8eb0c78ed95cbd58e961acee99c82fc7c3085a8c4535e9c",
+            "size_bytes": 27502,
+            "sha256": "72f51f412d116bb593b1580511057ccb2ba4335566a600191697698848aa566d",
             "relative_path": "data\\processed\\energy_profile_15min.csv"
         },
         "factory_orders.csv": {
@@ -74,13 +74,13 @@
             "relative_path": "data\\processed\\mrp_plan.csv"
         },
         "production_schedule.csv": {
-            "size_bytes": 3669,
-            "sha256": "0b136eb18727a945543cadd17604ec5dec94bf0c5bf102016b5b468d5997c3af",
+            "size_bytes": 3675,
+            "sha256": "35044528adba8f56aec47412a327e1070a8fb752dd91f309a9a2e16ac605a31e",
             "relative_path": "data\\processed\\production_schedule.csv"
         },
         "schedule_solver_metadata.csv": {
             "size_bytes": 471,
-            "sha256": "92019572302e177eab663167c559e26865d5f280633833bcd91c6c25bf54b5c3",
+            "sha256": "c3a61a208f650269974b90ed7bae89d6984aaeab0d278c8662f6d6a7266028cd",
             "relative_path": "data\\processed\\schedule_solver_metadata.csv"
         },
         "sku_production_plan.csv": {
