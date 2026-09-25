@@ -40,12 +40,11 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     # 1. 1. Hafta SKU Planından Partileri Yükle
     if sku_plan is None:
         sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
-    if sku_plan is None:
-        sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     changeover_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
     mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
+    
     # LP Taktik Seviyeden 1. Hafta Fazla Mesai (OT) Bütçesini Al
     machine_ot_hours = {}
     try:
@@ -54,6 +53,15 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             machine_ot_hours[str(r["machine_id"])] = float(r.get("overtime_hours", 0.0))
     except Exception:
         machine_ot_hours = {}
+
+    # Denetim Madde 23 (SSOT): Takvim mantığını doğrudan machines tablosundaki max_daily_hours'tan türet
+    machine_daily_hours = {}
+    try:
+        m_df = pd.read_sql("SELECT machine_id, max_daily_hours FROM machines", conn)
+        for _, r in m_df.iterrows():
+            machine_daily_hours[str(r["machine_id"])] = float(r["max_daily_hours"])
+    except Exception:
+        pass
 
     # Changeover matrisi dinamik okuma
     setup_dict = {}
@@ -433,15 +441,19 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             e_min = item["end_min"]
             total_duration = item["duration_min"]
             
+            # Denetim Madde 23: Takvim penceresini doğrudan machines.max_daily_hours'tan al (SSOT)
+            m_max_h = machine_daily_hours.get(mid, getattr(cfg, "DAILY_PRODUCTION_HOURS", 16.0))
+            ot_cutoff_min = max(0.0, (24.0 - m_max_h) * 60.0)
+
             ot_duration_in_task = 0
             cur_cursor = s_min
             while cur_cursor < e_min:
                 day_cursor = cur_cursor % 1440
-                if day_cursor < 480:  # 00:00 - 08:00 aralığı (Fazla Mesai Penceresi)
-                    step = min(e_min - cur_cursor, 480 - day_cursor)
+                if day_cursor < ot_cutoff_min:  # Gece Fazla Mesai Penceresi [0, ot_cutoff_min)
+                    step = min(e_min - cur_cursor, ot_cutoff_min - day_cursor)
                     ot_duration_in_task += step
                     cur_cursor += step
-                else:  # 08:00 - 24:00 normal vardiya aralığı
+                else:  # Normal çalışma aralığı [ot_cutoff_min, 1440)
                     step = min(e_min - cur_cursor, 1440 - day_cursor)
                     cur_cursor += step
 
