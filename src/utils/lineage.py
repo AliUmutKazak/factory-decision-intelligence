@@ -128,3 +128,49 @@ def record_pipeline_run_metadata(run_id=None, solver_metrics=None, data_source="
         conn.close()
 
     return metadata
+
+def start_pipeline_run(run_id: str, db_path: str = None) -> None:
+    """Denetim Madde 27: Koşumu RUNNING durumunda başlatır."""
+    import src.config as config
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    if os.path.exists(active_db):
+        conn = get_db_connection(active_db)
+        init_pipeline_runs_table(conn)
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT OR REPLACE INTO pipeline_runs 
+            (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            run_id,
+            datetime.now().isoformat(),
+            "pipeline_execution",
+            0,
+            get_git_sha(),
+            compute_file_hash(CONFIG_PATH),
+            "in_progress",
+            "RUNNING"
+        ))
+        conn.commit()
+        conn.close()
+
+
+def get_active_pipeline_run(db_path: str = None) -> dict:
+    """Denetim Madde 27: Yalnızca başarıyla tamamlanmış (COMPLETED/SUCCESS) en güncel aktif koşumu döner."""
+    import src.config as config
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    if not os.path.exists(active_db):
+        return None
+    conn = get_db_connection(active_db)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT run_id, timestamp, status, orders_count 
+        FROM pipeline_runs 
+        WHERE status IN ('COMPLETED', 'SUCCESS')
+        ORDER BY timestamp DESC LIMIT 1
+    """)
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
+    return None

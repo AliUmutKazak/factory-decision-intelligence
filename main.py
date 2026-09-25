@@ -15,13 +15,21 @@ from src.inventory.bom_mrp import run_mrp_engine
 from src.scheduling.schedule_cpsat import solve_cpsat_schedule
 from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
-from src.utils.lineage import record_pipeline_run_metadata, generate_run_id
+from src.utils.lineage import (
+    record_pipeline_run_metadata, 
+    generate_run_id, 
+    start_pipeline_run, 
+    get_active_pipeline_run
+)
 
 def run_end_to_end_pipeline():
     run_id = generate_run_id()
     print("\n" + "#" * 85)
     print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE BAŞLATILDI (Run ID: {run_id})")
     print("#" * 85 + "\n")
+
+    # Denetim Madde 27: Transaction Boundary - Koşum RUNNING olarak mühürlenir
+    start_pipeline_run(run_id=run_id)
 
     stages = [
         ("Aşama 1: Veri Ön İşleme & Temizlik", lambda: run_preprocessing()),
@@ -59,14 +67,14 @@ def run_end_to_end_pipeline():
         except Exception:
             pass
 
-        # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet
+        # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet (PROMOTE TO COMPLETED)
         meta = record_pipeline_run_metadata(
             run_id=run_id,
-            status="SUCCESS",
+            status="COMPLETED",
             orders_count=actual_orders_count,
             data_source="data/processed/factory_orders.csv"
         )
-        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: SUCCESS, Orders: {actual_orders_count})")
+        print(f"\n[AUDIT] Run başarıyla terfi ettirildi (PROMOTE) -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: COMPLETED, Orders: {actual_orders_count})")
 
         print("\n" + "#" * 85)
         print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_elapsed:.2f} saniye")

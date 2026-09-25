@@ -237,3 +237,49 @@ def test_pipeline_failure_status_and_downstream_isolation():
         assert row is not None, "pipeline_runs tablosu boş!"
         # Başarılı bir pipeline koşusunun statüsü SUCCESS veya COMPLETED olmalı, FAILED/RUNNING olmamalıdır
         assert row[0] in ("SUCCESS", "COMPLETED")      
+
+def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkeypatch):
+    """Denetim Madde 27: Pipeline çalışma sırasında RUNNING, hata anında FAILED, yalnızca başarıda COMPLETED olmalıdır."""
+    import sqlite3
+    import src.config as config
+    from src.utils.lineage import (
+        start_pipeline_run, 
+        record_pipeline_run_metadata, 
+        get_active_pipeline_run, 
+        init_pipeline_runs_table
+    )
+
+    temp_db = str(tmp_path / "test_boundary.db")
+    monkeypatch.setenv("FACTORY_DB_PATH", temp_db)
+    monkeypatch.setattr(config, "DB_PATH", temp_db)
+
+    conn = sqlite3.connect(temp_db)
+    init_pipeline_runs_table(conn)
+    conn.close()
+
+    # 1. Başlatıldığında durum RUNNING olmalı
+    run_1 = "RUN-TEST-BOUND-001"
+    start_pipeline_run(run_1, db_path=temp_db)
+    
+    conn = sqlite3.connect(temp_db)
+    c = conn.cursor()
+    c.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_1,))
+    assert c.fetchone()[0] == "RUNNING", "Pipeline baslatildiginda status RUNNING olmali!"
+    
+    # Henüz terfi etmediği için active run bulunamamalı
+    assert get_active_pipeline_run(db_path=temp_db) is None, "RUNNING durumundaki kosum active kabul edilemez!"
+    conn.close()
+
+    # 2. Hata durumunda FAILED mühürlenmeli ve asla promote edilmemeli
+    record_pipeline_run_metadata(run_id=run_1, status="FAILED", db_path=temp_db)
+    assert get_active_pipeline_run(db_path=temp_db) is None, "FAILED kosum active kabul edilemez!"
+
+    # 3. İkinci bir koşum başarıyla bittiğinde PROMOTE edilmeli ve ACTIVE run olmalı
+    run_2 = "RUN-TEST-BOUND-002"
+    start_pipeline_run(run_2, db_path=temp_db)
+    record_pipeline_run_metadata(run_id=run_2, status="COMPLETED", orders_count=500, db_path=temp_db)
+    
+    active_run = get_active_pipeline_run(db_path=temp_db)
+    assert active_run is not None
+    assert active_run["run_id"] == run_2
+    assert active_run["status"] == "COMPLETED"
