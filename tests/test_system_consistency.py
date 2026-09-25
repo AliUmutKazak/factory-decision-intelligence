@@ -217,18 +217,26 @@ def test_master_data_database_constraints():
         conn.commit()
     conn.rollback()
 
-    # 4. changeover_matrix (from_product, to_product) PRIMARY KEY ihlali
-    cur.execute("SELECT from_product, to_product FROM changeover_matrix LIMIT 1")
+    # 4. changeover_matrix (machine_id, from_product, to_product) PRIMARY KEY ihlali
+    # NOT NULL + 'ALL' sentinal değeri ile mükerrerlik kesinlikle engellenir
+    cur.execute("SELECT machine_id, from_product, to_product FROM changeover_matrix LIMIT 1")
     row = cur.fetchone()
     if row:
-        fp, tp = row[0], row[1]
+        mid, fp, tp = row[0], row[1], row[2]
     else:
-        fp, tp = 'P01', 'P01'
-        cur.execute("INSERT OR REPLACE INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES (?, ?, 10.0)", (fp, tp))
+        mid, fp, tp = 'ALL', 'P01', 'P01'
+        cur.execute("INSERT OR REPLACE INTO changeover_matrix (machine_id, from_product, to_product, setup_time_min) VALUES (?, ?, ?, 10.0)", (mid, fp, tp))
         conn.commit()
 
     with pytest.raises(sqlite3.IntegrityError):
-        cur.execute("INSERT INTO changeover_matrix (from_product, to_product, setup_time_min) VALUES (?, ?, 99.0)", (fp, tp))
+        # Aynı (machine_id, from_product, to_product) üçlüsünü tekrar eklemeyi dene -> Kesin IntegrityError
+        cur.execute("INSERT INTO changeover_matrix (machine_id, from_product, to_product, setup_time_min) VALUES (?, ?, ?, 99.0)", (mid, fp, tp))
+        conn.commit()
+    conn.rollback()
+
+    # Ekstra P0 Güvencesi: machine_id kolonu NOT NULL kısıtına sahip olmalı
+    with pytest.raises(sqlite3.IntegrityError):
+        cur.execute("INSERT INTO changeover_matrix (machine_id, from_product, to_product, setup_time_min) VALUES (NULL, 'P01', 'P02', 15.0)")
         conn.commit()
     conn.rollback()
 

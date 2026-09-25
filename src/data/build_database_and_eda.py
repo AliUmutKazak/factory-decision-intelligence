@@ -244,6 +244,11 @@ def initialize_database(force_recreate=False, run_id=None):
         if not os.path.exists(csv_file):
             raise FileNotFoundError(f"Missing mandatory master data: {table}.csv")
         loaded_data[table] = pd.read_csv(csv_file)
+        if table == "changeover_matrix":
+            if "machine_id" not in loaded_data[table].columns:
+                loaded_data[table]["machine_id"] = "ALL"
+            else:
+                loaded_data[table]["machine_id"] = loaded_data[table]["machine_id"].fillna("ALL")
 
     # Master data tablolarını açık kısıtlarla oluştur
     cursor.execute("""
@@ -303,16 +308,16 @@ def initialize_database(force_recreate=False, run_id=None):
         )
     """)
 
-    # Denetim Madde 22: Tezgâh bağımlı hazırlık matrisi (machine_id opsiyonel bileşik anahtar)
+    # P0 Şema Çözümü: SQLite composite PK içinde NULL uniqueness zafiyetini önleme.
+    # Genel (global) hazırlık kuralları için machine_id = 'ALL' kullanılır, NULL kesinlikle yasaktır.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS changeover_matrix (
-            machine_id TEXT DEFAULT NULL,
+            machine_id TEXT NOT NULL DEFAULT 'ALL',
             from_product TEXT NOT NULL,
             to_product TEXT NOT NULL,
             setup_time_min REAL NOT NULL,
             setup_cost REAL,
             PRIMARY KEY (machine_id, from_product, to_product),
-            FOREIGN KEY (machine_id) REFERENCES machines(machine_id),
             FOREIGN KEY (from_product) REFERENCES products(product_id),
             FOREIGN KEY (to_product) REFERENCES products(product_id)
         )
