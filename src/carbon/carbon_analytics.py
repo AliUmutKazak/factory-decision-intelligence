@@ -92,9 +92,47 @@ def compute_carbon_analytics(run_id=None):
     machine_kpis_df.to_csv(OUTPUT_MACHINE_CARBON_PATH, index=False)
 
     conn = get_db_connection(DB_PATH)
-    carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="replace")
-    machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="replace")
-    scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="replace")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS carbon_kpis (
+            scope_1_tco2e REAL,
+            scope_2_tco2e REAL,
+            total_tco2e REAL,
+            kgco2e_per_unit REAL,
+            run_id TEXT
+        );
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS carbon_machine_kpis (
+            machine_id TEXT,
+            processing_hours REAL,
+            setup_hours REAL,
+            idle_hours REAL,
+            processing_kwh REAL,
+            setup_kwh REAL,
+            idle_kwh REAL,
+            total_kwh REAL,
+            run_id TEXT,
+            carbon_share_pct REAL,
+            scope_2_tco2e REAL
+        );
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS carbon_price_scenarios (
+            carbon_price_eur_per_ton INTEGER,
+            total_carbon_exposure_eur REAL,
+            carbon_cost_per_unit_eur REAL,
+            run_id TEXT
+        );
+    """)
+    cursor.execute("DELETE FROM carbon_kpis;")
+    cursor.execute("DELETE FROM carbon_machine_kpis;")
+    cursor.execute("DELETE FROM carbon_price_scenarios;")
+    conn.commit()
+
+    carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="append")
+    machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="append")
+    scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="append")
     conn.close()
 
     print(f"[OK] Karbon KPI'ları Kaydedildi: {OUTPUT_CARBON_PATH}")

@@ -203,7 +203,22 @@ def initialize_database(force_recreate=False, run_id=None):
     if not os.path.exists(PROCESSED_ORDERS_PATH):
         raise FileNotFoundError(f"Missing mandatory order data: {PROCESSED_ORDERS_PATH}")
     orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
-    orders_df.to_sql("orders", conn, index=False, if_exists="replace")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            order_date TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            order_qty INTEGER NOT NULL,
+            year INTEGER,
+            month INTEGER,
+            day_of_week INTEGER,
+            is_weekend INTEGER
+        );
+    """)
+    cursor.execute("DELETE FROM orders;")
+    conn.commit()
+
+    orders_df.to_sql("orders", conn, index=False, if_exists="append")
 
     # 2. Tek ve Standart Run ID Kaydı (INITIALIZED)
     if not run_id:
