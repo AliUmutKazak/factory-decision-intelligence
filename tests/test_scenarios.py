@@ -1,3 +1,4 @@
+import src.utils.lineage as lineage_mod
 import sqlite3
 import os
 import sys
@@ -65,7 +66,7 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setattr(cfg, "DB_PATH", temp_db)
 
     # Modül içi import edilmiş yolları yamala
-    all_modules = [prep_mod, db_mod, fc_mod, plan_mod, mrp_mod, sched_mod, energy_mod, carbon_mod]
+    all_modules = [prep_mod, db_mod, fc_mod, plan_mod, mrp_mod, sched_mod, energy_mod, carbon_mod, lineage_mod]
     for mod in all_modules:
         if hasattr(mod, "DB_PATH"):
             monkeypatch.setattr(mod, "DB_PATH", temp_db)
