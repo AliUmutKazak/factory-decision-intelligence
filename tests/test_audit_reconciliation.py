@@ -38,21 +38,76 @@ def test_1_pipeline_run_lineage_zero_nulls(isolated_db):
 
 
 def test_2_cpsat_calendar_bounds(isolated_db):
+    """Denetim Madde 25: Gerçek takvim ve fazla mesai bütçe değişmezlerini (invariants) doğrular."""
     sched_df = pd.read_sql(
-        "SELECT start_min, end_min, calendar_shift FROM production_schedule",
+        """SELECT task_id, machine_id, start_min, end_min, duration_min, 
+                  regular_minutes, overtime_minutes, calendar_shift 
+           FROM production_schedule""",
         isolated_db,
     )
     assert not sched_df.empty, "production_schedule tablosu bos olamaz"
+
+    # Makinelerin günlük kapasite sınırlarını al (SSOT)
+    machines_df = pd.read_sql("SELECT machine_id, max_daily_hours FROM machines", isolated_db)
+    machine_daily_hours = dict(zip(machines_df["machine_id"].astype(str), machines_df["max_daily_hours"].astype(float)))
+
+    # Taktik LP seviyesinde onaylanan fazla mesai bütçesini al
+    cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", isolated_db)
+    allowed_ot_budget_min = {
+        str(r["machine_id"]): float(r["overtime_hours"]) * 60.0
+        for _, r in cap_df.iterrows()
+    }
+
+    # Değişmez 1 & 2: Görev bazında aralık, süre korunumu ve kesin takvim denetimi
     for _, r in sched_df.iterrows():
         s_min = int(r["start_min"])
         e_min = int(r["end_min"])
-        s_day = (s_min // 1440) % 7
-        e_day = (e_min // 1440) % 7
-        assert s_day != 6 and e_day != 6, f"Pazar gunu calisma tespit edildi: {r}"
-        assert r["calendar_shift"] in [
-            "REGULAR",
-            "OVERTIME",
-        ], f"Gecersiz calendar_shift: {r['calendar_shift']}"
+        dur = int(r["duration_min"])
+        reg_m = float(r["regular_minutes"])
+        ot_m = float(r["overtime_minutes"])
+        mid = str(r["machine_id"])
+
+        # Süre ve aralık tutarlılığı
+        assert e_min >= s_min, f"Gecersiz zaman araligi: start={s_min} > end={e_min}"
+        assert e_min - s_min == dur, f"Zaman farki sure ile uyumsuz: end - start != duration ({r['task_id']})"
+        assert abs((reg_m + ot_m) - dur) < 1e-4, f"Sure korunumu bozulmus: reg + ot != duration ({r['task_id']})"
+
+        # Kesin takvim: Başlangıç ile bitiş arasındaki HİÇBİR gün Pazar (gün indeksi 6) olamaz
+        start_day_idx = s_min // 1440
+        end_day_idx = e_min // 1440
+        for d in range(start_day_idx, end_day_idx + 1):
+            assert (d % 7) != 6, f"Pazar gunune sarkan gorev tespit edildi! Gun: {d}, Gorev: {r['task_id']}"
+
+        # Shift etiketi uyumu
+        expected_shift = "OVERTIME" if ot_m > (dur / 2.0) else "REGULAR"
+        assert r["calendar_shift"] == expected_shift, (
+            f"calendar_shift etiketi hatali! Beklenen: {expected_shift}, Fiili: {r['calendar_shift']} ({r['task_id']})"
+        )
+
+        # SSOT Kesim Noktası Doğrulaması (Gece OT penceresi)
+        max_h = machine_daily_hours.get(mid, 16.0)
+        ot_cutoff = max(0.0, (24.0 - max_h) * 60.0)
+        cur = s_min
+        calc_ot = 0.0
+        while cur < e_min:
+            day_cursor = cur % 1440
+            if day_cursor < ot_cutoff:
+                step = min(e_min - cur, ot_cutoff - day_cursor)
+                calc_ot += step
+                cur += step
+            else:
+                step = min(e_min - cur, 1440 - day_cursor)
+                cur += step
+        assert abs(calc_ot - ot_m) < 1e-4, f"Hesaplanan OT ile kaydedilen OT uyumsuz! ({r['task_id']})"
+
+    # Değişmez 3: Tezgâh bazlı toplam fazla mesai LP tavan sınırını aşamaz
+    machine_ot_sums = sched_df.groupby("machine_id")["overtime_minutes"].sum().to_dict()
+    for m, actual_ot in machine_ot_sums.items():
+        allowed_ot = allowed_ot_budget_min.get(str(m), 48.0 * 60.0)
+        assert actual_ot <= allowed_ot + 1e-4, (
+            f"Tezgah {m} icin fazla mesai butcesi asildi! "
+            f"Izin Verilen: {allowed_ot} dk, Fiili: {actual_ot} dk"
+        )
 
 
 def test_3_batch_quantity_contract(isolated_db):
