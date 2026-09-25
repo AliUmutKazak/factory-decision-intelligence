@@ -564,6 +564,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
         "objective_type": "MINIMIZE_MAKESPAN",
         "operational_objectives_backlog": "TARDINESS_OT_SETUP_PRIORITY",
+        "mrp_coupling_mode": "ANALYTICAL_EXPEDITE_OFFSET_PROTOTYPE",
+        "mrp_erp_operational_fields_backlog": "OPEN_PO_GOODS_RECEIPT_SUPPLIER_CALENDAR_DATETIME",
     }]
 
     if run_id:
