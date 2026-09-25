@@ -136,19 +136,29 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
 
     model = pulp.LpProblem("Industrial_Aggregate_Planning", pulp.LpMinimize)
 
-    # Karar Değişkenleri
-    P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
-    I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
-    B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
-    
-    # Fazla Mesai her makine için ayrı tanımlanır (OT_{m,t})
-    OT = pulp.LpVariable.dicts(
-        "Overtime",
-        [(m, t) for m in machines for t in periods],
-        lowBound=0,
-        upBound=AGGREGATE_MAX_OVERTIME_HOURS,
-        cat="Continuous"
-    )
+    # Karar Değişkenleri (Denetim Madde 24: PuLP 4.0 uyumlu dictionary tanımı)
+    if hasattr(model, "add_variable_dicts"):
+        P = model.add_variable_dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        I = model.add_variable_dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        B = model.add_variable_dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        OT = model.add_variable_dicts(
+            "Overtime",
+            [(m, t) for m in machines for t in periods],
+            lowBound=0,
+            upBound=AGGREGATE_MAX_OVERTIME_HOURS,
+            cat="Continuous"
+        )
+    else:
+        P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        OT = pulp.LpVariable.dicts(
+            "Overtime",
+            [(m, t) for m in machines for t in periods],
+            lowBound=0,
+            upBound=AGGREGATE_MAX_OVERTIME_HOURS,
+            cat="Continuous"
+        )
 
     # Amaç Fonksiyonu
     model += pulp.lpSum(
@@ -181,7 +191,11 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
                 f"Balance_{f}_W{t}"
             )
 
-    model.solve(pulp.PULP_CBC_CMD(msg=False))
+    import warnings
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=DeprecationWarning)
+        solver = pulp.PULP_CBC_CMD(msg=False)
+        model.solve(solver)
     solver_status = pulp.LpStatus[model.status]
     if solver_status != "Optimal":
         raise RuntimeError(
