@@ -328,6 +328,17 @@ def initialize_database(force_recreate=False, run_id=None):
             FOREIGN KEY (to_product) REFERENCES products(product_id)
         )
     """)
+
+    # Denetim Madde 21: Runtime Snapshot / MES Tezgâh Başlangıç Durumu Tablosu
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS machine_state (
+            machine_id TEXT PRIMARY KEY,
+            last_product_id TEXT NOT NULL,
+            state_timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id),
+            FOREIGN KEY (last_product_id) REFERENCES products(product_id)
+        )
+    """)
     conn.commit()
 
     # Master-data bütünlük denetimi (Fail-Fast)
@@ -341,6 +352,18 @@ def initialize_database(force_recreate=False, run_id=None):
 
     conn.commit()
     cursor.execute("PRAGMA foreign_keys = ON;")
+
+    # MES Başlangıç Snapshot Verisi (Runtime State Seeding)
+    initial_states = [
+        ("M01", "P01"),
+        ("M02", "P02"),
+        ("M03", "P04"),
+    ]
+    cursor.executemany("""
+        INSERT OR REPLACE INTO machine_state (machine_id, last_product_id)
+        VALUES (?, ?)
+    """, initial_states)
+    conn.commit()
 
     # 3. EDA Özet Tablosu
     eda_summary = analyze_demand_characteristics(orders_df)

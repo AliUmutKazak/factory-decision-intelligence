@@ -14,11 +14,32 @@ from src.config import (
     CPSAT_RANDOM_SEED,
 )
 
+def get_initial_machine_states(conn) -> dict:
+    """
+    Denetim Madde 21: Tezgâh başlangıç durumunu öncelikle SQLite 'machine_state'
+    (MES runtime snapshot) tablosundan okur. Tablo yoksa config.INITIAL_MACHINE_STATE'e düşer.
+    """
+    states = {}
+    try:
+        df_state = pd.read_sql("SELECT machine_id, last_product_id FROM machine_state", conn)
+        for _, r in df_state.iterrows():
+            states[str(r["machine_id"])] = str(r["last_product_id"])
+    except Exception:
+        pass
+
+    if not states:
+        states = getattr(cfg, "INITIAL_MACHINE_STATE", {})
+    return states
+
+
 def run_cpsat_scheduling(sku_plan=None, run_id=None):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = sqlite3.connect(DB_PATH)
+    machine_initial_states = get_initial_machine_states(conn)
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
+    if sku_plan is None:
+        sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
     if sku_plan is None:
         sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
@@ -240,7 +261,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         machine_setup_intervals = []
 
         # 1) Dummy -> Task (Günün ilk işi): Tezgâh başlangıç durumuna (Initial State) göre setup
-        p_init = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
+        p_init = machine_initial_states.get(mid, None)
         for i, tid in enumerate(tids):
             lit = model.NewBoolVar(f"first_{mid}_{tid}")
             circuit_arcs.append((dummy, i, lit))
@@ -386,7 +407,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             })
 
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
-        last_prod = getattr(cfg, "INITIAL_MACHINE_STATE", {}).get(mid, None)
+        last_prod = machine_initial_states.get(mid, None)
         for item in m_tasks:
             curr_prod = item["product_id"]
             setup_val = 0
