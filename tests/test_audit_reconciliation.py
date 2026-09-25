@@ -103,7 +103,9 @@ def test_2_cpsat_calendar_bounds(isolated_db):
     # Değişmez 3: Tezgâh bazlı toplam fazla mesai LP tavan sınırını aşamaz
     machine_ot_sums = sched_df.groupby("machine_id")["overtime_minutes"].sum().to_dict()
     for m, actual_ot in machine_ot_sums.items():
-        allowed_ot = allowed_ot_budget_min.get(str(m), 48.0 * 60.0)
+        if str(m) not in allowed_ot_budget_min:
+            raise KeyError(f"Eksik makine kapasite verisi: Tezgah {m} icin allowed_ot_budget bulunamadi!")
+        allowed_ot = allowed_ot_budget_min[str(m)]
         assert actual_ot <= allowed_ot + 1e-4, (
             f"Tezgah {m} icin fazla mesai butcesi asildi! "
             f"Izin Verilen: {allowed_ot} dk, Fiili: {actual_ot} dk"

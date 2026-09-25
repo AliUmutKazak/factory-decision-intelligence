@@ -335,7 +335,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         # P0 DÜZELTMESİ: Hafta Bazlı Sert OT Bütçe Kısıtı (Solver-Enforced OT Budget)
         # ---------------------------------------------------------------------
         break_intervals = []
-        allowed_ot_min = int(machine_ot_hours.get(str(mid), 0.0) * 60)
+        if str(mid) not in machine_ot_hours:
+            raise ValueError(f"Eksik makine takvim verisi (fail-fast): Tezgah {mid} icin OT limiti tanimlanmamis!")
+        allowed_ot_min = int(machine_ot_hours[str(mid)] * 60)
         total_days = (horizon // 1440) + 2
 
         # Hafta bazlı gece OT kullanımını biriktirmek için sözlük: {hafta_indeksi: [ot_kullanildi_boolean_değişkenleri]}
