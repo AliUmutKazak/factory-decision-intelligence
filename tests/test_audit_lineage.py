@@ -177,20 +177,28 @@ def test_historical_run_retention_policy(tmp_path):
     assert remaining == ["RUN-007", "RUN-008", "RUN-009"]
 
 def test_artifact_manifest_generation():
-    """Denetim Madde 4: Pipeline artifact manifestinin geçerli byte ve SHA-256 ürettiğini doğrular."""
+    """Denetim Madde 4 & 18: Artifact ve Input lineage manifest doğrulaması."""
     from src.utils.lineage import generate_run_manifest
-    import json
-    import os
-
+    
     manifest = generate_run_manifest(run_id="RUN-MANIFEST-TEST-001")
     assert manifest["run_id"] == "RUN-MANIFEST-TEST-001"
     assert manifest["total_artifacts"] > 0
+    assert "inputs" in manifest
+    
+    inputs = manifest["inputs"]
+    assert "raw_source_data" in inputs
+    assert "config_fingerprint" in inputs
+    assert inputs["config_fingerprint"]["sha256"] is not None
+    assert "environment" in inputs
+    assert "python_version" in inputs["environment"]
+    assert "solver_versions" in inputs["environment"]
+    assert "requirements_fingerprint" in inputs["environment"]
+    
     assert os.path.exists("reports/run_manifest.json")
-
     with open("reports/run_manifest.json", "r", encoding="utf-8") as f:
-        loaded = json.load(f)
-    assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
-    assert len(loaded["artifacts"]) > 0        
+        data = json.load(f)
+        assert data["run_id"] == "RUN-MANIFEST-TEST-001"
+        assert "inputs" in data        
 
 def test_p0_active_run_isolation_on_failure(tmp_path):
     """

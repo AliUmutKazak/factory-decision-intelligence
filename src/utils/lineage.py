@@ -211,16 +211,30 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> in
 
 def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
     """
-    Denetim Madde 4: Artifact Manifest.
-    Pipeline koşumunun ürettiği tüm artifact dosyalarının byte boyutu ve SHA-256 hash'ini mühürler.
+    Denetim Madde 4 & Madde 18: Artifact & Input Lineage Manifest.
+    - Pipeline çıktılarının (artifacts) SHA-256 ve boyutlarını mühürler.
+    - Tam tekrarlanabilirlik (reproducibility) için girdi verileri (raw/master data),
+      konfigürasyon, paket bağımlılıkları, python ve solver sürümlerinin parmak izini (fingerprint) tutar.
     """
     import hashlib
+    import sys
     import src.config as config
     from pathlib import Path
 
     root_dir = Path(__file__).resolve().parent.parent.parent
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
 
+    def compute_sha256(filepath: Path):
+        if not filepath.exists() or not filepath.is_file():
+            return None, 0
+        hasher = hashlib.sha256()
+        size = filepath.stat().st_size
+        with open(filepath, "rb") as f:
+            while chunk := f.read(65536):
+                hasher.update(chunk)
+        return hasher.hexdigest(), size
+
+    # 1. Output Artifacts Takibi
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     files_to_track = [
         Path(active_db),
         root_dir / "reports" / "run_metadata.json",
@@ -228,7 +242,6 @@ def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
         root_dir / "reports" / "forecast_model_metadata.json",
     ]
 
-    # Processed CSV'leri de ekle
     processed_dir = getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed")
     if Path(processed_dir).exists():
         for p in Path(processed_dir).glob("*.csv"):
@@ -236,26 +249,75 @@ def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
 
     manifest_entries = {}
     for file_path in files_to_track:
-        if file_path.exists() and file_path.is_file():
-            hasher = hashlib.sha256()
-            size = file_path.stat().st_size
-            with open(file_path, "rb") as f:
-                while chunk := f.read(65536):
-                    hasher.update(chunk)
+        sha, size = compute_sha256(file_path)
+        if sha is not None:
             manifest_entries[file_path.name] = {
                 "size_bytes": size,
-                "sha256": hasher.hexdigest(),
+                "sha256": sha,
                 "relative_path": str(file_path.relative_to(root_dir)) if root_dir in file_path.parents else file_path.name
             }
+
+    # 2. Input Lineage & Environment Fingerprinting (Madde 18)
+    inputs_lineage = {
+        "raw_source_data": {},
+        "config_fingerprint": {},
+        "environment": {}
+    }
+
+    # Raw / Master Data dosya hash'leri
+    raw_dir = root_dir / "data" / "raw"
+    if raw_dir.exists():
+        for r_file in raw_dir.glob("*"):
+            if r_file.is_file() and not r_file.name.startswith("."):
+                sha, size = compute_sha256(r_file)
+                if sha:
+                    inputs_lineage["raw_source_data"][r_file.name] = {
+                        "size_bytes": size,
+                        "sha256": sha,
+                        "relative_path": str(r_file.relative_to(root_dir))
+                    }
+
+    # Config Hash
+    config_path = root_dir / "src" / "config.py"
+    cfg_sha, cfg_size = compute_sha256(config_path)
+    inputs_lineage["config_fingerprint"] = {
+        "file": "src/config.py",
+        "sha256": cfg_sha,
+        "size_bytes": cfg_size
+    }
+
+    # Solver Versions
+    solver_versions = {}
+    try:
+        import ortools
+        solver_versions["ortools_cpsat"] = getattr(ortools, "__version__", "unknown")
+    except ImportError:
+        solver_versions["ortools_cpsat"] = "not_installed"
+
+    # Requirements Fingerprint
+    req_path = root_dir / "requirements.txt"
+    req_sha, req_size = compute_sha256(req_path)
+
+    inputs_lineage["environment"] = {
+        "python_version": sys.version.split()[0],
+        "solver_versions": solver_versions,
+        "requirements_fingerprint": {
+            "file": "requirements.txt",
+            "sha256": req_sha,
+            "size_bytes": req_size
+        }
+    }
 
     manifest = {
         "run_id": run_id,
         "created_at": datetime.now().isoformat(),
         "total_artifacts": len(manifest_entries),
-        "artifacts": manifest_entries
+        "artifacts": manifest_entries,
+        "inputs": inputs_lineage
     }
 
     manifest_path = root_dir / "reports" / "run_manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=4, ensure_ascii=False)
 
