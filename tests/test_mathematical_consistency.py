@@ -203,11 +203,11 @@ def test_family_to_sku_disaggregation_reconciliation():
         f = row["family_id"]
         expected_batches = int(round(row["prod_batches"]))
         actual_batches = sku_sum.get((w, f), 0)
-        # Closed-loop capacity repair ve integer lotting toleransı (|fark| <= 1 parti)
+        # Closed-loop capacity repair ve integer lotting tam korunum doğrulaması (sıfır tolerans)
         diff = abs(actual_batches - expected_batches)
-        assert diff <= 1, (
-            f"Ayrıştırma (Disaggregation) Hatası (Hafta {w}, {f}): "
-            f"Aile Hedefi {expected_batches} koli, SKU Toplamı {actual_batches} koli (Fark: {diff} > 1)"
+        assert diff == 0, (
+            f"Ayrıştırma (Disaggregation) Korunum Hatası (Hafta {w}, {f}): "
+            f"Aile Hedefi {expected_batches} koli, SKU Toplamı {actual_batches} koli (Fark: {diff} != 0)"
         )
 
 
@@ -466,13 +466,17 @@ def test_energy_schedule_production_units_conservation():
 
 def test_variable_energy_exact_physics_sum():
     """
-    P0 Test: Değişken işlem enerjisinin toplamının, her operasyon için
-    sum(production_units * variable_kwh_per_unit) formülüne birebir uyduğunu doğrular.
+    P0 Test: İki bileşenli termodinamik enerji modelinde değişken işlem enerjisi
+    sum(production_units * variable_kwh_per_unit) ve baz işleme yükü
+    sum(proc_hours * base_power_kw) toplamının, sistem KPI'larındaki processing_kwh
+    değerine kuruşu kuruşuna eşit olduğunu doğrular.
     """
     import src.config as cfg
     conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     routing = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
+    machines = pd.read_sql("SELECT machine_id, base_power_kw FROM machines", conn)
+    energy_kpis = pd.read_sql("SELECT * FROM energy_kpis", conn)
     energy_machines = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
     conn.close()
 
@@ -480,11 +484,32 @@ def test_variable_energy_exact_physics_sum():
         pytest.skip("Çizelge boş, atlanıyor.")
 
     merged = sched.merge(routing, on=["product_id", "operation_seq", "machine_id"], how="left")
+    merged = merged.merge(machines, on="machine_id", how="left")
     merged["variable_kwh_per_unit"] = merged["variable_kwh_per_unit"].fillna(0.0)
+    merged["base_power_kw"] = merged["base_power_kw"].fillna(0.0)
 
-    # Fiziksel kuramsal değişken enerji (kWh)
-    expected_variable_kwh = (merged["production_units"] * merged["variable_kwh_per_unit"]).sum()
+    # 1. Fiziksel değişken enerji (kWh)
+    expected_variable_kwh = float((merged["production_units"] * merged["variable_kwh_per_unit"]).sum())
+    assert expected_variable_kwh == pytest.approx(19537.5, abs=1e-2), (
+        f"Kanonik değişken enerji uyuşmazlığı: Beklenen 19537.5 kWh, Hesaplanan {expected_variable_kwh:.2f} kWh"
+    )
 
-    # İşlem enerjisi makine kpi toplamı (processing_kwh)
-    # total_kwh = proc + setup + idle; bu formülasyondaki işlem enerjisi bileşeni
-    assert expected_variable_kwh >= 0.0
+    # 2. Fiziksel baz işleme enerjisi (kWh)
+    merged["proc_hours"] = (merged["end_min"] - merged["start_min"]) / 60.0
+    expected_base_kwh = float((merged["proc_hours"] * merged["base_power_kw"]).sum())
+
+    # 3. İki bileşenin kuramsal toplamı
+    expected_total_proc_kwh = expected_variable_kwh + expected_base_kwh
+
+    # 4. KPI tabloları ile fiziksel eşitlik doğrulaması
+    actual_kpi_proc_kwh = float(energy_kpis["processing_kwh"].iloc[0])
+    actual_machine_proc_kwh = float(energy_machines["processing_kwh"].sum())
+
+    assert actual_kpi_proc_kwh == pytest.approx(expected_total_proc_kwh, rel=1e-4), (
+        f"Fiziksel işlem enerjisi formül uyuşmazlığı: Model {expected_total_proc_kwh:.4f} kWh, "
+        f"energy_kpis {actual_kpi_proc_kwh:.4f} kWh"
+    )
+    assert actual_machine_proc_kwh == pytest.approx(expected_total_proc_kwh, rel=1e-4), (
+        f"Makine KPI toplamı formül uyuşmazlığı: Model {expected_total_proc_kwh:.4f} kWh, "
+        f"energy_machine_kpis {actual_machine_proc_kwh:.4f} kWh"
+    )
