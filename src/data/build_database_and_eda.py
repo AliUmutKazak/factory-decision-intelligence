@@ -200,9 +200,14 @@ def initialize_database(force_recreate=False, run_id=None):
     init_pipeline_runs_table(conn)
 
     # 1. İşlenmiş sipariş verisini aktar
-    if not os.path.exists(PROCESSED_ORDERS_PATH):
-        raise FileNotFoundError(f"Missing mandatory order data: {PROCESSED_ORDERS_PATH}")
-    orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
+    try:
+        orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
+        if orders_df.empty:
+            raise pd.errors.EmptyDataError("Dosya bos")
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        from src.data.preprocessing import run_preprocessing
+        run_preprocessing()
+        orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orders (

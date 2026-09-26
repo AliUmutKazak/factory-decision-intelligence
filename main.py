@@ -5,8 +5,12 @@ Uçtan uca hiyerarşik üretim planlama, detaylı çizelgeleme,
 malzeme gereksinim planlaması, enerji ve karbon muhasebesi zincirini çalıştırır.
 """
 
+import os
 import sys
 import time
+import shutil
+from pathlib import Path
+
 from src.data.preprocessing import run_preprocessing
 from src.data.build_database_and_eda import initialize_database
 from src.forecasting.train_forecast import run_forecast_benchmark
@@ -22,8 +26,12 @@ from src.utils.lineage import (
     get_active_pipeline_run,
     apply_run_retention_policy,
     generate_run_manifest,
-    promote_run_to_active
+    promote_run_to_active,
+    update_pipeline_run_status,
+    validate_pipeline_run,
+    init_pipeline_runs_table
 )
+
 
 def run_end_to_end_pipeline():
     run_id = generate_run_id()
@@ -31,8 +39,21 @@ def run_end_to_end_pipeline():
     print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE BAŞLATILDI (Run ID: {run_id})")
     print("#" * 85 + "\n")
 
-    # Denetim Madde 27: Transaction Boundary - Koşum RUNNING olarak mühürlenir
-    start_pipeline_run(run_id=run_id)
+    base_dir = Path(__file__).resolve().parent
+    canonical_db = base_dir / "data" / "factory.db"
+    staging_dir = base_dir / "data" / "staging"
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_db = staging_dir / f"factory_staging_{run_id}.db"
+
+    # Mevcut kanonik DB varsa metadata ve baz tablolar için staging'e başlangıç kopyası al
+    if canonical_db.exists():
+        shutil.copy2(canonical_db, staging_db)
+
+    # Pipeline boyunca tüm modüllerin izole staging DB'ye yazmasını sağla
+    os.environ["FACTORY_DB_PATH"] = str(staging_db)
+
+    # Staging üzerinde koşumu RUNNING olarak başlat
+    start_pipeline_run(run_id=run_id, db_path=str(staging_db))
 
     stages = [
         ("Aşama 1: Veri Ön İşleme & Temizlik", lambda: run_preprocessing()),
@@ -58,25 +79,68 @@ def run_end_to_end_pipeline():
         total_elapsed = time.time() - total_start
 
         # 1. Aşama: STAGING
-        from src.utils.lineage import update_pipeline_run_status, validate_pipeline_run
-        update_pipeline_run_status(run_id=run_id, status="STAGING")
+        update_pipeline_run_status(run_id=run_id, status="STAGING", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: STAGING ({run_id})")
 
         # 2. Aşama: VALIDATE
-        update_pipeline_run_status(run_id=run_id, status="VALIDATE")
+        update_pipeline_run_status(run_id=run_id, status="VALIDATE", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: VALIDATE ({run_id})")
-        validate_pipeline_run(run_id=run_id)
+        validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
         print(f"[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
 
         # 3. Aşama: COMPLETED
-        update_pipeline_run_status(run_id=run_id, status="COMPLETED")
+        update_pipeline_run_status(run_id=run_id, status="COMPLETED", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: COMPLETED ({run_id})")
 
-        # Gerçek sipariş sayısını veritabanından dinamik al
+        # 4. Aşama: ACTIVE (Atomic DB Promotion & State Transition)
+        promote_run_to_active(run_id=run_id, db_path=str(staging_db))
+
+        # Environment değişkenini kaldır
+        os.environ.pop("FACTORY_DB_PATH", None)
+
+        # Açık kalmış olabilecek SQLite bağlantı handle'larını serbest bırak
+        import gc
+        gc.collect()
+        time.sleep(0.5)
+
+        # Windows & OneDrive File-Lock Güvenli Atomic Replacement
+        max_retries = 5
+        promoted = False
+        for attempt in range(max_retries):
+            try:
+                # Doğrudan staging dosyasını kanonik hedefe kopyala
+                shutil.copy2(staging_db, canonical_db)
+                promoted = True
+                break
+            except PermissionError:
+                gc.collect()
+                time.sleep(1.0)
+
+        if not promoted:
+            # Alternatif deneme: Geçici hedef üzerinden atomic replace
+            temp_target = canonical_db.with_suffix(f".tmp_{run_id}")
+            shutil.copy2(staging_db, temp_target)
+            if canonical_db.exists():
+                try:
+                    canonical_db.unlink()
+                except PermissionError:
+                    pass
+            temp_target.replace(canonical_db)
+
+        # Staging dosyasını temizle
+        if staging_db.exists():
+            try:
+                staging_db.unlink()
+            except Exception:
+                pass
+
+        print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE (data/factory.db güncellendi)")
+
+        # Gerçek sipariş sayısını veritabanından al
         actual_orders_count = 0
         try:
             from src.utils.db import get_db_connection
-            with get_db_connection() as conn:
+            with get_db_connection(str(canonical_db)) as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT COUNT(*) FROM orders")
                 row = cur.fetchone()
@@ -85,25 +149,21 @@ def run_end_to_end_pipeline():
         except Exception:
             pass
 
-        # 4. Aşama: ACTIVE (Atomic Promotion)
-        promote_run_to_active(run_id=run_id)
-        print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE")
-
-        # Denetim meta verisini gerçek sipariş adedi ve ACTIVE durumuyla kaydet
+        # Denetim meta verisini kaydet
         meta = record_pipeline_run_metadata(
             run_id=run_id,
             status="ACTIVE",
             orders_count=actual_orders_count,
             data_source="data/processed/factory_orders.csv"
         )
-        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}), Status: ACTIVE, Orders: {actual_orders_count})")
+        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: ACTIVE, Orders: {actual_orders_count})")
 
-        # Denetim Kapı 5: Historical Run Retention (Son 20 koşumu koru, eskileri tasfiye et)
-        pruned_count = apply_run_retention_policy(keep_last_n=20)
+        # Historical Run Retention
+        pruned_count = apply_run_retention_policy(keep_last_n=20, db_path=str(canonical_db))
         if pruned_count > 0:
             print(f"[AUDIT] Retention Policy uygulandı: {pruned_count} adet eski denetim kaydı arşivlendi/temizlendi.")
 
-        # Denetim Madde 4: Artifact Manifest Mühürleme
+        # Artifact Manifest Mühürleme
         manifest = generate_run_manifest(run_id=run_id)
         print(f"[AUDIT] Artifact Manifest oluşturuldu -> reports/run_manifest.json ({manifest['total_artifacts']} dosya mühürlendi)")
 
@@ -113,12 +173,29 @@ def run_end_to_end_pipeline():
 
     except Exception as exc:
         print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)
+        os.environ.pop("FACTORY_DB_PATH", None)
+
+        # Hata anında staging DB temizlenir, kanonik DB'ye dokunulmaz!
+        if staging_db.exists():
+            try:
+                staging_db.unlink()
+            except Exception:
+                pass
+
         try:
-            from src.utils.lineage import update_pipeline_run_status
-            update_pipeline_run_status(run_id=run_id, status="FAILED")
+            if canonical_db.exists():
+                from src.utils.db import get_db_connection
+                with get_db_connection(str(canonical_db)) as conn:
+                    init_pipeline_runs_table(conn)
+                    cur = conn.cursor()
+                    cur.execute(
+                        "INSERT OR REPLACE INTO pipeline_runs (run_id, timestamp, status) VALUES (?, datetime('now'), 'FAILED')",
+                        (run_id,)
+                    )
             record_pipeline_run_metadata(run_id=run_id, status="FAILED")
         except Exception:
             pass
+
         raise exc
 
 
