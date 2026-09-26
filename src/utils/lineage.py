@@ -175,7 +175,6 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
     Koşumun fiziksel ve matematiksel çıktılarının tutarlılığını denetler.
     Tüm kontroller geçerse True döner, aksi halde ValueError fırlatır.
     """
-    import sqlite3
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     conn = get_db_connection(active_db)
@@ -188,17 +187,17 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
         if sched_count == 0:
             raise ValueError(f"Validation Error: production_schedule tablosu boş (run_id: {run_id})")
 
-        # 2. Enerji analitiği kontrolü
-        cur.execute("SELECT COUNT(*) FROM energy_analytics")
+        # 2. Enerji analitiği kontrolü (Doğru tablo adı: energy_kpis)
+        cur.execute("SELECT COUNT(*) FROM energy_kpis")
         energy_count = cur.fetchone()[0]
         if energy_count == 0:
-            raise ValueError(f"Validation Error: energy_analytics tablosu boş (run_id: {run_id})")
+            raise ValueError(f"Validation Error: energy_kpis tablosu boş (run_id: {run_id})")
 
-        # 3. Karbon analitiği kontrolü
-        cur.execute("SELECT COUNT(*) FROM carbon_analytics")
+        # 3. Karbon analitiği kontrolü (Doğru tablo adı: carbon_kpis)
+        cur.execute("SELECT COUNT(*) FROM carbon_kpis")
         carbon_count = cur.fetchone()[0]
         if carbon_count == 0:
-            raise ValueError(f"Validation Error: carbon_analytics tablosu boş (run_id: {run_id})")
+            raise ValueError(f"Validation Error: carbon_kpis tablosu boş (run_id: {run_id})")
 
         return True
     finally:
