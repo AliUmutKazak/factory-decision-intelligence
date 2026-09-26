@@ -178,7 +178,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
     import sqlite3
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
-    conn = sqlite3.connect(active_db)
+    conn = get_db_connection(active_db)
     try:
         cur = conn.cursor()
         

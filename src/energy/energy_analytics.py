@@ -90,9 +90,24 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
 
         conn = get_db_connection(DB_PATH)
-        kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
-        profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
-        m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
+        cur = conn.cursor()
+        if run_id:
+            # İlgili run_id varsa mükerrer kaydı önlemek için temizle
+            try:
+                cur.execute("DELETE FROM energy_kpis WHERE run_id = ?", (run_id,))
+                cur.execute("DELETE FROM energy_profile_15min WHERE run_id = ?", (run_id,))
+                cur.execute("DELETE FROM energy_machine_kpis WHERE run_id = ?", (run_id,))
+                conn.commit()
+            except Exception:
+                pass
+            kpi_df.to_sql("energy_kpis", conn, if_exists="append", index=False)
+            profile_df.to_sql("energy_profile_15min", conn, if_exists="append", index=False)
+            m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="append", index=False)
+        else:
+            # Standalone çalıştırmada replace yerine temizleyip ekle
+            kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
+            profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
+            m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
         conn.close()
 
         return kpi_df, m_kpi_df, profile_df
