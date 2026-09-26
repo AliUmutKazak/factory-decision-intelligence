@@ -479,6 +479,19 @@ with tab_schedule:
         sched_copy["start_hour"] = sched_copy["start_min"] / 60.0
         sched_copy["duration_hour"] = sched_copy["duration_min"] / 60.0
 
+        # P0 Madde 2: Çok Haftalı Çizelgeleme Filtresi
+        if "schedule_week" in sched_copy.columns:
+            available_weeks = sorted(sched_copy["schedule_week"].dropna().unique().tolist())
+            selected_week = st.selectbox(
+                "🗓️ Planlama / Çizelgeleme Haftası Seçin:",
+                options=["Tüm Haftalar"] + [f"Hafta {int(w)}" for w in available_weeks],
+                index=0,
+                help="CP-SAT çok haftalı makine fazla mesai bütçesi (W1–W4) doğrultusunda ilgili haftanın operasyonlarını listeler."
+            )
+            if selected_week != "Tüm Haftalar":
+                target_w = int(selected_week.split(" ")[1])
+                sched_copy = sched_copy[sched_copy["schedule_week"] == target_w]
+
         hover_col = "lot_id" if "lot_id" in sched_copy.columns else "batch_id"
 
         fig_gantt = px.bar(
@@ -498,7 +511,7 @@ with tab_schedule:
                 "product_id": "Ürün"
             }
         )
-        # Madde 15: Model dinamik malzeme gecikme çizgisi (Hardcoded 8. saat yerine)
+        # Madde 15: Model dinamik malzeme gecikme çizgisi
         if "release_time_min" in sched_copy.columns:
             max_rel_min = sched_copy["release_time_min"].max()
             if pd.notna(max_rel_min) and max_rel_min > 0:
@@ -515,7 +528,7 @@ with tab_schedule:
         fig_gantt.update_yaxes(autorange="reversed")
         st.plotly_chart(fig_gantt, use_container_width=True)
 
-        sched_cols = [c for c in [hover_col, "machine_id", "setup_before_min", "start_min", "end_min", "duration_min", "batch_qty", "lot_qty"] if c in sched_copy.columns]
+        sched_cols = [c for c in ["schedule_week", hover_col, "machine_id", "setup_before_min", "start_min", "end_min", "duration_min", "batch_qty", "production_units"] if c in sched_copy.columns]
         st.dataframe(sched_copy[sched_cols], use_container_width=True)
 
 # =============================================================
