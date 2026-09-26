@@ -178,76 +178,79 @@ def test_run_manifest_generation(tmp_path, monkeypatch):
     assert "total_artifacts" in manifest
 
 
-def test_p0_active_run_isolation_on_failure(tmp_path):
+def test_p0_active_run_isolation_on_failure(tmp_path, monkeypatch):
     """
     P0 Denetim Kanıtı (Data Isolation & Split-Brain Prevention):
-    Yeni bir koşum çalışırken CP-SAT veya ara aşamada patlarsa,
-    önceki başarılı koşumun downstream tabloları ve active_run_id'si korunur.
-    Fiziksel tablolara hatalı/yarım veri yazılmaz, Split-Brain oluşamaz.
+    RUN-A ACTIVE ve production_schedule = A iken;
+    RUN-B RUNNING olarak başlar, get_db_connection(DB_PATH) üzerinden downstream
+    tablolara (production_schedule = B staging) yazar ve ardından FAILED olur.
+    Sonuçta kanonik DB'de ACTIVE = RUN-A ve production_schedule = A olduğu kanıtlanır.
     """
+    import src.config as cfg
     canonical_db = tmp_path / "factory.db"
-    staging_db = tmp_path / "factory_staging.db"
+    staging_db = tmp_path / "factory_staging_RUN-B.db"
 
-    # 1. RUN-A aktif olarak kanonik DB'ye kaydedilir ve tablolara verisi yazılır
-    conn = sqlite3.connect(str(canonical_db))
-    try:
+    # Varsayılan kanonik DB_PATH'i test dizinine sabitle
+    monkeypatch.setattr(cfg, "DB_PATH", canonical_db)
+    monkeypatch.setattr("src.utils.db.DB_PATH", canonical_db)
+    monkeypatch.delenv("FACTORY_DB_PATH", raising=False)
+
+    # 1. RUN-A ACTIVE olarak kanonik DB'dedir ve production_schedule = A verisine sahiptir
+    with get_db_connection(cfg.DB_PATH) as conn:
         init_pipeline_runs_table(conn)
-        conn.execute("INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES ('RUN-A', datetime('now'), 'ACTIVE')")
-        conn.commit()
-        # Fiziksel tablo: production_schedule (RUN-A)
+        conn.execute(
+            "INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES ('RUN-A', '2026-09-26T10:00:00', 'ACTIVE')"
+        )
         df_a = pd.DataFrame([{"lot_id": "LOT-A-001", "run_id": "RUN-A", "quantity": 100}])
         df_a.to_sql("production_schedule", conn, if_exists="replace", index=False)
-    finally:
-        conn.close()
+        conn.commit()
 
-    # 2. RUN-B başlatılır: Staging DB kopyalanır ve modüller staging'e yazar
+    # 2. RUN-B başlar: main.py mimarisindeki gibi staging kopyası alınır ve FACTORY_DB_PATH aktif edilir
     shutil.copy2(canonical_db, staging_db)
+    monkeypatch.setenv("FACTORY_DB_PATH", str(staging_db))
 
-    # RUN-B staging DB'deki tabloyu günceller (simüle edilmiş ara aşama)
-    conn_stg = sqlite3.connect(str(staging_db))
     try:
-        conn_stg.execute("INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES ('RUN-B', datetime('now'), 'RUNNING')")
-        conn_stg.commit()
-        df_b = pd.DataFrame([{"lot_id": "LOT-B-002", "run_id": "RUN-B", "quantity": 999}])
-        df_b.to_sql("production_schedule", conn_stg, if_exists="replace", index=False)
-    finally:
-        conn_stg.close()
-        del conn_stg
+        # RUN-B RUNNING olarak işaretlenir
+        start_pipeline_run(run_id="RUN-B")
+
+        # Alt modüller doğrudan get_db_connection(cfg.DB_PATH) çağırsa bile
+        # dinamik izolasyon sayesinde staging DB'ye yazar (production_schedule = B staging)
+        with get_db_connection(cfg.DB_PATH) as conn_mod:
+            df_b = pd.DataFrame([{"lot_id": "LOT-B-999", "run_id": "RUN-B", "quantity": 999}])
+            df_b.to_sql("production_schedule", conn_mod, if_exists="replace", index=False)
+            conn_mod.commit()
+
+        # 3. RUN-B downstream veriyi yazdıktan sonra patlar (CP-SAT / Validation Failure)
+        raise RuntimeError("Simulated pipeline failure after writing downstream staging data")
+
+    except RuntimeError:
+        # Pipeline hata yakalama bloğu: FACTORY_DB_PATH kaldırılır, staging silinir, RUN-B FAILED yazılır
+        monkeypatch.delenv("FACTORY_DB_PATH", raising=False)
         gc.collect()
-
-    # 3. Ara aşamada hata fırlatılır (CP-SAT solver failure simülasyonu)
-    try:
-        raise RuntimeError("CP-SAT solver failure simulated during RUN-B execution")
-    except Exception:
-        # Hata anında staging DB temizlenir, kanonik DB'ye dokunulmaz
         if staging_db.exists():
             try:
                 staging_db.unlink()
             except PermissionError:
                 pass
 
-        conn_can = sqlite3.connect(str(canonical_db))
-        try:
-            conn_can.execute("INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES ('RUN-B', datetime('now'), 'FAILED')")
-            conn_can.commit()
-        finally:
-            conn_can.close()
+        with get_db_connection(cfg.DB_PATH) as conn_fail:
+            conn_fail.execute(
+                "INSERT OR REPLACE INTO pipeline_runs (run_id, timestamp, status) VALUES ('RUN-B', '2026-09-26T10:05:00', 'FAILED')"
+            )
+            conn_fail.commit()
 
-    # 4. KANONİK VERİTABANI VE VERİ İZOLASYONU DOĞRULAMASI
-    # A) Aktif koşum hâlâ RUN-A olmalıdır
+    # 4. DOĞRULAMA:
+    # A) ACTIVE koşum hâlâ RUN-A olmalıdır
     active = get_active_pipeline_run(db_path=str(canonical_db))
     assert active is not None
     assert active["run_id"] == "RUN-A"
     assert active["status"] == "ACTIVE"
 
-    # B) Fiziksel production_schedule tablosunda RUN-B'nin verisi ASLA bulunmamalıdır!
-    conn_check = sqlite3.connect(str(canonical_db))
-    try:
+    # B) Kanonik DB'deki production_schedule tablosunda hâlâ A verisi durmalı, B verisi sızmamış olmalıdır
+    with get_db_connection(cfg.DB_PATH) as conn_check:
         df_final = pd.read_sql("SELECT * FROM production_schedule", conn_check)
-    finally:
-        conn_check.close()
 
     assert len(df_final) == 1
     assert df_final["run_id"].iloc[0] == "RUN-A"
     assert df_final["lot_id"].iloc[0] == "LOT-A-001"
-    assert "RUN-B" not in df_final["run_id"].values
+    assert int(df_final["quantity"].iloc[0]) == 100
