@@ -304,7 +304,7 @@ This platform bridges tactical operational research and discrete-event schedulin
 | **Energy** | **21,051.98 kWh** |
 | **Carbon** | **9.4907 tCO₂e** |
 
-> Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları `artifacts/reference/` dizininde ve `reference_run_metadata.json` dosyasında dondurulmuştur.
+> Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları tek yetkili kaynak (authoritative single source of truth) olarak `artifacts/reference/` dizininde dondurulmuştur.
 
 ### 📜 Historical Baselines & Model Evolution
 Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarihsel referanslar arşiv amaçlı aşağıda listelenmiştir:
