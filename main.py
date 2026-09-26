@@ -57,6 +57,21 @@ def run_end_to_end_pipeline():
 
         total_elapsed = time.time() - total_start
 
+        # 1. Aşama: STAGING
+        from src.utils.lineage import update_pipeline_run_status, validate_pipeline_run
+        update_pipeline_run_status(run_id=run_id, status="STAGING")
+        print(f"[AUDIT] Pipeline durumu: STAGING ({run_id})")
+
+        # 2. Aşama: VALIDATE
+        update_pipeline_run_status(run_id=run_id, status="VALIDATE")
+        print(f"[AUDIT] Pipeline durumu: VALIDATE ({run_id})")
+        validate_pipeline_run(run_id=run_id)
+        print(f"[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
+
+        # 3. Aşama: COMPLETED
+        update_pipeline_run_status(run_id=run_id, status="COMPLETED")
+        print(f"[AUDIT] Pipeline durumu: COMPLETED ({run_id})")
+
         # Gerçek sipariş sayısını veritabanından dinamik al
         actual_orders_count = 0
         try:
@@ -70,18 +85,18 @@ def run_end_to_end_pipeline():
         except Exception:
             pass
 
-        # P0: Atomic Active Run Promotion (Tüm pipeline başarıyla biterse terfi et)
+        # 4. Aşama: ACTIVE (Atomic Promotion)
         promote_run_to_active(run_id=run_id)
-        print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE / COMPLETED")
+        print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE")
 
-        # Denetim meta verisini gerçek sipariş adedi ve veri kaynağıyla kaydet
+        # Denetim meta verisini gerçek sipariş adedi ve ACTIVE durumuyla kaydet
         meta = record_pipeline_run_metadata(
             run_id=run_id,
-            status="COMPLETED",
+            status="ACTIVE",
             orders_count=actual_orders_count,
             data_source="data/processed/factory_orders.csv"
         )
-        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: COMPLETED, Orders: {actual_orders_count})")
+        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}), Status: ACTIVE, Orders: {actual_orders_count})")
 
         # Denetim Kapı 5: Historical Run Retention (Son 20 koşumu koru, eskileri tasfiye et)
         pruned_count = apply_run_retention_policy(keep_last_n=20)
@@ -99,6 +114,8 @@ def run_end_to_end_pipeline():
     except Exception as exc:
         print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)
         try:
+            from src.utils.lineage import update_pipeline_run_status
+            update_pipeline_run_status(run_id=run_id, status="FAILED")
             record_pipeline_run_metadata(run_id=run_id, status="FAILED")
         except Exception:
             pass

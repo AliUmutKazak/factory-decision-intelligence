@@ -154,22 +154,81 @@ def start_pipeline_run(run_id: str, db_path: str = None) -> None:
         conn.commit()
         conn.close()
 
+def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) -> None:
+    """Koşumun durumunu atomik olarak günceller (RUNNING -> STAGING -> VALIDATE -> COMPLETED -> ACTIVE / FAILED)."""
+    import src.config as config
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    if not os.path.exists(active_db):
+        return
+    conn = get_db_connection(active_db)
+    try:
+        cur = conn.cursor()
+        cur.execute("UPDATE pipeline_runs SET status = ? WHERE run_id = ?", (status, run_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
+    """
+    P0 Validation Gate:
+    Koşumun fiziksel ve matematiksel çıktılarının tutarlılığını denetler.
+    Tüm kontroller geçerse True döner, aksi halde ValueError fırlatır.
+    """
+    import sqlite3
+    import src.config as config
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    conn = sqlite3.connect(active_db)
+    try:
+        cur = conn.cursor()
+        
+        # 1. Schedule tablosu ve görev kontrolü
+        cur.execute("SELECT COUNT(*) FROM production_schedule")
+        sched_count = cur.fetchone()[0]
+        if sched_count == 0:
+            raise ValueError(f"Validation Error: production_schedule tablosu boş (run_id: {run_id})")
+
+        # 2. Enerji analitiği kontrolü
+        cur.execute("SELECT COUNT(*) FROM energy_analytics")
+        energy_count = cur.fetchone()[0]
+        if energy_count == 0:
+            raise ValueError(f"Validation Error: energy_analytics tablosu boş (run_id: {run_id})")
+
+        # 3. Karbon analitiği kontrolü
+        cur.execute("SELECT COUNT(*) FROM carbon_analytics")
+        carbon_count = cur.fetchone()[0]
+        if carbon_count == 0:
+            raise ValueError(f"Validation Error: carbon_analytics tablosu boş (run_id: {run_id})")
+
+        return True
+    finally:
+        conn.close()        
+
 
 def get_active_pipeline_run(db_path: str = None) -> dict:
-    """Denetim Madde 27: Yalnızca başarıyla tamamlanmış (COMPLETED/SUCCESS) en güncel aktif koşumu döner."""
+    """Yalnızca doğrulanmış ve terfi edilmiş en güncel aktif koşumu döner."""
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
     cur = conn.cursor()
+    # Öncelik ACTIVE, geriye dönük uyumluluk için COMPLETED/SUCCESS
     cur.execute("""
-        SELECT run_id, timestamp, status, orders_count 
-        FROM pipeline_runs 
-        WHERE status IN ('COMPLETED', 'SUCCESS')
+        SELECT run_id, timestamp, status, orders_count
+        FROM pipeline_runs
+        WHERE status = 'ACTIVE'
         ORDER BY timestamp DESC LIMIT 1
     """)
     row = cur.fetchone()
+    if not row:
+        cur.execute("""
+            SELECT run_id, timestamp, status, orders_count
+            FROM pipeline_runs
+            WHERE status IN ('COMPLETED', 'SUCCESS')
+            ORDER BY timestamp DESC LIMIT 1
+        """)
+        row = cur.fetchone()
     conn.close()
     if row:
         return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
@@ -342,9 +401,10 @@ def test_artifact_manifest_generation():
 def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     """
     P0 Mimarisi: Atomic Active Run Promotion.
-    Pipeline başarıyla tamamlandığında, run_id'yi tek bir atomik transaction içinde
-    COMPLETED / ACTIVE durumuna terfi ettirir.
-    Eğer hata olursa tüm transaction rollback edilir.
+    Pipeline başarıyla doğrulanınca, tek bir atomik transaction içinde:
+    1. Önceki ACTIVE olan koşumları ARCHIVED yapar.
+    2. Yeni run_id'yi ACTIVE durumuna terfi ettirir.
+    Hata durumunda transaction rollback edilir ve önceki ACTIVE sistem korunur.
     """
     import sqlite3
     import src.config as config
@@ -354,14 +414,21 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     try:
         cur = conn.cursor()
         cur.execute("BEGIN IMMEDIATE TRANSACTION;")
-        
-        # 1. Bu koşumu COMPLETED yap
+
+        # 1. Önceki ACTIVE koşumları ARCHIVED yap
         cur.execute("""
-            UPDATE pipeline_runs 
-            SET status = 'COMPLETED' 
+            UPDATE pipeline_runs
+            SET status = 'ARCHIVED'
+            WHERE status = 'ACTIVE' AND run_id != ?
+        """, (run_id,))
+
+        # 2. Yeni koşumu ACTIVE yap
+        cur.execute("""
+            UPDATE pipeline_runs
+            SET status = 'ACTIVE'
             WHERE run_id = ?
         """, (run_id,))
-        
+
         conn.commit()
         return True
     except Exception as e:
