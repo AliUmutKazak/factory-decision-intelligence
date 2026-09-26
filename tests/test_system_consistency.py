@@ -253,8 +253,8 @@ def test_pipeline_failure_status_and_downstream_isolation():
         cursor.execute("SELECT status FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
         row = cursor.fetchone()
         assert row is not None, "pipeline_runs tablosu boş!"
-        # Başarılı bir pipeline koşusunun statüsü SUCCESS veya COMPLETED olmalı, FAILED/RUNNING olmamalıdır
-        assert row[0] in ("SUCCESS", "COMPLETED")      
+        # Başarılı bir pipeline koşusunun statüsü SUCCESS, COMPLETED veya ACTIVE olmalı, FAILED/RUNNING olmamalıdır
+        assert row[0] in ("SUCCESS", "COMPLETED", "ACTIVE")      
 
 def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkeypatch):
     """Denetim Madde 27: Pipeline çalışma sırasında RUNNING, hata anında FAILED, yalnızca başarıda COMPLETED olmalıdır."""

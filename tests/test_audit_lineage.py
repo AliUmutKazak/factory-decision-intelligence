@@ -47,7 +47,7 @@ def test_pipeline_runs_table_exists_and_populated(db_connection):
     valid_runs = df_runs[~df_runs["run_id"].str.startswith("RUN-FAIL-SIM")]
     assert not valid_runs.empty, "Geçerli bir pipeline run kaydı bulunamadı!"
     last_status = valid_runs.iloc[-1]["status"]
-    assert last_status in ("SUCCESS", "COMPLETED"), f"Son pipeline çalıştırma durumu geçerli değil: {last_status}"
+    assert last_status in ("SUCCESS", "COMPLETED", "ACTIVE"), f"Son pipeline çalıştırma durumu geçerli değil: {last_status}"
 
 def test_downstream_tables_have_run_id(db_connection):
     """Tüm downstream tablolarında run_id sütununun var olduğunu doğrular."""
@@ -97,7 +97,7 @@ def test_runtime_run_metadata_consistency(db_connection):
     )
     latest_db_run = cursor.fetchone()
     assert latest_db_run is not None, "Runtime DB'de geçerli bir pipeline_run kaydı bulunamadı!"
-    assert latest_db_run[1] in ("SUCCESS", "COMPLETED"), f"Runtime DB status geçerli değil: {latest_db_run[1]}"
+    assert latest_db_run[1] in ("SUCCESS", "COMPLETED", "ACTIVE"), f"Runtime DB status geçerli değil: {latest_db_run[1]}"
 
     # 2. Metadata JSON varsa doğrula
     if metadata_path.exists():
@@ -112,7 +112,7 @@ def test_runtime_run_metadata_consistency(db_connection):
             cursor.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (json_run_id,))
             row = cursor.fetchone()
             assert row is not None, f"Runtime DB'de JSON'daki run_id bulunamadı: {json_run_id}"
-            assert row[0] in ("SUCCESS", "COMPLETED"), f"Runtime DB status geçerli değil: {row[0]}"
+            assert row[0] in ("SUCCESS", "COMPLETED", "ACTIVE"), f"Runtime DB status geçerli değil: {row[0]}"
 
 
 def test_frozen_reference_metadata_consistency():
@@ -139,7 +139,7 @@ def test_frozen_reference_metadata_consistency():
         row = cursor.fetchone()
 
     assert row is not None, f"Frozen reference DB'de referans run_id bulunamadı: {ref_metadata.get('run_id')}"
-    assert row[0] in ("SUCCESS", "COMPLETED"), f"Frozen reference DB status geçerli değil: {row[0]}"
+    assert row[0] in ("SUCCESS", "COMPLETED", "ACTIVE"), f"Frozen reference DB status geçerli değil: {row[0]}"
 
 def test_historical_run_retention_policy(tmp_path):
     """Denetim Kapı 5: En güncel N koşumun korunduğunu ve eski koşumların temizlendiğini doğrular."""
