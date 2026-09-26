@@ -40,20 +40,34 @@ def freeze_reference_atomic():
     print("============================================================")
     run_cmd([sys.executable, "main.py"])
 
-    # 1. Son basarili calismanin run_id ve git_sha bilgisini veritabanindan cek
+    # 1. En guncel ACTIVE pipeline run'i ve git_sha bilgisini veritabanindan cek
     db_path = BASE_DIR / "data" / "factory.db"
     conn = get_db_connection(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT run_id, git_sha FROM pipeline_runs WHERE status IN ('SUCCESS', 'COMPLETED') ORDER BY timestamp DESC LIMIT 1")
+    cur.execute("SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1")
     row = cur.fetchone()
     conn.close()
 
     if not row:
-        print("[ERROR] pipeline_runs tablosunda basarili run bulunamadi!")
+        print("[ERROR] pipeline_runs tablosunda ACTIVE durumunda run bulunamadi!")
         sys.exit(1)
 
-    run_id, git_sha = row[0], row[1]
-    print(f"\n[INFO] Referans Alinacak Run: {run_id} | Git SHA: {git_sha}")
+    run_id, git_sha, status = row[0], row[1], row[2]
+    print(f"\n[INFO] Referans Alinacak ACTIVE Run: {run_id} | Git SHA: {git_sha}")
+
+    # 1.1. run_metadata.json ile SQLite ACTIVE run mutabakati
+    meta_path = BASE_DIR / "reports" / "run_metadata.json"
+    if not meta_path.exists():
+        print(f"[ERROR] {meta_path} bulunamadi!")
+        sys.exit(1)
+
+    import json
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta_data = json.load(f)
+
+    if meta_data.get("run_id") != run_id:
+        print(f"[ERROR] Metadata run_id ({meta_data.get('run_id')}) ile DB ACTIVE run_id ({run_id}) uyusmuyor!")
+        sys.exit(1)
 
     # 2. Dizin Yollari
     ref_dir = BASE_DIR / "artifacts" / "reference"
@@ -91,7 +105,6 @@ def freeze_reference_atomic():
     # 3. Staging alaninda SHA-256 Manifest olustur
     print("\n3. Staging Icin Kriptografik SHA-256 Manifest Olusturuluyor...")
     import hashlib
-    import json
     from datetime import datetime
 
     def get_full_sha256(file_path):
@@ -139,24 +152,20 @@ def freeze_reference_atomic():
         if had_previous_ref:
             ref_dir.rename(backup_dir)
 
-        # B) Staging'i gercek referans dizinine atomik olarak tasi
+        # B) Staging dizinini ana referans yap
         staging_dir.rename(ref_dir)
 
-        # C) Basarili olduysa eski backup'i kaldir
+        # C) Basarili olduysa backup'i temizle
         if backup_dir.exists():
             shutil.rmtree(backup_dir)
-
-        print("============================================================")
-        print(f"CANONICAL RUN ATOMIK OLARAK SABITLENDI: {run_id} | Git: {git_sha[:8]}")
-        print("============================================================")
+        print("✓ Referans basariyla guncellendi (Atomic Swap OK).")
 
     except Exception as e:
-        print(f"[FATAL] Atomic Swap sirasinda hata olustu: {e}")
-        print("[ROLLBACK] Eski referans geri yukleniyor...")
-        if backup_dir.exists() and not ref_dir.exists():
+        print(f"[CRITICAL ERROR] Atomic Swap sirasinda hata olustu: {e}")
+        # Rollback
+        if not ref_dir.exists() and backup_dir.exists():
             backup_dir.rename(ref_dir)
-        if staging_dir.exists():
-            shutil.rmtree(staging_dir)
+            print("↺ Rollback yapildi: Eski referans geri yuklendi.")
         sys.exit(1)
 
 if __name__ == "__main__":
