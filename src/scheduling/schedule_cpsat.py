@@ -45,13 +45,21 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
     mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
     
-    # LP Taktik Seviyeden 1. Hafta Fazla Mesai (OT) Bütçesini Al
+    # LP Taktik Seviyeden Tüm Haftalar (W1..W4) için Makine Bazlı Fazla Mesai (OT) Bütçesini Al
+    weekly_machine_ot_budget_min = {}
     machine_ot_hours = {}
     try:
-        cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan WHERE period_week = 1", conn)
+        cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
         for _, r in cap_df.iterrows():
-            machine_ot_hours[str(r["machine_id"])] = float(r.get("overtime_hours", 0.0))
+            w_idx = int(r["period_week"])
+            m_id = str(r["machine_id"])
+            ot_h = float(r.get("overtime_hours", 0.0))
+            weekly_machine_ot_budget_min[(w_idx, m_id)] = ot_h * 60.0
+            # Geriye dönük uyumluluk ve varsayılan 1. hafta bütçesi
+            if w_idx == 1:
+                machine_ot_hours[m_id] = ot_h
     except Exception:
+        weekly_machine_ot_budget_min = {}
         machine_ot_hours = {}
 
     # Denetim Madde 23 (SSOT): Takvim mantığını doğrudan machines tablosundaki max_daily_hours'tan türet
@@ -491,6 +499,10 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
             ot_duration_in_task = 0
             cur_cursor = s_min
+            # Hafta bazlı OT ayrıştırması (Week 1, Week 2, Week 3, Week 4)
+            WEEK_LEN_MIN = 7 * 24 * 60  # 10080 dk
+            task_week = int(s_min // WEEK_LEN_MIN) + 1
+
             while cur_cursor < e_min:
                 day_cursor = cur_cursor % 1440
                 if day_cursor < ot_cutoff_min:  # Gece Fazla Mesai Penceresi [0, ot_cutoff_min)
@@ -503,7 +515,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
             regular_duration_in_task = max(0, total_duration - ot_duration_in_task)
 
-            # Denetim Madde 20: Interval Overlap ile hassas OT ve Regular ayrıştırması
+            # Denetim Madde 20 & P0 Madde 2: Interval Overlap ile hassas OT/Regular ve Hafta Ayrıştırması
+            item["schedule_week"] = task_week
             item["overtime_min"] = ot_duration_in_task
             item["overtime_minutes"] = ot_duration_in_task
             item["regular_minutes"] = regular_duration_in_task
@@ -519,9 +532,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
         "machine_id", "batch_count", "batch_size_units", "production_units",
         "duration_min", "start_min", "end_min",
-        "regular_minutes", "overtime_minutes",
-        "setup_before_min", "setup_start_min", "setup_end_min",
-        "is_overtime", "calendar_shift", "release_time_min"
+            "schedule_week", "regular_minutes", "overtime_minutes",
+            "setup_before_min", "setup_start_min", "setup_end_min",
+            "is_overtime", "calendar_shift", "release_time_min"
     ]
     for col in canonical_schedule_cols:
         if col not in sched_df.columns:
@@ -530,6 +543,14 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     os.makedirs('data/processed', exist_ok=True)
     os.makedirs('reports', exist_ok=True)
     sched_df.to_csv('data/processed/production_schedule.csv', index=False)
+    # P0 Madde 2: Hafta bazlı kümülatif OT bütçe kontrolü ve denetim logu (W1..W4)
+    if len(sched_df) > 0 and weekly_machine_ot_budget_min:
+        weekly_actual_ot = sched_df.groupby(["schedule_week", "machine_id"])["overtime_minutes"].sum().to_dict()
+        for (w, m), act_ot_min in weekly_actual_ot.items():
+            budget_min = weekly_machine_ot_budget_min.get((w, m), 48.0 * 60.0)
+            if act_ot_min > budget_min:
+                # Bilgilendirme ve denetim uyarısı
+                print(f"[AUDIT-OT] Hafta {w}, Makine {m}: Gerçekleşen OT={act_ot_min:.1f} dk, Bütçe={budget_min:.1f} dk")
 
     # -------------------------------------------------------------
     # Madde 24: CP-SAT Optimization Solver Metadata & Proof Lineage
