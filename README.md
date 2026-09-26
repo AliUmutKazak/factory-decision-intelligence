@@ -24,8 +24,8 @@ Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden,
 | **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.23 sa İşlem + 2.58 sa Setup** | Standart nominal kapasite kısıtları dahilinde çizelgelendi; fazla mesai bütçe sınırları (`max_daily_hours`) korundu. |
 | **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
 | **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku tahmini. |
-| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **21,051.98 kWh / 248.2 kW** | Dinamik güç profili (PROCESSING, SETUP, IDLE) üzerinden tepe yük ve tüketim fiziksel tutarlılıkla hesaplandı. |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **9.4907 tCO₂e** | Doğrulanmış referans koşumu emisyon muhasebesi dengelendi. |
+| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **21,054.23 kWh / 246.95 kW** | Dinamik güç profili (PROCESSING, SETUP, IDLE) üzerinden tepe yük (246.95 kW) ve ortalama yük (111.94 kW) fiziksel tutarlılıkla hesaplandı. |
+| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **9.4917 tCO₂e** | Doğrulanmış referans koşumu emisyon muhasebesi dengelendi (Kapsam 1: 0.2278 tCO₂e, Kapsam 2: 9.2639 tCO₂e). |
 > **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
 > **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
 > **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
@@ -184,10 +184,10 @@ $$NR_t = \max\left(0, GR_t + SS - I_{t-1}^{\text{proj}} - SR_t\right)$$
 ### 15-Dakikalık Tesis Yük Profili
 $$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\text{setup}}(t) + P_{m}^{\text{idle}}(t) \right)$$
 
-* **Tepe Yük (Peak Load):** $15.93\text{ kW}$
-* **Ortalama Yük (Avg Load):** $114.77\text{ kW}$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır)
+* **Tepe Yük (Peak Load):** $246.95\text{ kW}$
+* **Ortalama Yük (Avg Load):** $111.94\text{ kW}$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır, Load Factor: $0.453$)
 * **Yük Faktörü (Load Factor):** $0.462$
-* **Toplam Enerji Tüketimi:** $21,051.98\text{ kWh}$ (Referans koşum dinamik termodinamik enerji profili)
+* **Toplam Enerji Tüketimi:** $21,054.23\text{ kWh}$ (Referans koşum dinamik termodinamik enerji profili: İşleme 20,944.83 kWh, Setup 19.60 kWh, Boşta 89.79 kWh)
 * **Kapsam 1 + Kapsam 2 Emisyonu:** $10.917\text{ tCO}_2\text{e}$
 
 ### Sera Gazı Emisyonları (Modeled Production-System Scope 1 & 2)
@@ -301,8 +301,8 @@ This platform bridges tactical operational research and discrete-event schedulin
 | **Solver status** | `OPTIMAL` (Global optimum of the formulated CP-SAT model under discrete calendar & MES operational constraints) |
 | **Makespan** | **11,285 dk (188.08 saat)** |
 | **Production units** | **11,525 adet** (Planlanan: 11,525 / Mutabakat: %100) |
-| **Energy** | **21,051.98 kWh** |
-| **Carbon** | **9.4907 tCO₂e** |
+| **Energy** | **21,054.23 kWh** |
+| **Carbon** | **9.4917 tCO₂e** |
 
 > Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları tek yetkili kaynak (authoritative single source of truth) olarak `artifacts/reference/` dizininde dondurulmuştur.
 
@@ -310,7 +310,7 @@ This platform bridges tactical operational research and discrete-event schedulin
 Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarihsel referanslar arşiv amaçlı aşağıda listelenmiştir:
 - **v1 Single-Lot Baseline:** Operasyonlar arası transfer partileme olmaksızın çözülen ilk model (Makespan: ~8,962 dk, 8,250 mikro birim, 1,642 kWh enerji hesabı).
 - **v2 Transfer-Batched Pre-SSOT:** İlk alt-parti ve acil malzeme kısıtları entegrasyonu (Makespan: 14,105 – 14,683 dk denemeleri; ara referans: 13,698 dk).
-- **v2.2 Validated Reference Snapshot (Current):** Tam takvim/vardiya/fazla mesai bütçe kısıtları, dinamik MES durum kuplajı ve fiziksel enerji profili altında doğrulanmış referans (Makespan: 11,285 dk, Enerji: 21,051.98 kWh, Karbon: 9.4907 tCO₂e).
+- **v2.2 Validated Reference Snapshot (Current):** Tam takvim/vardiya/fazla mesai bütçe kısıtları, dinamik MES durum kuplajı ve fiziksel enerji profili altında doğrulanmış referans (Makespan: 11,285 dk, Enerji: 21,054.23 kWh, Karbon: 9.4917 tCO₂e).
 
 
 ## 8. Academic & Methodological References
