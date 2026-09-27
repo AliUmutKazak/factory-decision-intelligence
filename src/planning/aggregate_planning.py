@@ -430,7 +430,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
     """
     Hiyerarşik Üretim Planlama Motoru (Endüstriyel Kapalı Devre Re-Optimization)
     Alt seviye SKU fizibilitesi sağlanana kadar üst seviye Taktik LP'yi 
-    dinamik Benders benzeri kapasite kesmeleriyle yeniden çözer.
+    dinamik Iterative Capacity-Feedback kesitleriyle (cuts) yeniden çözer.
     """
     forecast_df, products_df, routing_df, machines_df = load_data()
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
@@ -481,7 +481,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
 
         # 4. Kapalı Devre Karar Mekanizması
         if not detected_overloads:
-            print(f"[CLOSED-LOOP OPTIMIZATION] Döngü {iteration}: SKU ayrıştırması operasyonel kapasitelerle %100 uyumlu. Global optimum doğrulandı.")
+            print(f"[ITERATIVE RE-OPTIMIZATION] Döngü {iteration}: SKU ayrıştırması operasyonel kapasitelerle %100 uyumlu. Operasyonel kapasite fizibilitesi ve yerel yakınsama doğrulandı.")
             final_family_plan = family_plan_df
             final_sku_plan = sku_plan_df
             final_shadow_prices = shadow_prices
