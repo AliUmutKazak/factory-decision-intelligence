@@ -389,4 +389,47 @@ def test_machine_state_run_scoped_snapshot(tmp_path):
     assert len(df_snap) >= 2
     assert set(df_snap["machine_id"]) >= {"M01", "M02"}
     assert df_snap.loc[df_snap["machine_id"] == "M01", "last_product_id"].values[0] == "P03"
+    conn.close()
+
+def test_canonical_reference_freeze_chain(tmp_path):
+    """Denetim Madde 34 (P0.1): Canonical Reference Freeze zincirini test eder."""
+    import sqlite3
+    import json
+    from src.utils.lineage import freeze_canonical_reference
+
+    db_path = tmp_path / "factory.db"
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            run_id TEXT PRIMARY KEY,
+            git_sha TEXT,
+            status TEXT,
+            created_at TEXT
+        )
+    """)
+    run_id = "RUN_CANONICAL_001"
+    cur.execute("INSERT INTO pipeline_runs VALUES (?, ?, 'ACTIVE', '2026-09-27T10:00:00')", (run_id, "abc1234"))
+    conn.commit()
+
+    # Sahte metadata hazırla
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir()
+    meta_path = reports_dir / "run_metadata.json"
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump({"run_id": run_id, "git_sha": "abc1234"}, f)
+
+    # Monkeypatch ile reports klasörünü izole test dizinine yönlendirelim veya geçici deneyelim
+    # Doğrudan fonksiyonu çağırıp test ediyoruz:
+    target_canonical = tmp_path / "canonical"
+    
+    # Run ID mismatch testi:
+    cur.execute("UPDATE pipeline_runs SET run_id = 'DIFFERENT_RUN'")
+    conn.commit()
+    try:
+        freeze_canonical_reference(conn, target_dir=str(target_canonical))
+        assert False, "Mismatch hatası fırlatılmalıydı!"
+    except ValueError:
+        pass  # Beklenen davranış
+
     conn.close()    

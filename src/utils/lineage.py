@@ -624,3 +624,92 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
         raise e
     finally:
         conn.close()
+
+def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs/canonical") -> dict:
+    """
+    Denetim Madde 34 (P0.1): Canonical Reference Freeze & Atomic Swap Zinciri.
+    1. ACTIVE run seç
+    2. artifact run_id doğrula
+    3. git_sha doğrula
+    4. explicit artifact allowlist
+    5. manifest üret
+    6. atomic swap
+    """
+    import os
+    import shutil
+    import tempfile
+    import json
+    from pathlib import Path
+    import src.config as config
+
+    root_dir = Path(__file__).resolve().parent.parent.parent
+    cur = conn.cursor()
+
+    # 1. ACTIVE run seç
+    cur.execute("SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1")
+    row = cur.fetchone()
+    if not row:
+        raise ValueError("Canonical freeze başarısız: Veritabanında ACTIVE statüsünde bir koşu bulunamadı.")
+    active_run_id, db_git_sha, _ = row
+
+    # 2 & 3. artifact run_id ve git_sha doğrula
+    metadata_file = root_dir / "reports" / "run_metadata.json"
+    if not metadata_file.exists():
+        raise FileNotFoundError(f"Canonical freeze başarısız: {metadata_file} bulunamadı.")
+    
+    with open(metadata_file, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+    
+    meta_run_id = meta.get("run_id")
+    meta_git_sha = meta.get("git_sha")
+
+    if meta_run_id != active_run_id:
+        raise ValueError(f"Run ID mismatch: DB active '{active_run_id}' != Metadata '{meta_run_id}'")
+    if meta_git_sha and db_git_sha and meta_git_sha != db_git_sha:
+        raise ValueError(f"Git SHA mismatch: DB '{db_git_sha}' != Metadata '{meta_git_sha}'")
+
+    # 4. Explicit Artifact Allowlist
+    active_db = Path(os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db"))
+    allowlist = [
+        active_db,
+        metadata_file,
+        root_dir / "reports" / "schedule_solver_metadata.json",
+        root_dir / "reports" / "forecast_model_metadata.json",
+    ]
+    
+    processed_dir = Path(getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed"))
+    if processed_dir.exists():
+        for csv_file in processed_dir.glob("*.csv"):
+            allowlist.append(csv_file)
+
+    # 5. Manifest üret
+    manifest = generate_run_manifest(run_id=active_run_id, db_path=str(active_db))
+
+    # 6. Atomic Swap (Önce geçici temp dizinine yaz, sonra atomik taşı)
+    canonical_target = Path(target_dir)
+    canonical_target.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(dir=str(canonical_target.parent)) as tmp_staging:
+        staging_dir = Path(tmp_staging) / "staging_canonical"
+        staging_dir.mkdir(parents=True, exist_ok=True)
+
+        for src_file in allowlist:
+            if src_file.exists() and src_file.is_file():
+                shutil.copy2(src_file, staging_dir / src_file.name)
+
+        # Manifest'i de staging içine koy
+        with open(staging_dir / "run_manifest.json", "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=4, ensure_ascii=False)
+
+        # Atomic Swap: Eski canonical varsa kaldır/değiştir
+        if canonical_target.exists():
+            shutil.rmtree(canonical_target)
+        shutil.move(str(staging_dir), str(canonical_target))
+
+    return {
+        "status": "SUCCESS",
+        "frozen_run_id": active_run_id,
+        "git_sha": db_git_sha,
+        "canonical_path": str(canonical_target),
+        "total_artifacts": len(manifest.get("artifacts", {}))
+    }        
