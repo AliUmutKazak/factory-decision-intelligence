@@ -522,13 +522,35 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     step = min(e_min - cur_cursor, 1440 - day_cursor)
                     cur_cursor += step
 
+            # Madde 11: Setup süresinin gece penceresine (OT) denk gelen kısmını da hesapla
+            # Gerçek makine kapasitesi açısından: Setup da makine zamanıdır!
+            setup_ot_duration = 0.0
+            s_setup_min = item.get("setup_start_min", 0.0)
+            e_setup_min = item.get("setup_end_min", 0.0)
+            if e_setup_min > s_setup_min:
+                cur_s = s_setup_min
+                while cur_s < e_setup_min:
+                    day_cur = cur_s % 1440
+                    if day_cur < ot_cutoff_min:
+                        step_s = min(e_setup_min - cur_s, ot_cutoff_min - day_cur)
+                        setup_ot_duration += step_s
+                        cur_s += step_s
+                    else:
+                        step_s = min(e_setup_min - cur_s, 1440 - day_cur)
+                        cur_s += step_s
+
+            item["setup_overtime_minutes"] = setup_ot_duration
+            total_actual_ot = ot_duration_in_task + setup_ot_duration
+
             regular_duration_in_task = max(0, total_duration - ot_duration_in_task)
 
-            # Denetim Madde 20 & P0 Madde 2: Interval Overlap ile hassas OT/Regular ve Hafta Ayrıştırması
+            # Denetim Madde 20, P0 Madde 2 & Madde 11: Production OT + Setup OT
             item["schedule_week"] = task_week
-            item["overtime_min"] = ot_duration_in_task
-            item["overtime_minutes"] = ot_duration_in_task
+            item["overtime_min"] = total_actual_ot
+            item["overtime_minutes"] = total_actual_ot
             item["regular_minutes"] = regular_duration_in_task
+            item["is_overtime"] = 1 if total_actual_ot > 0 else 0
+            item["calendar_shift"] = "OVERTIME" if total_actual_ot > (total_duration / 2) else "REGULAR"
             item["is_overtime"] = 1 if ot_duration_in_task > 0 else 0
             item["calendar_shift"] = "OVERTIME" if ot_duration_in_task > (total_duration / 2) else "REGULAR"
 
@@ -541,9 +563,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "task_id", "lot_id", "parent_lot_id", "sub_lot_index", "product_id", "operation_seq",
         "machine_id", "batch_count", "batch_size_units", "production_units",
         "duration_min", "start_min", "end_min",
-            "schedule_week", "regular_minutes", "overtime_minutes",
-            "setup_before_min", "setup_start_min", "setup_end_min",
-            "is_overtime", "calendar_shift", "release_time_min"
+        "schedule_week", "regular_minutes", "overtime_minutes", "setup_overtime_minutes",
+        "setup_before_min", "setup_start_min", "setup_end_min",
+        "is_overtime", "calendar_shift", "release_time_min"
     ]
     for col in canonical_schedule_cols:
         if col not in sched_df.columns:
