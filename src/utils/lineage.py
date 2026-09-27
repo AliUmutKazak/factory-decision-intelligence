@@ -67,7 +67,17 @@ def init_pipeline_runs_table(conn):
     """)
     conn.commit()
 
-def record_pipeline_run_metadata(run_id=None, solver_metrics=None, data_source="factory_orders.csv", orders_count=0, status="COMPLETED", db_path=None):
+def record_pipeline_run_metadata(
+    run_id=None,
+    solver_metrics=None,
+    data_source="factory_orders.csv",
+    orders_count=0,
+    status="COMPLETED",
+    db_path=None,
+    selected_models=None,
+    forecast_origin=None,
+    forecast_method="Hybrid_Backtest_Selection"
+):
     import pandas as pd
     try:
         import ortools
@@ -84,20 +94,50 @@ def record_pipeline_run_metadata(run_id=None, solver_metrics=None, data_source="
     if not run_id:
         run_id = generate_run_id()
 
-    metadata = {
-        "run_id": run_id,
-        "run_timestamp": datetime.now().isoformat(),
-        "git_sha": get_git_sha(),
-        "data_source": data_source,
-        "forecast_origin": "2017-12-31",
-        "forecast_method": "Hybrid_Backtest_Selection",
-        "selected_models": {
+    # Madde 17: Dinamik Model Lineage ve Governance Entegrasyonu
+    # Hard-coded model bilgisi yerine doğrudan DB / pipeline bağlamından dinamik oku
+    resolved_selected_models = dict(selected_models) if selected_models else {}
+    resolved_forecast_origin = forecast_origin
+
+    target_db = Path(db_path) if db_path else DB_PATH
+    if (not resolved_selected_models or not resolved_forecast_origin) and target_db.exists():
+        try:
+            with get_db_connection(target_db) as conn:
+                df_lineage = pd.read_sql(
+                    "SELECT product_id, selected_model, forecast_origin FROM model_lineage",
+                    conn
+                )
+                if not df_lineage.empty:
+                    if not resolved_selected_models:
+                        # En güncel ürün-model seçimlerini sözlüğe dök
+                        resolved_selected_models = dict(
+                            zip(df_lineage["product_id"], df_lineage["selected_model"])
+                        )
+                    if not resolved_forecast_origin and "forecast_origin" in df_lineage.columns:
+                        resolved_forecast_origin = str(df_lineage["forecast_origin"].dropna().iloc[-1])
+        except Exception:
+            pass
+
+    # Fallback: DB veya lineage kaydı bulunamazsa geriye dönük uyumluluk için varsayılanlar
+    if not resolved_selected_models:
+        resolved_selected_models = {
             "P01": "LightGBM",
             "P02": "Holt-Winters",
             "P03": "LightGBM",
             "P04": "LightGBM",
             "P05": "LightGBM"
-        },
+        }
+    if not resolved_forecast_origin:
+        resolved_forecast_origin = "2017-12-31"
+
+    metadata = {
+        "run_id": run_id,
+        "run_timestamp": datetime.now().isoformat(),
+        "git_sha": get_git_sha(),
+        "data_source": data_source,
+        "forecast_origin": resolved_forecast_origin,
+        "forecast_method": forecast_method,
+        "selected_models": resolved_selected_models,
         "config_hash": compute_file_hash(CONFIG_PATH),
         "status": status,
         "orders_count": orders_count,
