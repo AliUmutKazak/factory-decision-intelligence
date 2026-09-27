@@ -462,6 +462,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     print(f"Dual Bound: {best_bound} dakika | Optimality Gap: %{gap:.2f}")
 
     schedule_rows = []
+    weekly_accounting_rows = []
     for mid, tids in machine_to_tasks.items():
         m_tasks = []
         for tid in tids:
@@ -506,42 +507,56 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             m_max_h = machine_daily_hours.get(mid, getattr(cfg, "DAILY_PRODUCTION_HOURS", 16.0))
             ot_cutoff_min = max(0.0, (24.0 - m_max_h) * 60.0)
 
-            ot_duration_in_task = 0
-            cur_cursor = s_min
             # Hafta bazlı OT ayrıştırması (Week 1, Week 2, Week 3, Week 4)
             WEEK_LEN_MIN = 7 * 24 * 60  # 10080 dk
             task_week = int(s_min // WEEK_LEN_MIN) + 1
 
+            # Madde 13: Hafta sınırlarını (W1, W2..) aşan işler için operasyonel muhasebe ayrıştırması
+            task_week_breakdown = {}  # {week_num: {"regular": 0.0, "ot": 0.0, "setup_ot": 0.0}}
+
+            ot_duration_in_task = 0.0
+            cur_cursor = s_min
             while cur_cursor < e_min:
+                cur_w = int(cur_cursor // WEEK_LEN_MIN) + 1
+                if cur_w not in task_week_breakdown:
+                    task_week_breakdown[cur_w] = {"regular": 0.0, "ot": 0.0, "setup_ot": 0.0}
+
+                next_week_boundary = cur_w * WEEK_LEN_MIN
                 day_cursor = cur_cursor % 1440
                 if day_cursor < ot_cutoff_min:  # Gece Fazla Mesai Penceresi [0, ot_cutoff_min)
-                    step = min(e_min - cur_cursor, ot_cutoff_min - day_cursor)
+                    step = min(e_min - cur_cursor, ot_cutoff_min - day_cursor, next_week_boundary - cur_cursor)
                     ot_duration_in_task += step
+                    task_week_breakdown[cur_w]["ot"] += step
                     cur_cursor += step
                 else:  # Normal çalışma aralığı [ot_cutoff_min, 1440)
-                    step = min(e_min - cur_cursor, 1440 - day_cursor)
+                    step = min(e_min - cur_cursor, 1440 - day_cursor, next_week_boundary - cur_cursor)
+                    task_week_breakdown[cur_w]["regular"] += step
                     cur_cursor += step
 
-            # Madde 11: Setup süresinin gece penceresine (OT) denk gelen kısmını da hesapla
-            # Gerçek makine kapasitesi açısından: Setup da makine zamanıdır!
+            # Madde 11 & 13: Setup süresi ve hafta dağılımı
             setup_ot_duration = 0.0
             s_setup_min = item.get("setup_start_min", 0.0)
             e_setup_min = item.get("setup_end_min", 0.0)
             if e_setup_min > s_setup_min:
                 cur_s = s_setup_min
                 while cur_s < e_setup_min:
+                    cur_sw = int(cur_s // WEEK_LEN_MIN) + 1
+                    if cur_sw not in task_week_breakdown:
+                        task_week_breakdown[cur_sw] = {"regular": 0.0, "ot": 0.0, "setup_ot": 0.0}
+
+                    next_w_bound = cur_sw * WEEK_LEN_MIN
                     day_cur = cur_s % 1440
                     if day_cur < ot_cutoff_min:
-                        step_s = min(e_setup_min - cur_s, ot_cutoff_min - day_cur)
+                        step_s = min(e_setup_min - cur_s, ot_cutoff_min - day_cur, next_w_bound - cur_s)
                         setup_ot_duration += step_s
+                        task_week_breakdown[cur_sw]["setup_ot"] += step_s
                         cur_s += step_s
                     else:
-                        step_s = min(e_setup_min - cur_s, 1440 - day_cur)
+                        step_s = min(e_setup_min - cur_s, 1440 - day_cur, next_w_bound - cur_s)
                         cur_s += step_s
 
             item["setup_overtime_minutes"] = setup_ot_duration
             total_actual_ot = ot_duration_in_task + setup_ot_duration
-
             regular_duration_in_task = max(0, total_duration - ot_duration_in_task)
 
             # Denetim Madde 20, P0 Madde 2 & Madde 11: Production OT + Setup OT
@@ -551,10 +566,22 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             item["regular_minutes"] = regular_duration_in_task
             item["is_overtime"] = 1 if total_actual_ot > 0 else 0
             item["calendar_shift"] = "OVERTIME" if total_actual_ot > (total_duration / 2) else "REGULAR"
-            item["is_overtime"] = 1 if ot_duration_in_task > 0 else 0
-            item["calendar_shift"] = "OVERTIME" if ot_duration_in_task > (total_duration / 2) else "REGULAR"
 
             schedule_rows.append(item)
+
+            # Madde 13: Gerçek operasyonel muhasebe satırları (Weekly Task Accounting)
+            for w_num, w_data in sorted(task_week_breakdown.items()):
+                weekly_accounting_rows.append({
+                    "task_id": item.get("task_id", ""),
+                    "lot_id": item.get("lot_id", ""),
+                    "machine_id": item.get("machine_id", mid),
+                    "schedule_week": w_num,
+                    "regular_minutes": round(w_data["regular"], 2),
+                    "overtime_minutes": round(w_data["ot"] + w_data["setup_ot"], 2),
+                    "production_ot_minutes": round(w_data["ot"], 2),
+                    "setup_ot_minutes": round(w_data["setup_ot"], 2),
+                    "total_work_minutes": round(w_data["regular"] + w_data["ot"] + w_data["setup_ot"], 2)
+                })
 
     sched_df = pd.DataFrame(schedule_rows)
 
@@ -574,6 +601,10 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     os.makedirs('data/processed', exist_ok=True)
     os.makedirs('reports', exist_ok=True)
     sched_df.to_csv('data/processed/production_schedule.csv', index=False)
+    if weekly_accounting_rows:
+        accounting_df = pd.DataFrame(weekly_accounting_rows)
+        accounting_df.to_csv('data/processed/task_weekly_accounting.csv', index=False)
+        
     # P0 Madde 2: Hafta bazlı kümülatif OT bütçe kontrolü ve denetim logu (W1..W4)
     if len(sched_df) > 0 and weekly_machine_ot_budget_min:
         weekly_actual_ot = sched_df.groupby(["schedule_week", "machine_id"])["overtime_minutes"].sum().to_dict()
