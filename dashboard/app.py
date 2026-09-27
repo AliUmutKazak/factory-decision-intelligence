@@ -92,7 +92,19 @@ def determine_system_status(tables):
         if s_status in ["INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]:
             return "SOLVER INFEASIBLE", "error", f"CP-SAT Çizelgeleme çözücüsü başarısız: {s_status}."
 
-    # 3. Enerji & Karbon Metrik Kolon Kontrolü
+    # 3. Tablo Doluluk Kontrolleri (Madde 20)
+    core_upstream = ["forecast_demand", "sku_production_plan", "mrp_plan"]
+    downstream = ["production_schedule", "energy_kpis", "carbon_kpis"]
+
+    upstream_empty = any(tables[k].empty for k in core_upstream if k in tables)
+    downstream_empty = any(tables[k].empty for k in downstream if k in tables)
+
+    if upstream_empty and downstream_empty:
+        return "NO RUN", "error", "Pipeline tablolarının tamamı boş. Veri üretimi yapılmamış."
+    elif downstream_empty:
+        return "PARTIAL", "warning", "Taktik planlama hazır ancak operasyonel çizelgeleme veya enerji/karbon adımları henüz tamamlanmamış."
+
+    # 4. Çizelgeleme & Enerji/Karbon Mutabakat Kontrolü (Reconciliation)
     sched_df = tables.get("production_schedule", pd.DataFrame())
     energy_df = tables.get("energy_kpis", pd.DataFrame())
     carbon_df = tables.get("carbon_kpis", pd.DataFrame())
@@ -106,33 +118,7 @@ def determine_system_status(tables):
         if energy_col and energy_df[energy_col].sum() <= 0:
             return "DATA MISMATCH", "error", f"Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh, kolon: {energy_col})."
 
-    return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır."
-
-    # 4. Tablo Doluluk Kontrolleri
-    core_upstream = ["forecast_demand", "sku_production_plan", "mrp_plan"]
-    downstream = ["production_schedule", "energy_kpis", "carbon_kpis"]
-
-    upstream_empty = any(tables[k].empty for k in core_upstream if k in tables)
-    downstream_empty = any(tables[k].empty for k in downstream if k in tables)
-
-    if upstream_empty and downstream_empty:
-        return "NO RUN", "error", "Pipeline tablolarının tamamı boş. Veri üretimi yapılmamış."
-    elif downstream_empty:
-        return "PARTIAL", "warning", "Taktik planlama hazır ancak operasyonel çizelgeleme veya enerji/karbon adımları henüz tamamlanmamış."
-
-    # 5. Core Reconciliation (Schedule vs Energy/Carbon Mutabakatı)
-    sched_df = tables.get("production_schedule", pd.DataFrame())
-    energy_df = tables.get("energy_kpis", pd.DataFrame())
-    carbon_df = tables.get("carbon_kpis", pd.DataFrame())
-
-    if not sched_df.empty:
-        if energy_df.empty or carbon_df.empty:
-            return "DATA MISMATCH", "error", "Çizelge mevcut fakat enerji/karbon metrikleri hesaplanmamış."
-        
-        # Çizelgede üretilen parti var ama enerji tüketimi 0 ise tutarsızlık
-        if "energy_kwh" in energy_df.columns and energy_df["energy_kwh"].sum() <= 0:
-            return "DATA MISMATCH", "error", "Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh)."
-
+    # 5. Tüm kontroller başarıyla geçtiğinde sistem READY durumuna geçer
     return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır."
 
 # Başlık ve Üst Bilgi
