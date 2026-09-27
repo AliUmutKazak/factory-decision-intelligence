@@ -22,9 +22,13 @@ def compute_carbon_analytics(run_id=None):
 
     total_kwh = float(energy_kpi["grand_total_kwh"])
     total_units = int(energy_kpi["total_units_produced"])
+    makespan_hours = float(energy_kpi.get("makespan_hours", 0.0))
 
     # 1. Kapsam 1 Doğrudan Emisyonlar (Model B: Lojistik / Üretim Aktivitesine Bağlı Forklift Tüketimi)
-    actual_forklift_liters = DEFAULT_FORKLIFT_LITERS if total_units > 0 else 0.0
+    # Madde 14: Zaman birimi semantiği uyumlandırması (DEFAULT_FORKLIFT_LITERS Litre/hafta cinsindendir)
+    # 1 standart takvim haftası = 168 saat (7 * 24 saat)
+    run_weeks = (makespan_hours / 168.0) if makespan_hours > 0 else 1.0
+    actual_forklift_liters = (DEFAULT_FORKLIFT_LITERS * run_weeks) if total_units > 0 else 0.0
     scope_1_tco2e = actual_forklift_liters * DIESEL_EMISSION_FACTOR
 
     # 2. Kapsam 2 Dolaylı Emisyonlar (Satın Alınan Elektrik & Makine Ayrıştırması)
