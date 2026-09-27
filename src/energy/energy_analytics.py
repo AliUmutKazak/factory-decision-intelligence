@@ -164,86 +164,43 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         total_slice_load_kw = 0.0
 
         current_week = int(t // (7 * 1440)) + 1
-        day_idx = int(t // 1440) % 7
-        day_min = t % 1440
-        is_sunday = (day_idx == 6)
-        is_night_ot_window = (0 <= day_min < 480)
+        t_in_week = t % (7 * 1440)
+        is_calendar_regular = t_in_week < (5 * 1440)
 
         for m_id, specs in machine_specs.items():
-            m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-            allowed_ot = weekly_machine_ot_hours.get((current_week, str(m_id)), 0.0)
+            m_sched = schedule_df[schedule_df["machine_id"] == m_id]
 
-            # 1. PROC suresi ve enerjisi
-            proc_dur = 0.0
-            proc_kw_min = 0.0
-            for _, row in m_tasks.iterrows():
-                o_start = max(float(t), float(row["start_min"]))
-                o_end = min(t_end, float(row["end_min"]))
-                if o_end > o_start:
-                    d = o_end - o_start
-                    proc_dur += d
-                    proc_kw_min += d * float(row["proc_power_kw"])
+            # 1. İşlemde mi? (Interval overlap kontrolü: [start_min, end_min) kesişimi)
+            active_proc = m_sched[
+                (m_sched["start_min"] < t_end) & (m_sched["end_min"] > t)
+            ]
 
-            # 2. SETUP suresi ve enerjisi
-            setup_dur = 0.0
-            setup_kw_min = 0.0
-            for _, row in m_tasks.iterrows():
-                s_val = float(row.get("setup_before_min", 0))
-                if s_val > 0:
-                    s_start = float(row.get("setup_start_min", float(row["start_min"]) - s_val))
-                    s_end = float(row.get("setup_end_min", float(row["start_min"])))
-                    o_start = max(float(t), s_start)
-                    o_end = min(t_end, s_end)
-                    if o_end > o_start:
-                        d = o_end - o_start
-                        setup_dur += d
-                        setup_kw_min += d * float(specs["setup_kw"])
-
-            # 3. Kalan sure: IDLE mi, OFF mu?
-        rem_dur = max(0.0, actual_interval - (proc_dur + setup_dur))
-        idle_dur = 0.0
-        idle_kw_min = 0.0
-
-        # Madde 12: Kanonik Takvim Semantiği
-        # - Pazar günleri daima OFF (Hard Break)
-        # - Gece penceresinde (00:00 - 08:00):
-        #   Eğer o haftada bu makineye OT verilmemişse (W2+ veya W1 OT=0) kesinlikle OFF.
-        #   Eğer o gece penceresinde makinede aktif iş/setup yoksa gece açılmamıştır -> OFF.
-        if is_sunday:
-            is_machine_off = True
-        elif is_night_ot_window:
-            has_active_work = (proc_dur + setup_dur) > 0.0
-            if allowed_ot <= 0.0 or not has_active_work:
-                is_machine_off = True
+            slice_load_kw = 0.0
+            if len(active_proc) > 0:
+                # Makine işlemde: İki bileşenli termodinamik model uyarınca (base + variable proses gücü)
+                job = active_proc.iloc[0]
+                slice_load_kw = float(job.get("proc_power_kw", specs["base_kw"]))
+                m_proc_min[m_id] += actual_interval
+                m_proc_kwh[m_id] += slice_load_kw * (actual_interval / 60.0)
             else:
-                is_machine_off = False
-        else:
-            is_machine_off = False
+                # Boşta (Idle) mı, kapalı mı?
+                is_active_window = is_calendar_regular or (
+                    weekly_machine_ot_hours.get((current_week, m_id), 0.0) > 0
+                )
+                if is_active_window:
+                    slice_load_kw = specs["idle_kw"]
+                    m_idle_min[m_id] += actual_interval
+                    m_idle_kwh[m_id] += slice_load_kw * (actual_interval / 60.0)
+                else:
+                    slice_load_kw = 0.0
 
-        if not is_machine_off and rem_dur > 0.0:
-            idle_dur = rem_dur
-            idle_kw_min = idle_dur * float(specs["idle_kw"])
-
-            # Kumulatif makine toplamlarina ekle
-            m_proc_min[m_id] += proc_dur
-            m_setup_min[m_id] += setup_dur
-            m_idle_min[m_id] += idle_dur
-
-            slice_m_proc_kwh = proc_kw_min / 60.0
-            slice_m_setup_kwh = setup_kw_min / 60.0
-            slice_m_idle_kwh = idle_kw_min / 60.0
-
-            m_proc_kwh[m_id] += slice_m_proc_kwh
-            m_setup_kwh[m_id] += slice_m_setup_kwh
-            m_idle_kwh[m_id] += slice_m_idle_kwh
-
-            total_slice_load_kw += (proc_kw_min + setup_kw_min + idle_kw_min) / actual_interval if actual_interval > 0 else 0.0
+            total_slice_load_kw += slice_load_kw
 
         profile_records.append({
             "time_min": t,
-            "time_hour": round(t / 60.0, 4),
-            "interval_min": round(float(actual_interval), 2),
-            "total_load_kw": float(total_slice_load_kw)
+            "time_hour": round(t / 60.0, 2),
+            "interval_min": actual_interval,
+            "total_load_kw": round(total_slice_load_kw, 2),
         })
 
     # Makine KPI Tablosunu dogrudan dilim integrallerinden uret
@@ -252,14 +209,13 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     total_idle_kwh = 0.0
     total_proc_kwh_integrated = 0.0
 
-    # schedule_df üzerinden makine bazlı gerçek işlem süreleri ve enerjileri (Exact Physics)
+    # schedule_df üzerinden kesin analitik değerler
     sched_mach_group = schedule_df.groupby("machine_id").agg({
         "proc_hours": "sum",
         "total_proc_energy_kwh": "sum"
     }).to_dict(orient="index")
 
     for m_id, specs in machine_specs.items():
-        # Eğer schedule_df içinde makineye ait işlem varsa kesin değerleri al, yoksa 0.0
         actual_proc_kwh = float(sched_mach_group.get(m_id, {}).get("total_proc_energy_kwh", 0.0))
         actual_proc_hours = float(sched_mach_group.get(m_id, {}).get("proc_hours", 0.0))
 

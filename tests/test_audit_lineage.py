@@ -513,12 +513,24 @@ def test_validation_gate_blocks_overlapping_physics(tmp_path):
     cur.execute("CREATE TABLE machine_capacity_plan (machine_id TEXT, load_hours REAL)")
 
     # Fiziksel çakışma (Overlapping) enjekte et: İş 1 (100-300), İş 2 (200-400) -> Çakışma!
-    cur.execute("INSERT INTO production_schedule VALUES ('LOT_1', 'M01', 'P01', 10, 100, 300, 0)")
-    cur.execute("INSERT INTO production_schedule VALUES ('LOT_2', 'M01', 'P01', 10, 200, 400, 0)")
+    cur.execute(
+        "INSERT INTO production_schedule VALUES ('LOT_1', 'M01', 'P01',"
+        " 10, 100, 300, 0)"
+    )
+    cur.execute(
+        "INSERT INTO production_schedule VALUES ('LOT_2', 'M01', 'P01',"
+        " 10, 200, 400, 0)"
+    )
     cur.execute("INSERT INTO energy_kpis VALUES (100.0)")
     cur.execute("INSERT INTO energy_machine_kpis VALUES (100.0)")
     cur.execute("INSERT INTO carbon_kpis VALUES (50.0)")
     cur.execute("INSERT INTO sku_production_plan VALUES ('P01', 20, 1)")
+    cur.execute(
+        "INSERT INTO aggregate_plan VALUES (1, 100.0)"
+    )  # Boş tablo kontrolünü geçmesi için
+    cur.execute(
+        "INSERT INTO machine_capacity_plan VALUES ('M01', 100.0)"
+    )  # Boş tablo kontrolünü geçmesi için
     conn.commit()
     conn.close()
 
