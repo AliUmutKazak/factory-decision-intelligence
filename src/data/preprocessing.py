@@ -55,10 +55,15 @@ def get_erp_product_mapping(db_path: Path = DB_PATH) -> Dict[Any, str]:
                                 f"[ERP INTEGRATION ERROR] Eşleme tablosundaki SKU '{target_pid}' "
                                 f"veritabanı 'products' tablosunda tanımlı değil!"
                             )
-        except Exception as e:
-            # Sadece DB henüz hazır değilse kanonik eşlemeye devam et, ama silent drop yapma
-            if "products" not in str(e).lower():
-                raise e
+        except ValueError:
+            # Madde 16: SKU doğrulama ve veri bütünlüğü hatalarını asla yutma, doğrudan fail-fast fırlat
+            raise
+        except (sqlite3.OperationalError, pd.errors.DatabaseError) as e:
+            # Yalnızca DB/tablo henüz migrate edilmemişse fallback'e izin ver
+            if "no such table" in str(e).lower():
+                pass
+            else:
+                raise
 
     return mapping
 
