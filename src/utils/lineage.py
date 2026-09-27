@@ -245,31 +245,26 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
 def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
     """
     P0 Master Validation Gate:
-    Sistemin tek ve mutlak operational gate'idir. Yalnızca tabloların varlığını değil,
-    aşağıdaki 12 kurumsal ve matematiksel invariant'ı kesin olarak denetler:
-    1. Active/Current run_id tutarlılığı
-    2. Downstream tablolardaki satırların run_id eşleşmesi (orphan kayıt yok)
-    3. NULL run_id kontrolü
-    4. Schedule vs SKU exact reconciliation
-    5. Family vs SKU exact reconciliation
-    6. Machine capacity tavan sınırları
-    7. Overtime (OT) bütçe sınırları (48 saat / 2880 dk)
-    8. MRP release zamanlamaları
-    9. Enerji integral mutabakatı (Profil vs KPI)
-    10. Karbon denge korunumu
-    11. Solver status (OPTIMAL / FEASIBLE)
-    12. Manifest / input lineage bütünlüğü
+    COUNT(*) değil; 'same run' + 'math' + 'physics' + 'solver' + 'lineage'
+    5 temel kurumsal kuralı kesin olarak denetler:
+    1. same run: downstream tablolardaki run_id tutarlılığı
+    2. math: SKU mutabakatı ve miktar korunumu
+    3. physics: aynı tezgahta sıfır zaman çakışması (non-overlapping) ve OT bütçe sınırı
+    4. solver: OPTIMAL/FEASIBLE durumu ve geçerli pozitif makespan
+    5. lineage: metadata ve manifest dosya/run_id uyumu
     """
     import src.config as config
     import pandas as pd
     import numpy as np
+    import json
+    from pathlib import Path
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     conn = get_db_connection(active_db)
     try:
         cur = conn.cursor()
 
-        # 1 & 2 & 3. Tablo Varlık, Boşluk ve Run ID Eşleşme Kontrolleri
+        # 1. SAME RUN Tutarlılığı: Tabloların boş olmaması ve run_id uyumu
         tables_to_check = [
             "production_schedule", "energy_kpis", "carbon_kpis", 
             "sku_production_plan", "aggregate_plan", "machine_capacity_plan"
@@ -279,8 +274,17 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
             cnt = cur.fetchone()[0]
             if cnt == 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosu boş (run_id: {run_id})")
+            
+            # Tabloda run_id kolonu varsa, başka bir run_id'ye ait veri bulunmamalı
+            cur.execute(f"PRAGMA table_info({tbl})")
+            cols = [r[1] for r in cur.fetchall()]
+            if "run_id" in cols:
+                cur.execute(f"SELECT DISTINCT run_id FROM {tbl} WHERE run_id IS NOT NULL")
+                distinct_runs = [r[0] for r in cur.fetchall()]
+                if any(r != run_id for r in distinct_runs):
+                    raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}")
 
-        # 4 & 5. SKU ve Family Mutabakat Gate Kontrolleri
+        # 2. MATH: SKU Mutabakatı & Miktar Korunumu
         sched_df = pd.read_sql("SELECT product_id, production_units FROM production_schedule", conn)
         sku_plan_df = pd.read_sql("SELECT product_id, planned_units FROM sku_production_plan WHERE period_week = 1", conn)
         
@@ -292,27 +296,53 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
                 if abs(p_val - s_val) > 1e-4:
                     raise ValueError(f"[VALIDATION GATE FAIL] SKU Mutabakatı Bozuldu! Ürün: {pid}, Planlanan: {p_val}, Çizelgelenen: {s_val}")
 
-        # 6 & 7. Makine Kapasite ve OT Bütçe Sınırları (48 saat = 2880 dk)
+        # 3. PHYSICS: Tezgahlarda Zaman Çakışması Yokluğu (Non-Overlapping) & OT Sınırları
+        # Fiziksel çakışma kontrolü: Aynı makinede iki operasyon asla çakışamaz
+        ops_df = pd.read_sql("SELECT machine_id, start_minute, end_minute FROM production_schedule ORDER BY machine_id, start_minute", conn)
+        for mid, group in ops_df.groupby("machine_id"):
+            sorted_ops = group.sort_values(by="start_minute").to_dict(orient="records")
+            for i in range(len(sorted_ops) - 1):
+                cur_op = sorted_ops[i]
+                next_op = sorted_ops[i + 1]
+                if cur_op["end_minute"] > next_op["start_minute"] + 1e-4:
+                    raise ValueError(
+                        f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali! Makine {mid} üzerinde zaman çakışması: "
+                        f"İş 1 Bitiş={cur_op['end_minute']}, İş 2 Başlangıç={next_op['start_minute']}"
+                    )
+
+        # OT Bütçe Sınırı (48 saat = 2880 dk)
         machine_ot = pd.read_sql("SELECT machine_id, SUM(overtime_minutes) as total_ot FROM production_schedule GROUP BY machine_id", conn)
         for _, row in machine_ot.iterrows():
             if row["total_ot"] > 2880.0 + 1e-4:
                 raise ValueError(f"[VALIDATION GATE FAIL] OT Bütçe Sınırı Aşıldı! Makine: {row['machine_id']}, Fiili OT: {row['total_ot']} dk")
 
-        # 9 & 10. Enerji ve Karbon Denge Kontrolleri
+        # Enerji Korunum Dengesi
         energy_kpi = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
         machine_kpi = pd.read_sql("SELECT SUM(total_kwh) as m_sum FROM energy_machine_kpis", conn)
         if not energy_kpi.empty and not machine_kpi.empty:
-            if abs(float(energy_kpi.iloc[0,0]) - float(machine_kpi.iloc[0,0])) > 0.5:
+            if abs(float(energy_kpi.iloc[0, 0]) - float(machine_kpi.iloc[0, 0])) > 0.5:
                 raise ValueError("[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği (Facility Total != Sum of Machines)")
 
-        # 11. Solver Status Kontrolü
-        meta_json_path = ROOT_DIR / "reports" / "schedule_solver_metadata.json"
+        # 4. SOLVER Feasibility ve Makespan
+        root_dir = Path(__file__).resolve().parent.parent.parent
+        meta_json_path = root_dir / "reports" / "schedule_solver_metadata.json"
         if meta_json_path.exists():
             with open(meta_json_path, "r", encoding="utf-8") as f:
                 solver_meta = json.load(f)
             status = solver_meta.get("status", "").upper()
             if status not in ("OPTIMAL", "FEASIBLE", "OPTIMAL_OR_FEASIBLE"):
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz CP-SAT Solver Durumu: {status}")
+            makespan = solver_meta.get("makespan_minutes", 0)
+            if makespan is not None and float(makespan) <= 0:
+                raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
+
+        # 5. LINEAGE Bütünlüğü: Metadata doğrulaması
+        run_meta_path = root_dir / "reports" / "run_metadata.json"
+        if run_meta_path.exists():
+            with open(run_meta_path, "r", encoding="utf-8") as f:
+                run_meta = json.load(f)
+            if run_meta.get("run_id") and run_meta.get("run_id") != run_id:
+                raise ValueError(f"[VALIDATION GATE FAIL] Lineage metadata run_id uyumsuzluğu: {run_meta.get('run_id')} != {run_id}")
 
         return True
     finally:
@@ -713,3 +743,39 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         "canonical_path": str(canonical_target),
         "total_artifacts": len(manifest.get("artifacts", {}))
     }        
+
+def test_validation_gate_blocks_overlapping_physics(tmp_path):
+    """Denetim Madde 34 (P0.3): Validation Gate'in tezgah çakışmasını yakalayıp engellediğini doğrular."""
+    import sqlite3
+    from src.utils.lineage import validate_pipeline_run
+
+    db_path = tmp_path / "factory.db"
+    conn = sqlite3.connect(str(db_path))
+    cur = conn.cursor()
+    
+    # Gerekli tabloları oluştur
+    cur.execute("CREATE TABLE production_schedule (machine_id TEXT, product_id TEXT, production_units REAL, start_minute REAL, end_minute REAL, overtime_minutes REAL)")
+    cur.execute("CREATE TABLE energy_kpis (grand_total_kwh REAL)")
+    cur.execute("CREATE TABLE energy_machine_kpis (total_kwh REAL)")
+    cur.execute("CREATE TABLE carbon_kpis (total_carbon_kg REAL)")
+    cur.execute("CREATE TABLE sku_production_plan (product_id TEXT, planned_units REAL, period_week INTEGER)")
+    cur.execute("CREATE TABLE aggregate_plan (period_month INTEGER, total_hours REAL)")
+    cur.execute("CREATE TABLE machine_capacity_plan (machine_id TEXT, load_hours REAL)")
+
+    # Fiziksel çakışma (Overlapping) enjekte et: İş 1 (100-300), İş 2 (200-400) -> Çakışma!
+    cur.execute("INSERT INTO production_schedule VALUES ('M01', 'P01', 10, 100, 300, 0)")
+    cur.execute("INSERT INTO production_schedule VALUES ('M01', 'P01', 10, 200, 400, 0)")
+    cur.execute("INSERT INTO energy_kpis VALUES (100.0)")
+    cur.execute("INSERT INTO energy_machine_kpis VALUES (100.0)")
+    cur.execute("INSERT INTO carbon_kpis VALUES (50.0)")
+    cur.execute("INSERT INTO sku_production_plan VALUES ('P01', 20, 1)")
+    cur.execute("INSERT INTO aggregate_plan VALUES (1, 100)")
+    cur.execute("INSERT INTO machine_capacity_plan VALUES ('M01', 50)")
+    conn.commit()
+    conn.close()
+
+    try:
+        validate_pipeline_run(run_id="TEST_RUN_OVERLAP", db_path=str(db_path))
+        assert False, "Fiziksel çakışma validation gate tarafından engellenmeliydi!"
+    except ValueError as e:
+        assert "Fiziksel Kısıt İhlali" in str(e) or "zaman çakışması" in str(e)

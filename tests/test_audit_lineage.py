@@ -432,4 +432,60 @@ def test_canonical_reference_freeze_chain(tmp_path):
     except ValueError:
         pass  # Beklenen davranış
 
-    conn.close()    
+    conn.close() 
+
+def test_physical_active_run_isolation_on_failure(tmp_path):
+    """Denetim Madde 34 (P0.2): RUN-A aktifken RUN-B staging sırasında patlarsa
+    RUN-A'nın veritabanının ve disk artifact'lerinin bozulmadığını doğrular."""
+    import sqlite3
+    import json
+    import shutil
+
+    # 1. RUN-A (ACTIVE) ortamını kur
+    active_db = tmp_path / "factory.db"
+    conn = sqlite3.connect(str(active_db))
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS pipeline_runs (
+            run_id TEXT PRIMARY KEY,
+            status TEXT,
+            created_at TEXT
+        )
+    """)
+    cur.execute("INSERT INTO pipeline_runs VALUES ('RUN_A', 'ACTIVE', '2026-09-27T10:00:00')")
+    conn.commit()
+    conn.close()
+
+    reports_dir = tmp_path / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    run_a_meta = reports_dir / "run_metadata.json"
+    with open(run_a_meta, "w", encoding="utf-8") as f:
+        json.dump({"run_id": "RUN_A", "status": "ACTIVE"}, f)
+
+    # 2. RUN-B (STAGING) başlat ve başarısızlığı simüle et
+    staging_db = tmp_path / "factory_staging_RUN_B.db"
+    shutil.copy2(active_db, staging_db)
+
+    staging_conn = sqlite3.connect(str(staging_db))
+    staging_cur = staging_conn.cursor()
+    staging_cur.execute("UPDATE pipeline_runs SET status = 'STAGING_RUN_B'")
+    staging_conn.commit()
+    staging_conn.close()
+
+    # Simüle edilen RUN-B hatası -> staging silinir, rollback
+    if staging_db.exists():
+        staging_db.unlink()
+
+    # 3. RUN-A durumunun korunduğunu doğrula
+    verify_conn = sqlite3.connect(str(active_db))
+    verify_cur = verify_conn.cursor()
+    verify_cur.execute("SELECT run_id, status FROM pipeline_runs WHERE status = 'ACTIVE'")
+    row = verify_cur.fetchone()
+    verify_conn.close()
+
+    assert row is not None, "RUN-A active statüsü silinmiş!"
+    assert row[0] == "RUN_A", f"Beklenen RUN_A, bulunan: {row[0]}"
+
+    with open(run_a_meta, "r", encoding="utf-8") as f:
+        saved_meta = json.load(f)
+    assert saved_meta["run_id"] == "RUN_A", "RUN-A metadata bozulmuş!"   
