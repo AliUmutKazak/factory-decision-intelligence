@@ -32,13 +32,21 @@ st.set_page_config(
 )
 
 @st.cache_data(ttl=60)
-def get_table(table_name: str) -> pd.DataFrame:
-    """Veritabanından tabloyu güvenli şekilde çeker; hata durumunda boş DataFrame döner."""
+def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
+    """Veritabanından tabloyu güvenli şekilde çeker; run_id verilmişse ve tabloda varsa filtreler."""
     if not Path(DB_PATH).exists():
         return pd.DataFrame()
     try:
         with get_db_connection(DB_PATH) as conn:
-            return pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            cursor = conn.cursor()
+            cursor.execute(f"PRAGMA table_info({table_name})")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if run_id and "run_id" in columns:
+                query = f"SELECT * FROM {table_name} WHERE run_id = ?"
+                return pd.read_sql(query, conn, params=[run_id])
+            else:
+                return pd.read_sql(f"SELECT * FROM {table_name}", conn)
     except Exception:
         return pd.DataFrame()
 
@@ -47,6 +55,13 @@ def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
     if not df.empty:
         return df.iloc[0]
     return pd.Series({k: 0.0 for k in default_keys})
+
+def filter_by_active_run(df: pd.DataFrame, active_id: str) -> pd.DataFrame:
+    """Tabloları Aktif Run ID'ye Göre Filtreleme Yardımcısı (Madde 9.4 / Madde 22 fallback)"""
+    if not df.empty and "run_id" in df.columns and active_id and active_id != "N/A":
+        filtered = df[df["run_id"] == active_id]
+        return filtered if not filtered.empty else df
+    return df
 
 def determine_system_status(tables):
     """
@@ -125,21 +140,46 @@ def determine_system_status(tables):
 st.title("🏭 Factory Decision Intelligence Platform")
 st.caption("Talep Tahmini • Hiyerarşik Taktik Planlama • Zaman Fazlı MRP • CP-SAT Çizelgeleme • Enerji & Karbon")
 
-# Veri Setlerini Yükle
+# --- 1. Aktif Pipeline Run Tespiti (Madde 22) ---
+active_run = get_active_pipeline_run()
+df_runs = get_table("pipeline_runs")
+
+if active_run:
+    run_id_val = active_run.get("run_id", "N/A")
+    run_ts = active_run.get("timestamp", "N/A")
+    git_sha_val = active_run.get("git_sha", "N/A")
+    cfg_hash_val = active_run.get("config_hash", "N/A")
+    trigger_src = active_run.get("trigger_source", "N/A")
+    data_src_val = active_run.get("data_source", "N/A")
+elif not df_runs.empty:
+    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS", "ACTIVE"])]
+    latest_run = completed_runs.iloc[-1] if not completed_runs.empty else df_runs.iloc[-1]
+    run_id_val = latest_run.get("run_id", "N/A")
+    run_ts = latest_run.get("timestamp", "N/A")
+    git_sha_val = latest_run.get("git_sha", "N/A")
+    cfg_hash_val = latest_run.get("config_hash", "N/A")
+    trigger_src = latest_run.get("trigger_source", "N/A")
+    data_src_val = latest_run.get("data_source", "N/A")
+else:
+    run_id_val = run_ts = git_sha_val = cfg_hash_val = trigger_src = data_src_val = "N/A"
+
+target_run_id = run_id_val if run_id_val != "N/A" else None
+
+# --- 2. Veri Setlerini Aktif Run ID'ye Göre Çek ---
 raw_tables = {
-    "pipeline_runs": get_table("pipeline_runs"),
-    "forecast_model_lineage": get_table("forecast_model_lineage"),
-    "energy_kpis": get_table("energy_kpis"),
-    "carbon_kpis": get_table("carbon_kpis"),
-    "mrp_plan": get_table("mrp_plan"),
-    "forecast_demand": get_table("forecast_demand"),
-    "sku_production_plan": get_table("sku_production_plan"),
-    "production_schedule": get_table("production_schedule"),
-    "aggregate_plan": get_table("aggregate_plan"),
-    "machine_capacity_plan": get_table("machine_capacity_plan"),
+    "pipeline_runs": df_runs,
+    "forecast_model_lineage": get_table("forecast_model_lineage", run_id=target_run_id),
+    "energy_kpis": get_table("energy_kpis", run_id=target_run_id),
+    "carbon_kpis": get_table("carbon_kpis", run_id=target_run_id),
+    "mrp_plan": get_table("mrp_plan", run_id=target_run_id),
+    "forecast_demand": get_table("forecast_demand", run_id=target_run_id),
+    "sku_production_plan": get_table("sku_production_plan", run_id=target_run_id),
+    "production_schedule": get_table("production_schedule", run_id=target_run_id),
+    "aggregate_plan": get_table("aggregate_plan", run_id=target_run_id),
+    "machine_capacity_plan": get_table("machine_capacity_plan", run_id=target_run_id),
 }
 
-# Sistem Durumu Değerlendirmesi
+# --- 3. Sistem Durumu Değerlendirmesi ---
 status_code, status_level, status_msg = determine_system_status(raw_tables)
 
 # Sistem Durum Rozeti & Bilgilendirme
@@ -169,48 +209,20 @@ st.markdown(
 if status_code == "NO RUN":
     st.error("⚠️ Gösterilecek aktif çalışma verisi bulunamadı. Lütfen öncelikle veri hattını koşturunuz (`python main.py`).")
     st.stop()
-# --- Kurumsal Denetim & Lineage (Audit Trail) Kartı ---
-# Denetim Madde 9.4: df_runs.iloc[-1] yerine resmi ve onaylanmış active run'ı çekiyoruz
-active_run = get_active_pipeline_run()
-df_runs = raw_tables.get("pipeline_runs", pd.DataFrame())
 
-if active_run:
-    run_id_val = active_run.get("run_id", "N/A")
-    run_ts = active_run.get("timestamp", "N/A")
-    git_sha_val = active_run.get("git_sha", "N/A")
-    cfg_hash_val = active_run.get("config_hash", "N/A")
-    trigger_src = active_run.get("trigger_source", "N/A")
-    data_src_val = active_run.get("data_source", "N/A")
-elif not df_runs.empty:
-    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS", "ACTIVE"])]
-    latest_run = completed_runs.iloc[-1] if not completed_runs.empty else df_runs.iloc[-1]
-    run_id_val = latest_run.get("run_id", "N/A")
-    run_ts = latest_run.get("timestamp", "N/A")
-    git_sha_val = latest_run.get("git_sha", "N/A")
-    cfg_hash_val = latest_run.get("config_hash", "N/A")
-    trigger_src = latest_run.get("trigger_source", "N/A")
-    data_src_val = latest_run.get("data_source", "N/A")
-else:
-    run_id_val = run_ts = git_sha_val = cfg_hash_val = trigger_src = data_src_val = "N/A"
-
-with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) – Run: `{run_id_val}`", expanded=False):
+# --- 4. Kurumsal Denetim & Lineage (Audit Trail) Kartı ---
+with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) | Run: `{run_id_val}`", expanded=False):
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Run ID", run_id_val)
     c2.metric("Tetikleyici", trigger_src)
     c3.metric("Git SHA", git_sha_val[:8] if git_sha_val != "N/A" else "N/A")
     c4.metric("Config Hash", cfg_hash_val[:8] if cfg_hash_val != "N/A" else "N/A")
 
-    st.caption(f"⏱ **Çalıştırma Zamanı:** `{run_ts}` | **Veri Kaynağı:** `{data_src_val}`")
+    st.caption(f"🕒 **Çalıştırma Zamanı:** `{run_ts}` | **Veri Kaynağı:** `{data_src_val}`")
 
     df_model_lineage = raw_tables.get("forecast_model_lineage", pd.DataFrame())
     if not df_model_lineage.empty:
-        # Aktif koşuma göre filtrele
-        if "run_id" in df_model_lineage.columns and run_id_val != "N/A":
-            df_lineage_filtered = df_model_lineage[df_model_lineage["run_id"] == run_id_val]
-            if not df_lineage_filtered.empty:
-                df_model_lineage = df_lineage_filtered
-
-        st.markdown("##### 📋 SKU Bazlı Seçilen Tahmin Modelleri & Model Yönetişimi")
+        st.markdown("##### 📌 SKU Bazlı Seçilen Tahmin Modelleri & Model Yönetişimi")
         disp_cols = ["product_id", "selected_model", "backtest_wape", "backtest_rmse", "selection_reason", "run_id"]
         avail_cols = [c for c in disp_cols if c in df_model_lineage.columns]
         st.dataframe(df_model_lineage[avail_cols], use_container_width=True, hide_index=True)
@@ -225,14 +237,7 @@ c_kpi = safe_first_row(
     ["total_tco2e", "kgco2e_per_unit"]
 )
 
-# Tabloları Aktif Run ID'ye Göre Filtreleme Yardımcısı (Madde 9.4)
-def filter_by_active_run(df, active_id):
-    if not df.empty and "run_id" in df.columns and active_id != "N/A":
-        f_df = df[df["run_id"] == active_id]
-        return f_df if not f_df.empty else df
-    return df
-
-mrp_df = filter_by_active_run(raw_tables["mrp_plan"], run_id_val)
+# Sekmelerde Kullanılacak DataFrame Değişkenleri
 forecast_df = filter_by_active_run(raw_tables["forecast_demand"], run_id_val)
 sku_df = filter_by_active_run(raw_tables["sku_production_plan"], run_id_val)
 sched_df = filter_by_active_run(raw_tables["production_schedule"], run_id_val)
