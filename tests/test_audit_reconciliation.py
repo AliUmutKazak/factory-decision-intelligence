@@ -208,3 +208,7 @@ def test_7_reference_manifest_integrity():
 
     assert not missing_files, f"Eksik dosyalar var: {missing_files}"
     assert not mismatches, "SHA-256 uyumsuzlukları tespit edildi:\n" + "\n".join(mismatches)
+
+    for fname, meta in manifest["files"].items():
+        assert "logical_role" in meta, f"{fname} için logical_role tanımlanmamış!"
+        assert "schema_version" in meta, f"{fname} için schema_version tanımlanmamış!"

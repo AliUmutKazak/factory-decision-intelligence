@@ -84,34 +84,82 @@ def freeze_reference_atomic():
 
     # Madde 24: Single Source of Truth - Resmi Kanonik Çıktı Listesi (Allowlist)
     # reference_run_metadata.json gibi gayriresmi veya eski meta dosyalarının sızması engellenir.
-    CANONICAL_ARTIFACTS = {
-        # Tablolar / Veri Çıktıları (data/processed)
-        "data/processed/forecast_demand.csv",
-        "data/processed/aggregate_plan.csv",
-        "data/processed/sku_production_plan.csv",
-        "data/processed/production_schedule.csv",
-        "data/processed/mrp_plan.csv",
-        "data/processed/energy_profile_15min.csv",
-        "data/processed/energy_kpis.csv",
-        "data/processed/carbon_analytics.csv",
-        "data/processed/carbon_machine_kpis.csv",
-        "data/processed/factory_orders.csv",
-        "data/processed/machine_capacity_plan.csv",
-        "data/processed/forecast_model_lineage.csv",
-        # Raporlar / Model Metadata (reports)
-        "reports/forecast_model_metadata.json",
-        "reports/schedule_solver_metadata.json",
-        "reports/schedule_solver_metadata.csv",
-        # Üretim Veritabanı
-        "data/factory.db",
+    # Madde 25: Kurumsal Artifact Governance - Explicit Reference Artifact Catalog
+    CANONICAL_REFERENCE_ARTIFACTS = {
+        "data/processed/forecast_demand.csv": {
+            "logical_role": "demand_forecast",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/aggregate_plan.csv": {
+            "logical_role": "aggregate_production_plan",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/sku_production_plan.csv": {
+            "logical_role": "sku_level_production_plan",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/production_schedule.csv": {
+            "logical_role": "detailed_production_schedule",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/mrp_plan.csv": {
+            "logical_role": "material_requirements_plan",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/energy_profile_15min.csv": {
+            "logical_role": "energy_load_profile_15min",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/energy_kpis.csv": {
+            "logical_role": "energy_consumption_kpis",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/carbon_analytics.csv": {
+            "logical_role": "carbon_emission_analytics",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/carbon_machine_kpis.csv": {
+            "logical_role": "machine_level_carbon_kpis",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/factory_orders.csv": {
+            "logical_role": "factory_production_orders",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/machine_capacity_plan.csv": {
+            "logical_role": "machine_capacity_utilization",
+            "schema_version": "1.0.0",
+        },
+        "data/processed/forecast_model_lineage.csv": {
+            "logical_role": "forecast_feature_lineage",
+            "schema_version": "1.0.0",
+        },
+        "reports/forecast_model_metadata.json": {
+            "logical_role": "forecast_model_hyperparameters",
+            "schema_version": "1.0.0",
+        },
+        "reports/schedule_solver_metadata.json": {
+            "logical_role": "optimization_solver_run_stats",
+            "schema_version": "1.0.0",
+        },
+        "reports/schedule_solver_metadata.csv": {
+            "logical_role": "optimization_solver_kpis_tabular",
+            "schema_version": "1.0.0",
+        },
+        "data/factory.db": {
+            "logical_role": "operational_system_database",
+            "schema_version": "1.0.0",
+        },
     }
 
     copied_count = 0
-    for rel_path in sorted(CANONICAL_ARTIFACTS):
+    catalog_metadata = {}
+    for rel_path, meta in sorted(CANONICAL_REFERENCE_ARTIFACTS.items()):
         src_file = BASE_DIR / rel_path
         if src_file.exists() and src_file.is_file():
             shutil.copy2(src_file, staging_dir / src_file.name)
             copied_count += 1
+            catalog_metadata[src_file.name] = meta
         else:
             print(f"  [UYARI] Kanonik artifact henüz mevcut değil veya opsiyonel: {rel_path}")
 
@@ -132,9 +180,12 @@ def freeze_reference_atomic():
     manifest_files = {}
     for p in sorted(staging_dir.iterdir()):
         if p.is_file() and p.name != "manifest.json":
+            file_meta = catalog_metadata.get(p.name, {})
             manifest_files[p.name] = {
                 "sha256": get_full_sha256(p),
-                "bytes": p.stat().st_size
+                "bytes": p.stat().st_size,
+                "logical_role": file_meta.get("logical_role", "unknown"),
+                "schema_version": file_meta.get("schema_version", "1.0.0"),
             }
 
     manifest_data = {

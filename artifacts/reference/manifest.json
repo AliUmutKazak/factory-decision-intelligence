@@ -5,71 +5,105 @@
   "files": {
     ".gitkeep": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "bytes": 0
+      "bytes": 0,
+      "logical_role": "general_artifact",
+      "schema_version": "1.0.0"
     },
     "aggregate_plan.csv": {
       "sha256": "6ab1c38173dd3f5da02cd408f1ee407fb96e74a87aa0971e599dfda8e23bd925",
-      "bytes": 548
+      "bytes": 548,
+      "logical_role": "aggregate_production_plan",
+      "schema_version": "1.0.0"
     },
     "carbon_analytics.csv": {
       "sha256": "c414552eb829f402ec9d82eac5a2a8dc181e78628050af00344da451c1dcf009",
-      "bytes": 113
+      "bytes": 113,
+      "logical_role": "carbon_emission_analytics",
+      "schema_version": "1.0.0"
     },
     "carbon_machine_kpis.csv": {
       "sha256": "3101caf90ba3c7fbcd3bcc2473adacf62502067d8b8f23076765facf3417e779",
-      "bytes": 499
+      "bytes": 499,
+      "logical_role": "machine_level_carbon_kpis",
+      "schema_version": "1.0.0"
     },
     "energy_kpis.csv": {
       "sha256": "25f133bacc6f55f01219f53d67aa4bc5f17b2339d9b783ecdf065b721247ceee",
-      "bytes": 239
+      "bytes": 239,
+      "logical_role": "energy_consumption_kpis",
+      "schema_version": "1.0.0"
     },
     "energy_profile_15min.csv": {
       "sha256": "c5ea805160c0fdb9f5772fd5fefa4a2be17545c3d46a3a75d7f0743dabf43955",
-      "bytes": 23175
+      "bytes": 23175,
+      "logical_role": "energy_load_profile_15min",
+      "schema_version": "1.0.0"
     },
     "factory.db": {
       "sha256": "1f3a866a9f127166d7021437cdbf738bd8268ddb936ee3fce2b9fdfc9e4b9160",
-      "bytes": 499712
+      "bytes": 499712,
+      "logical_role": "operational_system_database",
+      "schema_version": "1.0.0"
     },
     "factory_orders.csv": {
       "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
-      "bytes": 285342
+      "bytes": 285342,
+      "logical_role": "factory_production_orders",
+      "schema_version": "1.0.0"
     },
     "forecast_demand.csv": {
       "sha256": "724ad71ec8b64075d259370ca97e269ab63ac45f1271373441ac8729e734ab55",
-      "bytes": 7032
+      "bytes": 7032,
+      "logical_role": "demand_forecast",
+      "schema_version": "1.0.0"
     },
     "forecast_model_lineage.csv": {
       "sha256": "08a2fd41c39ccaec4a66ee13b819f81fad17220d96191f14e3b1441148dd7a3c",
-      "bytes": 13972
+      "bytes": 13972,
+      "logical_role": "forecast_feature_lineage",
+      "schema_version": "1.0.0"
     },
     "forecast_model_metadata.json": {
       "sha256": "59aae92c8ceca03a39f703966528ac61ce611e20365d04a92dd0a38aac876098",
-      "bytes": 15809
+      "bytes": 15809,
+      "logical_role": "forecast_model_hyperparameters",
+      "schema_version": "1.0.0"
     },
     "machine_capacity_plan.csv": {
       "sha256": "99dec29b61a72ce47c94fc95686e2f31498ef49f8ee80386deb4ad11142c380e",
-      "bytes": 888
+      "bytes": 888,
+      "logical_role": "machine_capacity_utilization",
+      "schema_version": "1.0.0"
     },
     "mrp_plan.csv": {
       "sha256": "c3b574bfb219fcd08bc7bd06e5cae037aa50f056c0a22d157df0d9852813942a",
-      "bytes": 2016
+      "bytes": 2016,
+      "logical_role": "material_requirements_plan",
+      "schema_version": "1.0.0"
     },
     "production_schedule.csv": {
       "sha256": "ea8bd615c51f8e67c3b7c468067da049954acdc9785e210237b3a7b9c843a217",
-      "bytes": 2388
+      "bytes": 2388,
+      "logical_role": "detailed_production_schedule",
+      "schema_version": "1.0.0"
     },
     "schedule_solver_metadata.csv": {
       "sha256": "6bc1c1d5918c2d82c0859249e91d2796f3d2a54eefb9671edb6a58598a650c58",
-      "bytes": 724
+      "bytes": 724,
+      "logical_role": "optimization_solver_kpis_tabular",
+      "schema_version": "1.0.0"
     },
     "schedule_solver_metadata.json": {
       "sha256": "5e5668ccd74ad5863c031aa014a617fe04044f1aec7d7d5606d27547163ebc05",
-      "bytes": 866
+      "bytes": 866,
+      "logical_role": "optimization_solver_run_stats",
+      "schema_version": "1.0.0"
     },
     "sku_production_plan.csv": {
       "sha256": "dda521298591243fdbb6547cabd41af23ef9c261462cb1f038c334ee2bb07e72",
-      "bytes": 1007
+      "bytes": 1007,
+      "logical_role": "sku_level_production_plan",
+      "schema_version": "1.0.0"
     }
   }
 }
