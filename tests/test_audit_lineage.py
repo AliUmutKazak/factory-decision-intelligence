@@ -292,3 +292,52 @@ def test_atomic_promotion_archives_previous_active(tmp_path):
     cur.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_1,))
     assert cur.fetchone()[0] == "ARCHIVED"
     conn.close()
+
+def test_run_retention_policy_syncs_disk_artifacts(tmp_path):
+    """
+    Madde 23: Retention politikasının DB kayıtları silinirken
+    fiziksel disk snapshot dizinlerini (artifacts/reference_runs/<RUN_ID>)
+    senkron şekilde temizlediğini doğrular.
+    """
+    test_db = tmp_path / "factory_test.db"
+    artifacts_dir = tmp_path / "artifacts" / "reference_runs"
+    artifacts_dir.mkdir(parents=True)
+
+    conn = get_db_connection(str(test_db))
+    init_pipeline_runs_table(conn)
+    cur = conn.cursor()
+
+    # 4 adet test koşusu ve bunlara ait fiziki snapshot dizinleri oluşturalım
+    run_ids = ["RUN_01", "RUN_02", "RUN_03", "RUN_04"]
+    for i, r_id in enumerate(run_ids):
+        ts = f"2026-09-0{i+1}T10:00:00"
+        cur.execute("""
+            INSERT OR REPLACE INTO pipeline_runs 
+            (run_id, timestamp, git_sha, config_hash, trigger_source, data_source, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (r_id, ts, "abcdef12", "cfg12345", "TEST", "raw", "COMPLETED"))
+        
+        run_folder = artifacts_dir / r_id
+        run_folder.mkdir()
+        (run_folder / "manifest.json").write_text("{}", encoding="utf-8")
+    
+    conn.commit()
+
+    # Ayrıca DB'de hiç olmayan 1 adet yetim (orphan) snapshot dizini oluşturalım
+    orphan_dir = artifacts_dir / "RUN_ORPHAN"
+    orphan_dir.mkdir()
+    (orphan_dir / "manifest.json").write_text("{}", encoding="utf-8")
+
+    conn.close()
+
+    # keep_last_n=2 olarak retention çalıştır
+    deleted = apply_run_retention_policy(keep_last_n=2, db_path=str(test_db), artifacts_dir=str(artifacts_dir))
+
+    assert deleted == 2
+
+    # Kalan klasörleri kontrol et: Sadece en güncel 2 koşu (RUN_03 ve RUN_04) kalmalı
+    remaining_folders = {p.name for p in artifacts_dir.iterdir() if p.is_dir()}
+    assert remaining_folders == {"RUN_03", "RUN_04"}
+    assert not (artifacts_dir / "RUN_01").exists()
+    assert not (artifacts_dir / "RUN_02").exists()
+    assert not (artifacts_dir / "RUN_ORPHAN").exists()    

@@ -359,14 +359,20 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
         return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
     return None
 
-def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> int:
+def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artifacts_dir: str = None) -> int:
     """
-    Denetim Kapı 5: Historical Run Retention Policy.
-    Üretim veritabanında denetim kütüğünün sınırsız büyümesini engeller.
-    En güncel 'keep_last_n' adet koşumu korur, daha eski veya FAILED yetim kayıtları temizler.
-    Silinen satır sayısını döner.
+    Denetim Kapı 5 & Madde 23: Historical Run & Artifact Retention Policy.
+    - Üretim veritabanında denetim kütüğünün sınırsız büyümesini engeller.
+    - En güncel 'keep_last_n' adet koşumu korur, eski veya yetim kayıtları temizler.
+    - Veritabanından silinen veya yetim kalan fiziksel snapshot dizinlerini (artifacts/reference_runs/<RUN_ID>)
+      diskten temizleyerek veritabanı ile disk yaşam döngüsünü senkronize eder.
+    Silinen veritabanı satır sayısını döner.
     """
+    import os
+    import shutil
+    from pathlib import Path
     import src.config as config
+    
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return 0
@@ -389,6 +395,23 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> in
         cur.execute(f"DELETE FROM pipeline_runs WHERE run_id IN ({placeholders})", old_runs)
         deleted_count = cur.rowcount
         conn.commit()
+
+    # Fiziksel Disk Artifact Senkronizasyonu (Madde 23)
+    target_artifacts_dir = Path(artifacts_dir) if artifacts_dir else Path("artifacts/reference_runs")
+    if target_artifacts_dir.exists() and target_artifacts_dir.is_dir():
+        # 1. Silinen eski koşuların disk snapshot'larını temizle
+        for old_id in old_runs:
+            old_run_dir = target_artifacts_dir / old_id
+            if old_run_dir.exists() and old_run_dir.is_dir():
+                shutil.rmtree(old_run_dir, ignore_errors=True)
+
+        # 2. Yetim (orphan) snapshot temizliği: DB'de geçerli olan run_id'leri al
+        cur.execute("SELECT run_id FROM pipeline_runs")
+        valid_runs = set(row[0] for row in cur.fetchall())
+
+        for item in target_artifacts_dir.iterdir():
+            if item.is_dir() and item.name not in valid_runs:
+                shutil.rmtree(item, ignore_errors=True)
 
     conn.close()
     return deleted_count

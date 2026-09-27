@@ -160,6 +160,11 @@ def freeze_reference_atomic():
             shutil.rmtree(backup_dir)
         print("✓ Referans basariyla guncellendi (Atomic Swap OK).")
 
+        # 6. Disk Artifact & Run Retention Senkronizasyonu (Madde 23)
+        from src.utils.lineage import apply_run_retention_policy
+        apply_run_retention_policy(keep_last_n=20, db_path=str(BASE_DIR / "data" / "factory.db"))
+        print("✓ Disk artifact snapshot retention senkronizasyonu tamamlandı.")
+
     except Exception as e:
         print(f"[CRITICAL ERROR] Atomic Swap sirasinda hata olustu: {e}")
         # Rollback
