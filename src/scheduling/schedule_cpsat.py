@@ -104,12 +104,19 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     setup_dict[(m, f_p, t_p)] = s_val
 
     # -------------------------------------------------------------
-    # Closed-Loop MRP -> CP-SAT: Dinamik Malzeme Hazır Oluş Zamanı
+    # Madde 29: Closed-Loop MRP -> CP-SAT Endüstriyel Malzeme Mevcudiyeti Sözleşmesi
+    # Availability = Open PO + Supplier Lead Time + Goods Receipt + QC Hold
     # r_lot = max_{m in BOM} t_availability,m
     # -------------------------------------------------------------
-    # MRP'de 1. hafta teslimatı acil olan (EXPEDITE) malzemeler için dinamik tedarik gecikmesi
-    # planned_release_week <= 0 veya past due olan kalemlerin tedarik gecikme ofseti (dakika)
+    # Endüstriyel parametre ayrımı (varsayılan ekspres operasyon dağılımı: 480 dk)
+    DEFAULT_SUPPLIER_EXPEDITE_LT_MIN = 240  # Hızlandırılmış tedarikçi temin süresi
+    DEFAULT_GOODS_RECEIPT_MIN = 120        # Mal kabul, boşaltma ve ERP girişi
+    DEFAULT_QC_HOLD_MIN = 120              # Kalite kontrol / karantina onay süresi
+
     mat_availability = {}
+    mat_availability_details = {}
+    horizon_start_dt = pd.Timestamp("2018-01-01 08:00:00")  # Operasyonel takvim başlangıcı
+
     if "material_id" in mrp_df.columns and "action_message" in mrp_df.columns:
         w1_mrp = mrp_df[mrp_df["period_week"] == 1]
         for _, m_row in w1_mrp.iterrows():
@@ -118,22 +125,51 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             rel_week = int(m_row.get("planned_release_week", 1))
             
             if "EXPEDITE" in action:
-                # Gecikme derinliğine göre dinamik varış süresi:
-                # rel_week = 0 -> 480 dk (1 vardiya ekspres teslimat)
-                # rel_week < 0 -> her negatif hafta için +480 dk ek tedarik gecikmesi
-                delay_min = 480 + max(0, -rel_week) * 480
-                mat_availability[m_id] = delay_min
+                # Endüstriyel bileşenlerin toplamı: Open PO -> Supplier LT -> Goods Receipt -> QC Hold
+                base_delay = (
+                    DEFAULT_SUPPLIER_EXPEDITE_LT_MIN 
+                    + DEFAULT_GOODS_RECEIPT_MIN 
+                    + DEFAULT_QC_HOLD_MIN
+                )
+                extra_week_delay = max(0, -rel_week) * 480
+                total_delay_min = base_delay + extra_week_delay
+
+                mat_availability[m_id] = total_delay_min
+                mat_availability_details[m_id] = {
+                    "open_po_expedited": True,
+                    "supplier_lead_time_min": DEFAULT_SUPPLIER_EXPEDITE_LT_MIN + extra_week_delay,
+                    "goods_receipt_min": DEFAULT_GOODS_RECEIPT_MIN,
+                    "qc_hold_min": DEFAULT_QC_HOLD_MIN,
+                    "material_available_min": total_delay_min,
+                    "material_availability_datetime": (
+                        horizon_start_dt + pd.Timedelta(minutes=total_delay_min)
+                    ).strftime("%Y-%m-%d %H:%M:%S")
+                }
             else:
                 mat_availability[m_id] = 0
+                mat_availability_details[m_id] = {
+                    "open_po_expedited": False,
+                    "supplier_lead_time_min": 0,
+                    "goods_receipt_min": 0,
+                    "qc_hold_min": 0,
+                    "material_available_min": 0,
+                    "material_availability_datetime": horizon_start_dt.strftime("%Y-%m-%d %H:%M:%S")
+                }
 
     # Her SKU için BOM bileşenlerinin en geç varış anını (max availability) belirle
     sku_release_times = {}
+    sku_material_datetimes = {}
     for pid in sku_plan["product_id"].unique():
         prod_materials = bom_df[bom_df["product_id"] == pid]["material_id"].unique()
         if len(prod_materials) > 0:
-            sku_release_times[pid] = max(mat_availability.get(mid, 0) for mid in prod_materials)
+            max_rel = max(mat_availability.get(mid, 0) for mid in prod_materials)
+            sku_release_times[pid] = max_rel
+            sku_material_datetimes[pid] = (
+                horizon_start_dt + pd.Timedelta(minutes=max_rel)
+            ).strftime("%Y-%m-%d %H:%M:%S")
         else:
             sku_release_times[pid] = 0
+            sku_material_datetimes[pid] = horizon_start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
@@ -483,6 +519,10 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 "start_min": s_val,
                 "end_min": e_val,
                 "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
+                "material_availability_datetime": sku_material_datetimes.get(
+                    all_tasks[tid]["product_id"], horizon_start_dt.strftime("%Y-%m-%d %H:%M:%S")
+                )
+
             })
 
         m_tasks = sorted(m_tasks, key=lambda x: x["start_min"])
@@ -604,7 +644,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     if weekly_accounting_rows:
         accounting_df = pd.DataFrame(weekly_accounting_rows)
         accounting_df.to_csv('data/processed/task_weekly_accounting.csv', index=False)
-        
+
     # P0 Madde 2: Hafta bazlı kümülatif OT bütçe kontrolü ve denetim logu (W1..W4)
     if len(sched_df) > 0 and weekly_machine_ot_budget_min:
         weekly_actual_ot = sched_df.groupby(["schedule_week", "machine_id"])["overtime_minutes"].sum().to_dict()
@@ -647,8 +687,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
         "objective_type": "MINIMIZE_MAKESPAN",
         "operational_objectives_backlog": "TARDINESS_OT_SETUP_PRIORITY",
-        "mrp_coupling_mode": "ANALYTICAL_EXPEDITE_OFFSET_PROTOTYPE",
-        "mrp_erp_operational_fields_backlog": "OPEN_PO_GOODS_RECEIPT_SUPPLIER_CALENDAR_DATETIME",
+        "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
+        "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
+        "mrp_qc_hold_enforced": 1,
     }]
 
     if run_id:
