@@ -30,12 +30,30 @@ def get_initial_machine_states(conn) -> dict:
     if not states:
         states = getattr(cfg, "INITIAL_MACHINE_STATE", {})
     return states
-
-
+     
 def run_cpsat_scheduling(sku_plan=None, run_id=None):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = get_db_connection(DB_PATH)
     machine_initial_states = get_initial_machine_states(conn)
+
+    # Madde 30: Machine state run-scope snapshot mühürleme
+    if run_id and machine_initial_states:
+        try:
+            snapshot_records = [
+                {
+                    "run_id": run_id,
+                    "machine_id": m_id,
+                    "last_product_id": p_id,
+                    "state_timestamp": pd.Timestamp.now().isoformat(),
+                    "source_system": "MES_DATABASE"
+                }
+                for m_id, p_id in machine_initial_states.items()
+            ]
+            pd.DataFrame(snapshot_records).to_sql(
+                "machine_state_snapshot", conn, if_exists="append", index=False
+            )
+        except Exception as e:
+            print(f"[WARN] machine_state_snapshot kaydedilemedi: {e}")
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
     if sku_plan is None:

@@ -353,6 +353,19 @@ def initialize_database(force_recreate=False, run_id=None):
             FOREIGN KEY (last_product_id) REFERENCES products(product_id)
         )
     """)
+    # Denetim Madde 30: Machine State Run-Scoped Snapshot Tablosu
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS machine_state_snapshot (
+            run_id TEXT NOT NULL,
+            machine_id TEXT NOT NULL,
+            last_product_id TEXT NOT NULL,
+            state_timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+            source_system TEXT DEFAULT 'MES_DATABASE',
+            PRIMARY KEY (run_id, machine_id),
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        )
+    """)
+
     conn.commit()
 
     # Master-data bütünlük denetimi (Fail-Fast)

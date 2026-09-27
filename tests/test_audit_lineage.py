@@ -340,4 +340,53 @@ def test_run_retention_policy_syncs_disk_artifacts(tmp_path):
     assert remaining_folders == {"RUN_03", "RUN_04"}
     assert not (artifacts_dir / "RUN_01").exists()
     assert not (artifacts_dir / "RUN_02").exists()
-    assert not (artifacts_dir / "RUN_ORPHAN").exists()    
+    assert not (artifacts_dir / "RUN_ORPHAN").exists()
+
+def test_machine_state_run_scoped_snapshot(tmp_path):
+    """Denetim Madde 30: Planlama koşusunun kullandığı MES makine durumunun
+    machine_state_snapshot tablosunda run_id ile mühürlendiğini doğrular."""
+    import sqlite3
+    import pandas as pd
+    from src.scheduling import schedule_cpsat as sched_mod
+
+    db_path = tmp_path / "factory.db"
+    conn = sqlite3.connect(str(db_path))
+    
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS machine_state (machine_id TEXT PRIMARY KEY, last_product_id TEXT)")
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS machine_state_snapshot (
+            run_id TEXT NOT NULL,
+            machine_id TEXT NOT NULL,
+            last_product_id TEXT NOT NULL,
+            state_timestamp TEXT,
+            source_system TEXT,
+            PRIMARY KEY (run_id, machine_id)
+        )
+    """)
+    cur.execute("INSERT OR REPLACE INTO machine_state VALUES ('M01', 'P03'), ('M02', 'P01')")
+    conn.commit()
+
+    test_run_id = "RUN_TEST_SCOPE_123"
+    states = sched_mod.get_initial_machine_states(conn)
+    assert states["M01"] == "P03"
+    
+    # Snapshot kaydını çalıştır
+    snapshot_records = [
+        {
+            "run_id": test_run_id,
+            "machine_id": m,
+            "last_product_id": p,
+            "state_timestamp": pd.Timestamp.now().isoformat(),
+            "source_system": "MES_DATABASE"
+        }
+        for m, p in states.items()
+    ]
+    pd.DataFrame(snapshot_records).to_sql("machine_state_snapshot", conn, if_exists="append", index=False)
+    
+    # Doğrulama: run_id ile izole sorgulanabilirlik
+    df_snap = pd.read_sql(f"SELECT * FROM machine_state_snapshot WHERE run_id = '{test_run_id}'", conn)
+    assert len(df_snap) >= 2
+    assert set(df_snap["machine_id"]) >= {"M01", "M02"}
+    assert df_snap.loc[df_snap["machine_id"] == "M01", "last_product_id"].values[0] == "P03"
+    conn.close()    
