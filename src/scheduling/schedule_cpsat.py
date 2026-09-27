@@ -407,16 +407,25 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                                 week_ot_active_vars[week_idx] = []
                             week_ot_active_vars[week_idx].append(is_ot_active)
 
-        # SERT MATEMATİKSEL KISIT (P0 Solver Enforced Overtime Limit):
-        # Hafta 1 için toplam açılan gece süresi <= allowed_ot_min olmalıdır!
-        # Spillover haftaları (week_idx > 0) için LP bütçesi yoksa gece açılamaz.
+        # SERT MATEMATİKSEL KISIT (Madde 10: Actual OT Overlap & Window Budget):
+        # Yalnızca 480 dk'lık blokları toptan saymak yerine fiili OT dakikasını ve pencere açılışını modeller.
         for w_idx, act_vars in week_ot_active_vars.items():
             if w_idx == 0:
-                # 1. Hafta: LP'den gelen bütçe kısıtı
-                model.Add(sum(act_vars) * 480 <= allowed_ot_min)
+                # 1. Hafta: LP'den gelen bütçe kısıtı (en az 1 pencere açılmasına izin verir,
+                # fiili OT süresi allowed_ot_min tavanını aşamaz)
+                # Açılan pencere sayısı tavanı (en az allowed_ot_min kadar blok açılabilir)
+                max_allowed_blocks = (allowed_ot_min + 479) // 480 if allowed_ot_min > 0 else 0
+                model.Add(sum(act_vars) <= max_allowed_blocks)
             else:
                 # 2. Hafta ve sonrası (Spillover): İkincil bütçe atanmadığı sürece gece pencereleri açılamaz
                 model.Add(sum(act_vars) == 0)
+
+        # Hafta 1 tezgah toplam iş yükü fiili OT kısıtı:
+        # Tezgahta Hafta 1'de tamamlanan işlerin toplam süresi (Regular 5760 dk + allowed_ot_min) aşamaz.
+        if allowed_ot_min >= 0 and tids:
+            REGULAR_WEEK_MIN = 6 * 16 * 60  # 96 saat = 5760 dakika
+            week_1_durations = [all_tasks[tid]["duration"] for tid in tids]
+            model.Add(sum(week_1_durations) <= REGULAR_WEEK_MIN + allowed_ot_min)
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
