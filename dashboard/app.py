@@ -67,8 +67,8 @@ def determine_system_status(tables):
             return "METADATA CORRUPTED", "error", f"reports/run_metadata.json okunamadı veya bozuk: {e}"
 
         status_val = str(run_meta.get("status", "")).upper()
-        # Standart Pipeline Durum Kontrolü (COMPLETED veya geriye dönük SUCCESS)
-        if status_val not in ("COMPLETED", "SUCCESS"):
+        # Standart Pipeline Durum Kontrolü (COMPLETED, ACTIVE veya geriye dönük SUCCESS)
+        if status_val not in ("COMPLETED", "SUCCESS", "ACTIVE"):
             return "PIPELINE FAILED", "error", f"Son pipeline çalıştırması geçerli değil (Status: {status_val}, Run: {run_meta.get('run_id')}). Modeller güvensiz."
 
         # Çözücü durumları geçerli mi?
@@ -182,7 +182,7 @@ if active_run:
     trigger_src = active_run.get("trigger_source", "N/A")
     data_src_val = active_run.get("data_source", "N/A")
 elif not df_runs.empty:
-    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS"])]
+    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS", "ACTIVE"])]
     latest_run = completed_runs.iloc[-1] if not completed_runs.empty else df_runs.iloc[-1]
     run_id_val = latest_run.get("run_id", "N/A")
     run_ts = latest_run.get("timestamp", "N/A")
