@@ -264,6 +264,7 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
         start_pipeline_run, 
         record_pipeline_run_metadata, 
         get_active_pipeline_run, 
+        promote_run_to_active,
         init_pipeline_runs_table
     )
 
@@ -295,15 +296,18 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     record_pipeline_run_metadata(run_id=run_1, status="FAILED", db_path=temp_db)
     assert get_active_pipeline_run(db_path=temp_db) is None, "FAILED kosum active kabul edilemez!"
 
-    # 3. İkinci bir koşum başarıyla bittiğinde PROMOTE edilmeli ve ACTIVE run olmalı
+    # 3. İkinci bir koşum COMPLETED olsa bile promote_run_to_active çağrılmadıkça ACTIVE OLAMAZ (P1 Güvencesi)
     run_2 = "RUN-TEST-BOUND-002"
     start_pipeline_run(run_2, db_path=temp_db)
     record_pipeline_run_metadata(run_id=run_2, status="COMPLETED", orders_count=500, db_path=temp_db)
-    
+    assert get_active_pipeline_run(db_path=temp_db) is None, "COMPLETED kosum promote edilmedikce ACTIVE sayilamaz!"
+
+    # 4. Açıkça terfi ettirildiğinde (promote) artık ACTIVE olmalıdır
+    promote_run_to_active(run_id=run_2, db_path=temp_db)
     active_run = get_active_pipeline_run(db_path=temp_db)
     assert active_run is not None
     assert active_run["run_id"] == run_2
-    assert active_run["status"] == "COMPLETED"
+    assert active_run["status"] == "ACTIVE"
 
 def test_lp_cpsat_overtime_reconciliation():
     """

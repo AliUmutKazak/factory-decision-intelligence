@@ -246,15 +246,23 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
         conn.close()        
 
 
-def get_active_pipeline_run(db_path: str = None) -> dict:
-    """Yalnızca doğrulanmış ve terfi edilmiş en güncel aktif koşumu döner."""
+def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -> dict:
+    """
+    P1 Semantik Güvencesi:
+    Yalnızca doğrulanmış ve atomik olarak terfi ettirilmiş (ACTIVE) koşumu döner.
+    Sistemde ACTIVE koşum yoksa kesinlikle None döner (ACTIVE only).
+    
+    allow_fallback=True yalnızca eski/legacy migration testleri veya geriye dönük
+    uyumluluk için açıkça istendiğinde COMPLETED/SUCCESS durumuna bakar.
+    """
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
     cur = conn.cursor()
-    # Öncelik ACTIVE, geriye dönük uyumluluk için COMPLETED/SUCCESS
+    
+    # 1. Kesin Üretim Kuralı: Sadece ACTIVE durumu aranır
     cur.execute("""
         SELECT run_id, timestamp, status, orders_count
         FROM pipeline_runs
@@ -262,7 +270,9 @@ def get_active_pipeline_run(db_path: str = None) -> dict:
         ORDER BY timestamp DESC LIMIT 1
     """)
     row = cur.fetchone()
-    if not row:
+    
+    # 2. Uyumluluk Modu (Yalnızca parametre ile açıkça talep edilirse):
+    if not row and allow_fallback:
         cur.execute("""
             SELECT run_id, timestamp, status, orders_count
             FROM pipeline_runs
@@ -270,6 +280,7 @@ def get_active_pipeline_run(db_path: str = None) -> dict:
             ORDER BY timestamp DESC LIMIT 1
         """)
         row = cur.fetchone()
+        
     conn.close()
     if row:
         return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
