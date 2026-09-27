@@ -59,10 +59,6 @@
       "sha256": "ea8bd615c51f8e67c3b7c468067da049954acdc9785e210237b3a7b9c843a217",
       "bytes": 2388
     },
-    "run_metadata.json": {
-      "sha256": "0ef61046277ae2d49975e1985c60631abbaa5d3967f29567f99d200b4d322b47",
-      "bytes": 948
-    },
     "schedule_solver_metadata.csv": {
       "sha256": "6bc1c1d5918c2d82c0859249e91d2796f3d2a54eefb9671edb6a58598a650c58",
       "bytes": 724

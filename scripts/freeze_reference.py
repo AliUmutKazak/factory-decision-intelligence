@@ -80,27 +80,42 @@ def freeze_reference_atomic():
         shutil.rmtree(staging_dir)
     staging_dir.mkdir(parents=True, exist_ok=True)
 
-    print("\n2. Dosyalar Izole Staging Alanina Hazirlaniyor...")
+    print("\n2. Dosyalar Izole Staging Alanina Hazirlaniyor (CANONICAL ALLOWLIST)...")
 
-    # Kopyalanacak artifact kaynaklari
-    sources = [
-        BASE_DIR / "data" / "processed",
-        BASE_DIR / "reports",
-        BASE_DIR / "data" / "factory.db"
-    ]
+    # Madde 24: Single Source of Truth - Resmi Kanonik Çıktı Listesi (Allowlist)
+    # reference_run_metadata.json gibi gayriresmi veya eski meta dosyalarının sızması engellenir.
+    CANONICAL_ARTIFACTS = {
+        # Tablolar / Veri Çıktıları (data/processed)
+        "data/processed/forecast_demand.csv",
+        "data/processed/aggregate_plan.csv",
+        "data/processed/sku_production_plan.csv",
+        "data/processed/production_schedule.csv",
+        "data/processed/mrp_plan.csv",
+        "data/processed/energy_profile_15min.csv",
+        "data/processed/energy_kpis.csv",
+        "data/processed/carbon_analytics.csv",
+        "data/processed/carbon_machine_kpis.csv",
+        "data/processed/factory_orders.csv",
+        "data/processed/machine_capacity_plan.csv",
+        "data/processed/forecast_model_lineage.csv",
+        # Raporlar / Model Metadata (reports)
+        "reports/forecast_model_metadata.json",
+        "reports/schedule_solver_metadata.json",
+        "reports/schedule_solver_metadata.csv",
+        # Üretim Veritabanı
+        "data/factory.db",
+    }
 
     copied_count = 0
-    for src in sources:
-        if src.is_dir():
-            for item in src.iterdir():
-                if item.is_file() and not item.name.endswith(".tmp") and item.name != "run_manifest.json":
-                    shutil.copy2(item, staging_dir / item.name)
-                    copied_count += 1
-        elif src.is_file():
-            shutil.copy2(src, staging_dir / src.name)
+    for rel_path in sorted(CANONICAL_ARTIFACTS):
+        src_file = BASE_DIR / rel_path
+        if src_file.exists() and src_file.is_file():
+            shutil.copy2(src_file, staging_dir / src_file.name)
             copied_count += 1
+        else:
+            print(f"  [UYARI] Kanonik artifact henüz mevcut değil veya opsiyonel: {rel_path}")
 
-    print(f"Toplam {copied_count} artifact staging alanina alindi.")
+    print(f"Toplam {copied_count} kanonik artifact staging alanina alindi.")
 
     # 3. Staging alaninda SHA-256 Manifest olustur
     print("\n3. Staging Icin Kriptografik SHA-256 Manifest Olusturuluyor...")
