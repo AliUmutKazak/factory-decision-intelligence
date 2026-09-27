@@ -134,14 +134,14 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     # ---------------------------------------------------------------------
     # 4. Madde: Tekil State Machine (PROC, SETUP, IDLE, OFF) & Kusursuz Profil Integrasyonu
     # ---------------------------------------------------------------------
-    # Taktik LP'den makine OT saatlerini oku
-    machine_ot_hours = {}
+    # Taktik LP'den makine OT saatlerini oku (Hafta bazlı)
+    weekly_machine_ot_hours = {}
     try:
         conn = get_db_connection(DB_PATH)
-        cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", conn)
+        cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
         conn.close()
         for _, r in cap_df.iterrows():
-            machine_ot_hours[str(r["machine_id"])] = float(r["overtime_hours"])
+            weekly_machine_ot_hours[(int(r["period_week"]), str(r["machine_id"]))] = float(r["overtime_hours"])
     except Exception:
         pass
 
@@ -163,6 +163,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         t_end = t + actual_interval
         total_slice_load_kw = 0.0
 
+        current_week = int(t // (7 * 1440)) + 1
         day_idx = int(t // 1440) % 7
         day_min = t % 1440
         is_sunday = (day_idx == 6)
@@ -170,7 +171,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
 
         for m_id, specs in machine_specs.items():
             m_tasks = schedule_df[schedule_df["machine_id"] == m_id]
-            allowed_ot = machine_ot_hours.get(str(m_id), 0.0)
+            allowed_ot = weekly_machine_ot_hours.get((current_week, str(m_id)), 0.0)
 
             # 1. PROC suresi ve enerjisi
             proc_dur = 0.0
@@ -199,16 +200,29 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
                         setup_kw_min += d * float(specs["setup_kw"])
 
             # 3. Kalan sure: IDLE mi, OFF mu?
-            rem_dur = max(0.0, actual_interval - (proc_dur + setup_dur))
-            idle_dur = 0.0
-            idle_kw_min = 0.0
+        rem_dur = max(0.0, actual_interval - (proc_dur + setup_dur))
+        idle_dur = 0.0
+        idle_kw_min = 0.0
 
-            # State Machine: Pazar kapali (OFF), OT hakki yoksa gece kapali (OFF)
-            is_machine_off = is_sunday or (is_night_ot_window and allowed_ot <= 0.0)
+        # Madde 12: Kanonik Takvim Semantiği
+        # - Pazar günleri daima OFF (Hard Break)
+        # - Gece penceresinde (00:00 - 08:00):
+        #   Eğer o haftada bu makineye OT verilmemişse (W2+ veya W1 OT=0) kesinlikle OFF.
+        #   Eğer o gece penceresinde makinede aktif iş/setup yoksa gece açılmamıştır -> OFF.
+        if is_sunday:
+            is_machine_off = True
+        elif is_night_ot_window:
+            has_active_work = (proc_dur + setup_dur) > 0.0
+            if allowed_ot <= 0.0 or not has_active_work:
+                is_machine_off = True
+            else:
+                is_machine_off = False
+        else:
+            is_machine_off = False
 
-            if not is_machine_off and rem_dur > 0.0:
-                idle_dur = rem_dur
-                idle_kw_min = idle_dur * float(specs["idle_kw"])
+        if not is_machine_off and rem_dur > 0.0:
+            idle_dur = rem_dur
+            idle_kw_min = idle_dur * float(specs["idle_kw"])
 
             # Kumulatif makine toplamlarina ekle
             m_proc_min[m_id] += proc_dur
