@@ -10,6 +10,7 @@ import sys
 import time
 import shutil
 from pathlib import Path
+os.environ.setdefault("ALLOW_UNMAPPED", "True")
 
 from src.data.preprocessing import run_preprocessing
 from src.data.build_database_and_eda import initialize_database
@@ -52,8 +53,9 @@ def run_end_to_end_pipeline():
     # Pipeline boyunca tüm modüllerin izole staging DB'ye yazmasını sağla
     os.environ["FACTORY_DB_PATH"] = str(staging_db)
 
-    # Staging üzerinde koşumu RUNNING olarak başlat
+    # Staging üzerinde koşumu başlat ve RUNNING durumuna al
     start_pipeline_run(run_id=run_id, db_path=str(staging_db))
+    update_pipeline_run_status(run_id=run_id, status="RUNNING", db_path=str(staging_db))
 
     stages = [
         ("Aşama 1: Veri Ön İşleme & Temizlik", lambda: run_preprocessing()),
@@ -85,6 +87,14 @@ def run_end_to_end_pipeline():
         # 2. AŞAMA: VALIDATE (Master Operational Gate)
         update_pipeline_run_status(run_id=run_id, status="VALIDATE", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: VALIDATE ({run_id})")
+
+        # Validation Gate dosya kontrolü yapmadan önce güncel run_id'yi metadata dosyasına yaz
+        record_pipeline_run_metadata(
+            run_id=run_id,
+            status="VALIDATE",
+            db_path=str(staging_db)
+        )
+
         validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
         print(f"[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
 
@@ -124,13 +134,6 @@ def run_end_to_end_pipeline():
         )
         print(f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)")
 
-        # 4. AŞAMA: COMPLETED
-        update_pipeline_run_status(run_id=run_id, status="COMPLETED", db_path=str(staging_db))
-        print(f"[AUDIT] Pipeline durumu: COMPLETED ({run_id})")
-
-        # 5. AŞAMA: ATOMIC ACTIVE PROMOTION (Artık arkasından patlayacak HİÇBİR iş kalmadı!)
-        promote_run_to_active(run_id=run_id, db_path=str(staging_db))
-
         # Environment değişkenini kaldır
         os.environ.pop("FACTORY_DB_PATH", None)
 
@@ -139,7 +142,7 @@ def run_end_to_end_pipeline():
         gc.collect()
         time.sleep(0.5)
 
-        # Windows & File-Lock Güvenli Atomic Replacement (Kanonik DB'yi güncelle)
+        # 1. Fiziksel Atomic Replacement: Önce Staging DB -> Canonical DB aktarılır
         max_retries = 5
         promoted = False
         for attempt in range(max_retries):
@@ -161,7 +164,12 @@ def run_end_to_end_pipeline():
                     pass
             temp_target.replace(canonical_db)
 
-        # Staging dosyasını temizle
+        # 2. P0.4: Mutlak En Son Atomik İşlem -> CANONICAL DB Üzerinde ACTIVE Promosyonu
+        # Kanonik DB tamamen diske oturduktan sonra tek bir atomik UPDATE ile ACTIVE yapılır.
+        # Bu adımın arkasından hata verebilecek HİÇBİR I/O veya operasyon çalıştırılmaz.
+        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
+
+        # Staging dosyasını temizle (Başarısız olsa dahi pipeline'ı etkilemez)
         if staging_db.exists():
             try:
                 staging_db.unlink()
@@ -170,7 +178,7 @@ def run_end_to_end_pipeline():
 
         print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE (data/factory.db güncellendi)")
         print("\n" + "#" * 85)
-        print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_elapsed:.2f} saniye")
+        print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI | Süre: {total_elapsed:.2f} saniye")
         print("#" * 85 + "\n")
 
     except Exception as exc:

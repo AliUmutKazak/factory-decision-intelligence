@@ -494,51 +494,51 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
                 capacity_cuts[(m_id, w_id)] = capacity_cuts.get((m_id, w_id), 0.0) + ov
 
             # Son iterasyona ulaşıldıysa ve hâlâ aşım varsa güvenli onarım (heuristic repair) ile kapat
-                if iteration >= max_feedback_iters:
-                    print("[CLOSED-LOOP OPTIMIZATION] Maksimum re-optimization döngüsüne ulaşıldı. Nihai mutabakat heuristic repair ile bağlandı.")
-                    sku_plan_df, family_plan_df, repaired = validate_and_repair_disaggregation(
-                        sku_plan_df, family_plan_df, machine_capacity_df, routing_df, machines_df
-                    )
-                    final_family_plan = family_plan_df
-                    final_sku_plan = sku_plan_df
+            if iteration >= max_feedback_iters:
+                print("[CLOSED-LOOP OPTIMIZATION] Maksimum re-optimization döngüsüne ulaşıldı. Nihai mutabakat heuristic repair ile bağlandı.")
+                sku_plan_df, family_plan_df, repaired = validate_and_repair_disaggregation(
+                    sku_plan_df, family_plan_df, machine_capacity_df, routing_df, machines_df
+                )
+                final_family_plan = family_plan_df
+                final_sku_plan = sku_plan_df
 
-                    # Madde 28: Heuristic repair uygulandıysa kapasiteyi yeniden hesapla, stale shadow prices'ı geçersiz kıl
-                    if repaired:
-                        updated_capacity_df = machine_capacity_df.copy()
-                        for idx, c_row in updated_capacity_df.iterrows():
-                            m = c_row["machine_id"]
-                            w = c_row["period_week"]
-                            w_skus = sku_plan_df[sku_plan_df["period_week"] == w]
-                            new_load = sum(
-                                row["planned_batches"] * cycle_map.get((row["product_id"], m), 0.0)
-                                for _, row in w_skus.iterrows()
-                            )
-                            tot_cap = float(c_row.get("total_capacity_hours", c_row.get("capacity_hours", 0.0)))
-                            updated_capacity_df.loc[idx, "utilized_hours"] = round(new_load, 1)
-                            updated_capacity_df.loc[idx, "utilization_pct"] = round(
-                                (new_load / tot_cap * 100) if tot_cap > 0 else 0.0, 1
-                            )
-                            if "shadow_price_usd_per_hr" in updated_capacity_df.columns:
-                                updated_capacity_df.loc[idx, "shadow_price_usd_per_hr"] = 0.0
+                # Madde 28: Heuristic repair uygulandıysa kapasiteyi yeniden hesapla, stale shadow prices'ı geçersiz kıl
+                if repaired:
+                    updated_capacity_df = machine_capacity_df.copy()
+                    for idx, c_row in updated_capacity_df.iterrows():
+                        m = c_row["machine_id"]
+                        w = c_row["period_week"]
+                        w_skus = sku_plan_df[sku_plan_df["period_week"] == w]
+                        new_load = sum(
+                            row["planned_batches"] * cycle_map.get((row["product_id"], m), 0.0)
+                            for _, row in w_skus.iterrows()
+                        )
+                        tot_cap = float(c_row.get("total_capacity_hours", c_row.get("capacity_hours", 0.0)))
+                        updated_capacity_df.loc[idx, "utilized_hours"] = round(new_load, 1)
+                        updated_capacity_df.loc[idx, "utilization_pct"] = round(
+                            (new_load / tot_cap * 100) if tot_cap > 0 else 0.0, 1
+                        )
+                        if "shadow_price_usd_per_hr" in updated_capacity_df.columns:
+                            updated_capacity_df.loc[idx, "shadow_price_usd_per_hr"] = 0.0
 
-                        final_capacity_df = updated_capacity_df
+                    final_capacity_df = updated_capacity_df
 
-                        all_weeks = sorted(sku_plan_df["period_week"].unique())
-                        final_shadow_prices = {
-                            t: {
-                                "bottleneck_machine": "HEURISTIC_REPAIR_OVERRIDE",
-                                "shadow_price": 0.0,
-                                "is_valid": False,
-                                "repair_applied": True,
-                                "all_duals": {m: 0.0 for m in machines_df["machine_id"].unique()}
-                            }
-                            for t in all_weeks
+                    all_weeks = sorted(sku_plan_df["period_week"].unique())
+                    final_shadow_prices = {
+                        t: {
+                            "bottleneck_machine": "HEURISTIC_REPAIR_OVERRIDE",
+                            "shadow_price": 0.0,
+                            "is_valid": False,
+                            "repair_applied": True,
+                            "all_duals": {m: 0.0 for m in machines_df["machine_id"].unique()}
                         }
-                    else:
-                        final_shadow_prices = shadow_prices
-                        final_capacity_df = machine_capacity_df
+                        for t in all_weeks
+                    }
+                else:
+                    final_shadow_prices = shadow_prices
+                    final_capacity_df = machine_capacity_df
 
-                    break
+                break    
 
     print("=" * 85)
     print("      AŞAMA 4: HİYERARŞİK TAKTİK PLANLAMA (LEVEL 1: FAMILY AGGREGATE LP)      ")

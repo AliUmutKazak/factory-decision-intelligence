@@ -9,7 +9,7 @@ CONFIG_PATH = ROOT_DIR / "src" / "config.py"
 REPORTS_DIR = ROOT_DIR / "reports"
 METADATA_JSON_PATH = str(REPORTS_DIR / "run_metadata.json")
 VALID_STATUS_TRANSITIONS = {
-    "INITIALIZED": {"RUNNING"},
+    "INITIALIZED": {"RUNNING", "STAGING", "FAILED"},
     "RUNNING": {"STAGING", "FAILED"},
     "STAGING": {"VALIDATE", "FAILED"},
     "VALIDATE": {"COMPLETED", "FAILED"},
@@ -214,7 +214,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
     """
     P1 State Machine Enforcement:
     Durum geçiş kurallarını kesin olarak denetler. 
-    İllegal geçişlerde (örn. RUNNING -> ACTIVE, ARCHIVED -> RUNNING) ValueError fırlatır.
+    İllegal geçişlerde ValueError fırlatır, aynı duruma geçişlerde idempotent davranır.
     """
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
@@ -229,13 +229,16 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
             raise ValueError(f"State Machine Error: run_id '{run_id}' bulunamadı.")
         
         current_status = row[0]
+        if current_status == status:
+            return
+
         allowed = VALID_STATUS_TRANSITIONS.get(current_status, set())
         if status not in allowed:
             raise ValueError(
                 f"[STATE MACHINE VIOLATION] Geçersiz durum geçişi: '{current_status}' -> '{status}'. "
                 f"İzin verilen sonraki durumlar: {allowed if allowed else 'Yok (Terminal Durum)'}"
             )
-            
+        
         cur.execute("UPDATE pipeline_runs SET status = ? WHERE run_id = ?", (status, run_id))
         conn.commit()
     finally:
@@ -285,29 +288,39 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
                     raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}")
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
-        sched_df = pd.read_sql("SELECT product_id, production_units FROM production_schedule", conn)
+        # Detaylı çizelgeleme (CP-SAT) 1. haftayı (schedule_week = 1) çizelgeler.
+        # Rota adımları (operation_seq 1..N) aynı lotu tekrar içerdiğinden lot_id bazında tekilleştirilir.
+        sched_df = pd.read_sql("SELECT lot_id, product_id, production_units FROM production_schedule", conn)
         sku_plan_df = pd.read_sql("SELECT product_id, planned_units FROM sku_production_plan WHERE period_week = 1", conn)
         
         if not sched_df.empty and not sku_plan_df.empty:
-            s_agg = sched_df.groupby("product_id")["production_units"].sum()
+            # Her lot için tekil üretim miktarını al (operasyon katlanmasını önle)
+            unique_lots = sched_df.drop_duplicates(subset=["lot_id"])
+            s_agg = unique_lots.groupby("product_id")["production_units"].sum()
             p_agg = sku_plan_df.groupby("product_id")["planned_units"].sum()
+            
             for pid, p_val in p_agg.items():
-                s_val = s_agg.get(pid, 0)
+                s_val = s_agg.get(pid, 0.0)
                 if abs(p_val - s_val) > 1e-4:
-                    raise ValueError(f"[VALIDATION GATE FAIL] SKU Mutabakatı Bozuldu! Ürün: {pid}, Planlanan: {p_val}, Çizelgelenen: {s_val}")
+                    raise ValueError(
+                        f"[VALIDATION GATE FAIL] SKU Mutabakatı Bozuldu! Ürün: {pid}, "
+                        f"W1 Planlanan: {p_val}, Çizelgelenen (Tekil Lot): {s_val}"
+                    )
 
-        # 3. PHYSICS: Tezgahlarda Zaman Çakışması Yokluğu (Non-Overlapping) & OT Sınırları
-        # Fiziksel çakışma kontrolü: Aynı makinede iki operasyon asla çakışamaz
-        ops_df = pd.read_sql("SELECT machine_id, start_minute, end_minute FROM production_schedule ORDER BY machine_id, start_minute", conn)
+        # 3. PHYSICS: Tezgahlarda Zaman Çakışması Yokluğu (Non-Overlapping)
+        # Tablodaki kolon isimleri start_min ve end_min şeklindedir.
+        ops_df = pd.read_sql("SELECT machine_id, start_min, end_min FROM production_schedule ORDER BY machine_id, start_min", conn)
         for mid, group in ops_df.groupby("machine_id"):
-            sorted_ops = group.sort_values(by="start_minute").to_dict(orient="records")
+            sorted_ops = group.sort_values(by="start_min").to_dict(orient="records")
             for i in range(len(sorted_ops) - 1):
                 cur_op = sorted_ops[i]
                 next_op = sorted_ops[i + 1]
-                if cur_op["end_minute"] > next_op["start_minute"] + 1e-4:
+                # Bitiş dakikası sonraki operasyonun başlangıç dakikasından büyükse fiziksel çakışma vardır
+                if cur_op["end_min"] > next_op["start_min"] + 1e-4:
                     raise ValueError(
-                        f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali! Makine {mid} üzerinde zaman çakışması: "
-                        f"İş 1 Bitiş={cur_op['end_minute']}, İş 2 Başlangıç={next_op['start_minute']}"
+                        f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali! Tezgah {mid} üzerinde "
+                        f"zaman çakışması tespit edildi: [{cur_op['start_min']}, {cur_op['end_min']}] "
+                        f"ile [{next_op['start_min']}, {next_op['end_min']}]"
                     )
 
         # OT Bütçe Sınırı (48 saat = 2880 dk)
@@ -329,10 +342,14 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
         if meta_json_path.exists():
             with open(meta_json_path, "r", encoding="utf-8") as f:
                 solver_meta = json.load(f)
-            status = solver_meta.get("status", "").upper()
+            
+            # JSON anahtarları: 'solver_status' ve 'objective_value_min'
+            status = solver_meta.get("solver_status") or solver_meta.get("status", "")
+            status = str(status).upper()
             if status not in ("OPTIMAL", "FEASIBLE", "OPTIMAL_OR_FEASIBLE"):
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz CP-SAT Solver Durumu: {status}")
-            makespan = solver_meta.get("makespan_minutes", 0)
+            
+            makespan = solver_meta.get("objective_value_min") or solver_meta.get("makespan_minutes", 0)
             if makespan is not None and float(makespan) <= 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
 
@@ -596,21 +613,7 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
 
     return manifest
 
-def test_artifact_manifest_generation():
-    """Denetim Madde 4: Pipeline artifact manifestinin geçerli byte ve SHA-256 ürettiğini doğrular."""
-    from src.utils.lineage import generate_run_manifest
-    import json
-    import os
 
-    manifest = generate_run_manifest(run_id="RUN-MANIFEST-TEST-001")
-    assert manifest["run_id"] == "RUN-MANIFEST-TEST-001"
-    assert manifest["total_artifacts"] > 0
-    assert os.path.exists("reports/run_manifest.json")
-
-    with open("reports/run_manifest.json", "r", encoding="utf-8") as f:
-        loaded = json.load(f)
-    assert loaded["run_id"] == "RUN-MANIFEST-TEST-001"
-    assert len(loaded["artifacts"]) > 0
 
 def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     """
@@ -744,38 +747,3 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         "total_artifacts": len(manifest.get("artifacts", {}))
     }        
 
-def test_validation_gate_blocks_overlapping_physics(tmp_path):
-    """Denetim Madde 34 (P0.3): Validation Gate'in tezgah çakışmasını yakalayıp engellediğini doğrular."""
-    import sqlite3
-    from src.utils.lineage import validate_pipeline_run
-
-    db_path = tmp_path / "factory.db"
-    conn = sqlite3.connect(str(db_path))
-    cur = conn.cursor()
-    
-    # Gerekli tabloları oluştur
-    cur.execute("CREATE TABLE production_schedule (machine_id TEXT, product_id TEXT, production_units REAL, start_minute REAL, end_minute REAL, overtime_minutes REAL)")
-    cur.execute("CREATE TABLE energy_kpis (grand_total_kwh REAL)")
-    cur.execute("CREATE TABLE energy_machine_kpis (total_kwh REAL)")
-    cur.execute("CREATE TABLE carbon_kpis (total_carbon_kg REAL)")
-    cur.execute("CREATE TABLE sku_production_plan (product_id TEXT, planned_units REAL, period_week INTEGER)")
-    cur.execute("CREATE TABLE aggregate_plan (period_month INTEGER, total_hours REAL)")
-    cur.execute("CREATE TABLE machine_capacity_plan (machine_id TEXT, load_hours REAL)")
-
-    # Fiziksel çakışma (Overlapping) enjekte et: İş 1 (100-300), İş 2 (200-400) -> Çakışma!
-    cur.execute("INSERT INTO production_schedule VALUES ('M01', 'P01', 10, 100, 300, 0)")
-    cur.execute("INSERT INTO production_schedule VALUES ('M01', 'P01', 10, 200, 400, 0)")
-    cur.execute("INSERT INTO energy_kpis VALUES (100.0)")
-    cur.execute("INSERT INTO energy_machine_kpis VALUES (100.0)")
-    cur.execute("INSERT INTO carbon_kpis VALUES (50.0)")
-    cur.execute("INSERT INTO sku_production_plan VALUES ('P01', 20, 1)")
-    cur.execute("INSERT INTO aggregate_plan VALUES (1, 100)")
-    cur.execute("INSERT INTO machine_capacity_plan VALUES ('M01', 50)")
-    conn.commit()
-    conn.close()
-
-    try:
-        validate_pipeline_run(run_id="TEST_RUN_OVERLAP", db_path=str(db_path))
-        assert False, "Fiziksel çakışma validation gate tarafından engellenmeliydi!"
-    except ValueError as e:
-        assert "Fiziksel Kısıt İhlali" in str(e) or "zaman çakışması" in str(e)

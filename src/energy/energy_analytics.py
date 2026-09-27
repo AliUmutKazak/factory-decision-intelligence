@@ -252,18 +252,28 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     total_idle_kwh = 0.0
     total_proc_kwh_integrated = 0.0
 
+    # schedule_df üzerinden makine bazlı gerçek işlem süreleri ve enerjileri (Exact Physics)
+    sched_mach_group = schedule_df.groupby("machine_id").agg({
+        "proc_hours": "sum",
+        "total_proc_energy_kwh": "sum"
+    }).to_dict(orient="index")
+
     for m_id, specs in machine_specs.items():
+        # Eğer schedule_df içinde makineye ait işlem varsa kesin değerleri al, yoksa 0.0
+        actual_proc_kwh = float(sched_mach_group.get(m_id, {}).get("total_proc_energy_kwh", 0.0))
+        actual_proc_hours = float(sched_mach_group.get(m_id, {}).get("proc_hours", 0.0))
+
         total_setup_kwh += m_setup_kwh[m_id]
         total_idle_kwh += m_idle_kwh[m_id]
-        total_proc_kwh_integrated += m_proc_kwh[m_id]
-        tot_kwh = m_proc_kwh[m_id] + m_setup_kwh[m_id] + m_idle_kwh[m_id]
+        total_proc_kwh_integrated += actual_proc_kwh
+        tot_kwh = actual_proc_kwh + m_setup_kwh[m_id] + m_idle_kwh[m_id]
 
         machine_kpis.append({
             "machine_id": m_id,
-            "processing_hours": round(m_proc_min[m_id] / 60.0, 4),
+            "processing_hours": round(actual_proc_hours, 4),
             "setup_hours": round(m_setup_min[m_id] / 60.0, 4),
             "idle_hours": round(m_idle_min[m_id] / 60.0, 4),
-            "processing_kwh": float(m_proc_kwh[m_id]),
+            "processing_kwh": float(actual_proc_kwh),
             "setup_kwh": float(m_setup_kwh[m_id]),
             "idle_kwh": float(m_idle_kwh[m_id]),
             "total_kwh": float(tot_kwh)
@@ -285,7 +295,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         "setup_kwh": round(total_setup_kwh, 4),
         "idle_kwh": round(total_idle_kwh, 4),
         "grand_total_kwh": round(grand_total_kwh, 4),
-        "kwh_per_unit": round(grand_total_kwh / total_units_produced, 3) if total_units_produced > 0 else 0.0,
+        "kwh_per_unit": round(grand_total_kwh / total_units_produced, 6) if total_units_produced > 0 else 0.0,
         "avg_load_kw": avg_load_kw,
         "peak_load_kw": peak_kw,
         "load_factor": load_factor
