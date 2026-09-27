@@ -78,37 +78,68 @@ def run_end_to_end_pipeline():
 
         total_elapsed = time.time() - total_start
 
-        # 1. Aşama: STAGING
+        # 1. AŞAMA: STAGING
         update_pipeline_run_status(run_id=run_id, status="STAGING", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: STAGING ({run_id})")
 
-        # 2. Aşama: VALIDATE
+        # 2. AŞAMA: VALIDATE (Master Operational Gate)
         update_pipeline_run_status(run_id=run_id, status="VALIDATE", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: VALIDATE ({run_id})")
         validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
         print(f"[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
 
-        # 3. Aşama: COMPLETED
+        # 3. AŞAMA: SEAL ARTIFACTS (Promotion'dan ÖNCE tüm mühürleme ve denetim kayıtları tamamlanır!)
+        print(f"[AUDIT] Artifacts & Metadata mühürleniyor (SEAL ARTIFACTS)...")
+        
+        # Gerçek sipariş sayısını staging veritabanından al
+        actual_orders_count = 0
+        try:
+            from src.utils.db import get_db_connection
+            with get_db_connection(str(staging_db)) as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) FROM orders")
+                row = cur.fetchone()
+                if row:
+                    actual_orders_count = row[0]
+        except Exception:
+            pass
+
+        # Metadata kaydı (COMPLETED durumunda hazırlanır)
+        record_pipeline_run_metadata(
+            run_id=run_id,
+            status="COMPLETED",
+            orders_count=actual_orders_count,
+            data_source="data/processed/factory_orders.csv",
+            db_path=str(staging_db)
+        )
+
+        # Retention Policy (Staging üzerinde temizlenir)
+        apply_run_retention_policy(keep_last_n=20, db_path=str(staging_db))
+
+        # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
+        manifest = generate_run_manifest(run_id=run_id, db_path=str(staging_db))
+        print(f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)")
+
+        # 4. AŞAMA: COMPLETED
         update_pipeline_run_status(run_id=run_id, status="COMPLETED", db_path=str(staging_db))
         print(f"[AUDIT] Pipeline durumu: COMPLETED ({run_id})")
 
-        # 4. Aşama: ACTIVE (Atomic DB Promotion & State Transition)
+        # 5. AŞAMA: ATOMIC ACTIVE PROMOTION (Artık arkasından patlayacak HİÇBİR iş kalmadı!)
         promote_run_to_active(run_id=run_id, db_path=str(staging_db))
 
         # Environment değişkenini kaldır
         os.environ.pop("FACTORY_DB_PATH", None)
 
-        # Açık kalmış olabilecek SQLite bağlantı handle'larını serbest bırak
+        # Açık kalmış bağlantıları serbest bırak
         import gc
         gc.collect()
         time.sleep(0.5)
 
-        # Windows & OneDrive File-Lock Güvenli Atomic Replacement
+        # Windows & File-Lock Güvenli Atomic Replacement (Kanonik DB'yi güncelle)
         max_retries = 5
         promoted = False
         for attempt in range(max_retries):
             try:
-                # Doğrudan staging dosyasını kanonik hedefe kopyala
                 shutil.copy2(staging_db, canonical_db)
                 promoted = True
                 break
@@ -117,7 +148,6 @@ def run_end_to_end_pipeline():
                 time.sleep(1.0)
 
         if not promoted:
-            # Alternatif deneme: Geçici hedef üzerinden atomic replace
             temp_target = canonical_db.with_suffix(f".tmp_{run_id}")
             shutil.copy2(staging_db, temp_target)
             if canonical_db.exists():
@@ -135,38 +165,6 @@ def run_end_to_end_pipeline():
                 pass
 
         print(f"[AUDIT] Atomic Run Promotion başarılı: {run_id} -> ACTIVE (data/factory.db güncellendi)")
-
-        # Gerçek sipariş sayısını veritabanından al
-        actual_orders_count = 0
-        try:
-            from src.utils.db import get_db_connection
-            with get_db_connection(str(canonical_db)) as conn:
-                cur = conn.cursor()
-                cur.execute("SELECT COUNT(*) FROM orders")
-                row = cur.fetchone()
-                if row:
-                    actual_orders_count = row[0]
-        except Exception:
-            pass
-
-        # Denetim meta verisini kaydet
-        meta = record_pipeline_run_metadata(
-            run_id=run_id,
-            status="ACTIVE",
-            orders_count=actual_orders_count,
-            data_source="data/processed/factory_orders.csv"
-        )
-        print(f"\n[AUDIT] Run metadata kaydedildi -> reports/run_metadata.json (Run ID: {meta['run_id']}, Status: ACTIVE, Orders: {actual_orders_count})")
-
-        # Historical Run Retention
-        pruned_count = apply_run_retention_policy(keep_last_n=20, db_path=str(canonical_db))
-        if pruned_count > 0:
-            print(f"[AUDIT] Retention Policy uygulandı: {pruned_count} adet eski denetim kaydı arşivlendi/temizlendi.")
-
-        # Artifact Manifest Mühürleme
-        manifest = generate_run_manifest(run_id=run_id)
-        print(f"[AUDIT] Artifact Manifest oluşturuldu -> reports/run_manifest.json ({manifest['total_artifacts']} dosya mühürlendi)")
-
         print("\n" + "#" * 85)
         print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI! Toplam Süre: {total_elapsed:.2f} saniye")
         print("#" * 85 + "\n")
