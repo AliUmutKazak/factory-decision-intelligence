@@ -158,7 +158,10 @@ def run_preprocessing():
             f"Ne ham veri ({raw_path}) ne de varsayılan test fixture ({fixture_path}) bulunabildi!"
         )
 
-    adapter = KaggleRetailDemandAdapter(allow_unmapped=True)
+    # Madde 15: Production path fail-fast güvencesi (Bilinmeyen SKU geldiğinde sessiz filtreleme engellenir)
+    # CI/Test ortamında esneklik istenirse ALLOW_UNMAPPED çevre değişkeniyle açılabilir, varsayılan False'tur.
+    allow_unmapped_env = os.environ.get("ALLOW_UNMAPPED", "False").lower() in ("true", "1", "yes")
+    adapter = KaggleRetailDemandAdapter(allow_unmapped=allow_unmapped_env)
     factory_demand = adapter.adapt(data_source)
 
     factory_demand["year"] = factory_demand["order_date"].dt.year
