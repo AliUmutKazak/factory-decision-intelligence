@@ -117,7 +117,11 @@ def run_end_to_end_pipeline():
         apply_run_retention_policy(keep_last_n=20, db_path=str(staging_db))
 
         # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
-        manifest = generate_run_manifest(run_id=run_id, db_path=str(staging_db))
+        manifest = generate_run_manifest(
+            run_id=run_id,
+            db_path=str(staging_db),
+            input_source_path="data/processed/factory_orders.csv"
+        )
         print(f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)")
 
         # 4. AŞAMA: COMPLETED

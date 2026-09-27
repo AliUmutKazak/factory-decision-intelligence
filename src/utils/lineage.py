@@ -393,7 +393,7 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None) -> in
     conn.close()
     return deleted_count
 
-def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
+def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: str = None) -> dict:
     """
     Denetim Madde 4 & Madde 18: Artifact & Input Lineage Manifest.
     - Pipeline çıktılarının (artifacts) SHA-256 ve boyutlarını mühürler.
@@ -442,7 +442,35 @@ def generate_run_manifest(run_id: str, db_path: str = None) -> dict:
             }
 
     # 2. Input Lineage & Environment Fingerprinting (Madde 18)
+    # Fiilen boru hattında kullanılan girdi dosyasını (actual input source) tespit et
+    actual_input_path = None
+    if input_source_path and Path(input_source_path).exists():
+        actual_input_path = Path(input_source_path)
+    elif "USE_FIXTURE" in os.environ:
+        fixture_name = os.environ.get("USE_FIXTURE")
+        if not fixture_name.endswith(".csv"):
+            fixture_name = f"{fixture_name}.csv"
+        cand = root_dir / "data" / "fixtures" / fixture_name
+        if cand.exists():
+            actual_input_path = cand
+    elif (root_dir / "data" / "raw" / "train.csv").exists():
+        actual_input_path = root_dir / "data" / "raw" / "train.csv"
+    elif (root_dir / "data" / "fixtures" / "demand_fixture.csv").exists():
+        actual_input_path = root_dir / "data" / "fixtures" / "demand_fixture.csv"
+
+    input_dataset_info = {}
+    if actual_input_path and actual_input_path.exists():
+        inp_sha, inp_size = compute_sha256(actual_input_path)
+        input_dataset_info = {
+            "path": str(actual_input_path.relative_to(root_dir)) if root_dir in actual_input_path.parents else str(actual_input_path),
+            "sha256": inp_sha,
+            "size_bytes": inp_size,
+            "adapter": "KaggleRetailDemandAdapter",
+            "mapping_version": "canonical-v1"
+        }
+
     inputs_lineage = {
+        "input_dataset": input_dataset_info,
         "raw_source_data": {},
         "config_fingerprint": {},
         "environment": {}
