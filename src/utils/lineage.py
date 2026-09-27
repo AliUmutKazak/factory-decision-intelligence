@@ -506,9 +506,12 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     except ImportError:
         solver_versions["ortools_cpsat"] = "not_installed"
 
-    # Requirements Fingerprint
+    # Requirements & Lockfile Fingerprint (Madde 19: Full Reproducibility)
     req_path = root_dir / "requirements.txt"
     req_sha, req_size = compute_sha256(req_path)
+
+    lock_path = root_dir / "requirements.lock"
+    lock_sha, lock_size = compute_sha256(lock_path)
 
     inputs_lineage["environment"] = {
         "python_version": sys.version.split()[0],
@@ -517,7 +520,12 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
             "file": "requirements.txt",
             "sha256": req_sha,
             "size_bytes": req_size
-        }
+        },
+        "lockfile_fingerprint": {
+            "file": "requirements.lock",
+            "sha256": lock_sha,
+            "size_bytes": lock_size
+        } if lock_sha else None
     }
 
     manifest = {
