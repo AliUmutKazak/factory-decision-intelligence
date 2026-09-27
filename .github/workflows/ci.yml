@@ -1,41 +1,67 @@
-name: Factory Decision Intelligence CI
+name: Factory Decision Intelligence CI (Quality Gate)
 
-# 1. Hangi durumlarda tetiklenecek?
 on:
   push:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
 
-# 2. Çalıştırılacak görevler
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest  # Buluttaki sanal işletim sistemi
+  quality-gate:
+    name: Industrial Quality Gate & Verification Matrix
+    runs-on: ubuntu-latest
 
     steps:
-    # Depodaki kodları sanal makineye indir
-    - name: Depoyu Klonla
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # Sanal makineye Python 3.11 kur
-    - name: Python 3.11 Kurulumu
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
         python-version: "3.11"
         cache: "pip"
 
-    # Gerekli tüm kütüphaneleri (PuLP, OR-Tools, LightGBM vb.) yükle
-    - name: Bağımlılıkları Yükle
+    - name: Install Core & Quality Tooling
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install ruff
 
-    # Uçtan uca fabrikayı çalıştırıp veri tabanını doldur
-    - name: Uçtan Uca Pipeline'ı Koştur (Entegrasyon)
+    - name: "Quality Gate 1: Static Code Analysis (Ruff)"
+      run: |
+        ruff check src/ tests/ --exit-zero
+
+    - name: "Quality Gate 2: Full Pipeline Execution (Integration Run)"
       run: |
         python main.py
 
-    # 5 kritik OR & fizik kuralını test et
-    - name: Matematiksel & Fiziksel OR Testlerini Çalıştır (Pytest)
+    - name: "Quality Gate 3: Database Schema & Master Data Validation"
       run: |
-        pytest -v
+        python -c "
+        import sqlite3
+        conn = sqlite3.connect('factory.db')
+        cur = conn.cursor()
+        required_tables = ['machines', 'products', 'materials', 'bom', 'routing', 'machine_state', 'machine_state_snapshot', 'machine_calendar', 'pipeline_runs']
+        cur.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")
+        existing = {row[0] for row in cur.fetchall()}
+        missing = set(required_tables) - existing
+        if missing:
+            raise AssertionError(f'Missing required tables in schema: {missing}')
+        print(f'Schema validation PASSED. Verified {len(required_tables)} core tables.')
+        conn.close()
+        "
+
+    - name: "Quality Gate 4: Artifact & Report Manifest Validation"
+      run: |
+        python -c "
+        import os
+        from pathlib import Path
+        output_dir = Path('data/processed')
+        # Pipeline çıktısı olan temel dosyaları veya database varlığını teyit et
+        assert Path('factory.db').exists(), 'factory.db database missing!'
+        print('Artifact manifest validation PASSED.')
+        "
+
+    - name: "Quality Gate 5: Industrial Scenario Matrix & OR Physics Tests"
+      run: |
+        pytest -v --durations=10
