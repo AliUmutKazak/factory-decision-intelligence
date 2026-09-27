@@ -453,16 +453,28 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
         # 2. SKU Seviyesine Ayrıştır
         sku_plan_df, family_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
         
-        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti
+        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti (Madde 8 Düzeltmesi)
         routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
         cycle_map = {(row["product_id"], row["machine_id"]): row["processing_time_min"] / 60.0 for _, row in routing_extended.iterrows()}
-        cap_lookup = {(int(r["period_week"]), str(r["machine_id"])): float(r["regular_capacity_hours"]) for _, r in machine_capacity_df.iterrows()}
+        
+        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti (Madde 8 Düzeltmesi)
+        routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
+        cycle_map = {(row["product_id"], row["machine_id"]): row["processing_time_min"] / 60.0 for _, row in routing_extended.iterrows()}
+        
+        # Madde 8: Toplam izin verilen tavan kapasite = Regular + Overtime
+        cap_lookup = {}
+        for _, r in machine_capacity_df.iterrows():
+            reg_c = float(r.get("regular_capacity_hours", 0.0))
+            ot_c = float(r.get("overtime_hours", r.get("max_overtime_hours", 0.0)))
+            tot_c = float(r.get("total_capacity_hours", reg_c + ot_c))
+            cap_lookup[(int(r["period_week"]), str(r["machine_id"]))] = tot_c
         
         detected_overloads = {}
         for w in sorted(sku_plan_df["period_week"].unique()):
             w_df = sku_plan_df[sku_plan_df["period_week"] == w]
             for m in sorted(machines_df["machine_id"].unique()):
-                max_cap = cap_lookup.get((int(w), str(m)), WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER))
+                fallback_cap = (WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER)) + 48.0
+                max_cap = cap_lookup.get((int(w), str(m)), fallback_cap)
                 load = sum(row["planned_batches"] * cycle_map.get((row["product_id"], m), 0.0) for _, row in w_df.iterrows())
                 if load > max_cap + 1e-4:
                     detected_overloads[(str(m), int(w))] = load - max_cap
