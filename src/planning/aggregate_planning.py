@@ -141,7 +141,7 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
 
     # Karar Değişkenleri (Denetim Madde 24: PuLP 4.0 uyumlu dictionary tanımı)
     if hasattr(model, "add_variable_dicts"):
-        P = model.add_variable_dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        P = model.add_variable_dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Integer")
         I = model.add_variable_dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
         B = model.add_variable_dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
         OT = model.add_variable_dicts(
@@ -152,7 +152,7 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
             cat="Continuous"
         )
     else:
-        P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
+        P = pulp.LpVariable.dicts("Prod", [(f, t) for f in families for t in periods], lowBound=0, cat="Integer")
         I = pulp.LpVariable.dicts("Inv", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
         B = pulp.LpVariable.dicts("Backlog", [(f, t) for f in families for t in periods], lowBound=0, cat="Continuous")
         OT = pulp.LpVariable.dicts(
