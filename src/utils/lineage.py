@@ -8,6 +8,16 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 CONFIG_PATH = ROOT_DIR / "src" / "config.py"
 REPORTS_DIR = ROOT_DIR / "reports"
 METADATA_JSON_PATH = str(REPORTS_DIR / "run_metadata.json")
+VALID_STATUS_TRANSITIONS = {
+    "INITIALIZED": {"RUNNING"},
+    "RUNNING": {"STAGING", "FAILED"},
+    "STAGING": {"VALIDATE", "FAILED"},
+    "VALIDATE": {"COMPLETED", "FAILED"},
+    "COMPLETED": {"ACTIVE", "FAILED"},
+    "ACTIVE": {"ARCHIVED"},
+    "ARCHIVED": set(),  # Terminal durum
+    "FAILED": set(),    # Terminal durum
+}
 
 def generate_run_id():
     """Standart kurumsal Run ID formatı: RUN-YYYYMMDD-XXXX"""
@@ -35,7 +45,7 @@ def compute_file_hash(filepath):
     return sha256.hexdigest()[:16]
 
 def init_pipeline_runs_table(conn):
-    """Bütünleşik denetim şeması: Hem trigger hem git/config lineage alanlarını içerir."""
+    """Bütünleşik denetim şeması ve Partial Unique Index (Aynı anda tek ACTIVE garantisi)."""
     cur = conn.cursor()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pipeline_runs (
@@ -46,8 +56,14 @@ def init_pipeline_runs_table(conn):
             git_sha TEXT,
             config_hash TEXT,
             data_source TEXT,
-            status TEXT NOT NULL
+            status TEXT NOT NULL CHECK(status IN ('INITIALIZED', 'RUNNING', 'STAGING', 'VALIDATE', 'COMPLETED', 'ACTIVE', 'ARCHIVED', 'FAILED'))
         )
+    """)
+    # P1 Güvencesi: Tabloda aynı anda en fazla 1 adet ACTIVE kayıt olabilir!
+    cur.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_runs_unique_active 
+        ON pipeline_runs(status) 
+        WHERE status = 'ACTIVE';
     """)
     conn.commit()
 
@@ -155,7 +171,11 @@ def start_pipeline_run(run_id: str, db_path: str = None) -> None:
         conn.close()
 
 def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) -> None:
-    """Koşumun durumunu atomik olarak günceller (RUNNING -> STAGING -> VALIDATE -> COMPLETED -> ACTIVE / FAILED)."""
+    """
+    P1 State Machine Enforcement:
+    Durum geçiş kurallarını kesin olarak denetler. 
+    İllegal geçişlerde (örn. RUNNING -> ACTIVE, ARCHIVED -> RUNNING) ValueError fırlatır.
+    """
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
@@ -163,6 +183,19 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
     conn = get_db_connection(active_db)
     try:
         cur = conn.cursor()
+        cur.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_id,))
+        row = cur.fetchone()
+        if not row:
+            raise ValueError(f"State Machine Error: run_id '{run_id}' bulunamadı.")
+        
+        current_status = row[0]
+        allowed = VALID_STATUS_TRANSITIONS.get(current_status, set())
+        if status not in allowed:
+            raise ValueError(
+                f"[STATE MACHINE VIOLATION] Geçersiz durum geçişi: '{current_status}' -> '{status}'. "
+                f"İzin verilen sonraki durumlar: {allowed if allowed else 'Yok (Terminal Durum)'}"
+            )
+            
         cur.execute("UPDATE pipeline_runs SET status = ? WHERE run_id = ?", (status, run_id))
         conn.commit()
     finally:
@@ -452,11 +485,9 @@ def test_artifact_manifest_generation():
 
 def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     """
-    P0 Mimarisi: Atomic Active Run Promotion.
-    Pipeline başarıyla doğrulanınca, tek bir atomik transaction içinde:
-    1. Önceki ACTIVE olan koşumları ARCHIVED yapar.
-    2. Yeni run_id'yi ACTIVE durumuna terfi ettirir.
-    Hata durumunda transaction rollback edilir ve önceki ACTIVE sistem korunur.
+    P0/P1 Mimarisi: Atomic Active Run Promotion.
+    1. Önceki ACTIVE koşumu ARCHIVED yapar.
+    2. run_id koşumunu COMPLETED -> ACTIVE durumuna taşır.
     """
     import sqlite3
     import src.config as config
@@ -467,7 +498,13 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
         cur = conn.cursor()
         cur.execute("BEGIN IMMEDIATE TRANSACTION;")
 
-        # 1. Önceki ACTIVE koşumları ARCHIVED yap
+        cur.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_id,))
+        row = cur.fetchone()
+        if not row or row[0] != "COMPLETED":
+            curr = row[0] if row else "None"
+            raise ValueError(f"[PROMOTION VIOLATION] Yalnızca COMPLETED koşumlar ACTIVE yapılabilir! Mevcut durum: '{curr}'")
+
+        # 1. Önceki ACTIVE koşumları ARCHIVED yap (böylece partial unique index bozulmaz)
         cur.execute("""
             UPDATE pipeline_runs
             SET status = 'ARCHIVED'

@@ -254,3 +254,41 @@ def test_p0_active_run_isolation_on_failure(tmp_path, monkeypatch):
     assert df_final["run_id"].iloc[0] == "RUN-A"
     assert df_final["lot_id"].iloc[0] == "LOT-A-001"
     assert int(df_final["quantity"].iloc[0]) == 100
+
+def test_atomic_promotion_archives_previous_active(tmp_path):
+    """Yeni bir koşum ACTIVE yapıldığında eskisinin ARCHIVED olduğunu doğrular."""
+    test_db = tmp_path / "test_lineage.db"
+    conn = sqlite3.connect(str(test_db))
+    init_pipeline_runs_table(conn)
+    conn.close()
+
+    run_1 = "RUN-TEST-001"
+    run_2 = "RUN-TEST-002"
+
+    # run_1: RUNNING -> STAGING -> VALIDATE -> COMPLETED -> ACTIVE
+    start_pipeline_run(run_id=run_1, db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="STAGING", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="VALIDATE", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="COMPLETED", db_path=str(test_db))
+    promote_run_to_active(run_id=run_1, db_path=str(test_db))
+
+    # run_1 aktif olmalı
+    active = get_active_pipeline_run(db_path=str(test_db))
+    assert active["run_id"] == run_1
+
+    # run_2: RUNNING -> STAGING -> VALIDATE -> COMPLETED -> ACTIVE
+    start_pipeline_run(run_id=run_2, db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="STAGING", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="VALIDATE", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="COMPLETED", db_path=str(test_db))
+    promote_run_to_active(run_id=run_2, db_path=str(test_db))
+
+    # run_2 aktif, run_1 arşivlenmiş olmalı
+    active_now = get_active_pipeline_run(db_path=str(test_db))
+    assert active_now["run_id"] == run_2
+
+    conn = sqlite3.connect(str(test_db))
+    cur = conn.cursor()
+    cur.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_1,))
+    assert cur.fetchone()[0] == "ARCHIVED"
+    conn.close()
