@@ -8,10 +8,15 @@ import src.config as cfg
 from src.utils.db import get_db_connection
 from src.config import (
     DB_PATH,
-    MRP_EXPEDITE_RELEASE_TIME_MIN,
     CPSAT_TIME_LIMIT_SECONDS,
     CPSAT_NUM_SEARCH_WORKERS,
     CPSAT_RANDOM_SEED,
+    ENABLE_LOT_STREAMING,
+    MAX_SUB_LOT_BATCHES,
+    INITIAL_MACHINE_STATE,
+    SCHEDULING_WEIGHT_MAKESPAN,
+    SCHEDULING_WEIGHT_TARDINESS,
+    SCHEDULING_WEIGHT_SETUP,
 )
 
 def get_initial_machine_states(conn) -> dict:
@@ -339,6 +344,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 model.Add(all_tasks[tid]["start"] >= r_j)
 
     # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri (AddCircuit + OptionalInterval)
+        all_setup_terms = []
     for mid, tids in machine_to_tasks.items():
         n_m = len(tids)
         if n_m <= 1:
@@ -363,6 +369,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                 s_interval = model.NewOptionalIntervalVar(s_start, s_init, s_end, lit, f"init_setup_int_{mid}_{tid}")
                 machine_setup_intervals.append(s_interval)
                 model.Add(s_end <= all_tasks[tid]["start"]).OnlyEnforceIf(lit)
+                all_setup_terms.append(lit * s_init)
 
         # 2) Task -> Dummy (Günün son işi)
         for i, tid in enumerate(tids):
@@ -388,6 +395,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                     s_start = model.NewIntVar(0, horizon, f"setup_start_{mid}_{t1}_{t2}")
                     s_end = model.NewIntVar(0, horizon, f"setup_end_{mid}_{t1}_{t2}")
                     s_interval = model.NewOptionalIntervalVar(s_start, s12, s_end, lit, f"setup_int_{mid}_{t1}_{t2}")
+                    all_setup_terms.append(lit * s12)
                     machine_setup_intervals.append(s_interval)
 
                     # Hazırlık öncül iş bitmeden başlayamaz
@@ -496,11 +504,20 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         model.AddCircuit(circuit_arcs)
 
 
-    # Amaç: Makespan Minimize Et
+    # ---------------------------------------------------------------------
+    # P2: Çok Amaçlı Karar Fonksiyonu (Multi-Objective Optimization)
+    # Makespan ana hedef, sıra bağımlı ayar (setup) süreleri ikincil cezadır.
+    # ---------------------------------------------------------------------
     makespan = model.NewIntVar(0, horizon, "makespan")
     for tid in all_tasks:
         model.Add(makespan >= all_tasks[tid]["end"])
-    model.Minimize(makespan)
+
+    total_setup_duration = sum(all_setup_terms) if all_setup_terms else 0
+
+    # Leksikografik hiyerarşi: Makespan'i 100 ile çarparak birincil tutar,
+    # setup sürelerini ikincil hedef olarak en aza indirir.
+    objective_expr = 100 * makespan + total_setup_duration
+    model.Minimize(objective_expr)
 
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(CPSAT_TIME_LIMIT_SECONDS)
@@ -518,8 +535,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             f"Solver status: {status_name}. Pipeline terminated immediately."
         )
 
-    best_makespan = int(solver.ObjectiveValue())
-    best_bound = int(solver.BestObjectiveBound())
+    best_makespan = int(solver.Value(makespan))
+    best_bound = int(solver.BestObjectiveBound() / 100.0) if solver.BestObjectiveBound() > 0 else 0
     gap = ((best_makespan - best_bound) / best_makespan) * 100 if best_makespan > 0 else 0.0
 
     print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat)")
@@ -718,6 +735,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
         "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
         "mrp_qc_hold_enforced": 1,
+        "objective_makespan": int(solver.Value(makespan)),
+        "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
+        "total_objective_value": float(solver.ObjectiveValue() / 10.0),
     }]
 
     if run_id:

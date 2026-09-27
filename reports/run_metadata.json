@@ -1,7 +1,7 @@
 {
-    "run_id": "RUN-20260928-22e41b",
-    "run_timestamp": "2026-09-28T01:06:35.545175",
-    "git_sha": "77c2d35fbcd2bb344cf76df054b2b1691635b7d4",
+    "run_id": "RUN-20260928-976d74",
+    "run_timestamp": "2026-09-28T02:08:29.318220",
+    "git_sha": "168a26340666868531fb14e6386870d2e8585bc4",
     "data_source": "data/processed/factory_orders.csv",
     "forecast_origin": "2017-12-31",
     "forecast_method": "Hybrid_Backtest_Selection",
@@ -12,7 +12,7 @@
         "P04": "LightGBM",
         "P05": "LightGBM"
     },
-    "config_hash": "cf15974b475b883b",
+    "config_hash": "d6d14b7e52f46a4b",
     "status": "COMPLETED",
     "orders_count": 9130,
     "environment": {
