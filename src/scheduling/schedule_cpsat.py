@@ -80,14 +80,24 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         weekly_machine_ot_budget_min = {}
         machine_ot_hours = {}
 
-    # Denetim Madde 23 (SSOT): Takvim mantığını doğrudan machines tablosundaki max_daily_hours'tan türet
+    # Denetim Madde 31: machine_calendar öncelikli, yoksa machines.max_daily_hours SSOT
     machine_daily_hours = {}
     try:
-        m_df = pd.read_sql("SELECT machine_id, max_daily_hours FROM machines", conn)
-        for _, r in m_df.iterrows():
-            machine_daily_hours[str(r["machine_id"])] = float(r["max_daily_hours"])
+        cal_df = pd.read_sql(
+            "SELECT machine_id, AVG(available_hours) as avg_hours FROM machine_calendar WHERE is_available = 1 GROUP BY machine_id",
+            conn
+        )
+        for _, r in cal_df.iterrows():
+            machine_daily_hours[str(r["machine_id"])] = float(r["avg_hours"])
     except Exception:
         pass
+
+    # Eksik kalan veya takvimde olmayan makineler için machines tablosuna fallback
+    m_df = pd.read_sql("SELECT machine_id, max_daily_hours FROM machines", conn)
+    for _, r in m_df.iterrows():
+        mid = str(r["machine_id"])
+        if mid not in machine_daily_hours:
+            machine_daily_hours[mid] = float(r["max_daily_hours"])
 
     # Changeover matrisi dinamik okuma
     setup_dict = {}

@@ -365,7 +365,21 @@ def initialize_database(force_recreate=False, run_id=None):
             FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
         )
     """)
-
+    # Denetim Madde 31: Machine Calendar (Vardiya, Bakım ve Duruş Takvimi)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS machine_calendar (
+            calendar_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            machine_id TEXT NOT NULL,
+            day_of_week INTEGER NOT NULL,
+            shift_id TEXT DEFAULT 'SHIFT_REGULAR',
+            start_minute INTEGER DEFAULT 480,
+            end_minute INTEGER DEFAULT 1440,
+            available_hours REAL DEFAULT 16.0,
+            exception_type TEXT DEFAULT 'REGULAR',
+            is_available INTEGER DEFAULT 1,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        )
+    """)
     conn.commit()
 
     # Master-data bütünlük denetimi (Fail-Fast)
@@ -398,6 +412,20 @@ def initialize_database(force_recreate=False, run_id=None):
             INSERT OR REPLACE INTO machine_state (machine_id, last_product_id)
             VALUES (?, ?)
         """, initial_states)
+        conn.commit()
+
+    # Madde 31: machine_calendar tablosu boşsa machines verisinden tohumla
+    cursor.execute("SELECT COUNT(*) FROM machine_calendar")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("""
+            INSERT INTO machine_calendar (machine_id, day_of_week, shift_id, start_minute, end_minute, available_hours, exception_type, is_available)
+            SELECT machine_id, d.day_idx, 'SHIFT_REGULAR', 480, 480 + CAST(max_daily_hours * 60 AS INTEGER), max_daily_hours, 'REGULAR', 1
+            FROM machines
+            CROSS JOIN (
+                SELECT 0 AS day_idx UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
+                UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
+            ) d
+        """)
         conn.commit()
 
     # 3. EDA Özet Tablosu
