@@ -186,11 +186,17 @@ def record_pipeline_run_metadata(
     return metadata
 
 def start_pipeline_run(run_id: str, db_path: str = None) -> None:
-    """Denetim Madde 27: Koşumu RUNNING durumunda başlatır."""
+    """Denetim Madde 27: Koşumu her ortamda (fresh clone dahil) garantili olarak RUNNING durumunda başlatır."""
     import src.config as config
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
-    if os.path.exists(active_db):
-        conn = get_db_connection(active_db)
+    
+    # Hedef dizin yoksa oluştur (Fresh clone / CI ortamları için fail-safe)
+    db_dir = os.path.dirname(os.path.abspath(active_db))
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+
+    conn = get_db_connection(active_db)
+    try:
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
         cur.execute("""
@@ -208,6 +214,7 @@ def start_pipeline_run(run_id: str, db_path: str = None) -> None:
             "RUNNING"
         ))
         conn.commit()
+    finally:
         conn.close()
 
 def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) -> None:
