@@ -285,13 +285,14 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
             if cnt == 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosu boş (run_id: {run_id})")
             
-            # Tabloda run_id kolonu varsa, başka bir run_id'ye ait veri bulunmamalı
             cur.execute(f"PRAGMA table_info({tbl})")
             cols = [r[1] for r in cur.fetchall()]
+            # Tabloda run_id varsa kesinlikle tekil ve geçerli koşuma ait olmalı
             if "run_id" in cols:
-                cur.execute(f"SELECT DISTINCT run_id FROM {tbl} WHERE run_id IS NOT NULL")
+                cur.execute(f"SELECT DISTINCT run_id FROM {tbl}")
                 distinct_runs = [r[0] for r in cur.fetchall()]
-                if any(r != run_id for r in distinct_runs):
+                # NULL veya başka run_id bulunursa kesin fail
+                if not distinct_runs or any(r != run_id for r in distinct_runs):
                     raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}")
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu

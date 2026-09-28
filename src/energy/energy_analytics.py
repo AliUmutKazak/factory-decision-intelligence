@@ -80,10 +80,11 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         m_kpi_df = pd.DataFrame(machine_kpis)
         profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
 
-        if run_id:
-            kpi_df["run_id"] = run_id
-            m_kpi_df["run_id"] = run_id
-            profile_df["run_id"] = run_id
+        if not run_id:
+            run_id = "RUN-DEFAULT"
+        kpi_df["run_id"] = run_id
+        m_kpi_df["run_id"] = run_id
+        profile_df["run_id"] = run_id
 
         os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
         kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
@@ -289,10 +290,23 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     kpi_df = pd.DataFrame([kpi_summary])
     m_kpi_df = pd.DataFrame(machine_kpis)
 
-    if run_id:
-        kpi_df["run_id"] = run_id
-        m_kpi_df["run_id"] = run_id
-        profile_df["run_id"] = run_id
+    if not run_id:
+        try:
+            conn_run = get_db_connection(DB_PATH)
+            cur_run = conn_run.cursor()
+            cur_run.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
+            row_run = cur_run.fetchone()
+            if not row_run:
+                cur_run.execute("SELECT run_id FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1;")
+                row_run = cur_run.fetchone()
+            run_id = row_run[0] if row_run else "RUN-DEFAULT"
+            conn_run.close()
+        except Exception:
+            run_id = "RUN-DEFAULT"
+
+    kpi_df["run_id"] = run_id
+    m_kpi_df["run_id"] = run_id
+    profile_df["run_id"] = run_id
 
     # Normal calisma CSV kayitlari
     kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
