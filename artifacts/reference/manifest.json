@@ -1,134 +1,109 @@
 {
-    "run_id": "RUN-20260928-93dafc",
-    "created_at": "2026-09-28T16:07:33.027995",
-    "total_artifacts": 18,
-    "artifacts": {
-        "factory.db": {
-            "size_bytes": 528384,
-            "sha256": "8a26943aaef33ecbbc49ab2cdd7e590a3b3ca3dd66480b957c1d0479349ab34e",
-            "relative_path": "data\\factory.db"
-        },
-        "run_metadata.json": {
-            "size_bytes": 951,
-            "sha256": "d3f2109e400be4d9b7d4bafad11a4cbc48c44bfbe525c5a34afe4b7508c8f81f",
-            "relative_path": "reports\\run_metadata.json"
-        },
-        "schedule_solver_metadata.json": {
-            "size_bytes": 1002,
-            "sha256": "66d7bee35ce4c698f929ceb607556d6a7b1dd5127efe5b40a5a137c48c8405c7",
-            "relative_path": "reports\\schedule_solver_metadata.json"
-        },
-        "forecast_model_metadata.json": {
-            "size_bytes": 15809,
-            "sha256": "59aae92c8ceca03a39f703966528ac61ce611e20365d04a92dd0a38aac876098",
-            "relative_path": "reports\\forecast_model_metadata.json"
-        },
-        "aggregate_plan.csv": {
-            "size_bytes": 546,
-            "sha256": "c9e3b1cb444859917af1dbe1e5deb08210036af6afeb317a5e27f806d73dcb00",
-            "relative_path": "data\\processed\\aggregate_plan.csv"
-        },
-        "carbon_analytics.csv": {
-            "size_bytes": 112,
-            "sha256": "7aeb68651963fb7a9d2ae138ec8f0a7895bf0a8737bf0a6675c54cce294b997a",
-            "relative_path": "data\\processed\\carbon_analytics.csv"
-        },
-        "carbon_machine_kpis.csv": {
-            "size_bytes": 463,
-            "sha256": "85cd6d42d207ed00b42ce63ffec377cf82e7d7ebe486ebacdbcc3e09cef15322",
-            "relative_path": "data\\processed\\carbon_machine_kpis.csv"
-        },
-        "energy_kpis.csv": {
-            "size_bytes": 240,
-            "sha256": "e0d89f2ad167f7aabb6a232f3e64637a128de01159e684c28c79b0db1b9c8369",
-            "relative_path": "data\\processed\\energy_kpis.csv"
-        },
-        "energy_profile_15min.csv": {
-            "size_bytes": 32543,
-            "sha256": "c5b57bbd3875d4739429c7f964e9fc752a2b698823ce381e3675cfb1fa7e26ba",
-            "relative_path": "data\\processed\\energy_profile_15min.csv"
-        },
-        "factory_orders.csv": {
-            "size_bytes": 285342,
-            "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
-            "relative_path": "data\\processed\\factory_orders.csv"
-        },
-        "forecast_demand.csv": {
-            "size_bytes": 7032,
-            "sha256": "94a67c8c365bb462bf8c6f9b1f6c5394f5c43c18607ab8bc2317537ace22311e",
-            "relative_path": "data\\processed\\forecast_demand.csv"
-        },
-        "forecast_model_lineage.csv": {
-            "size_bytes": 13972,
-            "sha256": "f12160491388ae31261cd569d094b51e99afacffa1c7dc03e1bd897af2ce87de",
-            "relative_path": "data\\processed\\forecast_model_lineage.csv"
-        },
-        "machine_capacity_plan.csv": {
-            "size_bytes": 885,
-            "sha256": "00f03f045435f32360574a2dc668a434aaec75eddb27e60a3d3e90a03a1fd8a4",
-            "relative_path": "data\\processed\\machine_capacity_plan.csv"
-        },
-        "mrp_plan.csv": {
-            "size_bytes": 2059,
-            "sha256": "c27fca6fb38fb6a7178b10efa7cc6259834d2eda76aa1a57b7eccf1f0d71190b",
-            "relative_path": "data\\processed\\mrp_plan.csv"
-        },
-        "production_schedule.csv": {
-            "size_bytes": 4149,
-            "sha256": "92b91d563cb17769e63f590e256e5bf10080b91c497813429b157e0d8da45e20",
-            "relative_path": "data\\processed\\production_schedule.csv"
-        },
-        "schedule_solver_metadata.csv": {
-            "size_bytes": 832,
-            "sha256": "a88724aa9779bbc084586d81ef266c22cbf0b714f605e40148c3172b063f733a",
-            "relative_path": "data\\processed\\schedule_solver_metadata.csv"
-        },
-        "sku_production_plan.csv": {
-            "size_bytes": 1016,
-            "sha256": "85dc7fa13a6dd0eeab9a8e2c48ee116ce5e6d0c949cffd32c21093e04de6d738",
-            "relative_path": "data\\processed\\sku_production_plan.csv"
-        },
-        "task_weekly_accounting.csv": {
-            "size_bytes": 1441,
-            "sha256": "cdd8fb444f2b2876f9667eae39c1b8520cd0b88137ad4a04f916827b562efa3b",
-            "relative_path": "data\\processed\\task_weekly_accounting.csv"
-        }
+  "run_id": "RUN-20260928-93dafc",
+  "git_sha": "2df715b2c69bbf736778cc97c4d5f08f7c8ae086",
+  "timestamp": "2026-09-28T16:04:04.924049",
+  "files": {
+    ".gitkeep": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "logical_role": "general_artifact",
+      "schema_version": "1.0.0"
     },
-    "inputs": {
-        "input_dataset": {
-            "path": "data\\raw\\train.csv",
-            "sha256": "038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed",
-            "size_bytes": 17333449,
-            "adapter": "KaggleRetailDemandAdapter",
-            "mapping_version": "canonical-v1"
-        },
-        "raw_source_data": {
-            "train.csv": {
-                "size_bytes": 17333449,
-                "sha256": "038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed",
-                "relative_path": "data\\raw\\train.csv"
-            }
-        },
-        "config_fingerprint": {
-            "file": "src/config.py",
-            "sha256": "de28e79fe820c48591a2e60248e351d93cc80bb7f8e33fdc00e35344260f74ad",
-            "size_bytes": 5096
-        },
-        "environment": {
-            "python_version": "3.13.9",
-            "solver_versions": {
-                "ortools_cpsat": "9.15.6755"
-            },
-            "requirements_fingerprint": {
-                "file": "requirements.txt",
-                "sha256": "c36f7c61ac9c0544d830721913a28669dbd860cc1569d79644317e8a4b93a563",
-                "size_bytes": 384
-            },
-            "lockfile_fingerprint": {
-                "file": "requirements.lock",
-                "sha256": "cea86fcbe121a26f3e5bfbc457af586632bba7e6359b8fdc006a6a57ba7ca8ac",
-                "size_bytes": 1107
-            }
-        }
+    "aggregate_plan.csv": {
+      "sha256": "c9e3b1cb444859917af1dbe1e5deb08210036af6afeb317a5e27f806d73dcb00",
+      "bytes": 546,
+      "logical_role": "aggregate_production_plan",
+      "schema_version": "1.0.0"
+    },
+    "carbon_analytics.csv": {
+      "sha256": "0ad58029376dce3a5b75c4ffd2cfeb93d3194de9c71ceb478c8d5e9560bab534",
+      "bytes": 86,
+      "logical_role": "carbon_emission_analytics",
+      "schema_version": "1.0.0"
+    },
+    "carbon_machine_kpis.csv": {
+      "sha256": "1ad42ad6ea0f89aa07753b7f4057d0e0dcf11d738836849b3af03935a940a783",
+      "bytes": 324,
+      "logical_role": "machine_level_carbon_kpis",
+      "schema_version": "1.0.0"
+    },
+    "energy_kpis.csv": {
+      "sha256": "207c4c76b32603176440ab4fcff0563be543fc0e807436e9ee48f0c2d052e838",
+      "bytes": 213,
+      "logical_role": "energy_consumption_kpis",
+      "schema_version": "1.0.0"
+    },
+    "energy_profile_15min.csv": {
+      "sha256": "a070eb0f72ba5506146c93d840e5b7f272ac6b039046f26f208c8270aeb0b026",
+      "bytes": 17457,
+      "logical_role": "energy_load_profile_15min",
+      "schema_version": "1.0.0"
+    },
+    "factory.db": {
+      "sha256": "4f3e23b5eee3cbee3b44503fc15a4594399c769922728146bf41ebf629c30ee4",
+      "bytes": 528384,
+      "logical_role": "operational_system_database",
+      "schema_version": "1.0.0"
+    },
+    "factory_orders.csv": {
+      "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
+      "bytes": 285342,
+      "logical_role": "factory_production_orders",
+      "schema_version": "1.0.0"
+    },
+    "forecast_demand.csv": {
+      "sha256": "94a67c8c365bb462bf8c6f9b1f6c5394f5c43c18607ab8bc2317537ace22311e",
+      "bytes": 7032,
+      "logical_role": "demand_forecast",
+      "schema_version": "1.0.0"
+    },
+    "forecast_model_lineage.csv": {
+      "sha256": "f12160491388ae31261cd569d094b51e99afacffa1c7dc03e1bd897af2ce87de",
+      "bytes": 13972,
+      "logical_role": "forecast_feature_lineage",
+      "schema_version": "1.0.0"
+    },
+    "forecast_model_metadata.json": {
+      "sha256": "59aae92c8ceca03a39f703966528ac61ce611e20365d04a92dd0a38aac876098",
+      "bytes": 15809,
+      "logical_role": "forecast_model_hyperparameters",
+      "schema_version": "1.0.0"
+    },
+    "machine_capacity_plan.csv": {
+      "sha256": "00f03f045435f32360574a2dc668a434aaec75eddb27e60a3d3e90a03a1fd8a4",
+      "bytes": 885,
+      "logical_role": "machine_capacity_utilization",
+      "schema_version": "1.0.0"
+    },
+    "mrp_plan.csv": {
+      "sha256": "c27fca6fb38fb6a7178b10efa7cc6259834d2eda76aa1a57b7eccf1f0d71190b",
+      "bytes": 2059,
+      "logical_role": "material_requirements_plan",
+      "schema_version": "1.0.0"
+    },
+    "production_schedule.csv": {
+      "sha256": "68e9fe0336e6de16dd1c4b93c4e64f9af78fd677dc94c3906c518d00ae23e0be",
+      "bytes": 4455,
+      "logical_role": "detailed_production_schedule",
+      "schema_version": "1.0.0"
+    },
+    "schedule_solver_metadata.csv": {
+      "sha256": "a88724aa9779bbc084586d81ef266c22cbf0b714f605e40148c3172b063f733a",
+      "bytes": 832,
+      "logical_role": "optimization_solver_kpis_tabular",
+      "schema_version": "1.0.0"
+    },
+    "schedule_solver_metadata.json": {
+      "sha256": "66d7bee35ce4c698f929ceb607556d6a7b1dd5127efe5b40a5a137c48c8405c7",
+      "bytes": 1002,
+      "logical_role": "optimization_solver_run_stats",
+      "schema_version": "1.0.0"
+    },
+    "sku_production_plan.csv": {
+      "sha256": "85dc7fa13a6dd0eeab9a8e2c48ee116ce5e6d0c949cffd32c21093e04de6d738",
+      "bytes": 1016,
+      "logical_role": "sku_level_production_plan",
+      "schema_version": "1.0.0"
     }
+  }
 }

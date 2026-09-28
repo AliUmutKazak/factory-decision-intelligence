@@ -347,8 +347,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         all_setup_terms = []
     for mid, tids in machine_to_tasks.items():
         n_m = len(tids)
-        if n_m <= 1:
-            model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids])
+        if n_m == 0:
             continue
 
         dummy = n_m
@@ -501,7 +500,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
-        model.AddCircuit(circuit_arcs)
+        if circuit_arcs:
+            model.AddCircuit(circuit_arcs)
 
 
     # ---------------------------------------------------------------------
@@ -644,10 +644,12 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
             total_actual_ot = ot_duration_in_task + setup_ot_duration
             regular_duration_in_task = max(0, total_duration - ot_duration_in_task)
 
-            # Denetim Madde 20, P0 Madde 2 & Madde 11: Production OT + Setup OT
+            # Denetim Madde 20 & 25 Değişmezi: Görev süresi korunumu (duration_min == regular_minutes + overtime_minutes)
             item["schedule_week"] = task_week
-            item["overtime_min"] = total_actual_ot
-            item["overtime_minutes"] = total_actual_ot
+            item["production_overtime_minutes"] = ot_duration_in_task
+            item["overtime_min"] = ot_duration_in_task
+            item["overtime_minutes"] = ot_duration_in_task
+            item["total_overtime_minutes"] = total_actual_ot
             item["regular_minutes"] = regular_duration_in_task
             item["is_overtime"] = 1 if total_actual_ot > 0 else 0
             item["calendar_shift"] = "OVERTIME" if total_actual_ot > (total_duration / 2) else "REGULAR"
