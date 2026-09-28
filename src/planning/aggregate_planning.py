@@ -1,8 +1,18 @@
 """
-src/aggregate_planning.py
-Hax & Meal Hiyerarşik Agrega Üretim Planlama Modülü (PuLP)
-- Talep Ağırlıklı Kaynak Katsayıları (Forecast-weighted coefficients - Madde 6)
-- Dinamik Darboğaz Tespiti & Dual Değer Analizi (Dynamic Bottleneck Identification - Madde 13)
+src/planning/aggregate_planning.py
+Hax & Candea / Hax & Meal Hiyerarşik Agrega Üretim Planlama Modülü (PuLP)
+================================================================================
+Mimari Standart:
+  Tactical Continuous Relaxation with Integer SKU Disaggregation and Feasibility Repair.
+
+İş Akışı:
+  1. Tactical Family LP: Continuous relaxation ile optimal üretim, stok, fazla mesai ve kapasite tahsisi.
+  2. SKU Disaggregation: Taktik kararların parti boyutları (integer batches) seviyesine ayrıştırılması.
+  3. Dynamic Bottleneck & Capacity Feedback: Gerçek parti yuvarlamaları sonrası utilized hours ve utilization %
+     metriklerinin yeniden hesaplanması, heuristic feasibility repair uygulanması.
+  4. Sensitivity & Governance: Shadow price değerlerinin tamsayı ayrıştırma sonrası operasyonel seviyede
+     geçersiz kılınması (invalidation).
+================================================================================
 """
 
 import os
