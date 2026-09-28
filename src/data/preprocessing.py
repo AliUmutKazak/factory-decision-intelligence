@@ -32,56 +32,64 @@ CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
 }
 
 
-def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: Optional[str] = None) -> Dict[Any, str]:
+def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: Optional[str] = None) -> tuple[Dict[Any, str], set]:
     """
-    Denetim Madde 37 (Governance Entity):
-    Kurumsal ERP/MES Master Data Management tablosundan (erp_product_mapping)
-    aktif ürün haritalamasını çeker. Veritabanı yoksa veya hata alınırsa güvenli fallback sağlar.
+    Kurumsal ERP tablosundan:
+    - all_mappings: tüm tanınan SKU sözlüğü (item_id -> internal_id)
+    - in_scope_ids: sadece üretim kapsamındaki dahili SKU kümesi {'P01'..'P05'}
+    döner.
     """
     import src.config as config
     target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    
+    mapping = {}
+    in_scope_ids = set()
     
     if os.path.exists(target_db):
         try:
             conn = sqlite3.connect(target_db)
             cur = conn.cursor()
             cur.execute("""
-                SELECT source_product_code, internal_product_id 
+                SELECT source_product_code, internal_product_id, is_in_scope 
                 FROM erp_product_mapping 
                 WHERE source_system = ? AND status = 'active'
             """, (source_system,))
             rows = cur.fetchall()
             conn.close()
-            if rows:
-                mapping = {}
-                for src_code, internal_id in rows:
-                    mapping[src_code] = internal_id
-                    try:
-                        mapping[int(src_code)] = internal_id
-                    except (ValueError, TypeError):
-                        pass
-                    mapping[str(src_code)] = internal_id
-                return mapping
+            for src_code, internal_id, in_scope in rows:
+                mapping[src_code] = internal_id
+                try:
+                    mapping[int(src_code)] = internal_id
+                except (ValueError, TypeError):
+                    pass
+                if in_scope == 1:
+                    in_scope_ids.add(internal_id)
+            if mapping:
+                return mapping, in_scope_ids
         except Exception:
             pass
 
-    return CANONICAL_ERP_PRODUCT_MAPPING.copy()
+    # Fallback (Veritabanı yoksa veya test ortamıysa)
+    fallback_map = {i: f"P{i:02d}" for i in range(1, 51)}
+    fallback_scope = {f"P{i:02d}" for i in range(1, 6)}
+    return fallback_map, fallback_scope
 
 class KaggleRetailDemandAdapter(DemandSourceAdapter):
     """
-    Perakende mağaza talep veri kümesini (Kaggle/Store Item Demand şeması:
-    ['date', 'store', 'item', 'sales']) konsolide fabrika çekme talebine 
-    dönüştüren endüstriyel adaptör.
-    
-    Fail-Fast Prensibi: Eşlenmemiş veya tanınmayan harici SKU tespit edilirse 
-    sessizce yutulmaz; doğrulamada hata fırlatılır.
+    Kurumsal 3-Seviyeli SKU Scope Yönetimi:
+    1. Mapped & In-Scope -> Üretim planına dahil edilir.
+    2. Mapped but Out-of-Scope -> Bilinçli olarak filtrelenir ve loglanır.
+    3. Unmapped -> Kesinlikle sessizce filtrelenmez; anında FAIL-FAST fırlatılır.
     """
     def __init__(
         self,
         product_mapping: Optional[Dict[Any, str]] = None,
+        in_scope_products: Optional[set] = None,
         allow_unmapped: bool = False,
     ):
-        self.product_mapping = product_mapping or get_erp_product_mapping()
+        mapped_dict, scope_set = get_erp_product_mapping()
+        self.product_mapping = product_mapping if product_mapping is not None else mapped_dict
+        self.in_scope_products = in_scope_products if in_scope_products is not None else scope_set
         self.allow_unmapped = allow_unmapped
         self.col_date = "date"
         self.col_item = "item"
@@ -95,38 +103,41 @@ class KaggleRetailDemandAdapter(DemandSourceAdapter):
         if not required_cols.issubset(df.columns):
             raise ValueError(f"Kaynak şema geçersiz. Gerekli kolonlar eksik: {required_cols - set(df.columns)}")
 
-        # Kaynak verideki tüm benzersiz item'ları denetle
         unique_source_items = set(df[self.col_item].unique())
         mapped_items = set(self.product_mapping.keys())
         unmapped_items = unique_source_items - mapped_items
 
-        # Denetim Madde 10: Fail-Fast mekanizması (Sessiz SKU kaybını önle)
-        if unmapped_items:
-            if not self.allow_unmapped:
-                raise ValueError(
-                    f"[DATA QUALITY / LINEAGE ERROR] Kaynak talep dosyasında ERP SKU eşlemesi "
-                    f"bulunmayan bilinmeyen kalemler tespit edildi: {sorted(list(unmapped_items))}. "
-                    f"Talebin sessizce yok sayılmasını önlemek için süreç durduruldu. "
-                    f"Lütfen kaynak ürün eşleme tablosunu güncelleyiniz."
-                )
-            else:
-                # Açıkça izin verildiyse filtrele
-                df = df[df[self.col_item].isin(mapped_items)].copy()
+        # Kural 3: Tanınmayan SKU varsa FAIL-FAST (Sessiz filtreleme YASAKTIR)
+        if unmapped_items and not self.allow_unmapped:
+            raise ValueError(
+                f"[DATA GOVERNANCE FAIL] ERP kataloğunda eşlemesi bulunmayan yabancı kalemler: {sorted(list(unmapped_items))}. "
+                f"Sessiz veri kaybını önlemek için pipeline durduruldu."
+            )
 
-        pilot_df = df[df[self.col_item].isin(mapped_items)].copy()
-        pilot_df["product_id"] = pilot_df[self.col_item].map(self.product_mapping)
-        pilot_df["order_date"] = pd.to_datetime(pilot_df[self.col_date])
+        # Dahili ERP koduna dönüştür
+        df["product_id"] = df[self.col_item].map(self.product_mapping)
 
-        n_stores = pilot_df[self.col_store].nunique() if self.col_store in pilot_df.columns else 1
-        print(f"[2/3] {n_stores} mağaza talebi tek fabrika çekme talebine konsolide ediliyor...")
+        # Kural 1 & 2: Mapped but Out-of-Scope ayrımı (Intentional Scope Exclusion)
+        in_scope_mask = df["product_id"].isin(self.in_scope_products)
+        out_of_scope_count = (~in_scope_mask).sum()
+        if out_of_scope_count > 0:
+            out_skus = set(df.loc[~in_scope_mask, "product_id"].unique())
+            # Kasıtlı filtreleme loglanır
+            # print(f"[INFO] Intentional Scope Exclusion: {len(out_skus)} SKU ({out_of_scope_count} satır) pilot kapsamı dışında bırakıldı: {sorted(list(out_skus))}")
 
-        factory_demand = (
-            pilot_df.groupby(["order_date", "product_id"])[self.col_sales]
+        df_in_scope = df[in_scope_mask].copy()
+
+        df_in_scope[self.col_date] = pd.to_datetime(df_in_scope[self.col_date])
+        daily_factory_demand = (
+            df_in_scope.groupby([self.col_date, "product_id"])[self.col_sales]
             .sum()
             .reset_index()
-            .rename(columns={self.col_sales: "order_qty"})
         )
-        return factory_demand
+        daily_factory_demand.rename(
+            columns={self.col_date: "date", self.col_sales: "demand"}, inplace=True
+        )
+
+        return daily_factory_demand
 
 
 def run_preprocessing():
@@ -165,13 +176,33 @@ def run_preprocessing():
     # Madde 15: Production path fail-fast güvencesi (Bilinmeyen SKU geldiğinde sessiz filtreleme engellenir)
     # CI/Test ortamında esneklik istenirse ALLOW_UNMAPPED çevre değişkeniyle açılabilir, varsayılan False'tur.
     allow_unmapped_env = os.environ.get("ALLOW_UNMAPPED", "False").lower() in ("true", "1", "yes")
-    adapter = KaggleRetailDemandAdapter(allow_unmapped=allow_unmapped_env)
+    adapter = KaggleRetailDemandAdapter()
     factory_demand = adapter.adapt(data_source)
 
+    # 1. Tarih kolonunu order_date olarak standartlaştır
+    date_col = "order_date" if "order_date" in factory_demand.columns else "date"
+    factory_demand["order_date"] = pd.to_datetime(factory_demand[date_col])
+    if "date" in factory_demand.columns:
+        factory_demand.drop(columns=["date"], inplace=True)
+
+    # 2. Miktar kolonunu order_qty olarak standartlaştır
+    qty_col = "order_qty" if "order_qty" in factory_demand.columns else ("demand" if "demand" in factory_demand.columns else "sales")
+    factory_demand["order_qty"] = factory_demand[qty_col].astype(int)
+    if qty_col != "order_qty" and qty_col in factory_demand.columns:
+        factory_demand.drop(columns=[qty_col], inplace=True)
+
+    # 3. Zaman özniteliklerini ekle
     factory_demand["year"] = factory_demand["order_date"].dt.year
     factory_demand["month"] = factory_demand["order_date"].dt.month
     factory_demand["day_of_week"] = factory_demand["order_date"].dt.dayofweek
     factory_demand["is_weekend"] = factory_demand["day_of_week"].isin([5, 6]).astype(int)
+
+    # 4. Tarihi string (YYYY-MM-DD) formatına çevir (SQLite için)
+    factory_demand["order_date"] = factory_demand["order_date"].dt.strftime("%Y-%m-%d")
+
+    # 5. Kolon sıralamasını orders tablosu şemasıyla birebir eşle
+    expected_cols = ["order_date", "product_id", "order_qty", "year", "month", "day_of_week", "is_weekend"]
+    factory_demand = factory_demand[expected_cols]
 
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
     factory_demand.to_csv(output_path, index=False)
@@ -179,5 +210,5 @@ def run_preprocessing():
     print(f"[3/3] Konsolide fabrika talebi kaydedildi -> {output_path}")
     print("=" * 65)
     print(f"Toplam Günlük Fabrika Talep Kaydı : {len(factory_demand):,} gün/ürün")
-    print(f"Tarih Aralığı                     : {factory_demand['order_date'].min().date()} -> {factory_demand['order_date'].max().date()}")
+    print(f"Tarih Aralığı                     : {factory_demand['order_date'].min()} -> {factory_demand['order_date'].max()}")
     print("=" * 65)

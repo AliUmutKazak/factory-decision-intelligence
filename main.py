@@ -10,7 +10,7 @@ import sys
 import time
 import shutil
 from pathlib import Path
-os.environ.setdefault("ALLOW_UNMAPPED", "True")
+
 
 from src.data.preprocessing import run_preprocessing
 from src.data.build_database_and_eda import initialize_database
