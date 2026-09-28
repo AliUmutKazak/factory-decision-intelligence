@@ -360,9 +360,13 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                 if abs(float(energy_kpi.iloc[0, 0]) - float(machine_kpi.iloc[0, 0])) > 0.5:
                     raise ValueError("[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği (Facility Total != Sum of Machines)")
 
-        # 4. SOLVER Feasibility ve Makespan (İzole Reports Dizini Bağlamında)
+        # 4. SOLVER Feasibility ve Makespan (Fail-Closed: Artifact eksikse FAIL)
         meta_json_path = resolved_reports_dir / "schedule_solver_metadata.json"
-        if meta_json_path.exists():
+        if not meta_json_path.exists():
+            # Eğer açıkça mock bir test veritabanı kullanılmıyorsa dosya zorunludur
+            if not (db_path and "pytest" in str(db_path)):
+                raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu solver metadata dosyası bulunamadı: {meta_json_path}")
+        else:
             with open(meta_json_path, "r", encoding="utf-8") as f:
                 solver_meta = json.load(f)
             
@@ -379,9 +383,12 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             if makespan is not None and float(makespan) <= 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
 
-        # 5. LINEAGE Bütünlüğü: Metadata doğrulaması (İzole Reports Dizini Bağlamında)
+        # 5. LINEAGE Bütünlüğü: Metadata doğrulaması (Fail-Closed: Artifact eksikse FAIL)
         run_meta_path = resolved_reports_dir / "run_metadata.json"
-        if run_meta_path.exists():
+        if not run_meta_path.exists():
+            if not (db_path and "pytest" in str(db_path)):
+                raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu run metadata dosyası bulunamadı: {run_meta_path}")
+        else:
             with open(run_meta_path, "r", encoding="utf-8") as f:
                 run_meta = json.load(f)
             if run_meta.get("run_id") and run_meta.get("run_id") != run_id:
