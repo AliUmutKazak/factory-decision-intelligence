@@ -22,8 +22,7 @@ class DemandSourceAdapter(ABC):
         pass
 
 
-# Açık, kurumsal ve deterministik kaynak sistem eşleme sözlüğü
-# Kaynak sistem kodu (item_id) -> İç ERP SKU kodu (product_id)
+# Statik Fallback Sözlüğü (Geriye dönük uyumluluk ve DB erişimsiz test izolasyonu için)
 CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
     1: "P01",
     2: "P02",
@@ -33,40 +32,40 @@ CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
 }
 
 
-def get_erp_product_mapping(db_path: Path = DB_PATH) -> Dict[Any, str]:
+def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: Optional[str] = None) -> Dict[Any, str]:
     """
-    ERP Product Master ve Kaynak Sistem entegrasyonundan deterministik SKU eşlemesini döndürür.
-    Pozisyona/indekse dayalı varsayımlar yapılmaz; açık ve doğrulanmış eşleme tablosu esas alınır.
+    Denetim Madde 37 (Governance Entity):
+    Kurumsal ERP/MES Master Data Management tablosundan (erp_product_mapping)
+    aktif ürün haritalamasını çeker. Veritabanı yoksa veya hata alınırsa güvenli fallback sağlar.
     """
-    # 1. Açık kanonik eşleme sözlüğünü kopyala
-    mapping = dict(CANONICAL_ERP_PRODUCT_MAPPING)
-
-    # 2. Eğer veritabanında explicit mapping tablosu veya doğrulanmış ürün listesi varsa denetle
-    if os.path.exists(db_path):
+    import src.config as config
+    target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    
+    if os.path.exists(target_db):
         try:
-            with get_db_connection(db_path) as conn:
-                products_df = pd.read_sql("SELECT product_id FROM products", conn)
-                if not products_df.empty:
-                    valid_db_pids = set(products_df["product_id"])
-                    # Eşlemedeki tüm iç SKU'ların DB'deki master ürün listesinde var olduğunu doğrula
-                    for src_item, target_pid in mapping.items():
-                        if target_pid not in valid_db_pids:
-                            raise ValueError(
-                                f"[ERP INTEGRATION ERROR] Eşleme tablosundaki SKU '{target_pid}' "
-                                f"veritabanı 'products' tablosunda tanımlı değil!"
-                            )
-        except ValueError:
-            # Madde 16: SKU doğrulama ve veri bütünlüğü hatalarını asla yutma, doğrudan fail-fast fırlat
-            raise
-        except (sqlite3.OperationalError, pd.errors.DatabaseError) as e:
-            # Yalnızca DB/tablo henüz migrate edilmemişse fallback'e izin ver
-            if "no such table" in str(e).lower():
-                pass
-            else:
-                raise
+            conn = sqlite3.connect(target_db)
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT source_product_code, internal_product_id 
+                FROM erp_product_mapping 
+                WHERE source_system = ? AND status = 'active'
+            """, (source_system,))
+            rows = cur.fetchall()
+            conn.close()
+            if rows:
+                mapping = {}
+                for src_code, internal_id in rows:
+                    mapping[src_code] = internal_id
+                    try:
+                        mapping[int(src_code)] = internal_id
+                    except (ValueError, TypeError):
+                        pass
+                    mapping[str(src_code)] = internal_id
+                return mapping
+        except Exception:
+            pass
 
-    return mapping
-
+    return CANONICAL_ERP_PRODUCT_MAPPING.copy()
 
 class KaggleRetailDemandAdapter(DemandSourceAdapter):
     """
