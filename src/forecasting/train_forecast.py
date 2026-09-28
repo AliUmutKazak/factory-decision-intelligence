@@ -281,13 +281,28 @@ def run_forecast_benchmark(run_id=None):
                 ], ignore_index=True)
             future_preds = np.array(future_preds_list)
 
-        for d, q in zip(future_dates, future_preds):
-            final_forecast_records.append({
-                "forecast_date": d.strftime("%Y-%m-%d"),
-                "product_id": pid,
-                "forecast_demand": int(round(max(0, q))),
-                "model_used": best_name
-            })
+        # Forecast Uncertainty & Safety Stock (CV RMSE üzerinden belirsizlik bandı)
+    best_wape, best_rmse, best_bias = model_performance[best_name]
+    sigma_uncertainty = float(best_rmse) if best_rmse > 0 else float(np.std(pdf["demand"]))
+    z_90 = 1.282
+    safety_stock_val = int(round(z_90 * sigma_uncertainty))
+
+    for d, q in zip(future_dates, future_preds):
+        p50_val = int(round(max(0, q)))
+        p90_val = int(round(max(0, q + z_90 * sigma_uncertainty)))
+        p10_val = int(round(max(0, q - z_90 * sigma_uncertainty)))
+
+        final_forecast_records.append({
+            "forecast_date": d.strftime("%Y-%m-%d"),
+            "product_id": pid,
+            "forecast_demand": p50_val,
+            "demand_p10": p10_val,
+            "demand_p50": p50_val,
+            "demand_p90": p90_val,
+            "forecast_uncertainty_sigma": round(sigma_uncertainty, 2),
+            "recommended_safety_stock": safety_stock_val,
+            "model_used": best_name
+        })
 
         # Model Governance / Lineage Standartları (B. Eleştirisi: backtest_wape, backtest_rmse)
         competing_scores = {}
