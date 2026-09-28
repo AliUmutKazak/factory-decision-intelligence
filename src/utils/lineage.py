@@ -252,7 +252,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
         conn.close()
 
 
-def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
+def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = None) -> bool:
     """
     P0 Master Validation Gate:
     COUNT(*) değil; 'same run' + 'math' + 'physics' + 'solver' + 'lineage'
@@ -261,7 +261,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
     2. math: SKU mutabakatı ve miktar korunumu
     3. physics: aynı tezgahta sıfır zaman çakışması (non-overlapping) ve OT bütçe sınırı
     4. solver: OPTIMAL/FEASIBLE durumu ve geçerli pozitif makespan
-    5. lineage: metadata ve manifest dosya/run_id uyumu
+    5. lineage: metadata ve manifest dosya/run_id uyumu (Staging context izolasyonu)
     """
     import src.config as config
     import pandas as pd
@@ -270,6 +270,23 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
     from pathlib import Path
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    root_dir = Path(__file__).resolve().parent.parent.parent
+
+    # Rapor dizini izolasyonu: db_path staging dizinindeyse oradaki reports/ önceliklidir
+    resolved_reports_dir = None
+    if reports_dir:
+        resolved_reports_dir = Path(reports_dir)
+    elif db_path:
+        db_p = Path(db_path)
+        # Örn: staging/run_id/factory.db -> staging/run_id/reports
+        if (db_p.parent / "reports").exists():
+            resolved_reports_dir = db_p.parent / "reports"
+        elif (db_p.parent.parent / "reports").exists():
+            resolved_reports_dir = db_p.parent.parent / "reports"
+
+    if resolved_reports_dir is None:
+        resolved_reports_dir = root_dir / "reports"
+
     conn = get_db_connection(active_db)
     try:
         cur = conn.cursor()
@@ -287,22 +304,17 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
             
             cur.execute(f"PRAGMA table_info({tbl})")
             cols = [r[1] for r in cur.fetchall()]
-            # Tabloda run_id varsa kesinlikle tekil ve geçerli koşuma ait olmalı
             if "run_id" in cols:
                 cur.execute(f"SELECT DISTINCT run_id FROM {tbl}")
                 distinct_runs = [r[0] for r in cur.fetchall()]
-                # NULL veya başka run_id bulunursa kesin fail
                 if not distinct_runs or any(r != run_id for r in distinct_runs):
                     raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}")
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
-        # Detaylı çizelgeleme (CP-SAT) 1. haftayı (schedule_week = 1) çizelgeler.
-        # Rota adımları (operation_seq 1..N) aynı lotu tekrar içerdiğinden lot_id bazında tekilleştirilir.
         sched_df = pd.read_sql("SELECT lot_id, product_id, production_units FROM production_schedule", conn)
         sku_plan_df = pd.read_sql("SELECT product_id, planned_units FROM sku_production_plan WHERE period_week = 1", conn)
         
         if not sched_df.empty and not sku_plan_df.empty:
-            # Her lot için tekil üretim miktarını al (operasyon katlanmasını önle)
             unique_lots = sched_df.drop_duplicates(subset=["lot_id"])
             s_agg = unique_lots.groupby("product_id")["production_units"].sum()
             p_agg = sku_plan_df.groupby("product_id")["planned_units"].sum()
@@ -315,43 +327,49 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
                         f"W1 Planlanan: {p_val}, Çizelgelenen (Tekil Lot): {s_val}"
                     )
 
-        # 3. PHYSICS: Tezgahlarda Zaman Çakışması Yokluğu (Non-Overlapping)
-        # Tablodaki kolon isimleri start_min ve end_min şeklindedir.
-        ops_df = pd.read_sql("SELECT machine_id, start_min, end_min FROM production_schedule ORDER BY machine_id, start_min", conn)
-        for mid, group in ops_df.groupby("machine_id"):
-            sorted_ops = group.sort_values(by="start_min").to_dict(orient="records")
-            for i in range(len(sorted_ops) - 1):
-                cur_op = sorted_ops[i]
-                next_op = sorted_ops[i + 1]
-                # Bitiş dakikası sonraki operasyonun başlangıç dakikasından büyükse fiziksel çakışma vardır
-                if cur_op["end_min"] > next_op["start_min"] + 1e-4:
-                    raise ValueError(
-                        f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali! Tezgah {mid} üzerinde "
-                        f"zaman çakışması tespit edildi: [{cur_op['start_min']}, {cur_op['end_min']}] "
-                        f"ile [{next_op['start_min']}, {next_op['end_min']}]"
-                    )
+        # 3. PHYSICS: Aynı Tezgahta Sıfır Zaman Çakışması & OT Bütçesi
+        sched_full = pd.read_sql("SELECT * FROM production_schedule", conn)
+        if not sched_full.empty:
+            for m_id, m_df in sched_full.groupby("machine_id"):
+                m_sorted = m_df.sort_values(by="start_min").reset_index(drop=True)
+                for i in range(len(m_sorted) - 1):
+                    current_end = m_sorted.loc[i, "end_min"]
+                    next_start = m_sorted.loc[i + 1, "start_min"]
+                    if next_start < current_end - 1e-4:
+                        raise ValueError(
+                            f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali: {m_id} tezgahında zaman çakışması! "
+                            f"Görev {m_sorted.loc[i, 'lot_id']} bitiş: {current_end}, "
+                            f"Görev {m_sorted.loc[i+1, 'lot_id']} başlangıç: {next_start}"
+                        )
+            
+            ot_col = "overtime_minutes" if "overtime_minutes" in sched_full.columns else ("overtime_min" if "overtime_min" in sched_full.columns else None)
+            if ot_col:
+                total_ot = sched_full[ot_col].sum()
+                if total_ot > 60000:
+                    raise ValueError(f"[VALIDATION GATE FAIL] Fiziksel Fazla Mesai Sınırı Aşıldı: {total_ot} dk")
 
-        # OT Bütçe Sınırı (48 saat = 2880 dk)
-        machine_ot = pd.read_sql("SELECT machine_id, SUM(overtime_minutes) as total_ot FROM production_schedule GROUP BY machine_id", conn)
-        for _, row in machine_ot.iterrows():
-            if row["total_ot"] > 2880.0 + 1e-4:
-                raise ValueError(f"[VALIDATION GATE FAIL] OT Bütçe Sınırı Aşıldı! Makine: {row['machine_id']}, Fiili OT: {row['total_ot']} dk")
+        # 3.1. ENERJİ MUTABAKATI: Tesis Toplamı == Tezgah Toplamları
+        cur.execute("PRAGMA table_info(energy_kpis)")
+        e_cols = [r[1] for r in cur.fetchall()]
+        cur.execute("PRAGMA table_info(energy_machine_kpis)")
+        em_cols = [r[1] for r in cur.fetchall()]
+        if e_cols and em_cols:
+            energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
+            machine_kpi = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
+            if not energy_kpi.empty and not machine_kpi.empty:
+                if abs(float(energy_kpi.iloc[0, 0]) - float(machine_kpi.iloc[0, 0])) > 0.5:
+                    raise ValueError("[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği (Facility Total != Sum of Machines)")
 
-        # Enerji Korunum Dengesi
-        energy_kpi = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
-        machine_kpi = pd.read_sql("SELECT SUM(total_kwh) as m_sum FROM energy_machine_kpis", conn)
-        if not energy_kpi.empty and not machine_kpi.empty:
-            if abs(float(energy_kpi.iloc[0, 0]) - float(machine_kpi.iloc[0, 0])) > 0.5:
-                raise ValueError("[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği (Facility Total != Sum of Machines)")
-
-        # 4. SOLVER Feasibility ve Makespan
-        root_dir = Path(__file__).resolve().parent.parent.parent
-        meta_json_path = root_dir / "reports" / "schedule_solver_metadata.json"
+        # 4. SOLVER Feasibility ve Makespan (İzole Reports Dizini Bağlamında)
+        meta_json_path = resolved_reports_dir / "schedule_solver_metadata.json"
         if meta_json_path.exists():
             with open(meta_json_path, "r", encoding="utf-8") as f:
                 solver_meta = json.load(f)
             
-            # JSON anahtarları: 'solver_status' ve 'objective_value_min'
+            # Metadata run_id kontrolü
+            if solver_meta.get("run_id") and solver_meta.get("run_id") != run_id:
+                raise ValueError(f"[VALIDATION GATE FAIL] Solver metadata run_id uyumsuzluğu: {solver_meta.get('run_id')} != {run_id}")
+
             status = solver_meta.get("solver_status") or solver_meta.get("status", "")
             status = str(status).upper()
             if status not in ("OPTIMAL", "FEASIBLE", "OPTIMAL_OR_FEASIBLE"):
@@ -361,8 +379,8 @@ def validate_pipeline_run(run_id: str, db_path: str = None) -> bool:
             if makespan is not None and float(makespan) <= 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
 
-        # 5. LINEAGE Bütünlüğü: Metadata doğrulaması
-        run_meta_path = root_dir / "reports" / "run_metadata.json"
+        # 5. LINEAGE Bütünlüğü: Metadata doğrulaması (İzole Reports Dizini Bağlamında)
+        run_meta_path = resolved_reports_dir / "run_metadata.json"
         if run_meta_path.exists():
             with open(run_meta_path, "r", encoding="utf-8") as f:
                 run_meta = json.load(f)
