@@ -23,6 +23,8 @@ from src.config import (
 )
 from src.utils.lineage import get_active_pipeline_run
 from src.utils.db import get_db_connection
+from src.integration.rescheduler import ClosedLoopRescheduler
+from src.integration.mes_service import MESIntegrationService
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -244,12 +246,13 @@ sched_df = filter_by_active_run(raw_tables["production_schedule"], run_id_val)
 agg_df = filter_by_active_run(raw_tables["aggregate_plan"], run_id_val)
 mach_cap_df = filter_by_active_run(raw_tables["machine_capacity_plan"], run_id_val)
 
-tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability = st.tabs([
+tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_mes = st.tabs([
     "📊 Yönetici Özeti",
     "📈 Talep Tahmini & Doğrulama",
-    "📋 Taktik Planlama & MRP",
-    "⏱️ Detaylı Çizelge (Gantt)",
-    "🌱 Enerji & Karbon Analitiği"
+    "🎯 Taktik Planlama & S&OP",
+    "⏱️ Detaylı Çizelgeleme (Gantt)",
+    "🌱 Sürdürülebilirlik & Enerji",
+    "🏭 MES & Kapalı Çevrim Karar Desteği"
 ])
 
 # =============================================================
@@ -309,7 +312,8 @@ with tab_summary:
 
     st.markdown("---")
     st.subheader("Temel Fabrika Soruları & Model Yanıtları")
-
+    
+    mrp_df = get_table("mrp_plan", run_id_val)
     q_col1, q_col2 = st.columns(2)
     with q_col1:
         st.info(
@@ -578,9 +582,82 @@ with tab_sustainability:
             unit_cost_str = f"€{sim_exposure / total_units:.4f} / adet" if total_units > 0 else "N/A"
             st.metric("Birim Ürün Karbon Maliyeti", unit_cost_str)
 
-            st.markdown("---")
-            st.markdown("**İçsel Karbon Fiyatlandırma Senaryo Tablosu (Internal Carbon Pricing):**")
-            if not scen_df.empty:
-                st.dataframe(scen_df, use_container_width=True)
+
+# =============================================================
+# 6. SEKME: MES CANLI YÜRÜTME & KAPALI ÇEVRİM KARAR DESTEĞİ
+# =============================================================
+with tab_mes:
+    st.subheader("🏭 MES Sahadan Geribildirim & Dinamik Yeniden Çizelgeleme Kokpiti")
+    st.markdown(
+        "Bu panel, ERP/MES katmanından gelen fiili üretim verilerini ve sahadaki arıza/gecikme olaylarını izler. "
+        "Kritik sapmalarda **Kapalı Çevrim Yeniden Çizelgeleme (Closed-Loop Rescheduling)** motorunu tetikleyerek yeni teslim tarihlerini hesaplar."
+    )
+
+    col_m1, col_m2 = st.columns([1.2, 1])
+
+    with col_m1:
+        st.markdown("### 📋 Canlı İş Emri Takip Matrisi (`mes_order_tracking`)")
+        tracking_df = get_table("mes_order_tracking", run_id_val)
+        
+        if tracking_df.empty:
+            st.info("Henüz aktif run için MES takip kaydı yok. Aşağıdaki butondan çizelgeyi MES takip tablosuna aktarabilirsiniz.")
+            if st.button("🔄 Aktif Çizelgeyi MES Takibine Yükle"):
+                mes_srv = MESIntegrationService(run_id=run_id_val)
+                loaded_cnt = mes_srv.initialize_tracking_from_schedule()
+                st.success(f"{loaded_cnt} adet görev MES takip tablosuna başarıyla aktarıldı.")
+                st.rerun()
+        else:
+            status_filter = st.multiselect(
+                "Durum Filtresi:",
+                options=tracking_df["status"].unique().tolist(),
+                default=tracking_df["status"].unique().tolist()
+            )
+            filtered_tracking = tracking_df[tracking_df["status"].isin(status_filter)]
+            st.dataframe(
+                filtered_tracking[["task_id", "lot_id", "product_id", "machine_id", "scheduled_start_min", "scheduled_end_min", "status", "variance_min"]],
+                use_container_width=True,
+                height=300
+            )
+
+        st.markdown("### ⚠️ Sahadan Gelen Son Olaylar (`mes_execution_events`)")
+        events_df = get_table("mes_execution_events", run_id_val)
+        if not events_df.empty:
+            st.dataframe(events_df.tail(10), use_container_width=True, height=180)
+        else:
+            st.info("Kayıtlı plansız duruş veya olay bulunmuyor.")
+
+    with col_m2:
+        st.markdown("### ⚡ Kapalı Çevrim Kriz & What-If Simülatörü")
+        st.caption("Sahada beklenmedik bir arıza oluştuğunda, donmuş ufuk korunarak çizelgenin yeni durumu hesaplanır.")
+
+        with st.form("reschedule_sim_form"):
+            selected_machine = st.selectbox("Arızalanan Tezgâh:", ["M01", "M02", "M03"])
+            sim_down_start = st.number_input("Arıza Başlangıç Zamanı (Dakika):", min_value=0.0, max_value=20000.0, value=600.0, step=30.0)
+            sim_down_dur = st.number_input("Duruş / Onarım Süresi (Dakika):", min_value=10.0, max_value=3000.0, value=120.0, step=15.0)
+            sim_reason = st.text_input("Arıza Gerekçesi:", value="Plansız Mil/Rulman Hasarı")
+
+            run_sim_btn = st.form_submit_button("🚨 Dinamik Yeniden Çizelgele (Reschedule)")
+
+        if run_sim_btn:
+            rescheduler = ClosedLoopRescheduler(run_id=run_id_val)
+            res = rescheduler.reschedule_on_machine_breakdown(
+                machine_id=selected_machine,
+                down_start_min=sim_down_start,
+                down_duration_min=sim_down_dur,
+                reason=sim_reason
+            )
+
+            if res.get("status") == "RESCHEDULED":
+                st.success("✅ Kapalı çevrim yeniden çizelgeleme başarıyla tamamlandı!")
+                
+                c_k1, c_k2, c_k3 = st.columns(3)
+                c_k1.metric("Eski Makespan", f"{res['old_makespan_min']:.0f} dk")
+                c_k2.metric("Yeni Makespan", f"{res['new_makespan_min']:.0f} dk", delta=f"+{res['delta_makespan_min']:.0f} dk", delta_color="inverse")
+                c_k3.metric("Etkilenen İş Sayısı", f"{res['affected_tasks_count']} görev")
+
+                st.warning(
+                    f"⚠️ **Karar Destek Notu:** {selected_machine} üzerindeki {sim_down_dur:.0f} dakikalık duruş, "
+                    f"fabrika toplam teslim süresini **{res['delta_makespan_min']:.0f} dakika ({res['delta_makespan_min']/60:.1f} saat)** öteledi."
+                )
             else:
-                st.info("Karbon fiyat senaryoları bulunamadı.")
+                st.info(f"Sonuç: {res.get('message', 'İşlem tamamlandı.')}")
