@@ -39,7 +39,7 @@ jobs:
       run: |
         python -c "
         import sqlite3
-        conn = sqlite3.connect('factory.db')
+        conn = sqlite3.connect('data/factory.db')
         cur = conn.cursor()
         required_tables = ['machines', 'products', 'materials', 'bom', 'routing', 'machine_state', 'machine_state_snapshot', 'machine_calendar', 'pipeline_runs']
         cur.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")
@@ -58,7 +58,7 @@ jobs:
         from pathlib import Path
         output_dir = Path('data/processed')
         # Pipeline çıktısı olan temel dosyaları veya database varlığını teyit et
-        assert Path('factory.db').exists(), 'factory.db database missing!'
+        assert Path('data/factory.db').exists(), 'data/factory.db database missing!'
         print('Artifact manifest validation PASSED.')
         "
 
