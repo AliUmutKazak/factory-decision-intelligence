@@ -78,7 +78,8 @@ MAX_SUB_LOT_BATCHES = 40                 # Bir alt transfer lotunun alabileceği
 CPSAT_TIME_LIMIT_SECONDS = 30.0          # Çözücü zaman limiti (sn)
 CPSAT_NUM_SEARCH_WORKERS = 8             # Arama iş parçacığı sayısı
 CPSAT_RANDOM_SEED = 42                   # Tekrarlanabilirlik tohum değeri
-# P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Multi-Objective Lexicographic Weights)
+# P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Weighted-Sum Multi-Objective Scalarization)
+# Makespan ana bileşendir; setup süresi ikincil ceza olarak ağırlıklandırılır.
 # CP-SAT tamsayı (integer) aritmetiği gereği ağırlıklar tamsayı olarak tanımlanır.
 SCHEDULING_WEIGHT_MAKESPAN = 100   # alpha: Ana hedef (Makespan minimizasyonu)
 SCHEDULING_WEIGHT_SETUP = 1        # delta: Sıra bağımlı setup süresi cezası

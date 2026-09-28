@@ -28,20 +28,20 @@
       "schema_version": "1.0.0"
     },
     "energy_kpis.csv": {
-      "sha256": "207c4c76b32603176440ab4fcff0563be543fc0e807436e9ee48f0c2d052e838",
-      "bytes": 213,
+      "sha256": "99c13c48b271af2f55d928dfa8efb65498709d20dbed2af424460fabb8a1af3b",
+      "bytes": 240,
       "logical_role": "energy_consumption_kpis",
       "schema_version": "1.0.0"
     },
     "energy_profile_15min.csv": {
-      "sha256": "a070eb0f72ba5506146c93d840e5b7f272ac6b039046f26f208c8270aeb0b026",
-      "bytes": 17457,
+      "sha256": "f45b78bde1762a0dba6f71e8dcaf9a8b18c16dabaa93ed539d77b29ff05cd9a7",
+      "bytes": 32544,
       "logical_role": "energy_load_profile_15min",
       "schema_version": "1.0.0"
     },
     "factory.db": {
-      "sha256": "4f3e23b5eee3cbee3b44503fc15a4594399c769922728146bf41ebf629c30ee4",
-      "bytes": 528384,
+      "sha256": "814aca1369a477ea26bb7beec79e6ef497a366b4e49514e6a5e40f30b5da4385",
+      "bytes": 536576,
       "logical_role": "operational_system_database",
       "schema_version": "1.0.0"
     },

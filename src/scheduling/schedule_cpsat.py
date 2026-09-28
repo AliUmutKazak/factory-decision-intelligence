@@ -513,7 +513,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
     total_setup_duration = sum(all_setup_terms) if all_setup_terms else 0
 
-    # SSOT Uyarınca Config Ağırlıklarıyla Çok Amaçlı Karar Fonksiyonu
+    # Weighted-Sum Skalerleştirme: Makespan ağırlıklı birincil bileşen,
+    # setup süresi ise ikincil bileşen olarak penalize edilir.
+    # (Not: Katı leksikografik garanti için Faz 1 makespan, Faz 2 setup iki aşamalı çözümü yol haritasındadır.)
     objective_expr = (
         int(SCHEDULING_WEIGHT_MAKESPAN) * makespan +
         int(SCHEDULING_WEIGHT_SETUP) * total_setup_duration
