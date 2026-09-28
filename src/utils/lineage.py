@@ -679,7 +679,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     cur = conn.cursor()
 
     # 1. ACTIVE run seç
-    cur.execute("SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY created_at DESC LIMIT 1")
+    cur.execute("SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1")
     row = cur.fetchone()
     if not row:
         raise ValueError("Canonical freeze başarısız: Veritabanında ACTIVE statüsünde bir koşu bulunamadı.")
