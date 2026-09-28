@@ -42,16 +42,22 @@ def run_end_to_end_pipeline():
 
     base_dir = Path(__file__).resolve().parent
     canonical_db = base_dir / "data" / "factory.db"
-    staging_dir = base_dir / "data" / "staging"
-    staging_dir.mkdir(parents=True, exist_ok=True)
+    staging_dir = base_dir / "runs" / run_id
     staging_db = staging_dir / f"factory_staging_{run_id}.db"
+    staging_processed = staging_dir / "data" / "processed"
+    staging_reports = staging_dir / "reports"
+
+    staging_processed.mkdir(parents=True, exist_ok=True)
+    staging_reports.mkdir(parents=True, exist_ok=True)
 
     # Mevcut kanonik DB varsa metadata ve baz tablolar için staging'e başlangıç kopyası al
     if canonical_db.exists():
         shutil.copy2(canonical_db, staging_db)
 
-    # Pipeline boyunca tüm modüllerin izole staging DB'ye yazmasını sağla
+    # Pipeline boyunca tüm modüllerin izole staging ortamına yazmasını sağla
     os.environ["FACTORY_DB_PATH"] = str(staging_db)
+    os.environ["FACTORY_PROCESSED_DIR"] = str(staging_processed)
+    os.environ["FACTORY_REPORTS_DIR"] = str(staging_reports)
 
     # Staging üzerinde koşumu başlat ve RUNNING durumuna al
     start_pipeline_run(run_id=run_id, db_path=str(staging_db))
@@ -134,20 +140,37 @@ def run_end_to_end_pipeline():
         )
         print(f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)")
 
-        # Environment değişkenini kaldır
+        # Environment değişkenlerini kaldır
         os.environ.pop("FACTORY_DB_PATH", None)
+        os.environ.pop("FACTORY_PROCESSED_DIR", None)
+        os.environ.pop("FACTORY_REPORTS_DIR", None)
 
         # Açık kalmış bağlantıları serbest bırak
         import gc
         gc.collect()
         time.sleep(0.5)
 
-        # 1. Fiziksel Atomic Replacement: Önce Staging DB -> Canonical DB aktarılır
+        # 1. Fiziksel Atomic Replacement: Staging DB & Artifacts -> Canonical Store
         max_retries = 5
         promoted = False
         for attempt in range(max_retries):
             try:
                 shutil.copy2(staging_db, canonical_db)
+                
+                # Başarılı koşan koşumun artifact'lerini kanonik dizinlere terfi ettir (promote)
+                canonical_processed = base_dir / "data" / "processed"
+                canonical_reports = base_dir / "reports"
+                canonical_processed.mkdir(parents=True, exist_ok=True)
+                canonical_reports.mkdir(parents=True, exist_ok=True)
+
+                if staging_processed.exists():
+                    for item in staging_processed.glob("*.*"):
+                        shutil.copy2(item, canonical_processed / item.name)
+
+                if staging_reports.exists():
+                    for item in staging_reports.glob("*.*"):
+                        shutil.copy2(item, canonical_reports / item.name)
+
                 promoted = True
                 break
             except PermissionError:
@@ -184,11 +207,13 @@ def run_end_to_end_pipeline():
     except Exception as exc:
         print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)
         os.environ.pop("FACTORY_DB_PATH", None)
+        os.environ.pop("FACTORY_PROCESSED_DIR", None)
+        os.environ.pop("FACTORY_REPORTS_DIR", None)
 
-        # Hata anında staging DB temizlenir, kanonik DB'ye dokunulmaz!
-        if staging_db.exists():
+        # Hata anında staging DB ve izole staging klasörü temizlenir, kanonik DB/dosyalara dokunulmaz!
+        if staging_dir.exists():
             try:
-                staging_db.unlink()
+                shutil.rmtree(staging_dir, ignore_errors=True)
             except Exception:
                 pass
 

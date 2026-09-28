@@ -5,13 +5,18 @@ from pathlib import Path
 SRC_DIR = Path(__file__).resolve().parent
 BASE_DIR = SRC_DIR.parent
 
-# Test izolasyonu için ortam değişkeni desteği (Madde 10: Isolated Test State)
+# Test ve Staging izolasyonu için ortam değişkeni desteği
 _custom_data_dir = os.getenv("FACTORY_DATA_DIR")
 DATA_DIR = Path(_custom_data_dir) if _custom_data_dir else BASE_DIR / "data"
 
+_custom_processed_dir = os.getenv("FACTORY_PROCESSED_DIR")
+PROCESSED_DATA_DIR = Path(_custom_processed_dir) if _custom_processed_dir else DATA_DIR / "processed"
+
 RAW_DATA_DIR = DATA_DIR / "raw"
-PROCESSED_DATA_DIR = DATA_DIR / "processed"
 SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
+
+_custom_reports_dir = os.getenv("FACTORY_REPORTS_DIR")
+REPORTS_DIR = Path(_custom_reports_dir) if _custom_reports_dir else BASE_DIR / "reports"
 
 _custom_db_path = os.getenv("FACTORY_DB_PATH")
 DB_PATH = Path(_custom_db_path) if _custom_db_path else DATA_DIR / "factory.db"
