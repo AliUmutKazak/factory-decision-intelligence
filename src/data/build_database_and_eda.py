@@ -223,6 +223,43 @@ def initialize_database(force_recreate=False, run_id=None):
     cursor.execute("DELETE FROM orders;")
     conn.commit()
 
+    # -------------------------------------------------------------
+    # ERP / MES ENTEGRASYON VE YÜRÜTME TABLOLARI
+    # -------------------------------------------------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mes_execution_events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL,
+            task_id INTEGER,
+            machine_id TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            event_timestamp_min REAL NOT NULL,
+            actual_duration_min REAL,
+            delay_reason TEXT,
+            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        );
+        """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mes_order_tracking (
+            task_id INTEGER PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            lot_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            machine_id TEXT NOT NULL,
+            scheduled_start_min REAL NOT NULL,
+            scheduled_end_min REAL NOT NULL,
+            actual_start_min REAL,
+            actual_end_min REAL,
+            status TEXT DEFAULT 'SCHEDULED',
+            variance_min REAL DEFAULT 0.0,
+            last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
+        );
+        """)
+    conn.commit()
+
     orders_df.to_sql("orders", conn, index=False, if_exists="append")
 
     # 2. Tek ve Standart Run ID Kaydı (INITIALIZED)
