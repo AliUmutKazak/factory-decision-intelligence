@@ -78,11 +78,11 @@ MAX_SUB_LOT_BATCHES = 40                 # Bir alt transfer lotunun alabileceği
 CPSAT_TIME_LIMIT_SECONDS = 30.0          # Çözücü zaman limiti (sn)
 CPSAT_NUM_SEARCH_WORKERS = 8             # Arama iş parçacığı sayısı
 CPSAT_RANDOM_SEED = 42                   # Tekrarlanabilirlik tohum değeri
-# P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Multi-Objective Weights)
-# Makespan ana omurgadır; Setup ve Tardiness çizelgeyi gereksiz yaymadan sıkıştırır.
-SCHEDULING_WEIGHT_MAKESPAN = 10.0     # alpha: Ana hedef (Kompakt üretim ve makespan minimizasyonu)
-SCHEDULING_WEIGHT_TARDINESS = 1.0     # beta: Termin gecikmesi cezası
-SCHEDULING_WEIGHT_SETUP = 2.0         # delta: Sıra bağımlı setup azaltma teşviki
+# P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Multi-Objective Lexicographic Weights)
+# CP-SAT tamsayı (integer) aritmetiği gereği ağırlıklar tamsayı olarak tanımlanır.
+SCHEDULING_WEIGHT_MAKESPAN = 100   # alpha: Ana hedef (Makespan minimizasyonu)
+SCHEDULING_WEIGHT_SETUP = 1        # delta: Sıra bağımlı setup süresi cezası
+SCHEDULING_WEIGHT_TARDINESS = 0    # beta: Operasyonel termin (due date) entegrasyonu tamamlandığında devreye alınacaktır
 # Initial Machine Setup State (Planlama ufku başında tezgâhlarda takılı olan ürün/kalıp)
 # None verilirse ilk iş için ilave setup gerekmez (soğuk başlangıç/hazır varsayımı)
 INITIAL_MACHINE_STATE = {

@@ -268,8 +268,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "is_overtime", "calendar_shift", "release_time_min"
     ]
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
-        if run_id:
-            empty_df["run_id"] = run_id
+        empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
         os.makedirs("data/processed", exist_ok=True)
         empty_df.to_csv("data/processed/production_schedule.csv", index=False)
@@ -514,9 +513,11 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
     total_setup_duration = sum(all_setup_terms) if all_setup_terms else 0
 
-    # Leksikografik hiyerarşi: Makespan'i 100 ile çarparak birincil tutar,
-    # setup sürelerini ikincil hedef olarak en aza indirir.
-    objective_expr = 100 * makespan + total_setup_duration
+    # SSOT Uyarınca Config Ağırlıklarıyla Çok Amaçlı Karar Fonksiyonu
+    objective_expr = (
+        int(SCHEDULING_WEIGHT_MAKESPAN) * makespan +
+        int(SCHEDULING_WEIGHT_SETUP) * total_setup_duration
+    )
     model.Minimize(objective_expr)
 
     solver = cp_model.CpSolver()
@@ -536,7 +537,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         )
 
     best_makespan = int(solver.Value(makespan))
-    best_bound = int(solver.BestObjectiveBound() / 100.0) if solver.BestObjectiveBound() > 0 else 0
+    # Bound hesabı makespan ağırlığına bölünerek ölçeklenir
+    best_bound = int(solver.BestObjectiveBound() / float(SCHEDULING_WEIGHT_MAKESPAN)) if solver.BestObjectiveBound() > 0 else 0
     gap = ((best_makespan - best_bound) / best_makespan) * 100 if best_makespan > 0 else 0.0
 
     print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat)")
@@ -732,24 +734,21 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "cross_week_spillover_min": max(0, int(obj_val - (7 * 24 * 60))),
         "cross_week_execution_allowed": 1,
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
-        "objective_type": "MINIMIZE_MAKESPAN",
-        "operational_objectives_backlog": "TARDINESS_OT_SETUP_PRIORITY",
+        "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
+        "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
         "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
         "mrp_qc_hold_enforced": 1,
         "objective_makespan": int(solver.Value(makespan)),
         "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
-        "total_objective_value": float(solver.ObjectiveValue() / 10.0),
+        "total_objective_value": float(solver.ObjectiveValue()),
     }]
 
-    if run_id:
-        sched_df["run_id"] = run_id
+    effective_run_id = run_id if run_id else "DEFAULT_RUN"
+    sched_df["run_id"] = effective_run_id
 
     solver_meta_df = pd.DataFrame(solver_metadata)
-    if run_id:
-        solver_meta_df["run_id"] = run_id
-
-    solver_meta_df.to_csv('data/processed/schedule_solver_metadata.csv', index=False)
+    solver_meta_df["run_id"] = effective_run_id
 
     with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:
         json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
