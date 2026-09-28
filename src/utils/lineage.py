@@ -103,18 +103,26 @@ def record_pipeline_run_metadata(
     if (not resolved_selected_models or not resolved_forecast_origin) and target_db.exists():
         try:
             with get_db_connection(target_db) as conn:
-                df_lineage = pd.read_sql(
-                    "SELECT product_id, selected_model, forecast_origin FROM model_lineage",
-                    conn
+                # 13. Madde: forecast motorunun yazdığı asıl tablo adı forecast_model_lineage'dır
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('forecast_model_lineage', 'model_lineage')"
                 )
-                if not df_lineage.empty:
-                    if not resolved_selected_models:
-                        # En güncel ürün-model seçimlerini sözlüğe dök
-                        resolved_selected_models = dict(
-                            zip(df_lineage["product_id"], df_lineage["selected_model"])
-                        )
-                    if not resolved_forecast_origin and "forecast_origin" in df_lineage.columns:
-                        resolved_forecast_origin = str(df_lineage["forecast_origin"].dropna().iloc[-1])
+                tables = [r[0] for r in cursor.fetchall()]
+                tbl_name = "forecast_model_lineage" if "forecast_model_lineage" in tables else ("model_lineage" if "model_lineage" in tables else None)
+
+                if tbl_name:
+                    df_lineage = pd.read_sql(
+                        f"SELECT product_id, selected_model, forecast_origin FROM {tbl_name}",
+                        conn
+                    )
+                    if not df_lineage.empty:
+                        if not resolved_selected_models:
+                            resolved_selected_models = dict(
+                                zip(df_lineage["product_id"], df_lineage["selected_model"])
+                            )
+                        if not resolved_forecast_origin and "forecast_origin" in df_lineage.columns:
+                            resolved_forecast_origin = str(df_lineage["forecast_origin"].dropna().iloc[-1])
         except Exception:
             pass
 
