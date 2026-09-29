@@ -40,8 +40,9 @@ def run_end_to_end_pipeline():
     print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE BAŞLATILDI (Run ID: {run_id})")
     print("#" * 85 + "\n")
 
-    base_dir = Path(__file__).resolve().parent
-    canonical_db = base_dir / "data" / "factory.db"
+    # Test ve çalışma ortamı izolasyonu (CWD öncelikli)
+    base_dir = Path.cwd() if (Path.cwd() / "data").exists() else Path(__file__).resolve().parent
+    canonical_db = Path(os.environ.get("FACTORY_CANONICAL_DB", base_dir / "data" / "factory.db"))
     staging_dir = base_dir / "runs" / run_id
     staging_db = staging_dir / f"factory_staging_{run_id}.db"
     staging_processed = staging_dir / "data" / "processed"
@@ -203,6 +204,8 @@ def run_end_to_end_pipeline():
         print("\n" + "#" * 85)
         print(f" TÜM ENTEGRE PIPELINE BAŞARIYLA TAMAMLANDI | Süre: {total_elapsed:.2f} saniye")
         print("#" * 85 + "\n")
+
+        return True
 
     except Exception as exc:
         print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)

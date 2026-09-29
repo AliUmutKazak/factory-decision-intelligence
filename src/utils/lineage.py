@@ -162,8 +162,12 @@ def record_pipeline_run_metadata(
         }
     }
 
-    # JSON audit artifact kaydı
-    with open(METADATA_JSON_PATH, "w", encoding="utf-8") as f:
+    # JSON audit artifact kaydı (Staging & Canonical aware)
+    reports_target_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", REPORTS_DIR))
+    reports_target_dir.mkdir(parents=True, exist_ok=True)
+    target_meta_json = reports_target_dir / "run_metadata.json"
+
+    with open(target_meta_json, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=4, ensure_ascii=False)
 
     # SQLite DB denetim kaydı (hata yutulmaz, şema tutarlıdır)
@@ -365,8 +369,15 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
             machine_kpi = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
             if not energy_kpi.empty and not machine_kpi.empty:
-                if abs(float(energy_kpi.iloc[0, 0]) - float(machine_kpi.iloc[0, 0])) > 0.5:
-                    raise ValueError("[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği (Facility Total != Sum of Machines)")
+                # energy_kpis tablosunda tesis toplam kWh: grand_total_kwh
+                e_col_name = "grand_total_kwh" if "grand_total_kwh" in energy_kpi.columns else ("total_kwh" if "total_kwh" in energy_kpi.columns else None)
+                m_col_name = "total_kwh" if "total_kwh" in machine_kpi.columns else ("grand_total_kwh" if "grand_total_kwh" in machine_kpi.columns else None)
+                
+                if e_col_name and m_col_name:
+                    e_tot = float(energy_kpi[e_col_name].iloc[0])
+                    m_tot = float(machine_kpi[m_col_name].sum())
+                    if abs(e_tot - m_tot) > 0.5:
+                        raise ValueError(f"[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği: Tesis={e_tot:.2f} kWh != Tezgahlar={m_tot:.2f} kWh")
 
         # 4. SOLVER Feasibility ve Makespan (Fail-Closed: Artifact eksikse FAIL)
         meta_json_path = resolved_reports_dir / "schedule_solver_metadata.json"

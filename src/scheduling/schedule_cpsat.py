@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 import sqlite3
 import pandas as pd
 import numpy as np
@@ -752,12 +753,14 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     }]
 
     effective_run_id = run_id if run_id else "DEFAULT_RUN"
-    sched_df["run_id"] = effective_run_id
-
     solver_meta_df = pd.DataFrame(solver_metadata)
     solver_meta_df["run_id"] = effective_run_id
+    sched_df["run_id"] = effective_run_id
 
-    with open('reports/schedule_solver_metadata.json', 'w', encoding='utf-8') as f:
+    # Staging-aware reports path (Item 28)
+    reports_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", "reports"))
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    with open(reports_dir / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
         json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
 
     conn = get_db_connection(DB_PATH)
