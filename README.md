@@ -338,3 +338,18 @@ Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarih
 > *“The reference configuration uses fixed solver parameters and a fixed random seed to improve run-to-run reproducibility.”* 
 > 
 > Çoklu iş parçacıklı (`num_search_workers > 1`) CP-SAT aramalarında donanım ve işletim sistemi katmanındaki non-deterministic thread yarışları nedeniyle mutlak bit-seviyesinde (%100 bit-identical) eşitsizlikler olabilse de, sabit `random_seed` ve parametre yapılandırması çalıştırmalar arası sonuç stabilitesini ve tekrarlanabilirliği büyük ölçüde güvence altına alır.
+
+
+### Material Requirements: Analytical MRP-I vs. ERP-Grade MRP Boundary
+
+Bu platformun envanter katmanı, operasyonel bir işlem motoru (transactional ERP) yerine analitik optimizasyon akışını besleyen bir **Analytical MRP-I Engine** olarak tasarlanmıştır. Sistem sınırları ve kurumsal yol haritası aşağıdaki tabloda şeffaf bir şekilde ayrıştırılmıştır:
+
+| Fonksiyonel Yetenek | Mevcut Kapsam (Analytical MRP-I Engine) | Kurumsal Yol Haritası (ERP-Grade MRP) |
+| :--- | :--- | :--- |
+| **Ürün Ağacı (BOM)** | Çok seviyeli dinamik patlatma (Multi-level explosion) | Mühendislik/Üretim BOM ayrımı (EBOM / MBOM) |
+| **İhtiyaç Analizi** | Brüt & Net ihtiyaç ayrıştırması (Gross vs. Net Req) | Zaman-fazlı sipariş defteri (Time-phased pegging) |
+| **Tedarik Süresi** | Deterministik tedarik süresi ötelemesi (Lead Time offsetting) | Tedarikçi çalışma & sevkiyat takvimleri (Supplier Calendar) |
+| **Emniyet Stoğu** | Varyans ve hizmet seviyesi bazlı dinamik Safety Stock | Mevsimsel ve dinamik risk tamponları |
+| **Erken Uyarılar** | Darboğaz & teslimat riski uyarıları (EXPEDITE flags) | Otomatik satınalma siparişi tetikleme (Automated PO Release) |
+| **Stok Yönetimi** | Başlangıç stok seviyesi ve net bakiye projeksiyonu | Depo mal kabul, QC Hold, karantina ve fiziki rezervasyonlar |
+| **Hurda & Verim** | Standart teorik tüketim | Süreç içi hurda (Scrap), fire ve parça verim (Yield) oranları |
