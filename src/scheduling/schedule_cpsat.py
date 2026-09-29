@@ -68,19 +68,21 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
     mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
     
-    # LP Taktik Seviyeden Tüm Haftalar (W1..W4) için Makine Bazlı Fazla Mesai (OT) Bütçesini Al
+    # -------------------------------------------------------------------------
+    # OPERASYONEL POLİTİKA (Model A - Week-1 Finite Overtime Authorization):
+    # Çizelgeleyici Hafta 1 iş yükünü çözer. Fazla mesai bütçesi taktik LP'den
+    # yalnızca aktif yürütüm haftası (W1) için tahsis edilir.
+    # W2+ taşma (spillover) döneminde ek gece fazla mesaisi kapalıdır.
+    # -------------------------------------------------------------------------
     weekly_machine_ot_budget_min = {}
     machine_ot_hours = {}
     try:
-        cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
+        cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", conn)
         for _, r in cap_df.iterrows():
-            w_idx = int(r["period_week"])
             m_id = str(r["machine_id"])
             ot_h = float(r.get("overtime_hours", 0.0))
-            weekly_machine_ot_budget_min[(w_idx, m_id)] = ot_h * 60.0
-            # Geriye dönük uyumluluk ve varsayılan 1. hafta bütçesi
-            if w_idx == 1:
-                machine_ot_hours[m_id] = ot_h
+            machine_ot_hours[m_id] = ot_h
+            weekly_machine_ot_budget_min[(1, m_id)] = ot_h * 60.0
     except Exception:
         weekly_machine_ot_budget_min = {}
         machine_ot_hours = {}
@@ -477,17 +479,14 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
                                 week_ot_active_vars[week_idx] = []
                             week_ot_active_vars[week_idx].append(is_ot_active)
 
-        # SERT MATEMATİKSEL KISIT (Madde 10: Actual OT Overlap & Window Budget):
-        # Yalnızca 480 dk'lık blokları toptan saymak yerine fiili OT dakikasını ve pencere açılışını modeller.
+        # SERT MATEMATİKSEL KISIT (Model A Politikası - Week-1 Exclusive Overtime):
         for w_idx, act_vars in week_ot_active_vars.items():
             if w_idx == 0:
-                # 1. Hafta: LP'den gelen bütçe kısıtı (en az 1 pencere açılmasına izin verir,
-                # fiili OT süresi allowed_ot_min tavanını aşamaz)
-                # Açılan pencere sayısı tavanı (en az allowed_ot_min kadar blok açılabilir)
+                # 1. Hafta (W1): Taktik LP'den onaylanan bütçe tavanı kadar gece penceresi açılabilir
                 max_allowed_blocks = (allowed_ot_min + 479) // 480 if allowed_ot_min > 0 else 0
                 model.Add(sum(act_vars) <= max_allowed_blocks)
             else:
-                # 2. Hafta ve sonrası (Spillover): İkincil bütçe atanmadığı sürece gece pencereleri açılamaz
+                # 2. Hafta ve sonrası (Spillover): Model A politikası gereği W2+ gece fazla mesaisi açılamaz
                 model.Add(sum(act_vars) == 0)
 
         # Hafta 1 tezgah toplam iş yükü fiili OT kısıtı:
@@ -740,6 +739,8 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "cross_week_spillover_min": max(0, int(solver.Value(makespan) - (7 * 24 * 60))),
         "cross_week_execution_allowed": 1,
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
+        "ot_policy": "MODEL_A_WEEK1_ONLY",
+        "ot_policy_description": "Overtime authorized strictly for Week-1; cross-week spillover runs under regular shifts only.",
         "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
         "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
