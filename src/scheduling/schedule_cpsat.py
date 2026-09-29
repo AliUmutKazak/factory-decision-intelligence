@@ -697,13 +697,13 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         accounting_df = pd.DataFrame(weekly_accounting_rows)
         accounting_df.to_csv('data/processed/task_weekly_accounting.csv', index=False)
 
-    # P0 Madde 2: Hafta bazlı kümülatif OT bütçe kontrolü ve denetim logu (W1..W4)
-    if len(sched_df) > 0 and weekly_machine_ot_budget_min:
-        weekly_actual_ot = sched_df.groupby(["schedule_week", "machine_id"])["overtime_minutes"].sum().to_dict()
+    # P0 Madde 2 / Madde 20: Hafta bazlı kümülatif OT bütçe kontrolü (Source of Truth: weekly_accounting)
+    if weekly_accounting_rows and weekly_machine_ot_budget_min:
+        accounting_df = pd.DataFrame(weekly_accounting_rows)
+        weekly_actual_ot = accounting_df.groupby(["schedule_week", "machine_id"])["overtime_minutes"].sum().to_dict()
         for (w, m), act_ot_min in weekly_actual_ot.items():
             budget_min = weekly_machine_ot_budget_min.get((w, m), 48.0 * 60.0)
             if act_ot_min > budget_min:
-                # Bilgilendirme ve denetim uyarısı
                 print(f"[AUDIT-OT] Hafta {w}, Makine {m}: Gerçekleşen OT={act_ot_min:.1f} dk, Bütçe={budget_min:.1f} dk")
 
     # -------------------------------------------------------------
@@ -807,12 +807,18 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     else:
             print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
 
-    # Fazla Mesai (OT) Bütçe Uyumu Denetimi
-    actual_ot_min = sched_df[sched_df["machine_id"] == "M01"]["overtime_min"].sum()
+    # Fazla Mesai (OT) Bütçe Uyumu Denetimi (Source of Truth: Weekly Accounting)
+    if weekly_accounting_rows:
+        acc_df_audit = pd.DataFrame(weekly_accounting_rows)
+        m01_w1_mask = (acc_df_audit["machine_id"] == "M01") & (acc_df_audit["schedule_week"] == 1)
+        actual_ot_min = float(acc_df_audit[m01_w1_mask]["overtime_minutes"].sum())
+    else:
+        actual_ot_min = float(sched_df[sched_df["machine_id"] == "M01"]["overtime_min"].sum()) if "overtime_min" in sched_df.columns else 0.0
+
     allowed_ot_min = int(machine_ot_hours.get("M01", 0.0) * 60)
-    print("\n--- Fazla Mesai (OT) Bütçe Denetimi ---")
+    print("\n--- Fazla Mesai (OT) Bütçe Denetimi (Hafta 1 - Accounting Dilimli) ---")
     print(f"M01 İzin Verilen OT : {allowed_ot_min} dk ({allowed_ot_min / 60:.2f} saat)")
-    print(f"M01 Fiili Net OT    : {actual_ot_min} dk ({actual_ot_min / 60:.2f} saat)")
+    print(f"M01 Fiili Net OT    : {actual_ot_min:.1f} dk ({actual_ot_min / 60:.2f} saat)")
     if actual_ot_min <= allowed_ot_min:
         print("✓ BÜTÇE UYUMLU: Fiili fazla mesai LP tavan sınırını aşmadı.")
     else:
