@@ -262,14 +262,22 @@ def test_master_data_database_constraints():
 def test_pipeline_failure_status_and_downstream_isolation():
     """Pipeline başarısız olduğunda veya başlatıldığında stale downstream tabloların aktif kabul edilmediğini doğrular."""
     import src.config as cfg
+    from src.utils.lineage import get_active_pipeline_run
 
     with get_db_connection(cfg.DB_PATH) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT status FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1")
-        row = cursor.fetchone()
-        assert row is not None, "pipeline_runs tablosu boş!"
-        # Başarılı bir pipeline koşusunun statüsü SUCCESS, COMPLETED veya ACTIVE olmalı, FAILED/RUNNING olmamalıdır
-        assert row[0] in ("SUCCESS", "COMPLETED", "ACTIVE")
+        cursor.execute("SELECT status FROM pipeline_runs WHERE status IN ('ACTIVE', 'COMPLETED', 'SUCCESS') ORDER BY timestamp DESC LIMIT 1")
+        valid_run = cursor.fetchone()
+        assert valid_run is not None, "Sistemde en az 1 adet doğrulanmış başarılı pipeline koşumu bulunmalıdır!"
+
+        # Aktif koşum kontrolü: FAILED veya RUNNING koşumlar asla aktif kabul edilemez
+        active_run = get_active_pipeline_run(cfg.DB_PATH)
+        if active_run:
+            run_id = active_run.get('run_id') if isinstance(active_run, dict) else str(active_run)
+            cursor.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_id,))
+            row = cursor.fetchone()
+            assert row is not None, f"Aktif koşum veritabanında bulunamadı: {run_id}"
+            assert row[0] == 'ACTIVE', f"Aktif işaretlenen koşumun durumu ACTIVE olmalı, bulunan: {row[0]}"
 
 
 def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkeypatch):

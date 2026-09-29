@@ -112,6 +112,9 @@ def test_atomic_promotion_archives_previous_active(tmp_path):
     run_2 = "RUN-TEST-002"
 
     start_pipeline_run(run_id=run_1, db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="STAGING", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="VALIDATE", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_1, status="COMPLETED", db_path=str(test_db))
     promote_run_to_active(run_id=run_1, db_path=str(test_db))
 
     # run_1 aktif olmalı
@@ -120,6 +123,9 @@ def test_atomic_promotion_archives_previous_active(tmp_path):
 
     # run_2 terfi ettirilmeli
     start_pipeline_run(run_id=run_2, db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="STAGING", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="VALIDATE", db_path=str(test_db))
+    update_pipeline_run_status(run_id=run_2, status="COMPLETED", db_path=str(test_db))
     promote_run_to_active(run_id=run_2, db_path=str(test_db))
 
     # run_2 aktif, run_1 arşivlenmiş olmalı
