@@ -1,7 +1,7 @@
 {
     "run_id": "RUN-TEST-BOUND-002",
-    "run_timestamp": "2026-09-29T20:19:18.446677",
-    "git_sha": "3ae00ba5b179be94f03fec08b1d827665ec3ad0f",
+    "run_timestamp": "2026-09-29T20:43:26.109018",
+    "git_sha": "44bc38a43d328b740e133a47579066fd43611c6a",
     "data_source": "factory_orders.csv",
     "forecast_origin": "2017-12-31",
     "forecast_method": "Hybrid_Backtest_Selection",
