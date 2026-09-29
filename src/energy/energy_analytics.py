@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from src.config import PROCESSED_DATA_DIR, DB_PATH
 from src.utils.db import get_db_connection
+from src.scheduling.calendar_service import MachineCalendarService
 
 OUTPUT_ENERGY_KPI_PATH = PROCESSED_DATA_DIR / "energy_kpis.csv"
 OUTPUT_PROFILE_PATH = PROCESSED_DATA_DIR / "energy_profile_15min.csv"
@@ -164,9 +165,9 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         t_end = t + actual_interval
         total_slice_load_kw = 0.0
 
-        current_week = int(t // (7 * 1440)) + 1
-        t_in_week = t % (7 * 1440)
-        is_calendar_regular = t_in_week < (5 * 1440)
+        current_week, day_of_week, day_cursor = MachineCalendarService.get_week_and_day(t)
+        is_calendar_regular = MachineCalendarService.is_regular_calendar_shift(t)
+        is_ot_window = MachineCalendarService.is_overtime_window(t)
 
         for m_id, specs in machine_specs.items():
             m_sched = schedule_df[schedule_df["machine_id"] == m_id]
@@ -185,9 +186,10 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
                 m_proc_kwh[m_id] += slice_load_kw * (actual_interval / 60.0)
             else:
                 # Boşta (Idle) mı, kapalı mı?
-                is_active_window = is_calendar_regular or (
-                    weekly_machine_ot_hours.get((current_week, m_id), 0.0) > 0
-                )
+                # Regular mesaide idle; OT penceresinde ise ancak o haftada makinenin OT yetkisi varsa idle, yoksa OFF
+                has_ot_auth = weekly_machine_ot_hours.get((current_week, m_id), 0.0) > 0
+                is_active_window = is_calendar_regular or (is_ot_window and has_ot_auth)
+                
                 if is_active_window:
                     slice_load_kw = specs["idle_kw"]
                     m_idle_min[m_id] += actual_interval
@@ -325,3 +327,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     print("=" * 85)
 
     return kpi_summary
+
+
+if __name__ == "__main__":
+    compute_energy_analytics()
