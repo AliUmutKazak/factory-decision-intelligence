@@ -123,3 +123,57 @@ class ClosedLoopRescheduler:
             "new_makespan_min": new_makespan,
             "delta_makespan_min": delta_makespan,
         }
+
+    def record_execution_feedback(
+        self,
+        job_id: str,
+        machine_id: str,
+        planned_runtime_min: float,
+        actual_runtime_min: float,
+        planned_downtime_min: float,
+        actual_downtime_min: float,
+        planned_scrap_rate: float,
+        actual_scrap_rate: float,
+        tolerance_delay_min: float = 20.0,
+        scrap_tolerance: float = 0.03,
+    ) -> dict[str, Any]:
+        """
+        Kapali cevrim uretim geribildirimi (Execution Feedback) ve sapma analizi.
+        Sahadan donen gerceklesmeleri (actuals) planla kiyaslar, sapma toleransini asarsa
+        sisteme REPLAN_REQUIRED bayragi kaldirir ve dinamik yeniden cizelgelemeyi tetikler.
+        """
+        runtime_deviation = actual_runtime_min - planned_runtime_min
+        downtime_deviation = actual_downtime_min - planned_downtime_min
+        scrap_deviation = actual_scrap_rate - planned_scrap_rate
+        total_time_deviation = runtime_deviation + downtime_deviation
+
+        replan_required = total_time_deviation > tolerance_delay_min or scrap_deviation > scrap_tolerance
+
+        reschedule_result = None
+        if replan_required and total_time_deviation > 0:
+            reschedule_result = self.reschedule_on_machine_breakdown(
+                machine_id=machine_id,
+                down_start_min=planned_runtime_min,
+                down_duration_min=total_time_deviation,
+                reason=(
+                    f"Execution Deviation (Runtime: {runtime_deviation:+.1f}m, "
+                    f"Downtime: {downtime_deviation:+.1f}m, Scrap: {scrap_deviation:+.1%})"
+                ),
+            )
+
+        return {
+            "job_id": job_id,
+            "machine_id": machine_id,
+            "planned_runtime_min": planned_runtime_min,
+            "actual_runtime_min": actual_runtime_min,
+            "runtime_deviation_min": round(runtime_deviation, 2),
+            "planned_downtime_min": planned_downtime_min,
+            "actual_downtime_min": actual_downtime_min,
+            "downtime_deviation_min": round(downtime_deviation, 2),
+            "planned_scrap_rate": planned_scrap_rate,
+            "actual_scrap_rate": actual_scrap_rate,
+            "scrap_deviation": round(scrap_deviation, 4),
+            "total_time_deviation_min": round(total_time_deviation, 2),
+            "replan_required": replan_required,
+            "reschedule_result": reschedule_result,
+        }
