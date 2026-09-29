@@ -1,7 +1,13 @@
-import os, sys, json, uuid, hashlib, sqlite3, subprocess
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import uuid
 from datetime import datetime
 from pathlib import Path
-import src.config as config
+
+from src import config
 from src.utils.db import get_db_connection
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -16,8 +22,9 @@ VALID_STATUS_TRANSITIONS = {
     "COMPLETED": {"ACTIVE", "FAILED"},
     "ACTIVE": {"ARCHIVED"},
     "ARCHIVED": set(),  # Terminal durum
-    "FAILED": set(),    # Terminal durum
+    "FAILED": set(),  # Terminal durum
 }
+
 
 def generate_run_id():
     """Standart kurumsal Run ID formatı: RUN-YYYYMMDD-XXXX"""
@@ -25,15 +32,17 @@ def generate_run_id():
     unique_suffix = uuid.uuid4().hex[:6]
     return f"RUN-{now_str}-{unique_suffix}"
 
+
 def get_git_sha():
     try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], 
-            stderr=subprocess.DEVNULL, 
-            cwd=ROOT_DIR
-        ).decode("ascii").strip()
+        return (
+            subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, cwd=ROOT_DIR)
+            .decode("ascii")
+            .strip()
+        )
     except Exception:
         return "UNKNOWN_GIT_SHA"
+
 
 def compute_file_hash(filepath):
     if not os.path.exists(filepath):
@@ -43,6 +52,7 @@ def compute_file_hash(filepath):
         for b in iter(lambda: f.read(65536), b""):
             sha256.update(b)
     return sha256.hexdigest()[:16]
+
 
 def init_pipeline_runs_table(conn):
     """Bütünleşik denetim şeması ve Partial Unique Index (Aynı anda tek ACTIVE garantisi)."""
@@ -61,11 +71,12 @@ def init_pipeline_runs_table(conn):
     """)
     # P1 Güvencesi: Tabloda aynı anda en fazla 1 adet ACTIVE kayıt olabilir!
     cur.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_runs_unique_active 
-        ON pipeline_runs(status) 
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_runs_unique_active
+        ON pipeline_runs(status)
         WHERE status = 'ACTIVE';
     """)
     conn.commit()
+
 
 def record_pipeline_run_metadata(
     run_id=None,
@@ -76,16 +87,19 @@ def record_pipeline_run_metadata(
     db_path=None,
     selected_models=None,
     forecast_origin=None,
-    forecast_method="Hybrid_Backtest_Selection"
+    forecast_method="Hybrid_Backtest_Selection",
 ):
     import pandas as pd
+
     try:
         import ortools
+
         ortools_ver = ortools.__version__
     except Exception:
         ortools_ver = "not_installed"
     try:
         import pulp
+
         pulp_ver = pulp.__version__
     except Exception:
         pulp_ver = "not_installed"
@@ -99,7 +113,9 @@ def record_pipeline_run_metadata(
     resolved_selected_models = dict(selected_models) if selected_models else {}
     resolved_forecast_origin = forecast_origin
 
-    target_db = Path(db_path) if db_path else DB_PATH
+    from src.config import DB_PATH as CONFIG_DB_PATH
+
+    target_db = Path(db_path) if db_path else Path(CONFIG_DB_PATH)
     if (not resolved_selected_models or not resolved_forecast_origin) and target_db.exists():
         try:
             with get_db_connection(target_db) as conn:
@@ -109,18 +125,19 @@ def record_pipeline_run_metadata(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('forecast_model_lineage', 'model_lineage')"
                 )
                 tables = [r[0] for r in cursor.fetchall()]
-                tbl_name = "forecast_model_lineage" if "forecast_model_lineage" in tables else ("model_lineage" if "model_lineage" in tables else None)
+                tbl_name = (
+                    "forecast_model_lineage"
+                    if "forecast_model_lineage" in tables
+                    else ("model_lineage" if "model_lineage" in tables else None)
+                )
 
                 if tbl_name:
                     df_lineage = pd.read_sql(
-                        f"SELECT product_id, selected_model, forecast_origin FROM {tbl_name}",
-                        conn
+                        f"SELECT product_id, selected_model, forecast_origin FROM {tbl_name}", conn
                     )
                     if not df_lineage.empty:
                         if not resolved_selected_models:
-                            resolved_selected_models = dict(
-                                zip(df_lineage["product_id"], df_lineage["selected_model"])
-                            )
+                            resolved_selected_models = dict(zip(df_lineage["product_id"], df_lineage["selected_model"]))
                         if not resolved_forecast_origin and "forecast_origin" in df_lineage.columns:
                             resolved_forecast_origin = str(df_lineage["forecast_origin"].dropna().iloc[-1])
         except Exception:
@@ -133,7 +150,7 @@ def record_pipeline_run_metadata(
             "P02": "Holt-Winters",
             "P03": "LightGBM",
             "P04": "LightGBM",
-            "P05": "LightGBM"
+            "P05": "LightGBM",
         }
     if not resolved_forecast_origin:
         resolved_forecast_origin = "2017-12-31"
@@ -155,11 +172,12 @@ def record_pipeline_run_metadata(
             "ortools_version": ortools_ver,
             "pulp_version": pulp_ver,
         },
-        "optimization_metrics": solver_metrics or {
+        "optimization_metrics": solver_metrics
+        or {
             "aggregate_lp_status": "OPTIMAL",
             "cpsat_solver_status": "OPTIMAL_OR_FEASIBLE",
-            "notes": "End-to-end execution completed successfully"
-        }
+            "notes": "End-to-end execution completed successfully",
+        },
     }
 
     # JSON audit artifact kaydı (Staging & Canonical aware)
@@ -178,30 +196,35 @@ def record_pipeline_run_metadata(
         conn = get_db_connection(active_db)
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
-        cur.execute("""
-            INSERT OR REPLACE INTO pipeline_runs 
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO pipeline_runs
             (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            metadata["run_timestamp"],
-            "pipeline_execution",
-            orders_count,
-            metadata["git_sha"],
-            metadata["config_hash"],
-            data_source,
-            status
-        ))
+        """,
+            (
+                run_id,
+                metadata["run_timestamp"],
+                "pipeline_execution",
+                orders_count,
+                metadata["git_sha"],
+                metadata["config_hash"],
+                data_source,
+                status,
+            ),
+        )
         conn.commit()
         conn.close()
 
     return metadata
 
+
 def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     """Denetim Madde 27: Koşumu her ortamda (fresh clone dahil) garantili olarak RUNNING durumunda başlatır."""
-    import src.config as config
+    from src import config
+
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
-    
+
     # Hedef dizin yoksa oluştur (Fresh clone / CI ortamları için fail-safe)
     db_dir = os.path.dirname(os.path.abspath(active_db))
     if db_dir and not os.path.exists(db_dir):
@@ -211,31 +234,36 @@ def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     try:
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
-        cur.execute("""
-            INSERT OR REPLACE INTO pipeline_runs 
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO pipeline_runs
             (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            run_id,
-            datetime.now().isoformat(),
-            "pipeline_execution",
-            0,
-            get_git_sha(),
-            compute_file_hash(CONFIG_PATH),
-            "in_progress",
-            "RUNNING"
-        ))
+        """,
+            (
+                run_id,
+                datetime.now().isoformat(),
+                "pipeline_execution",
+                0,
+                get_git_sha(),
+                compute_file_hash(CONFIG_PATH),
+                "in_progress",
+                "RUNNING",
+            ),
+        )
         conn.commit()
     finally:
         conn.close()
 
+
 def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) -> None:
     """
     P1 State Machine Enforcement:
-    Durum geçiş kurallarını kesin olarak denetler. 
+    Durum geçiş kurallarını kesin olarak denetler.
     İllegal geçişlerde ValueError fırlatır, aynı duruma geçişlerde idempotent davranır.
     """
-    import src.config as config
+    from src import config
+
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return
@@ -246,7 +274,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
         row = cur.fetchone()
         if not row:
             raise ValueError(f"State Machine Error: run_id '{run_id}' bulunamadı.")
-        
+
         current_status = row[0]
         if current_status == status:
             return
@@ -257,7 +285,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
                 f"[STATE MACHINE VIOLATION] Geçersiz durum geçişi: '{current_status}' -> '{status}'. "
                 f"İzin verilen sonraki durumlar: {allowed if allowed else 'Yok (Terminal Durum)'}"
             )
-        
+
         cur.execute("UPDATE pipeline_runs SET status = ? WHERE run_id = ?", (status, run_id))
         conn.commit()
     finally:
@@ -275,11 +303,12 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
     4. solver: OPTIMAL/FEASIBLE durumu ve geçerli pozitif makespan
     5. lineage: metadata ve manifest dosya/run_id uyumu (Staging context izolasyonu)
     """
-    import src.config as config
-    import pandas as pd
-    import numpy as np
     import json
     from pathlib import Path
+
+    import pandas as pd
+
+    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     root_dir = Path(__file__).resolve().parent.parent.parent
@@ -305,32 +334,40 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
 
         # 1. SAME RUN Tutarlılığı: Tabloların boş olmaması ve run_id uyumu
         tables_to_check = [
-            "production_schedule", "energy_kpis", "carbon_kpis", 
-            "sku_production_plan", "aggregate_plan", "machine_capacity_plan"
+            "production_schedule",
+            "energy_kpis",
+            "carbon_kpis",
+            "sku_production_plan",
+            "aggregate_plan",
+            "machine_capacity_plan",
         ]
         for tbl in tables_to_check:
             cur.execute(f"SELECT COUNT(*) FROM {tbl}")
             cnt = cur.fetchone()[0]
             if cnt == 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosu boş (run_id: {run_id})")
-            
+
             cur.execute(f"PRAGMA table_info({tbl})")
             cols = [r[1] for r in cur.fetchall()]
             if "run_id" in cols:
                 cur.execute(f"SELECT DISTINCT run_id FROM {tbl}")
                 distinct_runs = [r[0] for r in cur.fetchall()]
                 if not distinct_runs or any(r != run_id for r in distinct_runs):
-                    raise ValueError(f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}")
+                    raise ValueError(
+                        f"[VALIDATION GATE FAIL] '{tbl}' tablosunda run_id tutarsızlığı: {distinct_runs} != {run_id}"
+                    )
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
         sched_df = pd.read_sql("SELECT lot_id, product_id, production_units FROM production_schedule", conn)
-        sku_plan_df = pd.read_sql("SELECT product_id, planned_units FROM sku_production_plan WHERE period_week = 1", conn)
-        
+        sku_plan_df = pd.read_sql(
+            "SELECT product_id, planned_units FROM sku_production_plan WHERE period_week = 1", conn
+        )
+
         if not sched_df.empty and not sku_plan_df.empty:
             unique_lots = sched_df.drop_duplicates(subset=["lot_id"])
             s_agg = unique_lots.groupby("product_id")["production_units"].sum()
             p_agg = sku_plan_df.groupby("product_id")["planned_units"].sum()
-            
+
             for pid, p_val in p_agg.items():
                 s_val = s_agg.get(pid, 0.0)
                 if abs(p_val - s_val) > 1e-4:
@@ -351,10 +388,14 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                         raise ValueError(
                             f"[VALIDATION GATE FAIL] Fiziksel Kısıt İhlali: {m_id} tezgahında zaman çakışması! "
                             f"Görev {m_sorted.loc[i, 'lot_id']} bitiş: {current_end}, "
-                            f"Görev {m_sorted.loc[i+1, 'lot_id']} başlangıç: {next_start}"
+                            f"Görev {m_sorted.loc[i + 1, 'lot_id']} başlangıç: {next_start}"
                         )
-            
-            ot_col = "overtime_minutes" if "overtime_minutes" in sched_full.columns else ("overtime_min" if "overtime_min" in sched_full.columns else None)
+
+            ot_col = (
+                "overtime_minutes"
+                if "overtime_minutes" in sched_full.columns
+                else ("overtime_min" if "overtime_min" in sched_full.columns else None)
+            )
             if ot_col:
                 total_ot = sched_full[ot_col].sum()
                 if total_ot > 60000:
@@ -370,14 +411,24 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             machine_kpi = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
             if not energy_kpi.empty and not machine_kpi.empty:
                 # energy_kpis tablosunda tesis toplam kWh: grand_total_kwh
-                e_col_name = "grand_total_kwh" if "grand_total_kwh" in energy_kpi.columns else ("total_kwh" if "total_kwh" in energy_kpi.columns else None)
-                m_col_name = "total_kwh" if "total_kwh" in machine_kpi.columns else ("grand_total_kwh" if "grand_total_kwh" in machine_kpi.columns else None)
-                
+                e_col_name = (
+                    "grand_total_kwh"
+                    if "grand_total_kwh" in energy_kpi.columns
+                    else ("total_kwh" if "total_kwh" in energy_kpi.columns else None)
+                )
+                m_col_name = (
+                    "total_kwh"
+                    if "total_kwh" in machine_kpi.columns
+                    else ("grand_total_kwh" if "grand_total_kwh" in machine_kpi.columns else None)
+                )
+
                 if e_col_name and m_col_name:
                     e_tot = float(energy_kpi[e_col_name].iloc[0])
                     m_tot = float(machine_kpi[m_col_name].sum())
                     if abs(e_tot - m_tot) > 0.5:
-                        raise ValueError(f"[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği: Tesis={e_tot:.2f} kWh != Tezgahlar={m_tot:.2f} kWh")
+                        raise ValueError(
+                            f"[VALIDATION GATE FAIL] Enerji Korunum Dengesizliği: Tesis={e_tot:.2f} kWh != Tezgahlar={m_tot:.2f} kWh"
+                        )
 
         # 4. SOLVER Feasibility ve Makespan (Fail-Closed: Artifact eksikse FAIL)
         meta_json_path = resolved_reports_dir / "schedule_solver_metadata.json"
@@ -386,18 +437,20 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             if not (db_path and "pytest" in str(db_path)):
                 raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu solver metadata dosyası bulunamadı: {meta_json_path}")
         else:
-            with open(meta_json_path, "r", encoding="utf-8") as f:
+            with open(meta_json_path, encoding="utf-8") as f:
                 solver_meta = json.load(f)
-            
+
             # Metadata run_id kontrolü
             if solver_meta.get("run_id") and solver_meta.get("run_id") != run_id:
-                raise ValueError(f"[VALIDATION GATE FAIL] Solver metadata run_id uyumsuzluğu: {solver_meta.get('run_id')} != {run_id}")
+                raise ValueError(
+                    f"[VALIDATION GATE FAIL] Solver metadata run_id uyumsuzluğu: {solver_meta.get('run_id')} != {run_id}"
+                )
 
             status = solver_meta.get("solver_status") or solver_meta.get("status", "")
             status = str(status).upper()
             if status not in ("OPTIMAL", "FEASIBLE", "OPTIMAL_OR_FEASIBLE"):
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz CP-SAT Solver Durumu: {status}")
-            
+
             makespan = solver_meta.get("objective_value_min") or solver_meta.get("makespan_minutes", 0)
             if makespan is not None and float(makespan) <= 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
@@ -408,14 +461,16 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             if not (db_path and "pytest" in str(db_path)):
                 raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu run metadata dosyası bulunamadı: {run_meta_path}")
         else:
-            with open(run_meta_path, "r", encoding="utf-8") as f:
+            with open(run_meta_path, encoding="utf-8") as f:
                 run_meta = json.load(f)
             if run_meta.get("run_id") and run_meta.get("run_id") != run_id:
-                raise ValueError(f"[VALIDATION GATE FAIL] Lineage metadata run_id uyumsuzluğu: {run_meta.get('run_id')} != {run_id}")
+                raise ValueError(
+                    f"[VALIDATION GATE FAIL] Lineage metadata run_id uyumsuzluğu: {run_meta.get('run_id')} != {run_id}"
+                )
 
         return True
     finally:
-        conn.close()        
+        conn.close()
 
 
 def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -> dict:
@@ -423,17 +478,18 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     P1 Semantik Güvencesi:
     Yalnızca doğrulanmış ve atomik olarak terfi ettirilmiş (ACTIVE) koşumu döner.
     Sistemde ACTIVE koşum yoksa kesinlikle None döner (ACTIVE only).
-    
+
     allow_fallback=True yalnızca eski/legacy migration testleri veya geriye dönük
     uyumluluk için açıkça istendiğinde COMPLETED/SUCCESS durumuna bakar.
     """
-    import src.config as config
+    from src import config
+
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
     cur = conn.cursor()
-    
+
     # 1. Kesin Üretim Kuralı: Sadece ACTIVE durumu aranır
     cur.execute("""
         SELECT run_id, timestamp, status, orders_count
@@ -442,7 +498,7 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
         ORDER BY timestamp DESC LIMIT 1
     """)
     row = cur.fetchone()
-    
+
     # 2. Uyumluluk Modu (Yalnızca parametre ile açıkça talep edilirse):
     if not row and allow_fallback:
         cur.execute("""
@@ -452,11 +508,12 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
             ORDER BY timestamp DESC LIMIT 1
         """)
         row = cur.fetchone()
-        
+
     conn.close()
     if row:
         return {"run_id": row[0], "timestamp": row[1], "status": row[2], "orders_count": row[3]}
     return None
+
 
 def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artifacts_dir: str = None) -> int:
     """
@@ -470,8 +527,9 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artif
     import os
     import shutil
     from pathlib import Path
-    import src.config as config
-    
+
+    from src import config
+
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
         return 0
@@ -481,11 +539,14 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artif
     cur = conn.cursor()
 
     # Saklanacak en yeni N kaydın dışındaki eski run_id'leri bul
-    cur.execute("""
-        SELECT run_id FROM pipeline_runs 
-        ORDER BY timestamp DESC 
+    cur.execute(
+        """
+        SELECT run_id FROM pipeline_runs
+        ORDER BY timestamp DESC
         LIMIT -1 OFFSET ?
-    """, (keep_last_n,))
+    """,
+        (keep_last_n,),
+    )
     old_runs = [row[0] for row in cur.fetchall()]
 
     deleted_count = 0
@@ -515,6 +576,7 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artif
     conn.close()
     return deleted_count
 
+
 def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: str = None) -> dict:
     """
     Denetim Madde 4 & Madde 18: Artifact & Input Lineage Manifest.
@@ -524,8 +586,9 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     """
     import hashlib
     import sys
-    import src.config as config
     from pathlib import Path
+
+    from src import config
 
     root_dir = Path(__file__).resolve().parent.parent.parent
 
@@ -560,7 +623,9 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
             manifest_entries[file_path.name] = {
                 "size_bytes": size,
                 "sha256": sha,
-                "relative_path": str(file_path.relative_to(root_dir)) if root_dir in file_path.parents else file_path.name
+                "relative_path": str(file_path.relative_to(root_dir))
+                if root_dir in file_path.parents
+                else file_path.name,
             }
 
     # 2. Input Lineage & Environment Fingerprinting (Madde 18)
@@ -584,18 +649,20 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     if actual_input_path and actual_input_path.exists():
         inp_sha, inp_size = compute_sha256(actual_input_path)
         input_dataset_info = {
-            "path": str(actual_input_path.relative_to(root_dir)) if root_dir in actual_input_path.parents else str(actual_input_path),
+            "path": str(actual_input_path.relative_to(root_dir))
+            if root_dir in actual_input_path.parents
+            else str(actual_input_path),
             "sha256": inp_sha,
             "size_bytes": inp_size,
             "adapter": "KaggleRetailDemandAdapter",
-            "mapping_version": "canonical-v1"
+            "mapping_version": "canonical-v1",
         }
 
     inputs_lineage = {
         "input_dataset": input_dataset_info,
         "raw_source_data": {},
         "config_fingerprint": {},
-        "environment": {}
+        "environment": {},
     }
 
     # Raw / Master Data dosya hash'leri
@@ -608,22 +675,19 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
                     inputs_lineage["raw_source_data"][r_file.name] = {
                         "size_bytes": size,
                         "sha256": sha,
-                        "relative_path": str(r_file.relative_to(root_dir))
+                        "relative_path": str(r_file.relative_to(root_dir)),
                     }
 
     # Config Hash
     config_path = root_dir / "src" / "config.py"
     cfg_sha, cfg_size = compute_sha256(config_path)
-    inputs_lineage["config_fingerprint"] = {
-        "file": "src/config.py",
-        "sha256": cfg_sha,
-        "size_bytes": cfg_size
-    }
+    inputs_lineage["config_fingerprint"] = {"file": "src/config.py", "sha256": cfg_sha, "size_bytes": cfg_size}
 
     # Solver Versions
     solver_versions = {}
     try:
         import ortools
+
         solver_versions["ortools_cpsat"] = getattr(ortools, "__version__", "unknown")
     except ImportError:
         solver_versions["ortools_cpsat"] = "not_installed"
@@ -638,16 +702,10 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     inputs_lineage["environment"] = {
         "python_version": sys.version.split()[0],
         "solver_versions": solver_versions,
-        "requirements_fingerprint": {
-            "file": "requirements.txt",
-            "sha256": req_sha,
-            "size_bytes": req_size
-        },
-        "lockfile_fingerprint": {
-            "file": "requirements.lock",
-            "sha256": lock_sha,
-            "size_bytes": lock_size
-        } if lock_sha else None
+        "requirements_fingerprint": {"file": "requirements.txt", "sha256": req_sha, "size_bytes": req_size},
+        "lockfile_fingerprint": {"file": "requirements.lock", "sha256": lock_sha, "size_bytes": lock_size}
+        if lock_sha
+        else None,
     }
 
     manifest = {
@@ -655,7 +713,7 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
         "created_at": datetime.now().isoformat(),
         "total_artifacts": len(manifest_entries),
         "artifacts": manifest_entries,
-        "inputs": inputs_lineage
+        "inputs": inputs_lineage,
     }
 
     manifest_path = root_dir / "reports" / "run_manifest.json"
@@ -666,15 +724,14 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     return manifest
 
 
-
 def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     """
     P0/P1 Mimarisi: Atomic Active Run Promotion.
     1. Önceki ACTIVE koşumu ARCHIVED yapar.
     2. run_id koşumunu COMPLETED -> ACTIVE durumuna taşır.
     """
-    import sqlite3
-    import src.config as config
+    from src import config
+
     target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
 
     conn = get_db_connection(target_db)
@@ -686,21 +743,29 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
         row = cur.fetchone()
         if not row or row[0] != "COMPLETED":
             curr = row[0] if row else "None"
-            raise ValueError(f"[PROMOTION VIOLATION] Yalnızca COMPLETED koşumlar ACTIVE yapılabilir! Mevcut durum: '{curr}'")
+            raise ValueError(
+                f"[PROMOTION VIOLATION] Yalnızca COMPLETED koşumlar ACTIVE yapılabilir! Mevcut durum: '{curr}'"
+            )
 
         # 1. Önceki ACTIVE koşumları ARCHIVED yap (böylece partial unique index bozulmaz)
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE pipeline_runs
             SET status = 'ARCHIVED'
             WHERE status = 'ACTIVE' AND run_id != ?
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
 
         # 2. Yeni koşumu ACTIVE yap
-        cur.execute("""
+        cur.execute(
+            """
             UPDATE pipeline_runs
             SET status = 'ACTIVE'
             WHERE run_id = ?
-        """, (run_id,))
+        """,
+            (run_id,),
+        )
 
         conn.commit()
         return True
@@ -709,6 +774,7 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
         raise e
     finally:
         conn.close()
+
 
 def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs/canonical") -> dict:
     """
@@ -720,12 +786,13 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     5. manifest üret
     6. atomic swap
     """
+    import json
     import os
     import shutil
     import tempfile
-    import json
     from pathlib import Path
-    import src.config as config
+
+    from src import config
 
     root_dir = Path(__file__).resolve().parent.parent.parent
     cur = conn.cursor()
@@ -734,7 +801,9 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     cur.execute("PRAGMA table_info(pipeline_runs)")
     cols = [col[1] for col in cur.fetchall()]
     order_col = "created_at" if "created_at" in cols else "timestamp" if "timestamp" in cols else "rowid"
-    cur.execute(f"SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY {order_col} DESC LIMIT 1")
+    cur.execute(
+        f"SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY {order_col} DESC LIMIT 1"
+    )
     row = cur.fetchone()
     if not row:
         raise ValueError("Canonical freeze başarısız: Veritabanında ACTIVE statüsünde bir koşu bulunamadı.")
@@ -744,10 +813,10 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     metadata_file = root_dir / "reports" / "run_metadata.json"
     if not metadata_file.exists():
         raise FileNotFoundError(f"Canonical freeze başarısız: {metadata_file} bulunamadı.")
-    
-    with open(metadata_file, "r", encoding="utf-8") as f:
+
+    with open(metadata_file, encoding="utf-8") as f:
         meta = json.load(f)
-    
+
     meta_run_id = meta.get("run_id")
     meta_git_sha = meta.get("git_sha")
 
@@ -764,7 +833,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         root_dir / "reports" / "schedule_solver_metadata.json",
         root_dir / "reports" / "forecast_model_metadata.json",
     ]
-    
+
     processed_dir = Path(getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed"))
     if processed_dir.exists():
         for csv_file in processed_dir.glob("*.csv"):
@@ -799,6 +868,5 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         "frozen_run_id": active_run_id,
         "git_sha": db_git_sha,
         "canonical_path": str(canonical_target),
-        "total_artifacts": len(manifest.get("artifacts", {}))
-    }        
-
+        "total_artifacts": len(manifest.get("artifacts", {})),
+    }

@@ -3,12 +3,16 @@ Closed-Loop Rescheduling Engine (CP-SAT Event-Driven Rescheduler)
 Sahadan gelen arıza, duruş veya gecikme olaylarında donmuş ufuk (frozen horizon)
 korunarak bekleyen görevleri dinamik olarak yeniden çizelgeler.
 """
-from typing import Dict, Any, Optional
+
+from typing import Any
+
 import pandas as pd
+
 from src.utils.db import get_db_connection
 
+
 class ClosedLoopRescheduler:
-    def __init__(self, run_id: Optional[str] = None):
+    def __init__(self, run_id: str | None = None):
         self.conn = get_db_connection()
         self.run_id = run_id or self._get_active_run_id()
 
@@ -19,12 +23,8 @@ class ClosedLoopRescheduler:
         return row[0] if row else "DEFAULT_RUN"
 
     def reschedule_on_machine_breakdown(
-        self,
-        machine_id: str,
-        down_start_min: float,
-        down_duration_min: float,
-        reason: str = "Unplanned Breakdown"
-    ) -> Dict[str, Any]:
+        self, machine_id: str, down_start_min: float, down_duration_min: float, reason: str = "Unplanned Breakdown"
+    ) -> dict[str, Any]:
         """
         Belirli bir makinede arıza meydana geldiğinde, donmuş ufku korur,
         etkilenen işleri arıza süresi kadar öteler ve ardıl operasyonlara yayar.
@@ -32,7 +32,7 @@ class ClosedLoopRescheduler:
         df_schedule = pd.read_sql_query(
             "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC;",
             self.conn,
-            params=(self.run_id,)
+            params=(self.run_id,),
         )
         if df_schedule.empty:
             return {"status": "ERROR", "message": "No active schedule found for run."}
@@ -42,7 +42,7 @@ class ClosedLoopRescheduler:
 
         # Kopyasını alıp üzerinde gecikme simülasyonu yapacağız
         df = df_schedule.copy()
-        
+
         # 1. Arızalanan makinede, arıza başlangıcından sonra başlayan veya devam eden işleri belirle
         # Bu makinedeki gecikme miktarı
         delay_shift = down_duration_min
@@ -57,14 +57,14 @@ class ClosedLoopRescheduler:
                 "message": "Arıza planlanan operasyonları etkilemedi.",
                 "old_makespan_min": old_makespan,
                 "new_makespan_min": old_makespan,
-                "delta_makespan_min": 0.0
+                "delta_makespan_min": 0.0,
             }
 
         # Makinedeki işleri ötele
         for idx in df[mask_target_machine].index:
             curr_start = df.loc[idx, "start_min"]
             curr_end = df.loc[idx, "end_min"]
-            
+
             # Eğer iş arıza başladığında zaten çalışıyorsa, kalan süresi arıza sonrasına kalır
             if curr_start < down_start_min < curr_end:
                 df.loc[idx, "end_min"] = curr_end + delay_shift
@@ -102,12 +102,15 @@ class ClosedLoopRescheduler:
 
         # 3. Olayı mes_execution_events tablosuna yaz
         cur = self.conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO mes_execution_events (
                 run_id, machine_id, event_type, event_timestamp_min,
                 actual_duration_min, delay_reason
             ) VALUES (?, ?, 'MACHINE_DOWN', ?, ?, ?);
-        """, (self.run_id, machine_id, down_start_min, down_duration_min, reason))
+        """,
+            (self.run_id, machine_id, down_start_min, down_duration_min, reason),
+        )
         self.conn.commit()
 
         return {
@@ -118,5 +121,5 @@ class ClosedLoopRescheduler:
             "affected_tasks_count": affected_count,
             "old_makespan_min": old_makespan,
             "new_makespan_min": new_makespan,
-            "delta_makespan_min": delta_makespan
+            "delta_makespan_min": delta_makespan,
         }

@@ -1,15 +1,17 @@
-import sys
 import os
+import sys
 
 # Proje kök dizinini sys.path'e ekle
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import sqlite3
-import pytest
 from pathlib import Path
+
+import pytest
+
+from src.carbon.carbon_analytics import compute_carbon_analytics
 from src.config import DB_PATH
 from src.energy.energy_analytics import compute_energy_analytics
-from src.carbon.carbon_analytics import compute_carbon_analytics
 from src.utils.db import get_db_connection
+
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_full_pipeline_database():

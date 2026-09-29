@@ -3,6 +3,7 @@ MachineCalendarService: Fabrika Takvim ve Vardiya Yönetimi Tekil Gerçeklik Kay
 Scheduler, Energy Analytics, Capacity ve Maintenance modüllerine standart takvim semantiği sağlar.
 """
 
+
 class MachineCalendarService:
     MINUTES_IN_HOUR = 60
     HOURS_IN_DAY = 24
@@ -14,7 +15,7 @@ class MachineCalendarService:
     # Gece OT Penceresi : 00:00 - 08:00 (480 dk)
     # Düzenli 2 Vardiya : 08:00 - 24:00 (960 dk)
     # Pazar Günü        : 24 saat Kapalı / Bakım (Hard Closed)
-    OT_WINDOW_MINUTES = 8 * 60   # 480 dk
+    OT_WINDOW_MINUTES = 8 * 60  # 480 dk
     REGULAR_SHIFT_START_MIN = 8 * 60  # 480 dk
 
     @classmethod

@@ -1,16 +1,18 @@
 import os
-import sqlite3
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from src.config import (
     DB_PATH,
-    PROCESSED_DATA_DIR,
-    MRP_SERVICE_LEVEL_Z,
     INITIAL_INVENTORY,
+    MRP_SERVICE_LEVEL_Z,
+    PROCESSED_DATA_DIR,
 )
 from src.utils.db import get_db_connection
 
 OUTPUT_MRP_PATH = PROCESSED_DATA_DIR / "mrp_plan.csv"
+
 
 def load_data():
     conn = get_db_connection(DB_PATH)
@@ -19,6 +21,7 @@ def load_data():
     materials = pd.read_sql("SELECT * FROM materials", conn)
     conn.close()
     return sku_plan, bom, materials
+
 
 def calculate_gross_requirements(sku_plan, bom):
     # Gross Requirement: GR_{m,t} = sum(BOM_{m,i} * PlannedUnits_{i,t})
@@ -32,6 +35,7 @@ def calculate_gross_requirements(sku_plan, bom):
         .rename(columns={"material_req": "gross_requirement"})
     )
     return gross_req
+
 
 def run_mrp_engine(run_id=None):
     sku_plan, bom, materials = load_data()
@@ -93,27 +97,36 @@ def run_mrp_engine(run_id=None):
 
             order_cost = planned_receipt * unit_cost
 
-            mrp_records.append({
-                "period_week": t,
-                "material_id": mid,
-                "material_name": mat_info["material_name"],
-                "gross_req": round(gross_req, 1),
-                "safety_stock": safety_stock,
-                "projected_avail": round(current_inv, 1),
-                "net_req": round(net_req, 1),
-                "planned_receipt": planned_receipt,
-                "planned_release_week": release_week,
-                "planned_release_qty": planned_receipt,
-                "action_message": action_message,
-                "order_cost": round(order_cost, 2)
-            })
+            mrp_records.append(
+                {
+                    "period_week": t,
+                    "material_id": mid,
+                    "material_name": mat_info["material_name"],
+                    "gross_req": round(gross_req, 1),
+                    "safety_stock": safety_stock,
+                    "projected_avail": round(current_inv, 1),
+                    "net_req": round(net_req, 1),
+                    "planned_receipt": planned_receipt,
+                    "planned_release_week": release_week,
+                    "planned_release_qty": planned_receipt,
+                    "action_message": action_message,
+                    "order_cost": round(order_cost, 2),
+                }
+            )
 
     mrp_df = pd.DataFrame(mrp_records)
 
     # Detay Tablo Çıktısı
     display_cols = [
-        "period_week", "material_id", "gross_req", "safety_stock",
-        "projected_avail", "net_req", "planned_receipt", "planned_release_week", "action_message"
+        "period_week",
+        "material_id",
+        "gross_req",
+        "safety_stock",
+        "projected_avail",
+        "net_req",
+        "planned_receipt",
+        "planned_release_week",
+        "action_message",
     ]
     print(mrp_df[display_cols].to_string(index=False))
     print("-" * 95)
@@ -121,10 +134,7 @@ def run_mrp_engine(run_id=None):
     # Satınalma Bütçe Özeti
     summary_df = (
         mrp_df.groupby(["material_id", "material_name"])
-        .agg(
-            total_ordered=("planned_receipt", "sum"),
-            total_procurement_cost=("order_cost", "sum")
-        )
+        .agg(total_ordered=("planned_receipt", "sum"), total_procurement_cost=("order_cost", "sum"))
         .reset_index()
     )
     print("SATINALMA BÜTÇESİ & TOPLAM MALZEME TAAHHÜT ÖZETİ:")
@@ -146,7 +156,8 @@ def run_mrp_engine(run_id=None):
     conn.close()
 
     print(f"[OK] Zaman Fazlı MRP Planı Kaydedildi: {OUTPUT_MRP_PATH}")
-    print(f"[OK] SQLite 'mrp_plan' tablosu güncellendi.")
+    print("[OK] SQLite 'mrp_plan' tablosu güncellendi.")
+
 
 if __name__ == "__main__":
     run_mrp_engine()

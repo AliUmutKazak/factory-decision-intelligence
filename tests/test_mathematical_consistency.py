@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Proje ana dizinini arama yoluna ekler
@@ -7,13 +7,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-import sqlite3
 import pandas as pd
 import pytest
+
 from src.config import (
-    DB_PATH,
-    AGGREGATE_MAX_OVERTIME_HOURS,
     AGGREGATE_INITIAL_INVENTORY,
+    AGGREGATE_MAX_OVERTIME_HOURS,
+    DB_PATH,
 )
 from src.utils.db import get_db_connection
 
@@ -30,23 +30,23 @@ def test_aggregate_inventory_balance():
         # Hafta 1 için başlangıç envanterini config'den alıyoruz
         prev_inv = AGGREGATE_INITIAL_INVENTORY.get(family, 0.0)
         prev_backlog = 0.0
-        
+
         for _, row in group.iterrows():
             p = row["prod_batches"]
             d = row["demand_batches"]
             i = row["end_inv_batches"]
             b = row["backlog_batches"]
-            
+
             # Net envanter hesabı (yuvarlama hassasiyetiyle)
             net_balance = round((prev_inv - prev_backlog) + p - d, 1)
             net_actual = round(i - b, 1)
-            
+
             assert net_actual == pytest.approx(net_balance, abs=0.2), (
-                f"Envanter Denge Hatası ({family} W{row['period_week']}): "
-                f"Beklenen {net_balance}, Çıkan {net_actual}"
+                f"Envanter Denge Hatası ({family} W{row['period_week']}): Beklenen {net_balance}, Çıkan {net_actual}"
             )
             prev_inv = i
             prev_backlog = b
+
 
 def test_machine_overtime_bounds():
     """Fazla mesainin yasal/teknik AGGREGATE_MAX_OVERTIME_HOURS tavanını aşmadığını doğrular."""
@@ -58,6 +58,7 @@ def test_machine_overtime_bounds():
     assert max_ot <= AGGREGATE_MAX_OVERTIME_HOURS, (
         f"Maksimum fazla mesai sınırı aşıldı! {max_ot} > {AGGREGATE_MAX_OVERTIME_HOURS}"
     )
+
 
 def test_energy_physics_assertion():
     """Madde 16: Tepe yükün ortalama yükten küçük olamayacağını garanti eder."""
@@ -75,10 +76,11 @@ def test_energy_physics_assertion():
 
     assert peak_load >= avg_load, f"Fiziksel İhlal: Peak ({peak_load} kW) < Avg ({avg_load} kW)"
     assert 0.0 < load_factor <= 1.0, f"Geçersiz Yük Faktörü: {load_factor}"
-    
+
     # 15 dakikalık profil ile KPI tepe değeri tam örtüşmeli
     profile_max = profile_df["total_load_kw"].max()
     assert round(profile_max, 2) == pytest.approx(peak_load, abs=0.1)
+
 
 def test_schedule_mrp_release_time_coupling():
     """Madde 14: MRP expedite kısıtına sahip lotların erken başlamadığını doğrular."""
@@ -89,19 +91,21 @@ def test_schedule_mrp_release_time_coupling():
     conn.close()
 
     expedite_mats = set(mrp_df[mrp_df["action_message"].str.contains("EXPEDITE", na=False)]["material_id"])
-    
+
     # İlk operasyonları denetle
     first_ops = sched_df[sched_df["operation_seq"] == 1]
     for _, row in first_ops.iterrows():
         pid = row["product_id"]
         req_mats = set(bom_df[bom_df["product_id"] == pid]["material_id"])
-        
+
         if req_mats.intersection(expedite_mats):
             # En az 480. dakikada serbest kalmış olmalı
             assert row["start_min"] >= 480, (
                 f"MRP Kısıt İhlali: {row['lot_id']} kritik hammadde eksik olmasına rağmen "
                 f"{row['start_min']}. dakikada başlatılmış!"
             )
+
+
 def test_precedence_constraints():
     """Eksik 1: Her partinin ardışık operasyonları arasındaki öncelik kısıtını doğrular (Start_{o+1} >= End_o)."""
     conn = get_db_connection()
@@ -189,7 +193,7 @@ def test_family_to_sku_disaggregation_reconciliation():
     Kapalı çevrim (closed-loop) kapasite onarımı ve tamsayı yuvarlama payı (<= 1 parti) gözetilir.
     """
     import os
-    import sqlite3
+
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
     family_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
@@ -246,7 +250,7 @@ def test_carbon_share_conservation():
         assert total_raw_share == pytest.approx(100.0, abs=1e-3), (
             f"Fiziksel Karbon Payı Korunumu Hatası (Raw): {total_raw_share}% != 100%"
         )
-    
+
     # Raporlama katmanı yuvarlanmış değer denetimi (1 ondalık yuvarlama toleransı)
     total_share = float(machine_kpis["carbon_share_pct"].sum())
     assert total_share == pytest.approx(100.0, abs=1.0), (
@@ -265,7 +269,7 @@ def test_forecast_output_integrity():
     assert (fc_df["forecast_demand"] >= 0).all(), "Tahmin tablosunda negatif talep değeri tespit edildi!"
 
     valid_models = {"LightGBM", "Holt-Winters", "Moving Average", "Seasonal Naive", "Naive"}
-    assert set(fc_df["model_used"]).issubset(valid_models), "Geçersiz model ismi tespit edildi!"            
+    assert set(fc_df["model_used"]).issubset(valid_models), "Geçersiz model ismi tespit edildi!"
 
 
 def test_hierarchical_capacity_decomposition():
@@ -274,8 +278,8 @@ def test_hierarchical_capacity_decomposition():
     Sira bagimli hazirlik (changeover) sureleri operasyonel katmanda eklenir.
     Processing <= LP Max Allowed Capacity sarti tum tezgahlarda saglanmalidir.
     """
+
     import pandas as pd
-    from pathlib import Path
 
     db_path = os.path.join("data", "factory.db")
     assert os.path.exists(db_path), "factory.db veritabani dosyasi bulunamadi"
@@ -286,14 +290,14 @@ def test_hierarchical_capacity_decomposition():
 
     w1_cap = cap_df[cap_df["period_week"] == 1]
     assert not w1_cap.empty, "machine_capacity_plan.csv icinde 1. hafta tanimi yok."
-    
+
     tolerance = 0.05
 
     for m_id in sorted(sched_df["machine_id"].unique()):
         m_sched = sched_df[sched_df["machine_id"] == m_id]
         m_cap = w1_cap[w1_cap["machine_id"] == m_id]
         assert not m_cap.empty, f"{m_id} icin W1 kapasitesi tanimlanmamis."
-        
+
         lp_max_hr = float(m_cap["total_capacity_hours"].iloc[0])
         proc_hr = float((m_sched["end_min"] - m_sched["start_min"]).sum() / 60.0)
         setup_hr = float(m_sched["setup_before_min"].sum() / 60.0)
@@ -327,8 +331,8 @@ def test_explicit_setup_intervals_physical_integrity():
     2. setup_start_min == setup_end_min - setup_before_min sağlanmalıdır.
     3. Setup aralığı, makinedeki bir önceki işin bitişinden önce başlayamaz.
     """
+
     import pandas as pd
-    from pathlib import Path
 
     db_path = os.path.join("data", "factory.db")
     if not os.path.exists(db_path):
@@ -345,18 +349,24 @@ def test_explicit_setup_intervals_physical_integrity():
             row = sorted_g.iloc[idx]
             s_dur = row["setup_before_min"]
             if s_dur > 0:
-                assert row["setup_end_min"] == row["start_min"], f"{row['task_id']} setup bitişi start_min ile eşleşmiyor!"
-                assert row["setup_start_min"] == row["setup_end_min"] - s_dur, f"{row['task_id']} setup süresi tutarsız!"
+                assert row["setup_end_min"] == row["start_min"], (
+                    f"{row['task_id']} setup bitişi start_min ile eşleşmiyor!"
+                )
+                assert row["setup_start_min"] == row["setup_end_min"] - s_dur, (
+                    f"{row['task_id']} setup süresi tutarsız!"
+                )
                 if idx > 0:
                     prev_end = sorted_g.iloc[idx - 1]["end_min"]
-                    assert row["setup_start_min"] >= prev_end, f"{row['task_id']} setup aralığı önceki iş bitmeden başlıyor!"
+                    assert row["setup_start_min"] >= prev_end, (
+                        f"{row['task_id']} setup aralığı önceki iş bitmeden başlıyor!"
+                    )
+
 
 def test_forecast_model_lineage_governance():
     """Madde 23: Model seçim kararlarının ve MLOps soykütüğünün doğrulanması."""
     import json
     import os
-    import sqlite3
-    
+
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
     lineage_df = pd.read_sql("SELECT * FROM forecast_model_lineage", conn)
@@ -366,10 +376,19 @@ def test_forecast_model_lineage_governance():
     assert len(lineage_df) == 5, f"5 pilot ürün bekleniyordu, {len(lineage_df)} bulundu."
 
     required_cols = [
-        "product_id", "selected_model", "model_version", "feature_version",
-        "training_start", "training_end", "backtest_start", "backtest_end",
-        "validation_score_wape", "test_score_rmse", "hyperparameters",
-        "competing_models", "selection_reason"
+        "product_id",
+        "selected_model",
+        "model_version",
+        "feature_version",
+        "training_start",
+        "training_end",
+        "backtest_start",
+        "backtest_end",
+        "validation_score_wape",
+        "test_score_rmse",
+        "hyperparameters",
+        "competing_models",
+        "selection_reason",
     ]
     for col in required_cols:
         assert col in lineage_df.columns, f"forecast_model_lineage içinde '{col}' kolonu eksik!"
@@ -377,15 +396,14 @@ def test_forecast_model_lineage_governance():
     # JSON metadata artifact kontrolü
     meta_path = os.path.join("reports", "forecast_model_metadata.json")
     assert os.path.exists(meta_path), f"{meta_path} artifact dosyası oluşturulmamış!"
-    with open(meta_path, "r", encoding="utf-8") as f:
+    with open(meta_path, encoding="utf-8") as f:
         meta_data = json.load(f)
     assert len(meta_data) == 5, "Metadata JSON dosyası 5 ürünü içermelidir."
 
+
 def test_schedule_solver_metadata_governance():
     """Madde 24: CP-SAT çözücü durumunun, makespan optimalliğinin ve çözüm kanıtının doğrulanması."""
-    import json
     import os
-    import sqlite3
 
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
@@ -396,18 +414,25 @@ def test_schedule_solver_metadata_governance():
     row = solver_df.iloc[0]
 
     required_fields = [
-        "solver_name", "solver_status", "is_optimal", "objective_value_min",
-        "best_bound_min", "optimality_gap_pct", "solve_time_seconds", "random_seed"
+        "solver_name",
+        "solver_status",
+        "is_optimal",
+        "objective_value_min",
+        "best_bound_min",
+        "optimality_gap_pct",
+        "solve_time_seconds",
+        "random_seed",
     ]
     for field in required_fields:
         assert field in solver_df.columns, f"Çözücü metadata tablosunda '{field}' eksik!"
 
     assert row["solver_status"] in ("OPTIMAL", "FEASIBLE"), f"Beklenmeyen çözücü statüsü: {row['solver_status']}"
     assert row["objective_value_min"] > 0, "Objective değeri pozitif olmalıdır."
-    
+
     # JSON artifact kontrolü
     meta_json_path = os.path.join("reports", "schedule_solver_metadata.json")
-    assert os.path.exists(meta_json_path), "reports/schedule_solver_metadata.json dosyası mevcut değil!" 
+    assert os.path.exists(meta_json_path), "reports/schedule_solver_metadata.json dosyası mevcut değil!"
+
 
 def test_batch_conservation_invariant():
     """
@@ -415,6 +440,7 @@ def test_batch_conservation_invariant():
     production_units == batch_count * batch_size (veya batch_qty * batch_size)
     """
     import src.config as cfg
+
     conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     conn.close()
@@ -428,8 +454,7 @@ def test_batch_conservation_invariant():
     expected_units = sched["batch_count"] * batch_size
     diff = (sched["production_units"] - expected_units).abs()
     assert (diff < 1e-5).all(), (
-        f"Batch conservation ihlali! production_units != batch_qty * batch_size. "
-        f"Maksimum fark: {diff.max()}"
+        f"Batch conservation ihlali! production_units != batch_qty * batch_size. Maksimum fark: {diff.max()}"
     )
 
 
@@ -439,6 +464,7 @@ def test_energy_schedule_production_units_conservation():
     operasyonel çizelgedeki ilk operasyonun tamamlanan toplam adedi tam eşit olmalıdır.
     """
     import src.config as cfg
+
     conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
@@ -472,6 +498,7 @@ def test_variable_energy_exact_physics_sum():
     değerine kuruşu kuruşuna eşit olduğunu doğrular.
     """
     import src.config as cfg
+
     conn = get_db_connection(cfg.DB_PATH)
     sched = pd.read_sql("SELECT * FROM production_schedule", conn)
     routing = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)

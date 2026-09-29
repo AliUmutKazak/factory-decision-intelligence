@@ -1,29 +1,30 @@
 import os
 import sqlite3
-import pandas as pd
-from pathlib import Path
-from typing import Dict, Any, Optional
 from abc import ABC, abstractmethod
-from src.config import RAW_DATA_DIR, PROCESSED_DATA_DIR, DB_PATH
-from src.utils.db import get_db_connection
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from src.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
 
 
 class DemandSourceAdapter(ABC):
     """
-    Dış sistemlerden (Kaggle CSV, ERP MES, SAP, IFS) gelen sipariş verilerini 
+    Dış sistemlerden (Kaggle CSV, ERP MES, SAP, IFS) gelen sipariş verilerini
     standart Fabrika Çekme Talebi formatına dönüştüren temel adaptör arayüzü.
     """
+
     @abstractmethod
     def adapt(self, source_path: Path) -> pd.DataFrame:
         """
         Dönüşüm çıktısı en az şu standart kolonları içermelidir:
         ['order_date', 'product_id', 'order_qty']
         """
-        pass
 
 
 # Statik Fallback Sözlüğü (Geriye dönük uyumluluk ve DB erişimsiz test izolasyonu için)
-CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
+CANONICAL_ERP_PRODUCT_MAPPING: dict[Any, str] = {
     1: "P01",
     2: "P02",
     3: "P03",
@@ -32,28 +33,32 @@ CANONICAL_ERP_PRODUCT_MAPPING: Dict[Any, str] = {
 }
 
 
-def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: Optional[str] = None) -> tuple[Dict[Any, str], set]:
+def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: str | None = None) -> tuple[dict[Any, str], set]:
     """
     Kurumsal ERP tablosundan:
     - all_mappings: tüm tanınan SKU sözlüğü (item_id -> internal_id)
     - in_scope_ids: sadece üretim kapsamındaki dahili SKU kümesi {'P01'..'P05'}
     döner.
     """
-    import src.config as config
+    from src import config
+
     target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
-    
+
     mapping = {}
     in_scope_ids = set()
-    
+
     if os.path.exists(target_db):
         try:
             conn = sqlite3.connect(target_db)
             cur = conn.cursor()
-            cur.execute("""
-                SELECT source_product_code, internal_product_id, is_in_scope 
-                FROM erp_product_mapping 
+            cur.execute(
+                """
+                SELECT source_product_code, internal_product_id, is_in_scope
+                FROM erp_product_mapping
                 WHERE source_system = ? AND status = 'active'
-            """, (source_system,))
+            """,
+                (source_system,),
+            )
             rows = cur.fetchall()
             conn.close()
             for src_code, internal_id, in_scope in rows:
@@ -74,6 +79,7 @@ def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: Optional[str
     fallback_scope = {f"P{i:02d}" for i in range(1, 6)}
     return fallback_map, fallback_scope
 
+
 class KaggleRetailDemandAdapter(DemandSourceAdapter):
     """
     Kurumsal 3-Seviyeli SKU Scope Yönetimi:
@@ -81,10 +87,11 @@ class KaggleRetailDemandAdapter(DemandSourceAdapter):
     2. Mapped but Out-of-Scope -> Bilinçli olarak filtrelenir ve loglanır.
     3. Unmapped -> Kesinlikle sessizce filtrelenmez; anında FAIL-FAST fırlatılır.
     """
+
     def __init__(
         self,
-        product_mapping: Optional[Dict[Any, str]] = None,
-        in_scope_products: Optional[set] = None,
+        product_mapping: dict[Any, str] | None = None,
+        in_scope_products: set | None = None,
         allow_unmapped: bool = False,
     ):
         mapped_dict, scope_set = get_erp_product_mapping()
@@ -128,14 +135,8 @@ class KaggleRetailDemandAdapter(DemandSourceAdapter):
         df_in_scope = df[in_scope_mask].copy()
 
         df_in_scope[self.col_date] = pd.to_datetime(df_in_scope[self.col_date])
-        daily_factory_demand = (
-            df_in_scope.groupby([self.col_date, "product_id"])[self.col_sales]
-            .sum()
-            .reset_index()
-        )
-        daily_factory_demand.rename(
-            columns={self.col_date: "date", self.col_sales: "demand"}, inplace=True
-        )
+        daily_factory_demand = df_in_scope.groupby([self.col_date, "product_id"])[self.col_sales].sum().reset_index()
+        daily_factory_demand.rename(columns={self.col_date: "date", self.col_sales: "demand"}, inplace=True)
 
         return daily_factory_demand
 
@@ -169,9 +170,7 @@ def run_preprocessing():
         data_source = fixture_path
         print(f"[1/3] Ham veri bulunamadı, varsayılan test fixture kullanılıyor ({fixture_path})...")
     else:
-        raise FileNotFoundError(
-            f"Ne ham veri ({raw_path}) ne de varsayılan test fixture ({fixture_path}) bulunabildi!"
-        )
+        raise FileNotFoundError(f"Ne ham veri ({raw_path}) ne de varsayılan test fixture ({fixture_path}) bulunabildi!")
 
     # Madde 15: Production path fail-fast güvencesi (Bilinmeyen SKU geldiğinde sessiz filtreleme engellenir)
     # CI/Test ortamında esneklik istenirse ALLOW_UNMAPPED çevre değişkeniyle açılabilir, varsayılan False'tur.
@@ -186,7 +185,11 @@ def run_preprocessing():
         factory_demand.drop(columns=["date"], inplace=True)
 
     # 2. Miktar kolonunu order_qty olarak standartlaştır
-    qty_col = "order_qty" if "order_qty" in factory_demand.columns else ("demand" if "demand" in factory_demand.columns else "sales")
+    qty_col = (
+        "order_qty"
+        if "order_qty" in factory_demand.columns
+        else ("demand" if "demand" in factory_demand.columns else "sales")
+    )
     factory_demand["order_qty"] = factory_demand[qty_col].astype(int)
     if qty_col != "order_qty" and qty_col in factory_demand.columns:
         factory_demand.drop(columns=[qty_col], inplace=True)
@@ -210,5 +213,7 @@ def run_preprocessing():
     print(f"[3/3] Konsolide fabrika talebi kaydedildi -> {output_path}")
     print("=" * 65)
     print(f"Toplam Günlük Fabrika Talep Kaydı : {len(factory_demand):,} gün/ürün")
-    print(f"Tarih Aralığı                     : {factory_demand['order_date'].min()} -> {factory_demand['order_date'].max()}")
+    print(
+        f"Tarih Aralığı                     : {factory_demand['order_date'].min()} -> {factory_demand['order_date'].max()}"
+    )
     print("=" * 65)

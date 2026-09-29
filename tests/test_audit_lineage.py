@@ -8,28 +8,26 @@ Doğrular:
 4. Historical Run Retention (Denetim Kütüğü Tasfiyesi)
 """
 
-import os
-import json
-import sqlite3
-import shutil
 import gc
-from pathlib import Path
-import pytest
-import pandas as pd
+import json
+import shutil
+import sqlite3
 
+import pandas as pd
+import pytest
+
+from src.utils.db import get_db_connection
 from src.utils.lineage import (
+    apply_run_retention_policy,
     generate_run_id,
+    generate_run_manifest,
+    get_active_pipeline_run,
+    init_pipeline_runs_table,
+    promote_run_to_active,
     start_pipeline_run,
     update_pipeline_run_status,
-    record_pipeline_run_metadata,
     validate_pipeline_run,
-    promote_run_to_active,
-    get_active_pipeline_run,
-    apply_run_retention_policy,
-    generate_run_manifest,
-    init_pipeline_runs_table
 )
-from src.utils.db import get_db_connection
 
 
 def test_run_id_generation_format():
@@ -145,7 +143,7 @@ def test_run_retention_policy(tmp_path):
     for i in range(10):
         conn.execute(
             "INSERT INTO pipeline_runs (run_id, timestamp, status) VALUES (?, datetime('now', ?), 'ARCHIVED')",
-            (f"RUN-OLD-{i}", f"-{10-i} hours")
+            (f"RUN-OLD-{i}", f"-{10 - i} hours"),
         )
     conn.commit()
     conn.close()
@@ -187,6 +185,7 @@ def test_p0_active_run_isolation_on_failure(tmp_path, monkeypatch):
     Sonuçta kanonik DB'de ACTIVE = RUN-A ve production_schedule = A olduğu kanıtlanır.
     """
     import src.config as cfg
+
     canonical_db = tmp_path / "factory.db"
     staging_db = tmp_path / "factory_staging_RUN-B.db"
 
@@ -255,7 +254,8 @@ def test_p0_active_run_isolation_on_failure(tmp_path, monkeypatch):
     assert df_final["lot_id"].iloc[0] == "LOT-A-001"
     assert int(df_final["quantity"].iloc[0]) == 100
 
-def test_atomic_promotion_archives_previous_active(tmp_path):
+
+def test_atomic_promotion_archives_previous_active_extended(tmp_path):
     """Yeni bir koşum ACTIVE yapıldığında eskisinin ARCHIVED olduğunu doğrular."""
     test_db = tmp_path / "test_lineage.db"
     conn = sqlite3.connect(str(test_db))
@@ -293,6 +293,7 @@ def test_atomic_promotion_archives_previous_active(tmp_path):
     assert cur.fetchone()[0] == "ARCHIVED"
     conn.close()
 
+
 def test_run_retention_policy_syncs_disk_artifacts(tmp_path):
     """
     Madde 23: Retention politikasının DB kayıtları silinirken
@@ -310,17 +311,20 @@ def test_run_retention_policy_syncs_disk_artifacts(tmp_path):
     # 4 adet test koşusu ve bunlara ait fiziki snapshot dizinleri oluşturalım
     run_ids = ["RUN_01", "RUN_02", "RUN_03", "RUN_04"]
     for i, r_id in enumerate(run_ids):
-        ts = f"2026-09-0{i+1}T10:00:00"
-        cur.execute("""
-            INSERT OR REPLACE INTO pipeline_runs 
+        ts = f"2026-09-0{i + 1}T10:00:00"
+        cur.execute(
+            """
+            INSERT OR REPLACE INTO pipeline_runs
             (run_id, timestamp, git_sha, config_hash, trigger_source, data_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (r_id, ts, "abcdef12", "cfg12345", "TEST", "raw", "COMPLETED"))
-        
+        """,
+            (r_id, ts, "abcdef12", "cfg12345", "TEST", "raw", "COMPLETED"),
+        )
+
         run_folder = artifacts_dir / r_id
         run_folder.mkdir()
         (run_folder / "manifest.json").write_text("{}", encoding="utf-8")
-    
+
     conn.commit()
 
     # Ayrıca DB'de hiç olmayan 1 adet yetim (orphan) snapshot dizini oluşturalım
@@ -342,19 +346,22 @@ def test_run_retention_policy_syncs_disk_artifacts(tmp_path):
     assert not (artifacts_dir / "RUN_02").exists()
     assert not (artifacts_dir / "RUN_ORPHAN").exists()
 
+
 def test_machine_state_run_scoped_snapshot(tmp_path):
     """Denetim Madde 30: Planlama koşusunun kullandığı MES makine durumunun
     machine_state_snapshot tablosunda run_id ile mühürlendiğini doğrular."""
     import sqlite3
-    import pandas as pd
+
     from src.scheduling import schedule_cpsat as sched_mod
 
     db_path = tmp_path / "factory.db"
     conn = sqlite3.connect(str(db_path))
-    
+
     cur = conn.cursor()
     cur.execute("CREATE TABLE machine_state (machine_id TEXT PRIMARY KEY, last_product_id TEXT)")
-    cur.execute("CREATE TABLE production_schedule (lot_id TEXT, machine_id TEXT, product_id TEXT, production_units REAL, start_min REAL, end_min REAL, overtime_minutes REAL)")
+    cur.execute(
+        "CREATE TABLE production_schedule (lot_id TEXT, machine_id TEXT, product_id TEXT, production_units REAL, start_min REAL, end_min REAL, overtime_minutes REAL)"
+    )
     cur.execute("""
         CREATE TABLE IF NOT EXISTS machine_state_snapshot (
             run_id TEXT NOT NULL,
@@ -374,10 +381,11 @@ def test_machine_state_run_scoped_snapshot(tmp_path):
     # Eğer snapshot fonksiyonu varsa testin mevcut devamı çalışır
     conn.close()
 
+
 def test_canonical_reference_freeze_chain(tmp_path):
     """Denetim Madde 34 (P0.1): Canonical Reference Freeze zincirini test eder."""
     import sqlite3
-    import json
+
     from src.utils.lineage import freeze_canonical_reference
 
     db_path = tmp_path / "factory.db"
@@ -405,7 +413,7 @@ def test_canonical_reference_freeze_chain(tmp_path):
     # Monkeypatch ile reports klasörünü izole test dizinine yönlendirelim veya geçici deneyelim
     # Doğrudan fonksiyonu çağırıp test ediyoruz:
     target_canonical = tmp_path / "canonical"
-    
+
     # Run ID mismatch testi:
     cur.execute("UPDATE pipeline_runs SET run_id = 'DIFFERENT_RUN'")
     conn.commit()
@@ -415,14 +423,14 @@ def test_canonical_reference_freeze_chain(tmp_path):
     except ValueError:
         pass  # Beklenen davranış
 
-    conn.close() 
+    conn.close()
+
 
 def test_physical_active_run_isolation_on_failure(tmp_path):
     """Denetim Madde 34 (P0.2): RUN-A aktifken RUN-B staging sırasında patlarsa
     RUN-A'nın veritabanının ve disk artifact'lerinin bozulmadığını doğrular."""
-    import sqlite3
-    import json
     import shutil
+    import sqlite3
 
     # 1. RUN-A (ACTIVE) ortamını kur
     active_db = tmp_path / "factory.db"
@@ -469,13 +477,15 @@ def test_physical_active_run_isolation_on_failure(tmp_path):
     assert row is not None, "RUN-A active statüsü silinmiş!"
     assert row[0] == "RUN_A", f"Beklenen RUN_A, bulunan: {row[0]}"
 
-    with open(run_a_meta, "r", encoding="utf-8") as f:
+    with open(run_a_meta, encoding="utf-8") as f:
         saved_meta = json.load(f)
     assert saved_meta["run_id"] == "RUN_A", "RUN-A metadata bozulmuş!"
+
 
 def test_artifact_manifest_generation(tmp_path):
     """Artifact manifest dosya parmak izi ve hash üretimini test eder."""
     import sqlite3
+
     from src.utils.lineage import generate_run_manifest
 
     db_file = tmp_path / "factory.db"
@@ -484,10 +494,7 @@ def test_artifact_manifest_generation(tmp_path):
     conn.commit()
     conn.close()
 
-    manifest = generate_run_manifest(
-        run_id="TEST_RUN_MANIFEST",
-        db_path=str(db_file)
-    )
+    manifest = generate_run_manifest(run_id="TEST_RUN_MANIFEST", db_path=str(db_file))
     assert manifest["run_id"] == "TEST_RUN_MANIFEST"
     assert "artifacts" in manifest
     assert manifest["total_artifacts"] >= 1
@@ -496,15 +503,15 @@ def test_artifact_manifest_generation(tmp_path):
 def test_validation_gate_blocks_overlapping_physics(tmp_path):
     """Denetim Madde 34 (P0.3): Validation Gate'in tezgah çakışmasını yakalayıp engellediğini doğrular."""
     import sqlite3
-    import pytest
-    from src.utils.lineage import validate_pipeline_run
 
     db_path = tmp_path / "factory.db"
     conn = sqlite3.connect(str(db_path))
     cur = conn.cursor()
-    
+
     # Gerekli tabloları güncel şemaya göre oluştur
-    cur.execute("CREATE TABLE production_schedule (lot_id TEXT, machine_id TEXT, product_id TEXT, production_units REAL, start_min REAL, end_min REAL, overtime_minutes REAL)")
+    cur.execute(
+        "CREATE TABLE production_schedule (lot_id TEXT, machine_id TEXT, product_id TEXT, production_units REAL, start_min REAL, end_min REAL, overtime_minutes REAL)"
+    )
     cur.execute("CREATE TABLE energy_kpis (grand_total_kwh REAL)")
     cur.execute("CREATE TABLE energy_machine_kpis (total_kwh REAL)")
     cur.execute("CREATE TABLE carbon_kpis (total_carbon_kg REAL)")
@@ -513,26 +520,16 @@ def test_validation_gate_blocks_overlapping_physics(tmp_path):
     cur.execute("CREATE TABLE machine_capacity_plan (machine_id TEXT, load_hours REAL)")
 
     # Fiziksel çakışma (Overlapping) enjekte et: İş 1 (100-300), İş 2 (200-400) -> Çakışma!
-    cur.execute(
-        "INSERT INTO production_schedule VALUES ('LOT_1', 'M01', 'P01',"
-        " 10, 100, 300, 0)"
-    )
-    cur.execute(
-        "INSERT INTO production_schedule VALUES ('LOT_2', 'M01', 'P01',"
-        " 10, 200, 400, 0)"
-    )
+    cur.execute("INSERT INTO production_schedule VALUES ('LOT_1', 'M01', 'P01', 10, 100, 300, 0)")
+    cur.execute("INSERT INTO production_schedule VALUES ('LOT_2', 'M01', 'P01', 10, 200, 400, 0)")
     cur.execute("INSERT INTO energy_kpis VALUES (100.0)")
     cur.execute("INSERT INTO energy_machine_kpis VALUES (100.0)")
     cur.execute("INSERT INTO carbon_kpis VALUES (50.0)")
     cur.execute("INSERT INTO sku_production_plan VALUES ('P01', 20, 1)")
-    cur.execute(
-        "INSERT INTO aggregate_plan VALUES (1, 100.0)"
-    )  # Boş tablo kontrolünü geçmesi için
-    cur.execute(
-        "INSERT INTO machine_capacity_plan VALUES ('M01', 100.0)"
-    )  # Boş tablo kontrolünü geçmesi için
+    cur.execute("INSERT INTO aggregate_plan VALUES (1, 100.0)")  # Boş tablo kontrolünü geçmesi için
+    cur.execute("INSERT INTO machine_capacity_plan VALUES ('M01', 100.0)")  # Boş tablo kontrolünü geçmesi için
     conn.commit()
     conn.close()
 
     with pytest.raises(ValueError, match="Fiziksel Kısıt İhlali"):
-        validate_pipeline_run("RUN_TEST", db_path=str(db_path))   
+        validate_pipeline_run("RUN_TEST", db_path=str(db_path))

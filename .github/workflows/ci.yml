@@ -29,7 +29,7 @@ jobs:
 
     - name: "Quality Gate 1: Static Code Analysis (Ruff)"
       run: |
-        ruff check src/ tests/ --exit-zero
+        ruff check src/ tests/
 
     - name: "Quality Gate 2: Full Pipeline Execution (Integration Run)"
       run: |

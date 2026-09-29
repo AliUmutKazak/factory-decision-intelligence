@@ -2,20 +2,18 @@ import hashlib
 import json
 import os
 import shutil
-import sqlite3
 import tempfile
+
 import pandas as pd
 import pytest
+
 from src.utils.db import get_db_connection
+
 
 @pytest.fixture(scope="module")
 def isolated_db():
     temp_dir = tempfile.mkdtemp()
-    src_db = (
-        "artifacts/reference/factory.db"
-        if os.path.exists("artifacts/reference/factory.db")
-        else "data/factory.db"
-    )
+    src_db = "artifacts/reference/factory.db" if os.path.exists("artifacts/reference/factory.db") else "data/factory.db"
     temp_db = os.path.join(temp_dir, "isolated_factory.db")
     shutil.copy2(src_db, temp_db)
     conn = get_db_connection(temp_db)
@@ -29,19 +27,15 @@ def test_1_pipeline_run_lineage_zero_nulls(isolated_db):
     assert not df.empty, "pipeline_runs tablosu bos olamaz"
     audit_cols = ["run_id", "timestamp", "git_sha", "config_hash", "status"]
     for col in audit_cols:
-        assert (
-            df[col].isnull().sum() == 0
-        ), f"pipeline_runs icinde {col} kolonunda null deger bulunamaz"
-    assert (
-        df["status"] == "SUCCESS"
-    ).any(), "En az bir basarili (SUCCESS) run_id kaydi bulunmali"
+        assert df[col].isnull().sum() == 0, f"pipeline_runs icinde {col} kolonunda null deger bulunamaz"
+    assert (df["status"] == "SUCCESS").any(), "En az bir basarili (SUCCESS) run_id kaydi bulunmali"
 
 
 def test_2_cpsat_calendar_bounds(isolated_db):
     """Denetim Madde 25: Gerçek takvim ve fazla mesai bütçe değişmezlerini (invariants) doğrular."""
     sched_df = pd.read_sql(
-        """SELECT task_id, machine_id, start_min, end_min, duration_min, 
-                  regular_minutes, overtime_minutes, calendar_shift 
+        """SELECT task_id, machine_id, start_min, end_min, duration_min,
+                  regular_minutes, overtime_minutes, calendar_shift
            FROM production_schedule""",
         isolated_db,
     )
@@ -52,11 +46,10 @@ def test_2_cpsat_calendar_bounds(isolated_db):
     machine_daily_hours = dict(zip(machines_df["machine_id"].astype(str), machines_df["max_daily_hours"].astype(float)))
 
     # Taktik LP seviyesinde onaylanan fazla mesai bütçesini al
-    cap_df = pd.read_sql("SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", isolated_db)
-    allowed_ot_budget_min = {
-        str(r["machine_id"]): float(r["overtime_hours"]) * 60.0
-        for _, r in cap_df.iterrows()
-    }
+    cap_df = pd.read_sql(
+        "SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", isolated_db
+    )
+    allowed_ot_budget_min = {str(r["machine_id"]): float(r["overtime_hours"]) * 60.0 for _, r in cap_df.iterrows()}
 
     # Değişmez 1 & 2: Görev bazında aralık, süre korunumu ve kesin takvim denetimi
     for _, r in sched_df.iterrows():
@@ -107,8 +100,7 @@ def test_2_cpsat_calendar_bounds(isolated_db):
             raise KeyError(f"Eksik makine kapasite verisi: Tezgah {m} icin allowed_ot_budget bulunamadi!")
         allowed_ot = allowed_ot_budget_min[str(m)]
         assert actual_ot <= allowed_ot + 1e-4, (
-            f"Tezgah {m} icin fazla mesai butcesi asildi! "
-            f"Izin Verilen: {allowed_ot} dk, Fiili: {actual_ot} dk"
+            f"Tezgah {m} icin fazla mesai butcesi asildi! Izin Verilen: {allowed_ot} dk, Fiili: {actual_ot} dk"
         )
 
 
@@ -118,12 +110,8 @@ def test_3_batch_quantity_contract(isolated_db):
         isolated_db,
     )
     assert not sched_df.empty
-    diff = (sched_df["batch_count"] * sched_df["batch_size_units"]) - sched_df[
-        "production_units"
-    ]
-    assert (
-        diff == 0
-    ).all(), "batch_count * batch_size_units == production_units sozlesmesi bozulmus"
+    diff = (sched_df["batch_count"] * sched_df["batch_size_units"]) - sched_df["production_units"]
+    assert (diff == 0).all(), "batch_count * batch_size_units == production_units sozlesmesi bozulmus"
 
 
 def test_4_sku_production_reconciliation(isolated_db):
@@ -137,9 +125,7 @@ def test_4_sku_production_reconciliation(isolated_db):
     )
     merged = pd.merge(plan_df, sched_df, on="product_id")
     assert len(merged) == len(plan_df)
-    assert (
-        merged["p_units"] == merged["s_units"]
-    ).all(), f"SKU Plan vs Cizelge adet uyumsuzlugu: {merged}"
+    assert (merged["p_units"] == merged["s_units"]).all(), f"SKU Plan vs Cizelge adet uyumsuzlugu: {merged}"
 
 
 def test_5_hierarchical_capacity_reconciliation(isolated_db):
@@ -155,9 +141,7 @@ def test_5_hierarchical_capacity_reconciliation(isolated_db):
     for _, r in merged.iterrows():
         allowed_hr = r["regular_capacity_hours"] + r["overtime_hours"]
         m_id = r["machine_id"]
-        assert r["actual_proc_hr"] <= (
-            allowed_hr + 1e-4
-        ), f"{m_id} LP saf islem kapasite ust sinirini asti"
+        assert r["actual_proc_hr"] <= (allowed_hr + 1e-4), f"{m_id} LP saf islem kapasite ust sinirini asti"
 
 
 def test_6_energy_state_machine_and_integral(isolated_db):
@@ -173,21 +157,18 @@ def test_6_energy_state_machine_and_integral(isolated_db):
     integral_val = float(prof.iloc[0, 0])
     kpi_val = float(kpi.iloc[0, 0])
     m_sum_val = float(mkpi.iloc[0, 0])
-    assert (
-        abs(integral_val - kpi_val) < 0.01
-    ), f"Profil integrali ({integral_val}) ile energy_kpis ({kpi_val}) farkli"
-    assert (
-        abs(m_sum_val - kpi_val) < 0.01
-    ), f"Makine KPI toplami ({m_sum_val}) ile energy_kpis ({kpi_val}) farkli"
+    assert abs(integral_val - kpi_val) < 0.01, f"Profil integrali ({integral_val}) ile energy_kpis ({kpi_val}) farkli"
+    assert abs(m_sum_val - kpi_val) < 0.01, f"Makine KPI toplami ({m_sum_val}) ile energy_kpis ({kpi_val}) farkli"
 
 
 def test_7_reference_manifest_integrity():
     from pathlib import Path
+
     base_dir = Path(__file__).resolve().parent.parent
     manifest_path = base_dir / "artifacts" / "reference" / "manifest.json"
     assert manifest_path.exists(), f"manifest.json bulunamadı: {manifest_path}"
-    
-    with open(manifest_path, "r", encoding="utf-8") as f:
+
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
     assert "files" in manifest and len(manifest["files"]) > 0
 
@@ -202,9 +183,7 @@ def test_7_reference_manifest_integrity():
         with open(fpath, "rb") as bf:
             curr_sha = hashlib.sha256(bf.read()).hexdigest()
         if curr_sha != meta["sha256"]:
-            mismatches.append(
-                f"{fname} -> Beklenen: {meta['sha256'][:8]}..., Gercek: {curr_sha[:8]}..."
-            )
+            mismatches.append(f"{fname} -> Beklenen: {meta['sha256'][:8]}..., Gercek: {curr_sha[:8]}...")
 
     assert not missing_files, f"Eksik dosyalar var: {missing_files}"
     assert not mismatches, "SHA-256 uyumsuzlukları tespit edildi:\n" + "\n".join(mismatches)

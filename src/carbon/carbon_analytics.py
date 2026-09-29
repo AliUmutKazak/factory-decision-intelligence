@@ -24,20 +24,22 @@ Gerçek Sistem Bağlantı Mimarisi:
 """
 
 import os
-import sqlite3
+
 import pandas as pd
+
 from src.config import (
-    DB_PATH,
-    PROCESSED_DATA_DIR,
-    GRID_EMISSION_FACTOR,
-    DIESEL_EMISSION_FACTOR,
-    DEFAULT_FORKLIFT_LITERS,
     CARBON_PRICE_SCENARIOS_EUR,
+    DB_PATH,
+    DEFAULT_FORKLIFT_LITERS,
+    DIESEL_EMISSION_FACTOR,
+    GRID_EMISSION_FACTOR,
+    PROCESSED_DATA_DIR,
 )
 from src.utils.db import get_db_connection
 
 OUTPUT_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_analytics.csv"
 OUTPUT_MACHINE_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_machine_kpis.csv"
+
 
 def compute_carbon_analytics(run_id=None):
     conn = get_db_connection(DB_PATH)
@@ -79,11 +81,13 @@ def compute_carbon_analytics(run_id=None):
     scenario_records = []
     for price in CARBON_PRICE_SCENARIOS_EUR:
         exposure_eur = total_tco2e * price
-        scenario_records.append({
-            "carbon_price_eur_per_ton": price,
-            "total_carbon_exposure_eur": round(exposure_eur, 2),
-            "carbon_cost_per_unit_eur": round(exposure_eur / total_units, 4) if total_units > 0 else 0.0
-        })
+        scenario_records.append(
+            {
+                "carbon_price_eur_per_ton": price,
+                "total_carbon_exposure_eur": round(exposure_eur, 2),
+                "carbon_cost_per_unit_eur": round(exposure_eur / total_units, 4) if total_units > 0 else 0.0,
+            }
+        )
 
     scen_df = pd.DataFrame(scenario_records)
 
@@ -91,7 +95,9 @@ def compute_carbon_analytics(run_id=None):
     print("=" * 80)
     print("            AŞAMA 7B: KURUMSAL KARBON ANALİTİĞİ (GHG PROTOCOL)            ")
     print("=" * 80)
-    print(f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik - {actual_forklift_liters:.1f} L)")
+    print(
+        f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik - {actual_forklift_liters:.1f} L)"
+    )
     print(f"  -> Activity Driver Modeli            : {activity_driver_label}")
     print(f"Kapsam 2 Dolaylı Emisyonlar (Scope 2)   : {scope_2_tco2e:.3f} tCO2e (Şebeke Elektriği)")
     print(f"Toplam Karbon Ayak İzi (Total tCO2e)   : {total_tco2e:.3f} tCO2e")
@@ -108,7 +114,7 @@ def compute_carbon_analytics(run_id=None):
         "scope_1_tco2e": round(scope_1_tco2e, 4),
         "scope_2_tco2e": round(scope_2_tco2e, 4),
         "total_tco2e": round(total_tco2e, 4),
-        "kgco2e_per_unit": round(kgco2e_per_unit, 4)
+        "kgco2e_per_unit": round(kgco2e_per_unit, 4),
     }
 
     os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
@@ -170,7 +176,8 @@ def compute_carbon_analytics(run_id=None):
 
     print(f"[OK] Karbon KPI'ları Kaydedildi: {OUTPUT_CARBON_PATH}")
     print(f"[OK] Makine Karbon KPI'ları Kaydedildi: {OUTPUT_MACHINE_CARBON_PATH}")
-    print(f"[OK] SQLite 'carbon_kpis', 'carbon_machine_kpis' ve 'carbon_price_scenarios' tabloları güncellendi.")
+    print("[OK] SQLite 'carbon_kpis', 'carbon_machine_kpis' ve 'carbon_price_scenarios' tabloları güncellendi.")
+
 
 if __name__ == "__main__":
     compute_carbon_analytics()

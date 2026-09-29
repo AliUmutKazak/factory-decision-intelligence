@@ -1,7 +1,9 @@
-import sqlite3
 import os
+import sqlite3
 from pathlib import Path
+
 from src.config import DB_PATH
+
 
 def get_db_connection(db_path=None):
     """

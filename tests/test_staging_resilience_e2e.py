@@ -10,12 +10,12 @@ Doğrulanacak Mimari Davranış:
    - RUN-A'ya ait üretim çizelgesi ve KPI tabloları bozulmadan kalır.
 """
 
-import os
 import shutil
 import sqlite3
-import pytest
 from pathlib import Path
 from unittest.mock import patch
+
+import pytest
 
 from main import run_end_to_end_pipeline
 from src.utils.lineage import get_active_pipeline_run
@@ -26,14 +26,12 @@ def test_staging_switchover_failure_resilience(tmp_path, monkeypatch):
     test_workspace.mkdir()
 
     repo_root = Path(__file__).resolve().parent.parent
-    
+
     for folder in ["config", "data"]:
         src_folder = repo_root / folder
         if src_folder.exists():
             shutil.copytree(
-                src_folder,
-                test_workspace / folder,
-                ignore=shutil.ignore_patterns("*.db", "*.db-journal", "staging_*")
+                src_folder, test_workspace / folder, ignore=shutil.ignore_patterns("*.db", "*.db-journal", "staging_*")
             )
 
     monkeypatch.chdir(test_workspace)

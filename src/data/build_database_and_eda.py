@@ -1,45 +1,36 @@
 import os
-import sqlite3
-import pandas as pd
+
 import numpy as np
-from src.utils.db import get_db_connection
+import pandas as pd
+
 from src.config import (
     DB_PATH,
     PROCESSED_DATA_DIR,
     SYNTHETIC_DATA_DIR,
 )
+from src.utils.db import get_db_connection
 
 PROCESSED_ORDERS_PATH = PROCESSED_DATA_DIR / "factory_orders.csv"
 
+
 def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
-    daily_product_demand = (
-        orders_df.groupby(["order_date", "product_id"])["order_qty"]
-        .sum()
-        .reset_index()
-    )
+    daily_product_demand = orders_df.groupby(["order_date", "product_id"])["order_qty"].sum().reset_index()
 
     stats = (
         daily_product_demand.groupby("product_id")["order_qty"]
-        .agg(
-            gunluk_ortalama="mean",
-            gunluk_std="std",
-            min_talep="min",
-            max_talep="max",
-            toplam_talep="sum"
-        )
+        .agg(gunluk_ortalama="mean", gunluk_std="std", min_talep="min", max_talep="max", toplam_talep="sum")
         .reset_index()
     )
 
     # Varyasyon Katsayısı (CV = sigma / mu)
     stats["cv_volatilite"] = (stats["gunluk_std"] / stats["gunluk_ortalama"]).round(3)
-    stats["talep_profili"] = np.where(
-        stats["cv_volatilite"] < 0.5, "Düzenli (Smooth)", "Dalgalı (Erratic)"
-    )
+    stats["talep_profili"] = np.where(stats["cv_volatilite"] < 0.5, "Düzenli (Smooth)", "Dalgalı (Erratic)")
 
     stats["gunluk_ortalama"] = stats["gunluk_ortalama"].round(1)
     stats["gunluk_std"] = stats["gunluk_std"].round(1)
 
     return stats
+
 
 def validate_master_data(data_dict):
     """
@@ -53,7 +44,7 @@ def validate_master_data(data_dict):
         "materials": ["material_id", "material_name"],
         "bom": ["product_id", "material_id", "qty_per_unit"],
         "routing": ["product_id", "operation_seq", "machine_id", "processing_time_min"],
-        "changeover_matrix": ["from_product", "to_product", "setup_time_min"]
+        "changeover_matrix": ["from_product", "to_product", "setup_time_min"],
     }
 
     # 2. Şema, Null ve Negatif Değer Kontrolleri
@@ -62,18 +53,20 @@ def validate_master_data(data_dict):
         missing = [c for c in req_list if c not in df.columns]
         if missing:
             raise ValueError(f"[MASTER DATA ERROR] '{tbl_name}' tablosunda zorunlu sütunlar eksik: {missing}")
-        
+
         # Null kontrolü
         null_counts = df[req_list].isnull().sum()
         if null_counts.any():
-            raise ValueError(f"[MASTER DATA ERROR] '{tbl_name}' tablosunda boş (null) değer tespit edildi:\n{null_counts[null_counts > 0]}")
+            raise ValueError(
+                f"[MASTER DATA ERROR] '{tbl_name}' tablosunda boş (null) değer tespit edildi:\n{null_counts[null_counts > 0]}"
+            )
 
     # 3. Sayısal Alanlarda Negatif Değer Kontrolü
     num_checks = [
         ("machines", ["base_power_kw", "operating_cost_per_hour", "max_daily_hours"]),
         ("bom", ["qty_per_unit"]),
         ("routing", ["processing_time_min"]),
-        ("changeover_matrix", ["setup_time_min"])
+        ("changeover_matrix", ["setup_time_min"]),
     ]
     for tbl_name, cols in num_checks:
         df = data_dict[tbl_name]
@@ -85,7 +78,7 @@ def validate_master_data(data_dict):
     if data_dict["machines"]["machine_id"].duplicated().any():
         dups = data_dict["machines"]["machine_id"][data_dict["machines"]["machine_id"].duplicated()].tolist()
         raise ValueError(f"[MASTER DATA ERROR] 'machines' tablosunda yinelenen machine_id: {dups}")
-    
+
     if data_dict["products"]["product_id"].duplicated().any():
         dups = data_dict["products"]["product_id"][data_dict["products"]["product_id"].duplicated()].tolist()
         raise ValueError(f"[MASTER DATA ERROR] 'products' tablosunda yinelenen product_id: {dups}")
@@ -106,9 +99,13 @@ def validate_master_data(data_dict):
     routing_products = set(data_dict["routing"]["product_id"])
     routing_machines = set(data_dict["routing"]["machine_id"])
     if not routing_products.issubset(valid_products):
-        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}")
+        raise ValueError(
+            f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}"
+        )
     if not routing_machines.issubset(valid_machines):
-        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}")
+        raise ValueError(
+            f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}"
+        )
 
     # 6. Kapsama Doğrulamaları (Coverage & Completeness)
     missing_bom = valid_products - bom_products
@@ -139,9 +136,13 @@ def validate_master_data(data_dict):
     routing_products = set(data_dict["routing"]["product_id"])
     routing_machines = set(data_dict["routing"]["machine_id"])
     if not routing_products.issubset(valid_products):
-        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}")
+        raise ValueError(
+            f"[MASTER DATA ERROR] 'routing' içinde tanımsız product_id: {routing_products - valid_products}"
+        )
     if not routing_machines.issubset(valid_machines):
-        raise ValueError(f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}")
+        raise ValueError(
+            f"[MASTER DATA ERROR] 'routing' içinde tanımsız machine_id: {routing_machines - valid_machines}"
+        )
 
     # 6. Kapsama Doğrulamaları (Coverage & Completeness)
     missing_bom = valid_products - bom_products
@@ -160,15 +161,16 @@ def validate_master_data(data_dict):
     if missing_pairs:
         raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
 
+
 def initialize_database(force_recreate=False, run_id=None):
     """
     Veritabanını SSOT (Single Source of Truth) ilkelerine uygun şekilde başlatır ve eşitler.
     Dosyayı tamamen silmek yerine idempotent tablo senkronizasyonu yapar ve
     her icra için 'pipeline_runs' denetim kaydı oluşturur.
     """
-    import uuid
-    from datetime import datetime
     import gc
+    from datetime import datetime
+
     gc.collect()
 
     if force_recreate and os.path.exists(DB_PATH):
@@ -195,8 +197,14 @@ def initialize_database(force_recreate=False, run_id=None):
     # Yeni koşum tamamlanıp doğrulanana kadar eski canlı veri lekelenmez.
 
     # 0. SSOT Merkezi Denetim Şeması (pipeline_runs)
-    from src.utils.lineage import init_pipeline_runs_table, generate_run_id, get_git_sha, compute_file_hash
     from src.config import CONFIG_PATH
+    from src.utils.lineage import (
+        compute_file_hash,
+        generate_run_id,
+        get_git_sha,
+        init_pipeline_runs_table,
+    )
+
     init_pipeline_runs_table(conn)
 
     # 1. İşlenmiş sipariş verisini aktar
@@ -206,6 +214,7 @@ def initialize_database(force_recreate=False, run_id=None):
             raise pd.errors.EmptyDataError("Dosya bos")
     except (FileNotFoundError, pd.errors.EmptyDataError):
         from src.data.preprocessing import run_preprocessing
+
         run_preprocessing()
         orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
     cursor = conn.cursor()
@@ -269,20 +278,23 @@ def initialize_database(force_recreate=False, run_id=None):
     git_sha = get_git_sha()
     cfg_hash = compute_file_hash(CONFIG_PATH)
 
-    cursor.execute("""
-        INSERT OR REPLACE INTO pipeline_runs 
-        (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status) 
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO pipeline_runs
+        (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        run_id,
-        datetime.now().isoformat(),
-        "pipeline_execution",
-        len(orders_df),
-        git_sha,
-        cfg_hash,
-        "factory_orders.csv",
-        "INITIALIZED"
-    ))
+    """,
+        (
+            run_id,
+            datetime.now().isoformat(),
+            "pipeline_execution",
+            len(orders_df),
+            git_sha,
+            cfg_hash,
+            "factory_orders.csv",
+            "INITIALIZED",
+        ),
+    )
     conn.commit()
 
     # 2. Sentetik fabrika ana veri tablolarını oku ve fail-fast doğrula
@@ -445,10 +457,13 @@ def initialize_database(force_recreate=False, run_id=None):
             ("M02", "P02"),
             ("M03", "P04"),
         ]
-        cursor.executemany("""
+        cursor.executemany(
+            """
             INSERT OR REPLACE INTO machine_state (machine_id, last_product_id)
             VALUES (?, ?)
-        """, initial_states)
+        """,
+            initial_states,
+        )
         conn.commit()
 
     # Madde 31: machine_calendar tablosu boşsa machines verisinden tohumla
@@ -459,7 +474,7 @@ def initialize_database(force_recreate=False, run_id=None):
             SELECT machine_id, d.day_idx, 'SHIFT_REGULAR', 480, 480 + CAST(max_daily_hours * 60 AS INTEGER), max_daily_hours, 'REGULAR', 1
             FROM machines
             CROSS JOIN (
-                SELECT 0 AS day_idx UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
+                SELECT 0 AS day_idx UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3
                 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6
             ) d
         """)
@@ -491,6 +506,6 @@ def initialize_database(force_recreate=False, run_id=None):
     print("     kurumsal şema uyumu ve çok amaçlı genişletmeler için rezerve edilmiştir.")
     print("=" * 75)
 
+
 if __name__ == "__main__":
     initialize_database()
-    

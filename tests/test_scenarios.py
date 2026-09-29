@@ -1,27 +1,26 @@
-import src.utils.lineage as lineage_mod
-import sqlite3
-import os
-import sys
 import shutil
+import sys
 from pathlib import Path
+
+import src.utils.lineage as lineage_mod
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import pytest
 import pandas as pd
-from src.utils.db import get_db_connection
+import pytest
 
-import src.config as cfg
-import src.data.preprocessing as prep_mod
-import src.data.build_database_and_eda as db_mod
-import src.forecasting.train_forecast as fc_mod
-import src.planning.aggregate_planning as plan_mod
-import src.inventory.bom_mrp as mrp_mod
-import src.scheduling.schedule_cpsat as sched_mod
-import src.energy.energy_analytics as energy_mod
 import src.carbon.carbon_analytics as carbon_mod
+import src.config as cfg
+import src.data.build_database_and_eda as db_mod
+import src.data.preprocessing as prep_mod
+import src.energy.energy_analytics as energy_mod
+import src.forecasting.train_forecast as fc_mod
+import src.inventory.bom_mrp as mrp_mod
+import src.planning.aggregate_planning as plan_mod
+import src.scheduling.schedule_cpsat as sched_mod
+from src.utils.db import get_db_connection
 
 
 @pytest.fixture
@@ -98,7 +97,7 @@ def isolated_env(tmp_path, monkeypatch):
 def test_scenario_zero_production(isolated_env, monkeypatch):
     """Sıfır üretim senaryosunda boş tablonun şemasının korunduğunu doğrular."""
     monkeypatch.setenv("USE_FIXTURE", "fixture_zero_production.csv")
-    
+
     prep_mod.run_preprocessing()
     db_mod.initialize_database()
     fc_mod.run_forecast_benchmark()
@@ -122,7 +121,7 @@ def test_scenario_zero_production(isolated_env, monkeypatch):
 def test_scenario_expedite_flags(isolated_env, monkeypatch):
     """Ani talep patlamasında MRP motorunun EXPEDITE aksiyon bayrağı ürettiğini doğrular."""
     monkeypatch.setenv("USE_FIXTURE", "fixture_expedite.csv")
-    
+
     prep_mod.run_preprocessing()
     db_mod.initialize_database()
     fc_mod.run_forecast_benchmark()
@@ -140,7 +139,7 @@ def test_scenario_expedite_flags(isolated_env, monkeypatch):
 def test_scenario_normal_e2e_reconciliation(isolated_env, monkeypatch):
     """Nominal senaryoda tüm uçtan uca zincirin pozitif üretimle eşleştiğini doğrular."""
     monkeypatch.setenv("USE_FIXTURE", "fixture_normal.csv")
-    
+
     prep_mod.run_preprocessing()
     db_mod.initialize_database()
     fc_mod.run_forecast_benchmark()
@@ -164,7 +163,7 @@ def test_scenario_normal_e2e_reconciliation(isolated_env, monkeypatch):
 def test_scenario_capacity_stress(isolated_env, monkeypatch):
     """Aşırı talep / stres senaryosunda agrega planlamanın fazla mesai sınırlarını zorladığını doğrular."""
     monkeypatch.setenv("USE_FIXTURE", "fixture_capacity_stress.csv")
-    
+
     prep_mod.run_preprocessing()
     db_mod.initialize_database()
     fc_mod.run_forecast_benchmark()

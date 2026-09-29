@@ -1,23 +1,22 @@
-﻿import json
+import json
 import os
-import sqlite3
-import pandas as pd
-import numpy as np
+
 import lightgbm as lgb
-import statsmodels
-from pathlib import Path
+import numpy as np
+import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-from src.utils.db import get_db_connection
 from src.config import (
     DB_PATH,
-    PROCESSED_DATA_DIR,
     FORECAST_HORIZON_DAYS,
+    PROCESSED_DATA_DIR,
 )
+from src.utils.db import get_db_connection
 
 OUTPUT_FORECAST_PATH = PROCESSED_DATA_DIR / "forecast_demand.csv"
 HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100
+
 
 def load_factory_demand():
     conn = get_db_connection(DB_PATH)
@@ -30,6 +29,7 @@ def load_factory_demand():
     conn.close()
     df["order_date"] = pd.to_datetime(df["order_date"])
     return df
+
 
 def build_training_matrix(df_single_sku):
     df = df_single_sku.copy().sort_values("order_date").reset_index(drop=True)
@@ -49,6 +49,7 @@ def build_training_matrix(df_single_sku):
     drop_cols = ["order_date", "product_id"] if "product_id" in df.columns else ["order_date"]
     return df.drop(columns=[c for c in drop_cols if c in df.columns])
 
+
 def extract_features_for_row(history_df, target_date):
     feats = {}
     feats["dayofweek"] = target_date.dayofweek
@@ -64,11 +65,12 @@ def extract_features_for_row(history_df, target_date):
         feats[f"lag_{lag}"] = demands[n - lag] if n >= lag else demands[-1]
 
     for w in [7, 14, 28]:
-        window_vals = demands[max(0, n - w):]
+        window_vals = demands[max(0, n - w) :]
         feats[f"rolling_mean_{w}"] = np.mean(window_vals)
         feats[f"rolling_std_{w}"] = np.std(window_vals) if len(window_vals) > 1 else 0.0
 
     return feats
+
 
 def evaluate_metrics(y_true, y_pred):
     denom = np.sum(y_true)
@@ -76,6 +78,7 @@ def evaluate_metrics(y_true, y_pred):
     rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
     bias = float(np.sum(y_pred - y_true))
     return wape, rmse, bias
+
 
 def evaluate_fold_model(model_name, train_df, test_df, horizon):
     y_test = test_df["demand"].values
@@ -89,10 +92,7 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
     elif model_name == "Holt-Winters":
         try:
             hw = ExponentialSmoothing(
-                train_df["demand"].astype(float),
-                trend="add",
-                seasonal="add",
-                seasonal_periods=7
+                train_df["demand"].astype(float), trend="add", seasonal="add", seasonal_periods=7
             ).fit()
             pred = np.maximum(0, hw.forecast(horizon).values)
         except Exception:
@@ -110,7 +110,7 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
             "learning_rate": 0.05,
             "num_leaves": 31,
             "verbose": -1,
-            "seed": 42
+            "seed": 42,
         }
         gbm = lgb.train(params, lgb_train, num_boost_round=LGBM_NUM_BOOST_ROUND)
         sim_history = train_df.copy()
@@ -121,14 +121,14 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
             feat_df = pd.DataFrame([feat_step])[feature_cols]
             p_val = max(0.0, float(gbm.predict(feat_df)[0]))
             pred_lgb.append(p_val)
-            sim_history = pd.concat([
-                sim_history,
-                pd.DataFrame([{"order_date": target_date, "demand": p_val}])
-            ], ignore_index=True)
+            sim_history = pd.concat(
+                [sim_history, pd.DataFrame([{"order_date": target_date, "demand": p_val}])], ignore_index=True
+            )
         pred = np.array(pred_lgb)
     else:
         pred = np.zeros(horizon)
     return evaluate_metrics(y_test, pred)
+
 
 def run_forecast_benchmark(run_id=None):
     df_all = load_factory_demand()
@@ -153,7 +153,7 @@ def run_forecast_benchmark(run_id=None):
         fold_cutoffs = [total_len - (num_folds - f) * HORIZON_DAYS for f in range(num_folds)]
         for f_idx, cutoff in enumerate(fold_cutoffs):
             train_sub = pdf.iloc[:cutoff].copy().reset_index(drop=True)
-            test_sub = pdf.iloc[cutoff:cutoff + HORIZON_DAYS].copy().reset_index(drop=True)
+            test_sub = pdf.iloc[cutoff : cutoff + HORIZON_DAYS].copy().reset_index(drop=True)
             for m_name in candidate_models:
                 w, r, b = evaluate_fold_model(m_name, train_sub, test_sub, HORIZON_DAYS)
                 cv_scores[m_name]["wape"].append(w)
@@ -171,14 +171,16 @@ def run_forecast_benchmark(run_id=None):
         best_wape, best_rmse, best_bias = model_performance[best_name]
 
         for m_name, (w, r, b) in model_performance.items():
-            benchmark_summary.append({
-                "SKU": pid,
-                "Model": m_name,
-                "Backtest_WAPE": f"{w:.4f}",
-                "Backtest_RMSE": f"{r:.2f}",
-                "Backtest_Bias": f"{b:.1f}",
-                "Kazanan": "✓" if m_name == best_name else ""
-            })
+            benchmark_summary.append(
+                {
+                    "SKU": pid,
+                    "Model": m_name,
+                    "Backtest_WAPE": f"{w:.4f}",
+                    "Backtest_RMSE": f"{r:.2f}",
+                    "Backtest_Bias": f"{b:.1f}",
+                    "Kazanan": "✓" if m_name == best_name else "",
+                }
+            )
 
         last_date = pd.to_datetime(pdf["order_date"].max())
         future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=HORIZON_DAYS, freq="D")
@@ -192,10 +194,7 @@ def run_forecast_benchmark(run_id=None):
             future_preds = np.repeat(pdf["demand"].iloc[-7:].mean(), HORIZON_DAYS)
         elif best_name == "Holt-Winters":
             hw_prod = ExponentialSmoothing(
-                pdf["demand"].astype(float),
-                trend="add",
-                seasonal="add",
-                seasonal_periods=7
+                pdf["demand"].astype(float), trend="add", seasonal="add", seasonal_periods=7
             ).fit()
             future_preds = hw_prod.forecast(HORIZON_DAYS).values
             future_preds = np.maximum(0, future_preds)
@@ -209,7 +208,7 @@ def run_forecast_benchmark(run_id=None):
                 "learning_rate": 0.05,
                 "num_leaves": 31,
                 "verbose": -1,
-                "seed": 42
+                "seed": 42,
             }
             gbm_prod = lgb.train(params, lgb_prod_train, num_boost_round=LGBM_NUM_BOOST_ROUND)
             prod_sim = pdf.copy()
@@ -219,10 +218,9 @@ def run_forecast_benchmark(run_id=None):
                 feat_df = pd.DataFrame([feat_step])[feature_cols]
                 p_val = max(0.0, float(gbm_prod.predict(feat_df)[0]))
                 future_preds_list.append(p_val)
-                prod_sim = pd.concat([
-                    prod_sim,
-                    pd.DataFrame([{"order_date": f_date, "demand": p_val}])
-                ], ignore_index=True)
+                prod_sim = pd.concat(
+                    [prod_sim, pd.DataFrame([{"order_date": f_date, "demand": p_val}])], ignore_index=True
+                )
             future_preds = np.array(future_preds_list)
 
         # 12. Madde: CV RMSE uzerinden belirsizlik ve dinamik Safety Stock
@@ -235,17 +233,19 @@ def run_forecast_benchmark(run_id=None):
             p90_val = int(round(max(0, q + z_90 * sigma_uncertainty)))
             p10_val = int(round(max(0, q - z_90 * sigma_uncertainty)))
 
-            final_forecast_records.append({
-                "forecast_date": d.strftime("%Y-%m-%d"),
-                "product_id": pid,
-                "forecast_demand": p50_val,
-                "demand_p10": p10_val,
-                "demand_p50": p50_val,
-                "demand_p90": p90_val,
-                "forecast_uncertainty_sigma": round(sigma_uncertainty, 2),
-                "recommended_safety_stock": safety_stock_val,
-                "model_used": best_name
-            })
+            final_forecast_records.append(
+                {
+                    "forecast_date": d.strftime("%Y-%m-%d"),
+                    "product_id": pid,
+                    "forecast_demand": p50_val,
+                    "demand_p10": p10_val,
+                    "demand_p50": p50_val,
+                    "demand_p90": p90_val,
+                    "forecast_uncertainty_sigma": round(sigma_uncertainty, 2),
+                    "recommended_safety_stock": safety_stock_val,
+                    "model_used": best_name,
+                }
+            )
 
         competing_scores = {}
         for m, vals in model_performance.items():
@@ -257,10 +257,10 @@ def run_forecast_benchmark(run_id=None):
                     f"fold_{f_i + 1}": {
                         "wape": round(cv_scores[m]["wape"][f_i], 4),
                         "rmse": round(cv_scores[m]["rmse"][f_i], 2),
-                        "bias": round(cv_scores[m]["bias"][f_i], 2)
+                        "bias": round(cv_scores[m]["bias"][f_i], 2),
                     }
                     for f_i in range(num_folds)
-                }
+                },
             }
 
         first_cutoff_dt = str(pdf.iloc[fold_cutoffs[0]]["order_date"])[:10]
@@ -272,7 +272,7 @@ def run_forecast_benchmark(run_id=None):
             "folds": num_folds,
             "horizon_days": HORIZON_DAYS,
             "backtest_start": backtest_start_dt,
-            "backtest_end": backtest_end_dt
+            "backtest_end": backtest_end_dt,
         }
 
         if best_name == "LightGBM":
@@ -283,40 +283,39 @@ def run_forecast_benchmark(run_id=None):
                 "num_boost_round": LGBM_NUM_BOOST_ROUND,
                 "lags": [1, 2, 3, 7, 14, 21, 28],
                 "rolling_windows": [7, 14, 28],
-                "cv_folds": num_folds
+                "cv_folds": num_folds,
             }
         elif best_name == "Holt-Winters":
             model_params = {
                 "trend": "add",
                 "seasonal": "add",
                 "seasonal_periods": 7,
-                "initialization_method": "estimated"
+                "initialization_method": "estimated",
             }
         else:
-            model_params = {
-                **cv_spec,
-                "model_family": best_name
-            }
+            model_params = {**cv_spec, "model_family": best_name}
 
-        model_lineage_records.append({
-            "product_id": pid,
-            "selected_model": best_name,
-            "model_version": "v3.0-rolling-origin-cv",
-            "feature_version": "v1.2-lag-calendar",
-            "forecast_origin": str(pdf["order_date"].max())[:10],
-            "training_start": str(pdf["order_date"].min())[:10],
-            "training_end": str(pdf["order_date"].max())[:10],
-            "backtest_start": backtest_start_dt,
-            "backtest_end": backtest_end_dt,
-            "backtest_wape": round(float(best_wape), 4),
-            "backtest_rmse": round(float(best_rmse), 2),
-            "backtest_bias": round(float(best_bias), 2),
-            "validation_score_wape": round(float(best_wape), 4),
-            "test_score_rmse": round(float(best_rmse), 2),
-            "hyperparameters": json.dumps(model_params),
-            "competing_models": json.dumps(competing_scores),
-            "selection_reason": f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f})."
-        })
+        model_lineage_records.append(
+            {
+                "product_id": pid,
+                "selected_model": best_name,
+                "model_version": "v3.0-rolling-origin-cv",
+                "feature_version": "v1.2-lag-calendar",
+                "forecast_origin": str(pdf["order_date"].max())[:10],
+                "training_start": str(pdf["order_date"].min())[:10],
+                "training_end": str(pdf["order_date"].max())[:10],
+                "backtest_start": backtest_start_dt,
+                "backtest_end": backtest_end_dt,
+                "backtest_wape": round(float(best_wape), 4),
+                "backtest_rmse": round(float(best_rmse), 2),
+                "backtest_bias": round(float(best_bias), 2),
+                "validation_score_wape": round(float(best_wape), 4),
+                "test_score_rmse": round(float(best_rmse), 2),
+                "hyperparameters": json.dumps(model_params),
+                "competing_models": json.dumps(competing_scores),
+                "selection_reason": f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f}).",
+            }
+        )
 
     summary_df = pd.DataFrame(benchmark_summary)
     print(summary_df.to_string(index=False))
@@ -351,9 +350,12 @@ def run_forecast_benchmark(run_id=None):
         lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
 
     print(f"[OK] 28 Gunluk Gelecek Tahminleri Yazildi: {OUTPUT_FORECAST_PATH}")
-    print(f"[OK] Model Governance Metadata Kaydedildi: forecast_model_lineage tablosu & reports/forecast_model_metadata.json")
+    print(
+        "[OK] Model Governance Metadata Kaydedildi: forecast_model_lineage tablosu & reports/forecast_model_metadata.json"
+    )
 
     return forecast_df
+
 
 if __name__ == "__main__":
     run_forecast_benchmark()

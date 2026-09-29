@@ -21,15 +21,16 @@ gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji 
 """
 
 import os
-import sqlite3
+
 import pandas as pd
-import numpy as np
-from src.config import PROCESSED_DATA_DIR, DB_PATH
-from src.utils.db import get_db_connection
+
+from src.config import DB_PATH, PROCESSED_DATA_DIR
 from src.scheduling.calendar_service import MachineCalendarService
+from src.utils.db import get_db_connection
 
 OUTPUT_ENERGY_KPI_PATH = PROCESSED_DATA_DIR / "energy_kpis.csv"
 OUTPUT_PROFILE_PATH = PROCESSED_DATA_DIR / "energy_profile_15min.csv"
+
 
 def load_data():
     conn = get_db_connection(DB_PATH)
@@ -39,14 +40,11 @@ def load_data():
     conn.close()
 
     # Routing tablosundaki variable_kwh_per_unit'i operasyon bazında birleştir
-    schedule_df = schedule_df.merge(
-        routing_df,
-        on=["product_id", "operation_seq", "machine_id"],
-        how="left"
-    )
+    schedule_df = schedule_df.merge(routing_df, on=["product_id", "operation_seq", "machine_id"], how="left")
     schedule_df["kwh_unit"] = schedule_df["variable_kwh_per_unit"].fillna(0.0)
 
     return schedule_df, machines_df
+
 
 def load_machine_specs() -> dict:
     conn = get_db_connection(DB_PATH)
@@ -60,9 +58,10 @@ def load_machine_specs() -> dict:
         specs[m_id] = {
             "base_kw": base_kw,
             "setup_kw": float(row.get("setup_kw", round(base_kw * 0.45, 2))),
-            "idle_kw": float(row.get("idle_kw", round(base_kw * 0.18, 2)))
+            "idle_kw": float(row.get("idle_kw", round(base_kw * 0.18, 2))),
         }
     return specs
+
 
 def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     if schedule_df is None or machines_df is None:
@@ -84,20 +83,22 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
             "kwh_per_unit": 0.0,
             "avg_load_kw": 0.0,
             "peak_load_kw": 0.0,
-            "load_factor": 0.0
+            "load_factor": 0.0,
         }
         machine_kpis = []
         for m_id in machines_df["machine_id"].unique():
-            machine_kpis.append({
-                "machine_id": m_id,
-                "processing_hours": 0.0,
-                "setup_hours": 0.0,
-                "idle_hours": 0.0,
-                "processing_kwh": 0.0,
-                "setup_kwh": 0.0,
-                "idle_kwh": 0.0,
-                "total_kwh": 0.0
-            })
+            machine_kpis.append(
+                {
+                    "machine_id": m_id,
+                    "processing_hours": 0.0,
+                    "setup_hours": 0.0,
+                    "idle_hours": 0.0,
+                    "processing_kwh": 0.0,
+                    "setup_kwh": 0.0,
+                    "idle_kwh": 0.0,
+                    "total_kwh": 0.0,
+                }
+            )
 
         kpi_df = pd.DataFrame([facility_kpis])
         m_kpi_df = pd.DataFrame(machine_kpis)
@@ -171,14 +172,14 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
 
     step_min = 15
     time_points = list(range(0, makespan_min, step_min))
-    
+
     # Her makine icin kumulatif sayaclar
-    m_proc_kwh = {m: 0.0 for m in machine_specs}
-    m_setup_kwh = {m: 0.0 for m in machine_specs}
-    m_idle_kwh = {m: 0.0 for m in machine_specs}
-    m_proc_min = {m: 0.0 for m in machine_specs}
-    m_setup_min = {m: 0.0 for m in machine_specs}
-    m_idle_min = {m: 0.0 for m in machine_specs}
+    m_proc_kwh = dict.fromkeys(machine_specs, 0.0)
+    m_setup_kwh = dict.fromkeys(machine_specs, 0.0)
+    m_idle_kwh = dict.fromkeys(machine_specs, 0.0)
+    m_proc_min = dict.fromkeys(machine_specs, 0.0)
+    m_setup_min = dict.fromkeys(machine_specs, 0.0)
+    m_idle_min = dict.fromkeys(machine_specs, 0.0)
 
     profile_records = []
 
@@ -195,9 +196,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
             m_sched = schedule_df[schedule_df["machine_id"] == m_id]
 
             # 1. İşlemde mi? (Interval overlap kontrolü: [start_min, end_min) kesişimi)
-            active_proc = m_sched[
-                (m_sched["start_min"] < t_end) & (m_sched["end_min"] > t)
-            ]
+            active_proc = m_sched[(m_sched["start_min"] < t_end) & (m_sched["end_min"] > t)]
 
             slice_load_kw = 0.0
             if len(active_proc) > 0:
@@ -211,7 +210,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
                 # Regular mesaide idle; OT penceresinde ise ancak o haftada makinenin OT yetkisi varsa idle, yoksa OFF
                 has_ot_auth = weekly_machine_ot_hours.get((current_week, m_id), 0.0) > 0
                 is_active_window = is_calendar_regular or (is_ot_window and has_ot_auth)
-                
+
                 if is_active_window:
                     slice_load_kw = specs["idle_kw"]
                     m_idle_min[m_id] += actual_interval
@@ -221,12 +220,14 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
 
             total_slice_load_kw += slice_load_kw
 
-        profile_records.append({
-            "time_min": t,
-            "time_hour": round(t / 60.0, 2),
-            "interval_min": actual_interval,
-            "total_load_kw": round(total_slice_load_kw, 2),
-        })
+        profile_records.append(
+            {
+                "time_min": t,
+                "time_hour": round(t / 60.0, 2),
+                "interval_min": actual_interval,
+                "total_load_kw": round(total_slice_load_kw, 2),
+            }
+        )
 
     # Makine KPI Tablosunu dogrudan dilim integrallerinden uret
     machine_kpis = []
@@ -235,10 +236,11 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     total_proc_kwh_integrated = 0.0
 
     # schedule_df üzerinden kesin analitik değerler
-    sched_mach_group = schedule_df.groupby("machine_id").agg({
-        "proc_hours": "sum",
-        "total_proc_energy_kwh": "sum"
-    }).to_dict(orient="index")
+    sched_mach_group = (
+        schedule_df.groupby("machine_id")
+        .agg({"proc_hours": "sum", "total_proc_energy_kwh": "sum"})
+        .to_dict(orient="index")
+    )
 
     for m_id, specs in machine_specs.items():
         actual_proc_kwh = float(sched_mach_group.get(m_id, {}).get("total_proc_energy_kwh", 0.0))
@@ -248,16 +250,18 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         idle_kwh_val = float(m_idle_kwh[m_id])
         tot_kwh = actual_proc_kwh + setup_kwh_val + idle_kwh_val
 
-        machine_kpis.append({
-            "machine_id": m_id,
-            "processing_hours": round(actual_proc_hours, 4),
-            "setup_hours": round(m_setup_min[m_id] / 60.0, 4),
-            "idle_hours": round(m_idle_min[m_id] / 60.0, 4),
-            "processing_kwh": round(actual_proc_kwh, 4),
-            "setup_kwh": round(setup_kwh_val, 4),
-            "idle_kwh": round(idle_kwh_val, 4),
-            "total_kwh": round(tot_kwh, 4)
-        })
+        machine_kpis.append(
+            {
+                "machine_id": m_id,
+                "processing_hours": round(actual_proc_hours, 4),
+                "setup_hours": round(m_setup_min[m_id] / 60.0, 4),
+                "idle_hours": round(m_idle_min[m_id] / 60.0, 4),
+                "processing_kwh": round(actual_proc_kwh, 4),
+                "setup_kwh": round(setup_kwh_val, 4),
+                "idle_kwh": round(idle_kwh_val, 4),
+                "total_kwh": round(tot_kwh, 4),
+            }
+        )
 
     # Fiziksel kuramsal toplamlar
     total_proc_kwh = sum(m["processing_kwh"] for m in machine_kpis)
@@ -301,9 +305,15 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     print("=" * 85)
     print(f"Toplam Üretim Miktarı     : {kpi_summary['total_units_produced']:,} adet")
     print(f"Toplam Enerji Tüketimi    : {kpi_summary['grand_total_kwh']:,} kWh")
-    print(f"  - İşlem (Processing)    : {kpi_summary['processing_kwh']:,} kWh ({kpi_summary['processing_kwh']/grand_total_kwh*100:.1f}%)")
-    print(f"  - Fiili Hazırlık (Setup): {kpi_summary['setup_kwh']:,} kWh ({kpi_summary['setup_kwh']/grand_total_kwh*100:.1f}%)")
-    print(f"  - Boşta Bekleme (Idle)  : {kpi_summary['idle_kwh']:,} kWh ({kpi_summary['idle_kwh']/grand_total_kwh*100:.1f}%)")
+    print(
+        f"  - İşlem (Processing)    : {kpi_summary['processing_kwh']:,} kWh ({kpi_summary['processing_kwh'] / grand_total_kwh * 100:.1f}%)"
+    )
+    print(
+        f"  - Fiili Hazırlık (Setup): {kpi_summary['setup_kwh']:,} kWh ({kpi_summary['setup_kwh'] / grand_total_kwh * 100:.1f}%)"
+    )
+    print(
+        f"  - Boşta Bekleme (Idle)  : {kpi_summary['idle_kwh']:,} kWh ({kpi_summary['idle_kwh'] / grand_total_kwh * 100:.1f}%)"
+    )
     print(f"Birim Enerji Tüketimi     : {kpi_summary['kwh_per_unit']} kWh/adet")
     print(f"Ortalama Yük (Avg Load)   : {kpi_summary['avg_load_kw']} kW")
     print(f"Tepe Yük (Peak Load)      : {kpi_summary['peak_load_kw']} kW")
