@@ -1,3 +1,25 @@
+"""
+===============================================================================
+OPERATIONAL ENERGY SIMULATION & ANALYTICAL ESTIMATION ENGINE
+===============================================================================
+Metodolojik Kapsam ve Mimari Ayrım (Madde 23):
+Bu modüldeki enerji ve yük profili hesaplamaları doğrudan fiziksel sayaçlardan
+(SCADA, Smart Meter, Power Meter, PLC) toplanan telemetri verisi DEĞİLDİR.
+
+Mevcut çıktı bir "Operational Energy Simulation / Analytical Estimate"dir:
+- CP-SAT detaylı çizelge zaman damgaları (start_min, end_min, duration_min)
+- İki bileşenli termo-elektrik yük modeli (Base Machine kW + Variable kWh/unit)
+- Makine durum makineleri (Processing, Explicit Setup, Idle, Calendar Off)
+kullanılarak 15 dakikalık dilimlerde analitik olarak integralize edilmiştir.
+
+Üretim Dağıtımı (Production Deployment) Entegrasyon Notu:
+Gerçek fabrika devreye alımlarında, bu simülasyon profili referans baseline
+olarak saklanır; SCADA/IoT edge gateway'lerinden (Modbus TCP / MQTT) gelen
+gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji sapma
+(Energy Variance & OEE-Energy) analizine girdi oluşturur.
+===============================================================================
+"""
+
 import os
 import sqlite3
 import pandas as pd
@@ -267,11 +289,15 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         "kwh_per_unit": round(grand_total_kwh / total_units_produced, 6) if total_units_produced > 0 else 0.0,
         "avg_load_kw": avg_load_kw,
         "peak_load_kw": peak_kw,
-        "load_factor": load_factor
+        "load_factor": load_factor,
+        "data_source": "ANALYTICAL_SIMULATION_ESTIMATE",
+        "telemetry_type": "SYNTHETIC_SCHEDULE_DERIVED",
+        "power_model": "BASE_PLUS_VARIABLE_PHYSICS",
     }
 
     print("=" * 85)
-    print("              AŞAMA 7A: ENERJİ ANALİTİĞİ VE YÜK PROFİLİ RAPORU              ")
+    print(" AŞAMA 7A: OPERASYONEL ENERJİ SİMÜLASYONU VE ANALİTİK TAHMİN RAPORU ")
+    print(" (Operational Energy Simulation / Analytical Estimate - Schedule Derived) ")
     print("=" * 85)
     print(f"Toplam Üretim Miktarı     : {kpi_summary['total_units_produced']:,} adet")
     print(f"Toplam Enerji Tüketimi    : {kpi_summary['grand_total_kwh']:,} kWh")
@@ -309,6 +335,10 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
     kpi_df["run_id"] = run_id
     m_kpi_df["run_id"] = run_id
     profile_df["run_id"] = run_id
+
+    # Madde 23: Sentetik simülasyon ve analitik kestirim ayrımı (KPI & Profil)
+    kpi_df["data_source"] = "ANALYTICAL_SIMULATION_ESTIMATE"
+    profile_df["data_source"] = "ANALYTICAL_SIMULATION_ESTIMATE"
 
     # Normal calisma CSV kayitlari
     kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
