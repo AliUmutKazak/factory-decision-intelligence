@@ -539,12 +539,13 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         )
 
     best_makespan = int(solver.Value(makespan))
-    # Bound hesabı makespan ağırlığına bölünerek ölçeklenir
-    best_bound = int(solver.BestObjectiveBound() / float(SCHEDULING_WEIGHT_MAKESPAN)) if solver.BestObjectiveBound() > 0 else 0
-    gap = ((best_makespan - best_bound) / best_makespan) * 100 if best_makespan > 0 else 0.0
+    total_setup_val = int(solver.Value(total_setup_duration)) if all_setup_terms else 0
+    obj_val = float(solver.ObjectiveValue())
+    best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
+    gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
 
-    print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat)")
-    print(f"Dual Bound: {best_bound} dakika | Optimality Gap: %{gap:.2f}")
+    print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika")
+    print(f"Bileşik Amaç Değeri (Objective): {obj_val:.1f} | Dual Bound: {best_bound:.1f} | Optimality Gap: %{gap:.2f}")
 
     schedule_rows = []
     weekly_accounting_rows = []
@@ -711,6 +712,9 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     obj_val = float(solver.ObjectiveValue()) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
     best_bound = float(solver.BestObjectiveBound()) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
 
+    obj_val = float(solver.ObjectiveValue())
+    best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
+
     # Gap hesabı: (|Objective - Bound| / max(1.0, |Objective|)) * 100
     if obj_val is not None and best_bound is not None:
         optimality_gap = abs(obj_val - best_bound) / max(1.0, abs(obj_val)) * 100.0
@@ -733,7 +737,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "tasks_scheduled": len(sched_df),
         "total_scheduled_units": int(sched_df["production_units"].sum()) if "production_units" in sched_df.columns else 0,
         "week_1_horizon_min": 7 * 24 * 60,
-        "cross_week_spillover_min": max(0, int(obj_val - (7 * 24 * 60))),
+        "cross_week_spillover_min": max(0, int(solver.Value(makespan) - (7 * 24 * 60))),
         "cross_week_execution_allowed": 1,
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
         "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
@@ -741,7 +745,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
         "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
         "mrp_qc_hold_enforced": 1,
-        "objective_makespan": int(solver.Value(makespan)),
+        "objective_makespan_min": int(solver.Value(makespan)),
         "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
         "total_objective_value": float(solver.ObjectiveValue()),
     }]
