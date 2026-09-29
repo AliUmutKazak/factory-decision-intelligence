@@ -59,10 +59,13 @@ def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
     return pd.Series({k: 0.0 for k in default_keys})
 
 def filter_by_active_run(df: pd.DataFrame, active_id: str) -> pd.DataFrame:
-    """Tabloları Aktif Run ID'ye Göre Filtreleme Yardımcısı (Madde 9.4 / Madde 22 fallback)"""
+    """
+    Tabloları Aktif Run ID'ye Göre Filtreleme Yardımcısı (Madde 25: Strict Run Isolation).
+    Eğer aktif run_id'ye ait kayıt yoksa eski veriye (fallback) düşülmez,
+    böylece sessiz veri uyuşmazlığı (DATA MISMATCH) engellenir.
+    """
     if not df.empty and "run_id" in df.columns and active_id and active_id != "N/A":
-        filtered = df[df["run_id"] == active_id]
-        return filtered if not filtered.empty else df
+        return df[df["run_id"] == active_id]
     return df
 
 def determine_system_status(tables):
@@ -84,9 +87,9 @@ def determine_system_status(tables):
             return "METADATA CORRUPTED", "error", f"reports/run_metadata.json okunamadı veya bozuk: {e}"
 
         status_val = str(run_meta.get("status", "")).upper()
-        # Standart Pipeline Durum Kontrolü (COMPLETED, ACTIVE veya geriye dönük SUCCESS)
-        if status_val not in ("COMPLETED", "SUCCESS", "ACTIVE"):
-            return "PIPELINE FAILED", "error", f"Son pipeline çalıştırması geçerli değil (Status: {status_val}, Run: {run_meta.get('run_id')}). Modeller güvensiz."
+        # Madde 27: Backend ACTIVE kontratı ile Dashboard semantik uyumu
+        if status_val != "ACTIVE":
+            return "PIPELINE FAILED", "error", f"Aktif pipeline koşumu doğrulanmadı (Status: {status_val}, Run: {run_meta.get('run_id')}). Yalnızca ACTIVE statülü koşumlar yayına alınır."
 
         # Çözücü durumları geçerli mi?
         opt_metrics = run_meta.get("optimization_metrics", {})
@@ -531,9 +534,10 @@ with tab_schedule:
 # =============================================================
 with tab_sustainability:
     st.subheader("15 Dakikalık Tesis Yük Profili & GHG Karbon Analitiği")
-    prof_df = get_table("energy_profile_15min")
-    scen_df = get_table("carbon_price_scenarios")
-    mach_carb_df = get_table("carbon_machine_kpis")
+    # Madde 26: Sustainability tablolarını aktif run_id ile filtreleme (Active-run isolation)
+    prof_df = get_table("energy_profile_15min", run_id=active_run_id)
+    scen_df = get_table("carbon_price_scenarios", run_id=active_run_id)
+    mach_carb_df = get_table("carbon_machine_kpis", run_id=active_run_id)
 
     if prof_df.empty:
         st.warning("Enerji profil verisi (energy_profile_15min) bulunamadı.")
