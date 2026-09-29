@@ -1,3 +1,28 @@
+"""
+===============================================================================
+CORPORATE CARBON ANALYTICS & GHG PROTOCOL ACCOUNTING ENGINE
+===============================================================================
+Metodolojik Kapsam ve Entegrasyon Mimarisi (Denetim Madde 24):
+Kurumsal karbon ayak izi hesaplaması üç ana fabrika veri katmanına dayanır:
+
+  1. Kapsam 1 (Doğrudan Emisyonlar - Forklift & İç Lojistik):
+     - Endüstriyel Entegrasyon (Production Deployment Activity Drivers):
+       * ERP Akaryakıt İşlemleri (Fuel Transactions / İrsaliye)
+       * Telemetrik Forklift Çalışma Saatleri (Forklift Hours)
+       * MES Malzeme Taşıma Hareketleri (Material Moves / Logistics Trips)
+     - Analitik Taban Kestirimi (Baseline Fallback):
+       * Çizelge makespan süresine endeksli haftalık operasyonel taban tüketim
+         modeli (85 L/hafta takvim çarpanı).
+
+  2. Kapsam 2 (Dolaylı Emisyonlar - Şebeke Elektriği):
+     - Enerji simülasyonu ve akıllı sayaç (Smart Meter / Energy Meter) aktif
+       güç integralleri.
+
+Gerçek Sistem Bağlantı Mimarisi:
+  [Energy Meter] + [Fuel Transactions] + [Production Execution (MES/MRP Moves)]
+===============================================================================
+"""
+
 import os
 import sqlite3
 import pandas as pd
@@ -24,9 +49,10 @@ def compute_carbon_analytics(run_id=None):
     total_units = int(energy_kpi["total_units_produced"])
     makespan_hours = float(energy_kpi.get("makespan_hours", 0.0))
 
-    # 1. Kapsam 1 Doğrudan Emisyonlar (Model B: Lojistik / Üretim Aktivitesine Bağlı Forklift Tüketimi)
-    # Madde 14: Zaman birimi semantiği uyumlandırması (DEFAULT_FORKLIFT_LITERS Litre/hafta cinsindendir)
-    # 1 standart takvim haftası = 168 saat (7 * 24 saat)
+    # 1. Kapsam 1 Doğrudan Emisyonlar (GHG Protocol Scope 1: Lojistik / Forklift Tüketimi)
+    # Madde 24: Activity Driver Modellemesi (Fallback Baseline: 85 L/hafta @ makespan scaling)
+    # Gerçek sistem entegrasyonu: Forklift Hours / Trips / Material Moves / Fuel Transactions
+    activity_driver_label = "SCHEDULE_SCALED_BASELINE (85 L/week fallback)"
     run_weeks = (makespan_hours / 168.0) if makespan_hours > 0 else 1.0
     actual_forklift_liters = (DEFAULT_FORKLIFT_LITERS * run_weeks) if total_units > 0 else 0.0
     scope_1_tco2e = actual_forklift_liters * DIESEL_EMISSION_FACTOR
@@ -66,6 +92,7 @@ def compute_carbon_analytics(run_id=None):
     print("            AŞAMA 7B: KURUMSAL KARBON ANALİTİĞİ (GHG PROTOCOL)            ")
     print("=" * 80)
     print(f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik - {actual_forklift_liters:.1f} L)")
+    print(f"  -> Activity Driver Modeli            : {activity_driver_label}")
     print(f"Kapsam 2 Dolaylı Emisyonlar (Scope 2)   : {scope_2_tco2e:.3f} tCO2e (Şebeke Elektriği)")
     print(f"Toplam Karbon Ayak İzi (Total tCO2e)   : {total_tco2e:.3f} tCO2e")
     print(f"Birim Karbon Yoğunluğu                 : {kgco2e_per_unit:.3f} kgCO2e / adet")
@@ -135,6 +162,8 @@ def compute_carbon_analytics(run_id=None):
     conn.commit()
 
     carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="append")
+    if "data_source" in machine_kpis_df.columns:
+        machine_kpis_df = machine_kpis_df.drop(columns=["data_source"])
     machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="append")
     scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="append")
     conn.close()
