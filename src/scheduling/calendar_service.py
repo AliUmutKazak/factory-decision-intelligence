@@ -3,6 +3,8 @@ MachineCalendarService: Fabrika Takvim ve Vardiya Yönetimi Tekil Gerçeklik Kay
 Scheduler, Energy Analytics, Capacity ve Maintenance modüllerine standart takvim semantiği sağlar.
 """
 
+from typing import Tuple, Dict, Any
+
 
 class MachineCalendarService:
     MINUTES_IN_HOUR = 60
@@ -12,14 +14,17 @@ class MachineCalendarService:
     MINUTES_IN_WEEK = 10080  # 7 * 1440
 
     # Fabrika Vardiya Tanımları (Pzt - Cmt):
-    # Gece OT Penceresi : 00:00 - 08:00 (480 dk)
-    # Düzenli 2 Vardiya : 08:00 - 24:00 (960 dk)
+    # Gece OT Penceresi : 00:00 - 08:00 (480 dk = 8 saat)
+    # Düzenli 2 Vardiya : 08:00 - 24:00 (960 dk = 16 saat)
     # Pazar Günü        : 24 saat Kapalı / Bakım (Hard Closed)
     OT_WINDOW_MINUTES = 8 * 60  # 480 dk
     REGULAR_SHIFT_START_MIN = 8 * 60  # 480 dk
+    REGULAR_HOURS_PER_DAY = 16.0
+    OVERTIME_HOURS_PER_DAY = 8.0
+    WORKING_DAYS_PER_WEEK = 6  # Pzt - Cmt
 
     @classmethod
-    def get_week_and_day(cls, time_min: float) -> tuple[int, int, float]:
+    def get_week_and_day(cls, time_min: float) -> Tuple[int, int, float]:
         """
         Verilen mutlak dakika için (week_index, day_of_week, day_cursor_min) döner.
         day_of_week: 0=Pazartesi, ..., 5=Cumartesi, 6=Pazar
@@ -55,3 +60,18 @@ class MachineCalendarService:
         if day_of_week == 6:  # Pazar kapalı
             return False
         return day_cursor_min < cls.OT_WINDOW_MINUTES
+
+    @classmethod
+    def get_weekly_nominal_hours(cls) -> float:
+        """Haftalık nominal düzenli vardiya saat tavanı: 6 gün * 16 saat = 96.0 saat."""
+        return cls.WORKING_DAYS_PER_WEEK * cls.REGULAR_HOURS_PER_DAY
+
+    @classmethod
+    def get_weekly_max_overtime_hours(cls) -> float:
+        """Haftalık maksimum fazla mesai penceresi: 6 gün * 8 saat = 48.0 saat."""
+        return cls.WORKING_DAYS_PER_WEEK * cls.OVERTIME_HOURS_PER_DAY
+
+    @classmethod
+    def get_effective_capacity_hours(cls, buffer_pct: float = 0.10) -> float:
+        """Güvenlik payı (buffer) düşülmüş net nominal kapasite (örn: 96.0 * 0.90 = 86.4 saat)."""
+        return cls.get_weekly_nominal_hours() * (1.0 - buffer_pct)

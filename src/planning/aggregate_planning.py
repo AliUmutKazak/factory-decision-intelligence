@@ -35,6 +35,7 @@ from src.config import (
     WEEKLY_HOURS_PER_MACHINE,
 )
 from src.utils.db import get_db_connection
+from src.scheduling.calendar_service import MachineCalendarService
 
 OUTPUT_AGGREGATE_PATH = PROCESSED_DATA_DIR / "aggregate_plan.csv"
 OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
@@ -141,7 +142,9 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
         demand[(row["family_id"], row["period_week"])] = row["forecast_batches"]
 
     # Makine Başına Efektif Kapasite (Buffer düşülmüş standart kapasite)
-    effective_hours_per_machine = WEEKLY_HOURS_PER_MACHINE * (1.0 - AGGREGATE_CAPACITY_BUFFER)
+    # SSoT: Kapasite ve fazla mesai MachineCalendarService üzerinden alınır
+    effective_hours_per_machine = MachineCalendarService.get_effective_capacity_hours(AGGREGATE_CAPACITY_BUFFER)
+    max_ot_hours = MachineCalendarService.get_weekly_max_overtime_hours()
 
     model = pulp.LpProblem("Industrial_Aggregate_Planning", pulp.LpMinimize)
 
@@ -156,7 +159,7 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
             "Overtime",
             [(m, t) for m in machines for t in periods],
             lowBound=0,
-            upBound=AGGREGATE_MAX_OVERTIME_HOURS,
+            upBound=max_ot_hours,
             cat="Continuous",
         )
     else:
@@ -167,7 +170,7 @@ def solve_aggregate_lp(sku_weekly, family_weekly, products_df, routing_df, machi
             "Overtime",
             [(m, t) for m in machines for t in periods],
             lowBound=0,
-            upBound=AGGREGATE_MAX_OVERTIME_HOURS,
+            upBound=max_ot_hours,
             cat="Continuous",
         )
 
