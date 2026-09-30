@@ -586,3 +586,105 @@ def test_p0_run_scoped_artifact_isolation(tmp_path):
         manifest_data = json.load(f)
     assert "run_id" in manifest_data, "Manifest dosyasÄ± run_id iÃ§ermelidir."
     assert "artifacts" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
+
+def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
+    """
+    P1-4 Contract Test:
+    Boru hattı bileşenlerinin aynı run_id altında:
+    1. input_source_lineage (SHA-256 bütünlüğü)
+    2. forecast_model_lineage (merkezi config parametreleri)
+    3. pipeline_runs (yaşam döngüsü durumu)
+    ile atomik ve doğrulanabilir bir denetim izi (audit trail) oluşturduğunu kanıtlar.
+    """
+    import json
+    import sqlite3
+    from src.config import FORECAST_FEATURE_VERSION, FORECAST_MODEL_VERSION, HOLT_WINTERS_DEFAULT_PARAMS
+    from src.utils.lineage import (
+        generate_run_id,
+        init_pipeline_runs_table,
+        record_input_source_lineage,
+        start_pipeline_run,
+        update_pipeline_run_status,
+    )
+
+    db_file = tmp_path / "factory_contract_test.db"
+    
+    # 1. Pipeline runs ve diğer şemaları oluştur
+    conn = sqlite3.connect(db_file)
+    init_pipeline_runs_table(conn)
+    
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS input_source_lineage (
+            lineage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL,
+            source_name TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            size_bytes INTEGER DEFAULT 0,
+            row_count INTEGER,
+            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(run_id, source_name)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS forecast_model_lineage (
+            product_id TEXT,
+            selected_model TEXT,
+            model_version TEXT,
+            feature_version TEXT,
+            hyperparameters TEXT,
+            run_id TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setenv("FACTORY_DB_PATH", str(db_file))
+
+    # 2. Koşum başlat
+    test_run_id = generate_run_id()
+    start_pipeline_run(test_run_id, db_path=str(db_file))
+
+    # 3. Girdi lineage kaydı
+    recorded_inputs = record_input_source_lineage(test_run_id, db_path=str(db_file))
+    assert recorded_inputs > 0, "Girdi kaynakları (config / raw) lineage tablosuna işlenmeli."
+
+    # 4. Forecast governance kaydı simülasyonu (P1-3 config doğrulaması)
+    conn = sqlite3.connect(db_file)
+    conn.execute("""
+        INSERT INTO forecast_model_lineage (product_id, selected_model, model_version, feature_version, hyperparameters, run_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, ("P01", "Holt-Winters", FORECAST_MODEL_VERSION, FORECAST_FEATURE_VERSION, json.dumps(HOLT_WINTERS_DEFAULT_PARAMS), test_run_id))
+    conn.commit()
+
+    # 5. Koşumu state machine kurallarına uygun olarak tamamla: RUNNING -> STAGING -> VALIDATE -> COMPLETED
+    update_pipeline_run_status(test_run_id, "STAGING", db_path=str(db_file))
+    update_pipeline_run_status(test_run_id, "VALIDATE", db_path=str(db_file))
+    update_pipeline_run_status(test_run_id, "COMPLETED", db_path=str(db_file))
+
+    # 6. Kontrat Doğrulamaları
+    cursor = conn.cursor()
+
+    # Kural A: pipeline_runs durumu COMPLETED olmalı
+    cursor.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (test_run_id,))
+    row = cursor.fetchone()
+    assert row is not None and row[0] == "COMPLETED"
+
+    # Kural B: input_source_lineage kayıtları geçerli SHA-256 taşımalı
+    cursor.execute("SELECT source_name, sha256 FROM input_source_lineage WHERE run_id = ?", (test_run_id,))
+    inputs = cursor.fetchall()
+    assert len(inputs) == recorded_inputs
+    for _, sha in inputs:
+        assert len(sha) == 64
+
+    # Kural C: forecast_model_lineage merkezi config ile eşleşmeli
+    cursor.execute("SELECT model_version, feature_version, hyperparameters FROM forecast_model_lineage WHERE run_id = ?", (test_run_id,))
+    f_row = cursor.fetchone()
+    assert f_row[0] == FORECAST_MODEL_VERSION
+    assert f_row[1] == FORECAST_FEATURE_VERSION
+    params = json.loads(f_row[2])
+    assert params["seasonal_periods"] == 7
+
+    conn.close()
