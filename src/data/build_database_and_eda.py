@@ -431,6 +431,25 @@ def initialize_database(force_recreate=False, run_id=None):
     """)
     conn.commit()
 
+    # P1-1: ERP Mapping Table (External System Reconciliation)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS erp_mapping (
+            mapping_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_type TEXT NOT NULL,          -- 'SKU', 'MACHINE', 'RAW_MATERIAL'
+            internal_id TEXT NOT NULL,          -- 'P01', 'M01', 'RM_STEEL_01'
+            erp_system TEXT NOT NULL,           -- 'SAP_S4HANA', 'IFS_APPS'
+            erp_code TEXT NOT NULL,             -- 'MAT-100234', 'WC-CNC-01'
+            description TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(entity_type, erp_system, erp_code),
+            UNIQUE(entity_type, erp_system, internal_id)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_erp_mapping_lookup ON erp_mapping(entity_type, internal_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_erp_mapping_reverse ON erp_mapping(erp_system, erp_code)")
+
     # Master-data bütünlük denetimi (Fail-Fast)
     validate_master_data(loaded_data)
     # Veritabanını temizlerken ve master datayı yeniden yüklerken foreign key kontrollerini
@@ -465,6 +484,36 @@ def initialize_database(force_recreate=False, run_id=None):
             initial_states,
         )
         conn.commit()
+
+    # -------------------------------------------------------------------------
+    # P1-1: ERP Mapping Seed Data (Cold-Start & External Reconciliation)
+    # -------------------------------------------------------------------------
+    cursor.execute("SELECT COUNT(*) FROM erp_mapping")
+    existing_erp_count = cursor.fetchone()[0]
+
+    if existing_erp_count == 0 or force_recreate:
+        erp_seed_data = [
+            # Ürünler (SKU)
+            ('SKU', 'P01', 'SAP_S4HANA', 'MAT-10001', 'Endüstriyel Vana Gövdesi DN50'),
+            ('SKU', 'P02', 'SAP_S4HANA', 'MAT-10002', 'Flanş Bağlantı Parçası F10'),
+            ('SKU', 'P03', 'SAP_S4HANA', 'MAT-10003', 'Hidrolik Silindir Mili 25mm'),
+            ('SKU', 'P04', 'SAP_S4HANA', 'MAT-10004', 'Pnömatik Dağıtıcı Blok'),
+            ('SKU', 'P05', 'SAP_S4HANA', 'MAT-10005', 'Hassas Dişli Çark Modül 2'),
+            # Makineler (Work Centers)
+            ('MACHINE', 'M01', 'SAP_S4HANA', 'WC-CNC-5AX', '5 Eksen CNC İşleme Merkezi'),
+            ('MACHINE', 'M02', 'SAP_S4HANA', 'WC-LATHE-01', 'CNC Torna Tezgahı'),
+            ('MACHINE', 'M03', 'SAP_S4HANA', 'WC-MILL-02', 'Dikey İşleme Merkezi'),
+            ('MACHINE', 'M04', 'SAP_S4HANA', 'WC-GRIND-01', 'Silindirik Taşlama'),
+            # Hammaddeler (Raw Materials)
+            ('RAW_MATERIAL', 'RM_STEEL_01', 'SAP_S4HANA', 'RAW-ST52-01', 'Çelik Çubuk ST-52'),
+            ('RAW_MATERIAL', 'RM_ALUM_02', 'SAP_S4HANA', 'RAW-AL6061', 'Alüminyum Kütük 6061'),
+            ('RAW_MATERIAL', 'RM_BRASS_01', 'SAP_S4HANA', 'RAW-MS58', 'Pirinç Profil MS-58')
+        ]
+        cursor.executemany("""
+            INSERT OR REPLACE INTO erp_mapping (entity_type, internal_id, erp_system, erp_code, description)
+            VALUES (?, ?, ?, ?, ?)
+        """, erp_seed_data)
+        conn.commit()    
 
     # Madde 31: machine_calendar tablosu boşsa machines verisinden tohumla
     cursor.execute("SELECT COUNT(*) FROM machine_calendar")
