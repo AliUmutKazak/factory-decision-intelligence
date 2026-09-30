@@ -515,6 +515,23 @@ def initialize_database(force_recreate=False, run_id=None):
         """, erp_seed_data)
         conn.commit()    
 
+    # P1-2: Input Source Lineage Tablosu (Audit & Provenance)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS input_source_lineage (
+            lineage_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL,
+            source_name TEXT NOT NULL,
+            source_type TEXT NOT NULL,          -- 'RAW_FILE', 'FIXTURE', 'MASTER_DATA'
+            source_path TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            size_bytes INTEGER DEFAULT 0,
+            row_count INTEGER,
+            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(run_id, source_name)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_input_lineage_run ON input_source_lineage(run_id)")
+
     # Madde 31: machine_calendar tablosu boşsa machines verisinden tohumla
     cursor.execute("SELECT COUNT(*) FROM machine_calendar")
     if cursor.fetchone()[0] == 0:
