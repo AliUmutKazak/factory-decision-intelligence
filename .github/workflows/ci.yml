@@ -1,4 +1,4 @@
-name: Factory Decision Intelligence CI (Quality Gate)
+name: Industrial Quality Gate & Verification Matrix
 
 on:
   push:
@@ -25,7 +25,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install ruff
+        pip install ruff pytest
+
+    - name: Ensure Directory Structure
+      run: |
+        mkdir -p data/processed reports artifacts/reference
 
     - name: "Quality Gate 1: Static Code Analysis (Ruff)"
       run: |
@@ -39,7 +43,10 @@ jobs:
       run: |
         python -c "
         import sqlite3
-        conn = sqlite3.connect('data/factory.db')
+        from pathlib import Path
+        db_path = Path('data/factory.db')
+        assert db_path.exists(), f'{db_path} does not exist!'
+        conn = sqlite3.connect(db_path)
         cur = conn.cursor()
         required_tables = ['machines', 'products', 'materials', 'bom', 'routing', 'machine_state', 'machine_state_snapshot', 'machine_calendar', 'pipeline_runs']
         cur.execute(\"SELECT name FROM sqlite_master WHERE type='table'\")
@@ -54,10 +61,7 @@ jobs:
     - name: "Quality Gate 4: Artifact & Report Manifest Validation"
       run: |
         python -c "
-        import os
         from pathlib import Path
-        output_dir = Path('data/processed')
-        # Pipeline çıktısı olan temel dosyaları veya database varlığını teyit et
         assert Path('data/factory.db').exists(), 'data/factory.db database missing!'
         print('Artifact manifest validation PASSED.')
         "
