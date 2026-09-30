@@ -101,3 +101,5 @@ INITIAL_MACHINE_STATE = {
     "M02": "P02",
     "M03": "P04",
 }
+# P2 Scenario Parameters
+DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH = 0.18  # Endüstriyel elektrik baz fiyatı (€/kWh)

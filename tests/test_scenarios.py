@@ -181,3 +181,64 @@ def test_scenario_capacity_stress(isolated_env, monkeypatch):
     assert "max_machine_overtime_hours" in agg_plan.columns
     assert agg_plan["max_machine_overtime_hours"].max() > 0.0
     assert len(sched) > 0
+
+def test_scenario_engine_tradeoff_matrix(isolated_env):
+    """
+    P2-1 Contract Test:
+    What-If Karar Destek Motorunun 7 senaryo ve beklenen metrikleri
+    eksiksiz ürettiğini ve şok yönlülük kurallarını sağladığını doğrular.
+    """
+    from src.scenarios.scenario_engine import ScenarioEngine
+
+    engine = ScenarioEngine(db_path=isolated_env["db_path"])
+    df = engine.run_all_scenarios()
+
+    # 1. Şok Kapsama Kontrolü (Görseldeki 7 Senaryo)
+    expected_scenarios = [
+        "BASELINE",
+        "+20% DEMAND",
+        "-10% CAPACITY",
+        "+25% ENERGY COST",
+        "+50 €/tCO2",
+        "M01 FAILURE",
+        "RAW MATERIAL DELAY",
+    ]
+    assert list(df["Scenario"]) == expected_scenarios
+
+    # 2. Metrik Kapsama Kontrolü
+    required_cols = [
+        "Makespan (h)",
+        "OT (%)",
+        "Inventory Cost (€)",
+        "Backlog (units)",
+        "Energy Cost (€)",
+        "Carbon (tCO2e)",
+        "Carbon Cost (€)",
+        "Total Cost (€)",
+    ]
+    for col in required_cols:
+        assert col in df.columns
+
+    # 3. Yönsel Tutarlılık (Monotonicity & Sensitivity) Kontrolleri
+    baseline = df.loc[df["Scenario"] == "BASELINE"].iloc[0]
+    demand_shock = df.loc[df["Scenario"] == "+20% DEMAND"].iloc[0]
+    m01_failure = df.loc[df["Scenario"] == "M01 FAILURE"].iloc[0]
+    energy_shock = df.loc[df["Scenario"] == "+25% ENERGY COST"].iloc[0]
+    carbon_shock = df.loc[df["Scenario"] == "+50 €/tCO2"].iloc[0]
+
+    # Talep artışı enerji ve karbonu artırmalı, OT'yi düşürmeli
+    assert demand_shock["Energy Cost (€)"] > baseline["Energy Cost (€)"]
+    assert demand_shock["Carbon (tCO2e)"] > baseline["Carbon (tCO2e)"]
+    assert demand_shock["OT (%)"] < baseline["OT (%)"]
+
+    # Makine arızası makespan'i en çok zorlayan senaryolardan biri olmalı
+    assert m01_failure["Makespan (h)"] > baseline["Makespan (h)"]
+    assert m01_failure["Total Cost (€)"] > baseline["Total Cost (€)"]
+
+    # Enerji şoku sadece enerji maliyetini etkilemeli, makespan sabit kalmalı
+    assert energy_shock["Energy Cost (€)"] > baseline["Energy Cost (€)"]
+    assert energy_shock["Makespan (h)"] == baseline["Makespan (h)"]
+
+    # Karbon vergisi artışı sadece karbon maliyetini yükseltmeli
+    assert carbon_shock["Carbon Cost (€)"] > baseline["Carbon Cost (€)"]
+    assert carbon_shock["Carbon (tCO2e)"] == baseline["Carbon (tCO2e)"]
