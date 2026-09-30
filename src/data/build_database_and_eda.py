@@ -532,6 +532,29 @@ def initialize_database(force_recreate=False, run_id=None):
     """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_input_lineage_run ON input_source_lineage(run_id)")
 
+    # P2-2: MES Production Actuals & Execution Tracking (Closed-Loop Replanning)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mes_production_actuals (
+            actual_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT,
+            task_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            machine_id TEXT NOT NULL,
+            planned_start_hour REAL,
+            planned_end_hour REAL,
+            actual_start_hour REAL NOT NULL,
+            actual_end_hour REAL NOT NULL,
+            actual_units INTEGER NOT NULL,
+            scrap_units INTEGER DEFAULT 0,
+            downtime_hours REAL DEFAULT 0.0,
+            status TEXT DEFAULT 'COMPLETED',
+            recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (run_id) REFERENCES pipeline_runs(run_id)
+        )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mes_actuals_run ON mes_production_actuals(run_id)")
+    conn.commit()
+
     # Madde 31: machine_calendar tablosu boşsa machines verisinden tohumla
     cursor.execute("SELECT COUNT(*) FROM machine_calendar")
     if cursor.fetchone()[0] == 0:
