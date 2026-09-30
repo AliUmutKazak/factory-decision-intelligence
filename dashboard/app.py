@@ -249,13 +249,14 @@ sched_df = filter_by_active_run(raw_tables["production_schedule"], run_id_val)
 agg_df = filter_by_active_run(raw_tables["aggregate_plan"], run_id_val)
 mach_cap_df = filter_by_active_run(raw_tables["machine_capacity_plan"], run_id_val)
 
-tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_mes = st.tabs([
-    "📊 Yönetici Özeti",
-    "📈 Talep Tahmini & Doğrulama",
-    "🎯 Taktik Planlama & S&OP",
-    "⏱️ Detaylı Çizelgeleme (Gantt)",
-    "🌱 Sürdürülebilirlik & Enerji",
-    "🏭 MES & Kapalı Çevrim Karar Desteği"
+tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_scenarios, tab_mes = st.tabs([
+    "📊 Genel Özet",
+    "📈 Talep Tahmini",
+    "📦 Agrega Planlama (LP/MRP)",
+    "⚙️ Detay Çizelgeleme (CP-SAT)",
+    "🌱 Sürdürülebilirlik & Karbon",
+    "🎯 Senaryo & Karar Destek",
+    "🏭 MES & Kapalı Çevrim",
 ])
 
 # =============================================================
@@ -535,9 +536,9 @@ with tab_schedule:
 with tab_sustainability:
     st.subheader("15 Dakikalık Tesis Yük Profili & GHG Karbon Analitiği")
     # Madde 26: Sustainability tablolarını aktif run_id ile filtreleme (Active-run isolation)
-    prof_df = get_table("energy_profile_15min", run_id=active_run_id)
-    scen_df = get_table("carbon_price_scenarios", run_id=active_run_id)
-    mach_carb_df = get_table("carbon_machine_kpis", run_id=active_run_id)
+    prof_df = get_table("energy_profile_15min", run_id=run_id_val)
+    scen_df = get_table("carbon_price_scenarios", run_id=run_id_val)
+    mach_carb_df = get_table("carbon_machine_kpis", run_id=run_id_val)
 
     if prof_df.empty:
         st.warning("Enerji profil verisi (energy_profile_15min) bulunamadı.")
@@ -586,9 +587,53 @@ with tab_sustainability:
             unit_cost_str = f"€{sim_exposure / total_units:.4f} / adet" if total_units > 0 else "N/A"
             st.metric("Birim Ürün Karbon Maliyeti", unit_cost_str)
 
+# =========================================================
+# 6. SEKME: ÇOK AMAÇLI SENARYO & KARAR DESTEK MATRİSİ
+# =========================================================
+with tab_scenarios:
+    st.subheader("🎯 Çok Amaçlı Senaryo & Karar Destek Matrisi (Trade-Off Engine)")
+    st.markdown(
+        "Farklı makro ve operasyonel şokların (**Talep Artışı, Tezgâh Arızası, Enerji Tarifesi Şoku vb.**) "
+        "üretim süresi (Makespan), fazla mesai, stok, enerji, karbon ve toplam maliyet üzerindeki etkilerini simüle eder."
+    )
+
+    try:
+        from src.scenarios.scenario_engine import ScenarioEngine
+        engine = ScenarioEngine(db_path=DB_PATH)
+        tradeoff_df = engine.run_all_scenarios()
+        
+        if not tradeoff_df.empty:
+            c1, c2, c3 = st.columns(3)
+            best_cost_row = tradeoff_df.loc[tradeoff_df["Total Cost (€)"].idxmin()]
+            worst_cost_row = tradeoff_df.loc[tradeoff_df["Total Cost (€)"].idxmax()]
+            baseline_match = tradeoff_df[tradeoff_df["Scenario"] == "Baseline"]
+            baseline_row = baseline_match.iloc[0] if not baseline_match.empty else best_cost_row
+
+            c1.metric("📌 Baz Senaryo Maliyeti", f"{baseline_row['Total Cost (€)']:,.2f} €")
+            c2.metric("🟢 En Düşük Maliyetli Senaryo", f"{best_cost_row['Scenario']}", f"{best_cost_row['Total Cost (€)']:,.2f} €")
+            c3.metric("🔴 En Yüksek Riskli Senaryo", f"{worst_cost_row['Scenario']}", f"{worst_cost_row['Total Cost (€)']:,.2f} €")
+
+            st.markdown("### 📊 Çok Kriterli Senaryo Karşılaştırma Matrisi")
+            st.dataframe(
+                tradeoff_df.style.format({
+                    "Makespan (h)": "{:.1f}",
+                    "OT (%)": "{:.1f}%",
+                    "Inventory Cost (€)": "€{:,.2f}",
+                    "Energy Cost (€)": "€{:,.2f}",
+                    "Carbon (tCO2e)": "{:.3f}",
+                    "Carbon Cost (€)": "€{:,.2f}",
+                    "Total Cost (€)": "€{:,.2f}",
+                }).highlight_min(subset=["Total Cost (€)"], color="#2e7d32")
+                  .highlight_max(subset=["Total Cost (€)"], color="#c62828"),
+                use_container_width=True
+            )
+        else:
+            st.warning("Senaryo sonuçları boş döndü.")
+    except Exception as e:
+        st.error(f"Senaryo motoru hatası: {e}")
 
 # =============================================================
-# 6. SEKME: MES CANLI YÜRÜTME & KAPALI ÇEVRİM KARAR DESTEĞİ
+# 7. SEKME: MES CANLI YÜRÜTME & KAPALI ÇEVRİM KARAR DESTEĞİ
 # =============================================================
 with tab_mes:
     st.subheader("🏭 MES Sahadan Geribildirim & Dinamik Yeniden Çizelgeleme Kokpiti")
@@ -600,9 +645,28 @@ with tab_mes:
     col_m1, col_m2 = st.columns([1.2, 1])
 
     with col_m1:
+        st.markdown("### 🔄 Kapalı Çevrim Fiili Durum & Tolerans Analizi")
+        try:
+            from src.scenarios.closed_loop import ClosedLoopEngine
+            cl_engine = ClosedLoopEngine(db_path=DB_PATH)
+            decision = cl_engine.evaluate_variance_and_trigger(run_id_val)
+
+            kpi1, kpi2, kpi3 = st.columns(3)
+            kpi1.metric("Zaman Kayması (Slippage)", f"%{decision.schedule_slippage_pct:.1f}")
+            kpi2.metric("Toplam Gecikme", f"{decision.total_delay_hours:.1f} sa")
+            kpi3.metric("Hurda / Scrap Oranı", f"%{decision.scrap_rate_pct:.1f}")
+
+            if decision.requires_replanning:
+                st.error(f"🚨 **DİNAMİK YENİDEN PLANLAMA TETİKLENDİ:** {decision.trigger_reason}")
+            else:
+                st.success("✅ **Üretim Toleranslar Dahilinde:** Yeniden planlama gerekmiyor.")
+        except Exception as e:
+            st.caption(f"Kapalı çevrim analiz durumu: {e}")
+
+        st.markdown("---")
+        
         st.markdown("### 📋 Canlı İş Emri Takip Matrisi (`mes_order_tracking`)")
         tracking_df = get_table("mes_order_tracking", run_id_val)
-        
         if tracking_df.empty:
             st.info("Henüz aktif run için MES takip kaydı yok. Aşağıdaki butondan çizelgeyi MES takip tablosuna aktarabilirsiniz.")
             if st.button("🔄 Aktif Çizelgeyi MES Takibine Yükle"):
