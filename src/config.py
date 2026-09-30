@@ -60,6 +60,18 @@ INITIAL_INVENTORY = {"RAW_STEEL_A": 4500.0, "RAW_STEEL_B": 8000.0, "RAW_ALLOY_RO
 PLANNING_HORIZON_WEEKS = 4  # 4 haftalık taktik planlama ufku
 FORECAST_HORIZON_DAYS = PLANNING_HORIZON_WEEKS * 7  # 28 günlük günlük tahmin ufku
 
+# --- Demand Forecast & Governance Configuration ---
+FORECAST_MODEL_VERSION = os.getenv("FORECAST_MODEL_VERSION", "v3.0-rolling-origin-cv")
+FORECAST_FEATURE_VERSION = os.getenv("FORECAST_FEATURE_VERSION", "v1.2-lag-calendar")
+
+# Holt-Winters Varsayılan Hiperparametreleri
+HOLT_WINTERS_DEFAULT_PARAMS = {
+    "trend": "add",
+    "seasonal": "add",
+    "seasonal_periods": 7,
+    "initialization_method": "estimated",
+}
+
 # 6. Taktik Toplu Planlama (Aggregate Planning - LP) Parametreleri
 UNITS_PER_BATCH = 25  # 1 Üretim Kolisi / Lot = 25 Perakende Adet
 AGGREGATE_CAPACITY_BUFFER = 0.10  # %10 Planlı duruş / bakım kapasite tamponu

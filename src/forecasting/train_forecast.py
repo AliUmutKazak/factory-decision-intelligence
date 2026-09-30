@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 
 import lightgbm as lgb
@@ -8,7 +8,10 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from src.config import (
     DB_PATH,
+    FORECAST_FEATURE_VERSION,
     FORECAST_HORIZON_DAYS,
+    FORECAST_MODEL_VERSION,
+    HOLT_WINTERS_DEFAULT_PARAMS,
     PROCESSED_DATA_DIR,
 )
 from src.utils.db import get_db_connection
@@ -286,12 +289,7 @@ def run_forecast_benchmark(run_id=None):
                 "cv_folds": num_folds,
             }
         elif best_name == "Holt-Winters":
-            model_params = {
-                "trend": "add",
-                "seasonal": "add",
-                "seasonal_periods": 7,
-                "initialization_method": "estimated",
-            }
+            model_params = dict(HOLT_WINTERS_DEFAULT_PARAMS)
         else:
             model_params = {**cv_spec, "model_family": best_name}
 
@@ -299,8 +297,8 @@ def run_forecast_benchmark(run_id=None):
             {
                 "product_id": pid,
                 "selected_model": best_name,
-                "model_version": "v3.0-rolling-origin-cv",
-                "feature_version": "v1.2-lag-calendar",
+                "model_version": FORECAST_MODEL_VERSION,
+                "feature_version": FORECAST_FEATURE_VERSION,
                 "forecast_origin": str(pdf["order_date"].max())[:10],
                 "training_start": str(pdf["order_date"].min())[:10],
                 "training_end": str(pdf["order_date"].max())[:10],
