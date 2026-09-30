@@ -147,7 +147,10 @@ class ClosedLoopRescheduler:
         scrap_deviation = actual_scrap_rate - planned_scrap_rate
         total_time_deviation = runtime_deviation + downtime_deviation
 
-        replan_required = total_time_deviation > tolerance_delay_min or scrap_deviation > scrap_tolerance
+        replan_required = (
+            total_time_deviation > tolerance_delay_min
+            or scrap_deviation > scrap_tolerance
+        )
 
         reschedule_result = None
         if replan_required and total_time_deviation > 0:
