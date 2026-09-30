@@ -539,3 +539,50 @@ def test_validation_gate_blocks_overlapping_physics(tmp_path):
 
     with pytest.raises(ValueError, match="Fiziksel Kısıt İhlali"):
         validate_pipeline_run("RUN_TEST", db_path=str(db_path))
+
+def test_p0_run_scoped_artifact_isolation(tmp_path):
+    """
+    P0-3 Regresyon Testi:
+    Her pipeline koÅŸumunun artifacts/runs/{run_id} altÄ±nda tÃ¼m DB, CSV ve
+    manifest dosyalarÄ±yla tam izole bir paket oluÅŸturduÄŸunu doÄŸrular.
+    """
+    from pathlib import Path
+    import json
+
+    runs_root = Path("artifacts/runs")
+    if not runs_root.exists() or not list(runs_root.iterdir()):
+        pytest.skip("HenÃ¼z hiÃ§bir run paketi oluÅŸturulmamÄ±ÅŸ.")
+
+    # En son oluÅŸturulan run klasÃ¶rÃ¼nÃ¼ bul
+    latest_run_dir = max(runs_root.iterdir(), key=lambda p: p.stat().st_mtime)
+    assert latest_run_dir.is_dir(), "Run artefakt hedefi bir klasÃ¶r olmalÄ±dÄ±r."
+
+    # 1. factory.db varlÄ±k ve bÃ¼yÃ¼klÃ¼k kontrolÃ¼
+    isolated_db = latest_run_dir / "factory.db"
+    assert isolated_db.exists(), "factory.db izole run klasÃ¶rÃ¼nde bulunamadÄ±."
+    assert isolated_db.stat().st_size > 0, "factory.db boÅŸ olamaz."
+
+    # 2. Kritik operasyonel CSV'lerin izolasyon kontrolÃ¼
+    expected_csvs = [
+        "aggregate_plan.csv",
+        "forecast_demand.csv",
+        "mrp_plan.csv",
+        "production_schedule.csv",
+        "energy_kpis.csv",
+        "carbon_analytics.csv",
+    ]
+    for csv_name in expected_csvs:
+        csv_file = latest_run_dir / csv_name
+        assert csv_file.exists(), f"{csv_name} izole run paketinde eksik."
+        assert csv_file.stat().st_size > 0, f"{csv_name} boÅŸ olamaz."
+
+    # 3. Manifest ve Metadata mÃ¼hÃ¼r kontrolÃ¼
+    assert (latest_run_dir / "run_metadata.json").exists(), "run_metadata.json eksik."
+    assert (latest_run_dir / "run_manifest.json").exists(), "run_manifest.json eksik."
+    assert (latest_run_dir / "manifest.json").exists(), "manifest.json eksik."
+
+    # Manifest iÃ§eriÄŸinin JSON olarak geÃ§erliliÄŸini sÄ±na
+    with open(latest_run_dir / "manifest.json", "r", encoding="utf-8") as f:
+        manifest_data = json.load(f)
+    assert "run_id" in manifest_data, "Manifest dosyasÄ± run_id iÃ§ermelidir."
+    assert "artifacts" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
