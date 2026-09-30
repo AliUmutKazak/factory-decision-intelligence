@@ -172,6 +172,40 @@ def run_end_to_end_pipeline():
                     for item in staging_reports.glob("*.*"):
                         shutil.copy2(item, canonical_reports / item.name)
 
+                # ---------------------------------------------------------
+                # P0-3: Production Artifact Isolation (Run-Scoped Archive)
+                # ---------------------------------------------------------
+                run_artifacts_dir = base_dir / "artifacts" / "runs" / run_id
+                run_artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+                # 1. Staging DB kopyasını run klasörüne factory.db olarak mühürle
+                if staging_db.exists():
+                    shutil.copy2(staging_db, run_artifacts_dir / "factory.db")
+                elif canonical_db.exists():
+                    shutil.copy2(canonical_db, run_artifacts_dir / "factory.db")
+
+                # 2. Processed CSV çıktılarını topla (staging veya canonical)
+                source_processed = staging_processed if any(staging_processed.glob("*.csv")) else canonical_processed
+                if source_processed.exists():
+                    for item in source_processed.glob("*.csv"):
+                        shutil.copy2(item, run_artifacts_dir / item.name)
+
+                # 3. Reports ve manifest çıktılarını topla (staging veya canonical)
+                source_reports = staging_reports if any(staging_reports.glob("*.json")) else canonical_reports
+                if source_reports.exists():
+                    for item in source_reports.glob("*.*"):
+                        shutil.copy2(item, run_artifacts_dir / item.name)
+                        if item.name == "run_manifest.json":
+                            shutil.copy2(item, run_artifacts_dir / "manifest.json")
+
+                # run_manifest.json canonical reports içindeyse doğrudan garantiye al
+                manifest_file = canonical_reports / "run_manifest.json"
+                if manifest_file.exists():
+                    shutil.copy2(manifest_file, run_artifacts_dir / "run_manifest.json")
+                    shutil.copy2(manifest_file, run_artifacts_dir / "manifest.json")
+
+                print(f"[AUDIT] P0-3 Run Isolation tamamlandı: {run_artifacts_dir}")
+
                 promoted = True
                 break
             except PermissionError:
