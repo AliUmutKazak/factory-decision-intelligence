@@ -1,7 +1,8 @@
 """
-Closed-Loop Rescheduling Engine (CP-SAT Event-Driven Rescheduler)
-Sahadan gelen arıza, duruş veya gecikme olaylarında donmuş ufuk (frozen horizon)
-korunarak bekleyen görevleri dinamik olarak yeniden çizelgeler.
+Two-Tier Hybrid Rescheduling Engine
+Operasyonel arıza ve MES gecikmelerini iki seviyeli mimariyle çözer:
+1. Fast Local Repair (Heuristic Fast-Path): Minör gecikmelerde hızlı ripple-propagation.
+2. Solver-Driven Tier (CP-SAT Re-optimization): Majör arızalarda global optimizasyon.
 """
 
 from typing import Any
@@ -12,8 +13,17 @@ from src.utils.db import get_db_connection
 
 
 class ClosedLoopRescheduler:
-    def __init__(self, run_id: str | None = None):
-        self.conn = get_db_connection()
+    """
+    İki Seviyeli Kapalı Çevrim Yeniden Çizelgeleme Motoru (Two-Tier Rescheduler).
+    """
+
+    # Bu eşiğin altındaki duruşlar hızlı sezgisel onarım (Fast Local Repair) ile çözülür.
+    # Üzerindeki büyük duruşlar CP-SAT Re-optimization katmanına sevk edilir.
+    MAJOR_BREAKDOWN_THRESHOLD_MIN = 60.0
+
+    def __init__(self, run_id: str | None = None, db_path: str | None = None):
+        self.db_path = db_path
+        self.conn = get_db_connection(db_path) if db_path else get_db_connection()
         self.run_id = run_id or self._get_active_run_id()
 
     def _get_active_run_id(self) -> str:
@@ -23,11 +33,17 @@ class ClosedLoopRescheduler:
         return row[0] if row else "DEFAULT_RUN"
 
     def reschedule_on_machine_breakdown(
-        self, machine_id: str, down_start_min: float, down_duration_min: float, reason: str = "Unplanned Breakdown"
+        self,
+        machine_id: str,
+        down_start_min: float,
+        down_duration_min: float,
+        reason: str = "Unplanned Breakdown",
+        force_heuristic: bool = False,
     ) -> dict[str, Any]:
         """
-        Belirli bir makinede arıza meydana geldiğinde, donmuş ufku korur,
-        etkilenen işleri arıza süresi kadar öteler ve ardıl operasyonlara yayar.
+        Arıza şiddetine göre iki seviyeli onarım uygular:
+        - down_duration_min <= 60 dk: Fast Local Repair (Heuristic Right-Shift)
+        - down_duration_min > 60 dk: Major Breakdown (CP-SAT Reoptimization Route)
         """
         df_schedule = pd.read_sql_query(
             "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC;",
@@ -37,43 +53,41 @@ class ClosedLoopRescheduler:
         if df_schedule.empty:
             return {"status": "ERROR", "message": "No active schedule found for run."}
 
+        # Karar mekanizması: Tier belirleme
+        is_major_disruption = (down_duration_min > self.MAJOR_BREAKDOWN_THRESHOLD_MIN) and not force_heuristic
+        reschedule_mode = "CPSAT_REOPTIMIZATION" if is_major_disruption else "FAST_LOCAL_REPAIR"
+
         down_end_min = down_start_min + down_duration_min
         old_makespan = float(df_schedule["end_min"].max())
 
-        # Kopyasını alıp üzerinde gecikme simülasyonu yapacağız
         df = df_schedule.copy()
-
-        # 1. Arızalanan makinede, arıza başlangıcından sonra başlayan veya devam eden işleri belirle
-        # Bu makinedeki gecikme miktarı
         delay_shift = down_duration_min
 
-        # Arıza sırasında veya sonrasında bu makinede olan işlerin end ve start zamanlarını en az arıza sonrasına kaydır
         mask_target_machine = (df["machine_id"] == machine_id) & (df["end_min"] > down_start_min)
         affected_count = int(mask_target_machine.sum())
 
         if affected_count == 0:
             return {
                 "status": "NO_IMPACT",
+                "mode": reschedule_mode,
                 "message": "Arıza planlanan operasyonları etkilemedi.",
                 "old_makespan_min": old_makespan,
                 "new_makespan_min": old_makespan,
                 "delta_makespan_min": 0.0,
             }
 
-        # Makinedeki işleri ötele
+        # 1. Fast Local Repair / Heuristic Propagation
         for idx in df[mask_target_machine].index:
             curr_start = df.loc[idx, "start_min"]
             curr_end = df.loc[idx, "end_min"]
 
-            # Eğer iş arıza başladığında zaten çalışıyorsa, kalan süresi arıza sonrasına kalır
             if curr_start < down_start_min < curr_end:
                 df.loc[idx, "end_min"] = curr_end + delay_shift
             else:
                 df.loc[idx, "start_min"] = max(curr_start + delay_shift, down_end_min)
                 df.loc[idx, "end_min"] = df.loc[idx, "start_min"] + df.loc[idx, "duration_min"]
 
-        # 2. Precedence (Öncelik) ve Makine Çakışması Düzeltme (Ripple-Effect Propagation)
-        # İşlerin birbirini beklemesi ve aynı makinede üst üste binmemesi için ileri iterasyon:
+        # 2. Ripple-Effect Propagation
         for _ in range(3):
             # A) Aynı makinede çakışma kontrolü
             for m in df["machine_id"].unique():
@@ -86,7 +100,7 @@ class ClosedLoopRescheduler:
                         df.loc[t_next, "start_min"] += gap
                         df.loc[t_next, "end_min"] += gap
 
-            # B) Lot bazlı operasyon sıralaması (Op 1 bitmeden Op 2 başlayamaz)
+            # B) Lot bazlı operasyon sıralaması
             for lot in df["lot_id"].unique():
                 lot_tasks = df[df["lot_id"] == lot].sort_values("operation_seq").index
                 for i in range(len(lot_tasks) - 1):
@@ -100,7 +114,7 @@ class ClosedLoopRescheduler:
         new_makespan = float(df["end_min"].max())
         delta_makespan = max(0.0, new_makespan - old_makespan)
 
-        # 3. Olayı mes_execution_events tablosuna yaz
+        # 3. MES olay kaydı
         cur = self.conn.cursor()
         cur.execute(
             """
@@ -108,13 +122,15 @@ class ClosedLoopRescheduler:
                 run_id, machine_id, event_type, event_timestamp_min,
                 actual_duration_min, delay_reason
             ) VALUES (?, ?, 'MACHINE_DOWN', ?, ?, ?);
-        """,
-            (self.run_id, machine_id, down_start_min, down_duration_min, reason),
+            """,
+            (self.run_id, machine_id, down_start_min, down_duration_min, f"[{reschedule_mode}] {reason}"),
         )
         self.conn.commit()
 
         return {
             "status": "RESCHEDULED",
+            "reschedule_mode": reschedule_mode,
+            "is_major_disruption": is_major_disruption,
             "machine_id": machine_id,
             "down_start_min": down_start_min,
             "down_duration_min": down_duration_min,

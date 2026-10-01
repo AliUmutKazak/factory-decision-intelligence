@@ -49,3 +49,34 @@ def test_reschedule_event_persisted_to_db():
     count_after = cur.fetchone()[0]
 
     assert count_after == count_before + 1, "Arıza olayı mes_execution_events tablosuna kaydedilmedi."
+
+def test_two_tier_hybrid_rescheduling_modes():
+    """
+    Kısa süreli arızalarda (<= 60 dk) FAST_LOCAL_REPAIR,
+    büyük duruşlarda (> 60 dk) CPSAT_REOPTIMIZATION modunun tetiklendiğini doğrular.
+    """
+    rescheduler = ClosedLoopRescheduler()
+
+    # 1. Küçük gecikme (15 dk) -> Fast-path heuristic
+    result_minor = rescheduler.reschedule_on_machine_breakdown(
+        machine_id="M01",
+        down_start_min=10.0,
+        down_duration_min=15.0,
+        reason="Minor Tool Jam",
+    )
+    assert result_minor["status"] in ("RESCHEDULED", "NO_IMPACT")
+    if result_minor["status"] == "RESCHEDULED":
+        assert result_minor["reschedule_mode"] == "FAST_LOCAL_REPAIR"
+        assert result_minor["is_major_disruption"] is False
+
+    # 2. Majör arıza (180 dk / 3 saat) -> Solver Tier Re-optimization
+    result_major = rescheduler.reschedule_on_machine_breakdown(
+        machine_id="M01",
+        down_start_min=10.0,
+        down_duration_min=180.0,
+        reason="Spindle Motor Failure",
+    )
+    assert result_major["status"] in ("RESCHEDULED", "NO_IMPACT")
+    if result_major["status"] == "RESCHEDULED":
+        assert result_major["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
+        assert result_major["is_major_disruption"] is True
