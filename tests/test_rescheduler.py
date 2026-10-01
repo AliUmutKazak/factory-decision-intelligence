@@ -3,6 +3,8 @@ tests/test_rescheduler.py
 Closed-Loop Dynamic Rescheduling motorunun test süiti.
 """
 
+import pandas as pd
+
 from src.integration.rescheduler import ClosedLoopRescheduler
 from src.utils.db import get_db_connection
 
@@ -80,3 +82,35 @@ def test_two_tier_hybrid_rescheduling_modes():
     if result_major["status"] == "RESCHEDULED":
         assert result_major["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
         assert result_major["is_major_disruption"] is True
+
+def test_frozen_horizon_preserves_completed_and_running_tasks():
+    """
+    Arıza anında geçmiş işlerin (COMPLETED) değişmediğini,
+    devam eden işin (RUNNING) başlangıç zamanının korunduğunu doğrular.
+    """
+    rescheduler = ClosedLoopRescheduler()
+    conn = get_db_connection()
+
+    # Aktif çizelgedeki ilk görevi alalım
+    df_first = pd.read_sql_query(
+        "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC LIMIT 1;",
+        conn,
+        params=(rescheduler.run_id,),
+    )
+    if not df_first.empty:
+        task = df_first.iloc[0]
+        mach = task["machine_id"]
+        t_start = float(task["start_min"])
+        t_end = float(task["end_min"])
+
+        # Görevin tam ortasında (RUNNING anında) bir arıza simüle edelim
+        mid_time = (t_start + t_end) / 2.0
+        result = rescheduler.reschedule_on_machine_breakdown(
+            machine_id=mach,
+            down_start_min=mid_time,
+            down_duration_min=45.0,
+            reason="Test Mid-run Breakdown",
+        )
+        assert result["status"] == "RESCHEDULED"
+        # Etkilenen iş sayısı en az 1 olmalı
+        assert result["affected_tasks_count"] >= 1

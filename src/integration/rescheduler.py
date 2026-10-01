@@ -1,8 +1,12 @@
-"""
-Two-Tier Hybrid Rescheduling Engine
+"""Two-Tier Hybrid Rescheduling Engine.
+
 Operasyonel arıza ve MES gecikmelerini iki seviyeli mimariyle çözer:
 1. Fast Local Repair (Heuristic Fast-Path): Minör gecikmelerde hızlı ripple-propagation.
 2. Solver-Driven Tier (CP-SAT Re-optimization): Majör arızalarda global optimizasyon.
+Gerçek 'Frozen Horizon' kurallarını uygular:
+- COMPLETED: Immutable (dokunulmaz)
+- RUNNING: Frozen start (başlangıç kilitli, bitiş ötelenir)
+- SCHEDULED: Movable (tamamen yeniden konumlandırılabilir)
 """
 
 from typing import Any
@@ -13,12 +17,8 @@ from src.utils.db import get_db_connection
 
 
 class ClosedLoopRescheduler:
-    """
-    İki Seviyeli Kapalı Çevrim Yeniden Çizelgeleme Motoru (Two-Tier Rescheduler).
-    """
+    """İki Seviyeli Kapalı Çevrim Yeniden Çizelgeleme Motoru (Two-Tier Rescheduler)."""
 
-    # Bu eşiğin altındaki duruşlar hızlı sezgisel onarım (Fast Local Repair) ile çözülür.
-    # Üzerindeki büyük duruşlar CP-SAT Re-optimization katmanına sevk edilir.
     MAJOR_BREAKDOWN_THRESHOLD_MIN = 60.0
 
     def __init__(self, run_id: str | None = None, db_path: str | None = None):
@@ -40,10 +40,12 @@ class ClosedLoopRescheduler:
         reason: str = "Unplanned Breakdown",
         force_heuristic: bool = False,
     ) -> dict[str, Any]:
-        """
-        Arıza şiddetine göre iki seviyeli onarım uygular:
-        - down_duration_min <= 60 dk: Fast Local Repair (Heuristic Right-Shift)
-        - down_duration_min > 60 dk: Major Breakdown (CP-SAT Reoptimization Route)
+        """Arıza şiddetine ve donmuş ufka göre iki seviyeli onarım uygular.
+
+        Frozen Horizon Mantığı:
+        - end_min <= down_start_min: COMPLETED -> Değiştirilemez (Immutable)
+        - start_min < down_start_min < end_min: RUNNING -> Başlangıç kilitli, bitiş ötelenir
+        - start_min >= down_start_min: SCHEDULED -> Tamamen ötelenir (Movable)
         """
         df_schedule = pd.read_sql_query(
             "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC;",
@@ -53,7 +55,6 @@ class ClosedLoopRescheduler:
         if df_schedule.empty:
             return {"status": "ERROR", "message": "No active schedule found for run."}
 
-        # Karar mekanizması: Tier belirleme
         is_major_disruption = (down_duration_min > self.MAJOR_BREAKDOWN_THRESHOLD_MIN) and not force_heuristic
         reschedule_mode = "CPSAT_REOPTIMIZATION" if is_major_disruption else "FAST_LOCAL_REPAIR"
 
@@ -63,8 +64,10 @@ class ClosedLoopRescheduler:
         df = df_schedule.copy()
         delay_shift = down_duration_min
 
-        mask_target_machine = (df["machine_id"] == machine_id) & (df["end_min"] > down_start_min)
-        affected_count = int(mask_target_machine.sum())
+        # Frozen Horizon Durum Tespiti:
+        # Sadece arıza anından sonra biten ve hedef makinede olan operasyonlar etkilenir
+        mask_target = (df["machine_id"] == machine_id) & (df["end_min"] > down_start_min)
+        affected_count = int(mask_target.sum())
 
         if affected_count == 0:
             return {
@@ -76,18 +79,21 @@ class ClosedLoopRescheduler:
                 "delta_makespan_min": 0.0,
             }
 
-        # 1. Fast Local Repair / Heuristic Propagation
-        for idx in df[mask_target_machine].index:
+        # 1. Hedef makinedeki işlerin Frozen Horizon ayrımı ile ötelenmesi
+        for idx in df[mask_target].index:
             curr_start = df.loc[idx, "start_min"]
             curr_end = df.loc[idx, "end_min"]
 
             if curr_start < down_start_min < curr_end:
+                # RUNNING (Frozen Start): Başlangıç sabit, bitiş arıza süresi kadar ötelenir
                 df.loc[idx, "end_min"] = curr_end + delay_shift
-            else:
+            elif curr_start >= down_start_min:
+                # SCHEDULED (Movable): En erken arıza bitişinden sonra başlayabilir
                 df.loc[idx, "start_min"] = max(curr_start + delay_shift, down_end_min)
                 df.loc[idx, "end_min"] = df.loc[idx, "start_min"] + df.loc[idx, "duration_min"]
 
-        # 2. Ripple-Effect Propagation
+        # 2. Precedence (Öncelik) ve Makine Çakışması Düzeltme (Ripple-Effect Propagation)
+        # SADECE henüz tamamlanmamış (Movable veya Running sonrası) işler dalgalanır, COMPLETED işlere DOKUNULMAZ.
         for _ in range(3):
             # A) Aynı makinede çakışma kontrolü
             for m in df["machine_id"].unique():
@@ -95,26 +101,38 @@ class ClosedLoopRescheduler:
                 for i in range(len(m_tasks) - 1):
                     t_curr = m_tasks[i]
                     t_next = m_tasks[i + 1]
-                    if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
-                        gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
-                        df.loc[t_next, "start_min"] += gap
-                        df.loc[t_next, "end_min"] += gap
 
-            # B) Lot bazlı operasyon sıralaması
+                    # t_next ancak donmuş ufuk dışındaysa (yani henüz bitmemiş/gelecek işse) kaydırılabilir
+                    if df.loc[t_next, "end_min"] > down_start_min:
+                        if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
+                            gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
+                            # Eğer t_next RUNNING ise sadece end ötelenir, SCHEDULED ise start ve end ötelenir
+                            if df.loc[t_next, "start_min"] < down_start_min:
+                                df.loc[t_next, "end_min"] += gap
+                            else:
+                                df.loc[t_next, "start_min"] += gap
+                                df.loc[t_next, "end_min"] += gap
+
+            # B) Lot bazlı operasyon sıralaması (Op N bitmeden Op N+1 başlayamaz)
             for lot in df["lot_id"].unique():
                 lot_tasks = df[df["lot_id"] == lot].sort_values("operation_seq").index
                 for i in range(len(lot_tasks) - 1):
                     t_curr = lot_tasks[i]
                     t_next = lot_tasks[i + 1]
-                    if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
-                        gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
-                        df.loc[t_next, "start_min"] += gap
-                        df.loc[t_next, "end_min"] += gap
+
+                    if df.loc[t_next, "end_min"] > down_start_min:
+                        if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
+                            gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
+                            if df.loc[t_next, "start_min"] < down_start_min:
+                                df.loc[t_next, "end_min"] += gap
+                            else:
+                                df.loc[t_next, "start_min"] += gap
+                                df.loc[t_next, "end_min"] += gap
 
         new_makespan = float(df["end_min"].max())
         delta_makespan = max(0.0, new_makespan - old_makespan)
 
-        # 3. MES olay kaydı
+        # 3. Olayı mes_execution_events tablosuna yaz
         cur = self.conn.cursor()
         cur.execute(
             """
