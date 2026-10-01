@@ -68,6 +68,7 @@ def test_mes_machine_down_triggers_reschedule():
     )
     assert impact["reschedule_required"] is True, "Makine arızası anında reschedule tetiklemeli."
 
+
 def test_mes_service_strict_active_run_isolation():
     """
     Geçersiz veya inaktif bir run_id verildiğinde servisin sessizce

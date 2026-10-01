@@ -25,8 +25,9 @@ st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
     page_icon="🏭",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
+
 
 @st.cache_data(ttl=60)
 def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
@@ -47,11 +48,13 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
     except Exception:
         return pd.DataFrame()
 
+
 def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
     """iloc[0] kaynaklı IndexError çökmelerini önlemek için güvenli satır okuyucu."""
     if not df.empty:
         return df.iloc[0]
     return pd.Series({k: 0.0 for k in default_keys})
+
 
 def filter_by_active_run(df: pd.DataFrame, active_id: str) -> pd.DataFrame:
     """
@@ -62,6 +65,7 @@ def filter_by_active_run(df: pd.DataFrame, active_id: str) -> pd.DataFrame:
     if not df.empty and "run_id" in df.columns and active_id and active_id != "N/A":
         return df[df["run_id"] == active_id]
     return df
+
 
 def determine_system_status(tables):
     """
@@ -84,7 +88,11 @@ def determine_system_status(tables):
         status_val = str(run_meta.get("status", "")).upper()
         # Madde 27: Backend ACTIVE kontratı ile Dashboard semantik uyumu
         if status_val != "ACTIVE":
-            return "PIPELINE FAILED", "error", f"Aktif pipeline koşumu doğrulanmadı (Status: {status_val}, Run: {run_meta.get('run_id')}). Yalnızca ACTIVE statülü koşumlar yayına alınır."
+            return (
+                "PIPELINE FAILED",
+                "error",
+                f"Aktif pipeline koşumu doğrulanmadı (Status: {status_val}, Run: {run_meta.get('run_id')}). Yalnızca ACTIVE statülü koşumlar yayına alınır.",
+            )
 
         # Çözücü durumları geçerli mi?
         opt_metrics = run_meta.get("optimization_metrics", {})
@@ -117,7 +125,11 @@ def determine_system_status(tables):
     if upstream_empty and downstream_empty:
         return "NO RUN", "error", "Pipeline tablolarının tamamı boş. Veri üretimi yapılmamış."
     elif downstream_empty:
-        return "PARTIAL", "warning", "Taktik planlama hazır ancak operasyonel çizelgeleme veya enerji/karbon adımları henüz tamamlanmamış."
+        return (
+            "PARTIAL",
+            "warning",
+            "Taktik planlama hazır ancak operasyonel çizelgeleme veya enerji/karbon adımları henüz tamamlanmamış.",
+        )
 
     # 4. Çizelgeleme & Enerji/Karbon Mutabakat Kontrolü (Reconciliation)
     sched_df = tables.get("production_schedule", pd.DataFrame())
@@ -129,12 +141,25 @@ def determine_system_status(tables):
             return "DATA MISMATCH", "error", "Çizelge mevcut fakat enerji/karbon metrikleri hesaplanmamış."
 
         # Tablodaki gerçek kolon: grand_total_kwh (fallback: energy_kwh)
-        energy_col = "grand_total_kwh" if "grand_total_kwh" in energy_df.columns else ("energy_kwh" if "energy_kwh" in energy_df.columns else None)
+        energy_col = (
+            "grand_total_kwh"
+            if "grand_total_kwh" in energy_df.columns
+            else ("energy_kwh" if "energy_kwh" in energy_df.columns else None)
+        )
         if energy_col and energy_df[energy_col].sum() <= 0:
-            return "DATA MISMATCH", "error", f"Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh, kolon: {energy_col})."
+            return (
+                "DATA MISMATCH",
+                "error",
+                f"Çizelgelenen operasyonlar var ancak toplam enerji tüketimi geçersiz (<=0 kWh, kolon: {energy_col}).",
+            )
 
     # 5. Tüm kontroller başarıyla geçtiğinde sistem READY durumuna geçer
-    return "READY", "success", "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır."
+    return (
+        "READY",
+        "success",
+        "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır.",
+    )
+
 
 # Başlık ve Üst Bilgi
 st.title("🏭 Factory Decision Intelligence Platform")
@@ -197,17 +222,19 @@ status_colors = {
 st.markdown(
     f"""
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
-        <span style="{status_colors.get(status_code, '')} padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;">
+        <span style="{status_colors.get(status_code, "")} padding: 4px 12px; border-radius: 6px; font-weight: bold; font-size: 13px;">
             SİSTEM DURUMU: {status_code}
         </span>
         <span style="font-size: 13px; color: #888;">{status_msg}</span>
     </div>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 if status_code == "NO RUN":
-    st.error("⚠️ Gösterilecek aktif çalışma verisi bulunamadı. Lütfen öncelikle veri hattını koşturunuz (`python main.py`).")
+    st.error(
+        "⚠️ Gösterilecek aktif çalışma verisi bulunamadı. Lütfen öncelikle veri hattını koşturunuz (`python main.py`)."
+    )
     st.stop()
 
 # --- 4. Kurumsal Denetim & Lineage (Audit Trail) Kartı ---
@@ -230,12 +257,9 @@ with st.expander(f"🔍 Model & Lineage Denetim İzi (Audit Trail) | Run: `{run_
 # Güvenli Tekil KPI Satırları
 e_kpi = safe_first_row(
     raw_tables["energy_kpis"],
-    ["makespan_hours", "grand_total_kwh", "kwh_per_unit", "peak_load_kw", "avg_load_kw", "total_units_produced"]
+    ["makespan_hours", "grand_total_kwh", "kwh_per_unit", "peak_load_kw", "avg_load_kw", "total_units_produced"],
 )
-c_kpi = safe_first_row(
-    raw_tables["carbon_kpis"],
-    ["total_tco2e", "kgco2e_per_unit"]
-)
+c_kpi = safe_first_row(raw_tables["carbon_kpis"], ["total_tco2e", "kgco2e_per_unit"])
 
 # Sekmelerde Kullanılacak DataFrame Değişkenleri
 forecast_df = filter_by_active_run(raw_tables["forecast_demand"], run_id_val)
@@ -244,15 +268,17 @@ sched_df = filter_by_active_run(raw_tables["production_schedule"], run_id_val)
 agg_df = filter_by_active_run(raw_tables["aggregate_plan"], run_id_val)
 mach_cap_df = filter_by_active_run(raw_tables["machine_capacity_plan"], run_id_val)
 
-tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_scenarios, tab_mes = st.tabs([
-    "📊 Genel Özet",
-    "📈 Talep Tahmini",
-    "📦 Agrega Planlama (LP/MRP)",
-    "⚙️ Detay Çizelgeleme (CP-SAT)",
-    "🌱 Sürdürülebilirlik & Karbon",
-    "🎯 Senaryo & Karar Destek",
-    "🏭 MES & Kapalı Çevrim",
-])
+tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_scenarios, tab_mes = st.tabs(
+    [
+        "📊 Genel Özet",
+        "📈 Talep Tahmini",
+        "📦 Agrega Planlama (LP/MRP)",
+        "⚙️ Detay Çizelgeleme (CP-SAT)",
+        "🌱 Sürdürülebilirlik & Karbon",
+        "🎯 Senaryo & Karar Destek",
+        "🏭 MES & Kapalı Çevrim",
+    ]
+)
 
 # =============================================================
 # TAB 1: YÖNETİCİ ÖZETİ
@@ -260,7 +286,11 @@ tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_scena
 with tab_summary:
     st.subheader("Bütünleşik Karar Akışı Göstergeleri")
 
-    total_gross_demand = int(forecast_df["forecast_demand"].sum()) if not forecast_df.empty and "forecast_demand" in forecast_df.columns else 0
+    total_gross_demand = (
+        int(forecast_df["forecast_demand"].sum())
+        if not forecast_df.empty and "forecast_demand" in forecast_df.columns
+        else 0
+    )
     w1_planned_units = (
         int(sku_df[sku_df["period_week"] == 1]["planned_units"].sum())
         if not sku_df.empty and "period_week" in sku_df.columns and "planned_units" in sku_df.columns
@@ -271,7 +301,7 @@ with tab_summary:
     col1.metric(
         "1. Hafta Net Üretim Hedefi",
         f"{w1_planned_units:,} Adet",
-        help="LP Modeli tarafından 1. hafta için optimize edilen net üretim miktarı"
+        help="LP Modeli tarafından 1. hafta için optimize edilen net üretim miktarı",
     )
 
     # Makine bazlı fiili yük (İşlem + Setup) hesaplama
@@ -292,21 +322,23 @@ with tab_summary:
     col2.metric(
         "Çizelge Makespan",
         f"{makespan_val:.1f} Saat",
-        delta=f"Darboğaz: {bottleneck_machine} (+{bottleneck_overtime:.1f} sa)" if bottleneck_overtime > 0 else "Nominal Kapasite İçi",
+        delta=f"Darboğaz: {bottleneck_machine} (+{bottleneck_overtime:.1f} sa)"
+        if bottleneck_overtime > 0
+        else "Nominal Kapasite İçi",
         delta_color="inverse" if bottleneck_overtime > 0 else "normal",
-        help=f"Toplam takvim makespan süresi: {makespan_val:.1f} saat. Darboğaz makine ({bottleneck_machine}) fiili yükü: {bottleneck_hours:.1f} saat (Nominal sınır: {WEEKLY_HOURS_PER_MACHINE} saat)."
+        help=f"Toplam takvim makespan süresi: {makespan_val:.1f} saat. Darboğaz makine ({bottleneck_machine}) fiili yükü: {bottleneck_hours:.1f} saat (Nominal sınır: {WEEKLY_HOURS_PER_MACHINE} saat).",
     )
     col3.metric(
         "Toplam Enerji Tüketimi",
         f"{float(e_kpi.get('grand_total_kwh', 0.0)):,.1f} kWh",
         delta=f"{float(e_kpi.get('kwh_per_unit', 0.0)):.3f} kWh/adet",
-        help="1. hafta çizelgesindeki 3 tezgâhın toplam işlem, hazırlık ve boşta bekleme enerjisi"
+        help="1. hafta çizelgesindeki 3 tezgâhın toplam işlem, hazırlık ve boşta bekleme enerjisi",
     )
     col4.metric(
         "Modellenen Üretim Kapsam 1–2 Emisyonu",
         f"{float(c_kpi.get('total_tco2e', 0.0)):.3f} tCO₂e",
         delta=f"{float(c_kpi.get('kgco2e_per_unit', 0.0)):.3f} kgCO₂e/adet",
-        help="Modeled Production-System Scope 1–2 Footprint: Yalnızca modellenen üretim tezgâhlarının elektrik tüketimi (Scope 2 - Location-Based şebeke) ve tezgâhlar arası iç hat forklift dizeli (Scope 1) dahildir. Tesis geneli HVAC, ofis, aydınlatma ve yardımcı işletmeler kapsam dışıdır."
+        help="Modeled Production-System Scope 1–2 Footprint: Yalnızca modellenen üretim tezgâhlarının elektrik tüketimi (Scope 2 - Location-Based şebeke) ve tezgâhlar arası iç hat forklift dizeli (Scope 1) dahildir. Tesis geneli HVAC, ofis, aydınlatma ve yardımcı işletmeler kapsam dışıdır.",
     )
 
     st.markdown("---")
@@ -384,13 +416,19 @@ with tab_forecast:
                 model_counts = forecast_df.groupby(["product_id", "model_used"]).size().reset_index(name="gun_sayisi")
                 st.dataframe(model_counts[["product_id", "model_used"]], use_container_width=True)
             st.success("✓ **P02 & P03:** Klasik zaman serisi modeli olan **Holt-Winters** en düşük WAPE ile kazandı.")
-            st.success("✓ **P01, P04 & P05:** Çok adımlı özyinelemeli **LightGBM** doğrusal olmayan örüntüleri yakalayarak birinci oldu.")
+            st.success(
+                "✓ **P01, P04 & P05:** Çok adımlı özyinelemeli **LightGBM** doğrusal olmayan örüntüleri yakalayarak birinci oldu."
+            )
 
         with col_f2:
             fig_fc = px.line(
-                forecast_df, x="forecast_date", y="forecast_demand", color="product_id",
-                markers=True, title="5 Pilot Ürün İçin Günlük Fabrika Çekme Talebi Tahmini",
-                labels={"forecast_date": "Tarih", "forecast_demand": "Tahmin Edilen Talep (Adet)"}
+                forecast_df,
+                x="forecast_date",
+                y="forecast_demand",
+                color="product_id",
+                markers=True,
+                title="5 Pilot Ürün İçin Günlük Fabrika Çekme Talebi Tahmini",
+                labels={"forecast_date": "Tarih", "forecast_demand": "Tahmin Edilen Talep (Adet)"},
             )
             fig_fc.update_layout(hovermode="x unified")
             st.plotly_chart(fig_fc, use_container_width=True)
@@ -408,11 +446,14 @@ with tab_plan:
         with col_p1:
             st.markdown("**Haftalık Aile Taktik Planı (Talep vs Üretim - Koliler):**")
             fig_agg = px.bar(
-                agg_df, x="period_week", y=["demand_batches", "prod_batches"],
+                agg_df,
+                x="period_week",
+                y=["demand_batches", "prod_batches"],
                 color_discrete_sequence=["#636EFA", "#EF553B"],
-                barmode="group", facet_col="family_id",
+                barmode="group",
+                facet_col="family_id",
                 labels={"value": "Koli (Batches)", "period_week": "Hafta", "variable": "Metrik"},
-                title="Aile Bazlı Talep ve Üretim Dengesi"
+                title="Aile Bazlı Talep ve Üretim Dengesi",
             )
             st.plotly_chart(fig_agg, use_container_width=True)
 
@@ -427,12 +468,16 @@ with tab_plan:
     if not mach_cap_df.empty:
         st.dataframe(
             mach_cap_df.style.apply(
-                lambda row: ['background-color: rgba(255, 75, 75, 0.2)' if row.get('is_bottleneck') == 'YES' else '' for _ in row],
-                axis=1
+                lambda row: [
+                    "background-color: rgba(255, 75, 75, 0.2)" if row.get("is_bottleneck") == "YES" else "" for _ in row
+                ],
+                axis=1,
             ),
-            use_container_width=True
+            use_container_width=True,
         )
-        st.caption("🔴 Kırmızı vurgulanan satırlar o hafta için bağlayıcı kısıtı (binding bottleneck) ve marjinal gevşeme değerini ($/hour) gösterir.")
+        st.caption(
+            "🔴 Kırmızı vurgulanan satırlar o hafta için bağlayıcı kısıtı (binding bottleneck) ve marjinal gevşeme değerini ($/hour) gösterir."
+        )
     else:
         st.info("Makine kapasite plan verisi bulunamadı.")
 
@@ -446,6 +491,7 @@ with tab_plan:
     if mrp_df.empty:
         st.info("MRP plan verisi bulunamadı.")
     else:
+
         def highlight_action(val):
             if "EXPEDITE" in str(val):
                 return "background-color: #ffcccc; color: #990000; font-weight: bold"
@@ -480,7 +526,7 @@ with tab_schedule:
                 "🗓️ Planlama / Çizelgeleme Haftası Seçin:",
                 options=["Tüm Haftalar"] + [f"Hafta {int(w)}" for w in available_weeks],
                 index=0,
-                help="CP-SAT çok haftalı makine fazla mesai bütçesi (W1–W4) doğrultusunda ilgili haftanın operasyonlarını listeler."
+                help="CP-SAT çok haftalı makine fazla mesai bütçesi (W1–W4) doğrultusunda ilgili haftanın operasyonlarını listeler.",
             )
             if selected_week != "Tüm Haftalar":
                 target_w = int(selected_week.split(" ")[1])
@@ -502,8 +548,8 @@ with tab_schedule:
                 "machine_id": "Tezgâh",
                 "duration_hour": "Süre (Saat)",
                 "start_hour": "Simülasyon Başlangıç (Saat)",
-                "product_id": "Ürün"
-            }
+                "product_id": "Ürün",
+            },
         )
         # Madde 15: Model dinamik malzeme gecikme çizgisi
         if "release_time_min" in sched_copy.columns:
@@ -515,14 +561,28 @@ with tab_schedule:
                     line_dash="dot",
                     line_color="orange",
                     annotation_text=f"Dinamik Malzeme Release ({max_rel_hr:.1f}. sa)",
-                    annotation_position="top right"
+                    annotation_position="top right",
                 )
 
         fig_gantt.update_layout(xaxis_title="Simülasyon Zamanı (Saat)", yaxis_title="Tezgâh")
         fig_gantt.update_yaxes(autorange="reversed")
         st.plotly_chart(fig_gantt, use_container_width=True)
 
-        sched_cols = [c for c in ["schedule_week", hover_col, "machine_id", "setup_before_min", "start_min", "end_min", "duration_min", "batch_qty", "production_units"] if c in sched_copy.columns]
+        sched_cols = [
+            c
+            for c in [
+                "schedule_week",
+                hover_col,
+                "machine_id",
+                "setup_before_min",
+                "start_min",
+                "end_min",
+                "duration_min",
+                "batch_qty",
+                "production_units",
+            ]
+            if c in sched_copy.columns
+        ]
         st.dataframe(sched_copy[sched_cols], use_container_width=True)
 
 # =============================================================
@@ -544,26 +604,24 @@ with tab_sustainability:
             avg_kw = float(e_kpi.get("avg_load_kw", 0.0))
 
             fig_load = px.line(
-                prof_df, x="time_hour", y="total_load_kw",
+                prof_df,
+                x="time_hour",
+                y="total_load_kw",
                 title=f"Tesis Güç Çekiş Profili (Tepe Yük: {peak_kw:.1f} kW | Ortalama: {avg_kw:.1f} kW)",
-                labels={"time_hour": "Zaman (Saat)", "total_load_kw": "Toplam Güç (kW)"}
+                labels={"time_hour": "Zaman (Saat)", "total_load_kw": "Toplam Güç (kW)"},
             )
-            fig_load.add_hline(
-                y=peak_kw, line_dash="dash", line_color="red",
-                annotation_text=f"Peak: {peak_kw:.1f} kW"
-            )
-            fig_load.add_hline(
-                y=avg_kw, line_dash="dot", line_color="green",
-                annotation_text=f"Avg: {avg_kw:.1f} kW"
-            )
+            fig_load.add_hline(y=peak_kw, line_dash="dash", line_color="red", annotation_text=f"Peak: {peak_kw:.1f} kW")
+            fig_load.add_hline(y=avg_kw, line_dash="dot", line_color="green", annotation_text=f"Avg: {avg_kw:.1f} kW")
             st.plotly_chart(fig_load, use_container_width=True)
 
             if not mach_carb_df.empty and "scope_2_tco2e" in mach_carb_df.columns:
                 st.markdown("**Tezgâh Bazlı Kapsam 2 Emisyon Payı:**")
                 fig_pie = px.pie(
-                    mach_carb_df, names="machine_id", values="scope_2_tco2e",
+                    mach_carb_df,
+                    names="machine_id",
+                    values="scope_2_tco2e",
                     title="Makine Bazlı Karbon Salımı Dağılımı",
-                    hole=0.4
+                    hole=0.4,
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
 
@@ -571,8 +629,11 @@ with tab_sustainability:
             st.markdown("### 💶 Dahili Karbon Fiyat Simülatörü (Internal Carbon Pricing)")
             user_c_price = st.slider(
                 "Dahili Karbon Fiyat Senaryosu / Internal Carbon Price Scenario (€/tCO₂e):",
-                min_value=0, max_value=200, value=80, step=10,
-                help="Bu simülasyon bir emisyon piyasası takası değil, Exposure = Carbon × InternalCarbonPrice formülüne dayalı içsel gölge fiyatlandırma (Shadow Pricing) senaryosudur."
+                min_value=0,
+                max_value=200,
+                value=80,
+                step=10,
+                help="Bu simülasyon bir emisyon piyasası takası değil, Exposure = Carbon × InternalCarbonPrice formülüne dayalı içsel gölge fiyatlandırma (Shadow Pricing) senaryosudur.",
             )
             total_carbon = float(c_kpi.get("total_tco2e", 0.0))
             sim_exposure = total_carbon * user_c_price
@@ -594,6 +655,7 @@ with tab_scenarios:
 
     try:
         from src.scenarios.scenario_engine import ScenarioEngine
+
         engine = ScenarioEngine(db_path=DB_PATH)
         tradeoff_df = engine.run_all_scenarios()
 
@@ -605,22 +667,33 @@ with tab_scenarios:
             baseline_row = baseline_match.iloc[0] if not baseline_match.empty else best_cost_row
 
             c1.metric("📌 Baz Senaryo Maliyeti", f"{baseline_row['Total Cost (€)']:,.2f} €")
-            c2.metric("🟢 En Düşük Maliyetli Senaryo", f"{best_cost_row['Scenario']}", f"{best_cost_row['Total Cost (€)']:,.2f} €")
-            c3.metric("🔴 En Yüksek Riskli Senaryo", f"{worst_cost_row['Scenario']}", f"{worst_cost_row['Total Cost (€)']:,.2f} €")
+            c2.metric(
+                "🟢 En Düşük Maliyetli Senaryo",
+                f"{best_cost_row['Scenario']}",
+                f"{best_cost_row['Total Cost (€)']:,.2f} €",
+            )
+            c3.metric(
+                "🔴 En Yüksek Riskli Senaryo",
+                f"{worst_cost_row['Scenario']}",
+                f"{worst_cost_row['Total Cost (€)']:,.2f} €",
+            )
 
             st.markdown("### 📊 Çok Kriterli Senaryo Karşılaştırma Matrisi")
             st.dataframe(
-                tradeoff_df.style.format({
-                    "Makespan (h)": "{:.1f}",
-                    "OT (%)": "{:.1f}%",
-                    "Inventory Cost (€)": "€{:,.2f}",
-                    "Energy Cost (€)": "€{:,.2f}",
-                    "Carbon (tCO2e)": "{:.3f}",
-                    "Carbon Cost (€)": "€{:,.2f}",
-                    "Total Cost (€)": "€{:,.2f}",
-                }).highlight_min(subset=["Total Cost (€)"], color="#2e7d32")
-                  .highlight_max(subset=["Total Cost (€)"], color="#c62828"),
-                use_container_width=True
+                tradeoff_df.style.format(
+                    {
+                        "Makespan (h)": "{:.1f}",
+                        "OT (%)": "{:.1f}%",
+                        "Inventory Cost (€)": "€{:,.2f}",
+                        "Energy Cost (€)": "€{:,.2f}",
+                        "Carbon (tCO2e)": "{:.3f}",
+                        "Carbon Cost (€)": "€{:,.2f}",
+                        "Total Cost (€)": "€{:,.2f}",
+                    }
+                )
+                .highlight_min(subset=["Total Cost (€)"], color="#2e7d32")
+                .highlight_max(subset=["Total Cost (€)"], color="#c62828"),
+                use_container_width=True,
             )
         else:
             st.warning("Senaryo sonuçları boş döndü.")
@@ -643,6 +716,7 @@ with tab_mes:
         st.markdown("### 🔄 Kapalı Çevrim Fiili Durum & Tolerans Analizi")
         try:
             from src.scenarios.closed_loop import ClosedLoopEngine
+
             cl_engine = ClosedLoopEngine(db_path=DB_PATH)
             decision = cl_engine.evaluate_variance_and_trigger(run_id_val)
 
@@ -663,7 +737,9 @@ with tab_mes:
         st.markdown("### 📋 Canlı İş Emri Takip Matrisi (`mes_order_tracking`)")
         tracking_df = get_table("mes_order_tracking", run_id_val)
         if tracking_df.empty:
-            st.info("Henüz aktif run için MES takip kaydı yok. Aşağıdaki butondan çizelgeyi MES takip tablosuna aktarabilirsiniz.")
+            st.info(
+                "Henüz aktif run için MES takip kaydı yok. Aşağıdaki butondan çizelgeyi MES takip tablosuna aktarabilirsiniz."
+            )
             if st.button("🔄 Aktif Çizelgeyi MES Takibine Yükle"):
                 mes_srv = MESIntegrationService(run_id=run_id_val)
                 loaded_cnt = mes_srv.initialize_tracking_from_schedule()
@@ -673,13 +749,24 @@ with tab_mes:
             status_filter = st.multiselect(
                 "Durum Filtresi:",
                 options=tracking_df["status"].unique().tolist(),
-                default=tracking_df["status"].unique().tolist()
+                default=tracking_df["status"].unique().tolist(),
             )
             filtered_tracking = tracking_df[tracking_df["status"].isin(status_filter)]
             st.dataframe(
-                filtered_tracking[["task_id", "lot_id", "product_id", "machine_id", "scheduled_start_min", "scheduled_end_min", "status", "variance_min"]],
+                filtered_tracking[
+                    [
+                        "task_id",
+                        "lot_id",
+                        "product_id",
+                        "machine_id",
+                        "scheduled_start_min",
+                        "scheduled_end_min",
+                        "status",
+                        "variance_min",
+                    ]
+                ],
                 use_container_width=True,
-                height=300
+                height=300,
             )
 
         st.markdown("### ⚠️ Sahadan Gelen Son Olaylar (`mes_execution_events`)")
@@ -695,8 +782,12 @@ with tab_mes:
 
         with st.form("reschedule_sim_form"):
             selected_machine = st.selectbox("Arızalanan Tezgâh:", ["M01", "M02", "M03"])
-            sim_down_start = st.number_input("Arıza Başlangıç Zamanı (Dakika):", min_value=0.0, max_value=20000.0, value=600.0, step=30.0)
-            sim_down_dur = st.number_input("Duruş / Onarım Süresi (Dakika):", min_value=10.0, max_value=3000.0, value=120.0, step=15.0)
+            sim_down_start = st.number_input(
+                "Arıza Başlangıç Zamanı (Dakika):", min_value=0.0, max_value=20000.0, value=600.0, step=30.0
+            )
+            sim_down_dur = st.number_input(
+                "Duruş / Onarım Süresi (Dakika):", min_value=10.0, max_value=3000.0, value=120.0, step=15.0
+            )
             sim_reason = st.text_input("Arıza Gerekçesi:", value="Plansız Mil/Rulman Hasarı")
 
             run_sim_btn = st.form_submit_button("🚨 Dinamik Yeniden Çizelgele (Reschedule)")
@@ -707,7 +798,7 @@ with tab_mes:
                 machine_id=selected_machine,
                 down_start_min=sim_down_start,
                 down_duration_min=sim_down_dur,
-                reason=sim_reason
+                reason=sim_reason,
             )
 
             if res.get("status") == "RESCHEDULED":
@@ -715,12 +806,17 @@ with tab_mes:
 
                 c_k1, c_k2, c_k3 = st.columns(3)
                 c_k1.metric("Eski Makespan", f"{res['old_makespan_min']:.0f} dk")
-                c_k2.metric("Yeni Makespan", f"{res['new_makespan_min']:.0f} dk", delta=f"+{res['delta_makespan_min']:.0f} dk", delta_color="inverse")
+                c_k2.metric(
+                    "Yeni Makespan",
+                    f"{res['new_makespan_min']:.0f} dk",
+                    delta=f"+{res['delta_makespan_min']:.0f} dk",
+                    delta_color="inverse",
+                )
                 c_k3.metric("Etkilenen İş Sayısı", f"{res['affected_tasks_count']} görev")
 
                 st.warning(
                     f"⚠️ **Karar Destek Notu:** {selected_machine} üzerindeki {sim_down_dur:.0f} dakikalık duruş, "
-                    f"fabrika toplam teslim süresini **{res['delta_makespan_min']:.0f} dakika ({res['delta_makespan_min']/60:.1f} saat)** öteledi."
+                    f"fabrika toplam teslim süresini **{res['delta_makespan_min']:.0f} dakika ({res['delta_makespan_min'] / 60:.1f} saat)** öteledi."
                 )
             else:
                 st.info(f"Sonuç: {res.get('message', 'İşlem tamamlandı.')}")

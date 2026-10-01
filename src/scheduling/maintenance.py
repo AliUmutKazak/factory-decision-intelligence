@@ -13,6 +13,7 @@ import pandas as pd
 @dataclass
 class MaintenanceWindow:
     """Planlı bakım veya duruş penceresi."""
+
     machine_id: str
     start_min: int
     end_min: int
@@ -71,21 +72,21 @@ def inject_maintenance_intervals_into_model(
             continue
 
         var_name = f"maint_{m_id}_{idx}"
-        fixed_interval = model.NewFixedSizeIntervalVar(
-            mw.start_min, mw.duration_min, var_name
-        )
+        fixed_interval = model.NewFixedSizeIntervalVar(mw.start_min, mw.duration_min, var_name)
 
         if m_id not in machine_intervals_map:
             machine_intervals_map[m_id] = []
         machine_intervals_map[m_id].append(fixed_interval)
 
-        injected_records.append({
-            "machine_id": m_id,
-            "start_min": mw.start_min,
-            "end_min": mw.end_min,
-            "duration_min": mw.duration_min,
-            "type": mw.maintenance_type,
-            "var_name": var_name,
-        })
+        injected_records.append(
+            {
+                "machine_id": m_id,
+                "start_min": mw.start_min,
+                "end_min": mw.end_min,
+                "duration_min": mw.duration_min,
+                "type": mw.maintenance_type,
+                "var_name": var_name,
+            }
+        )
 
     return injected_records

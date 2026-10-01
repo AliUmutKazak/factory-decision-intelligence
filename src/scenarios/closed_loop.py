@@ -53,11 +53,7 @@ class ClosedLoopEngine:
         Belirlenen tolerans aşıldığında Replanning tetikleme kararı verir.
         """
         conn = get_db_connection(self.db_path)
-        actuals_df = pd.read_sql(
-            "SELECT * FROM mes_production_actuals WHERE run_id = ?",
-            conn,
-            params=(run_id,)
-        )
+        actuals_df = pd.read_sql("SELECT * FROM mes_production_actuals WHERE run_id = ?", conn, params=(run_id,))
         conn.close()
 
         if actuals_df.empty:
@@ -67,7 +63,7 @@ class ClosedLoopEngine:
                 total_delay_hours=0.0,
                 scrap_rate_pct=0.0,
                 requires_replanning=False,
-                trigger_reason="No MES actuals recorded for this run."
+                trigger_reason="No MES actuals recorded for this run.",
             )
 
         # Planlanan vs Gerçekleşen Makespan ve Gecikme Analizi
@@ -92,7 +88,9 @@ class ClosedLoopEngine:
 
         if slippage_pct >= self.slippage_threshold_pct:
             requires_replanning = True
-            reasons.append(f"Schedule slippage ({slippage_pct:.1f}%) exceeded threshold ({self.slippage_threshold_pct:.1f}%)")
+            reasons.append(
+                f"Schedule slippage ({slippage_pct:.1f}%) exceeded threshold ({self.slippage_threshold_pct:.1f}%)"
+            )
 
         if delta_delay >= self.max_delay_hours:
             requires_replanning = True
@@ -108,5 +106,5 @@ class ClosedLoopEngine:
             total_delay_hours=round(delta_delay, 2),
             scrap_rate_pct=round(scrap_rate_pct, 2),
             requires_replanning=requires_replanning,
-            trigger_reason="; ".join(reasons) if reasons else "Execution within tolerance limits."
+            trigger_reason="; ".join(reasons) if reasons else "Execution within tolerance limits.",
         )

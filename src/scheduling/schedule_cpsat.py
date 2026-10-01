@@ -13,6 +13,7 @@ from src.config import (
     DB_PATH,
     SCHEDULING_WEIGHT_MAKESPAN,
     SCHEDULING_WEIGHT_SETUP,
+    SCHEDULING_WEIGHT_TARDINESS,
 )
 from src.utils.db import get_db_connection
 
@@ -511,7 +512,7 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
     # ---------------------------------------------------------------------
     # P2: Çok Amaçlı Karar Fonksiyonu (Multi-Objective Optimization)
-    # Makespan ana hedef, sıra bağımlı ayar (setup) süreleri ikincil cezadır.
+    # Makespan + Sıra Bağımlı Setup + Müşteri Öncelikli Ağırlıklı Gecikme
     # ---------------------------------------------------------------------
     makespan = model.NewIntVar(0, horizon, "makespan")
     for tid in all_tasks:
@@ -519,10 +520,37 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
     total_setup_duration = sum(all_setup_terms) if all_setup_terms else 0
 
-    # Weighted-Sum Skalerleştirme: Makespan ağırlıklı birincil bileşen,
-    # setup süresi ise ikincil bileşen olarak penalize edilir.
-    # (Not: Katı leksikografik garanti için Faz 1 makespan, Faz 2 setup iki aşamalı çözümü yol haritasındadır.)
-    objective_expr = int(SCHEDULING_WEIGHT_MAKESPAN) * makespan + int(SCHEDULING_WEIGHT_SETUP) * total_setup_duration
+    # Ağırlıklı Gecikme (Weighted Tardiness) Değişkenleri
+    # Her partinin (lot) nihai operasyonunun bitişi termin süresiyle karşılaştırılır.
+    tardiness_terms = []
+    NOMINAL_DUE_DATE_MIN = 7 * 24 * 60  # Hafta-1 nominal sonu (10.080 dk)
+
+    for lid, group in tasks_df.groupby("lot_id"):
+        last_op = group.sort_values("operation_seq").iloc[-1]
+        last_tid = last_op["task_id"]
+        last_end = all_tasks[last_tid]["end"]
+
+        # Termin süresi (dakika) - Veride tanımlıysa al, yoksa nominal Hafta-1 ufku
+        due_date = int(last_op.get("due_date_min", NOMINAL_DUE_DATE_MIN))
+
+        # Müşteri öncelik katsayısı (priority * tier multiplier, varsayılan 1)
+        priority_weight = int(last_op.get("priority_weight", 1))
+
+        # Gecikme Değişkeni: T_j >= 0 ve T_j >= last_end - due_date
+        tardiness_var = model.NewIntVar(0, horizon, f"tardiness_{lid}")
+        model.Add(tardiness_var >= last_end - due_date)
+        model.Add(tardiness_var >= 0)
+
+        tardiness_terms.append(priority_weight * tardiness_var)
+
+    total_weighted_tardiness = sum(tardiness_terms) if tardiness_terms else 0
+
+    # Çok Amaçlı Karar Fonksiyonu: Makespan + Setup + Weighted Tardiness
+    objective_expr = (
+        int(SCHEDULING_WEIGHT_MAKESPAN) * makespan
+        + int(SCHEDULING_WEIGHT_SETUP) * total_setup_duration
+        + int(SCHEDULING_WEIGHT_TARDINESS) * total_weighted_tardiness
+    )
     model.Minimize(objective_expr)
 
     solver = cp_model.CpSolver()
@@ -547,7 +575,10 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
     best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
     gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
 
-    print(f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika")
+    total_tardiness_val = int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0
+    print(
+        f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika | Ağırlıklı Gecikme: {total_tardiness_val} dk"
+    )
     print(f"Bileşik Amaç Değeri (Objective): {obj_val:.1f} | Dual Bound: {best_bound:.1f} | Optimality Gap: %{gap:.2f}")
 
     schedule_rows = []

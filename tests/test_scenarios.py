@@ -182,6 +182,7 @@ def test_scenario_capacity_stress(isolated_env, monkeypatch):
     assert agg_plan["max_machine_overtime_hours"].max() > 0.0
     assert len(sched) > 0
 
+
 def test_scenario_engine_tradeoff_matrix(isolated_env):
     """
     P2-1 Contract Test:

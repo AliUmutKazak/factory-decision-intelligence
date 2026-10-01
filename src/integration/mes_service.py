@@ -23,9 +23,7 @@ class MESIntegrationService:
         """
         cur = self.conn.cursor()
         try:
-            cur.execute(
-                "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;"
-            )
+            cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
             row = cur.fetchone()
             return row[0] if row else None
         finally:

@@ -94,11 +94,7 @@ def run_end_to_end_pipeline():
         print(f"[AUDIT] Pipeline durumu: VALIDATE ({run_id})")
 
         # Validation Gate dosya kontrolü yapmadan önce güncel run_id'yi metadata dosyasına yaz
-        record_pipeline_run_metadata(
-            run_id=run_id,
-            status="VALIDATE",
-            db_path=str(staging_db)
-        )
+        record_pipeline_run_metadata(run_id=run_id, status="VALIDATE", db_path=str(staging_db))
 
         validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
         print("[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
@@ -110,6 +106,7 @@ def run_end_to_end_pipeline():
         actual_orders_count = 0
         try:
             from src.utils.db import get_db_connection
+
             with get_db_connection(str(staging_db)) as conn:
                 cur = conn.cursor()
                 cur.execute("SELECT COUNT(*) FROM orders")
@@ -125,7 +122,7 @@ def run_end_to_end_pipeline():
             status="COMPLETED",
             orders_count=actual_orders_count,
             data_source="data/processed/factory_orders.csv",
-            db_path=str(staging_db)
+            db_path=str(staging_db),
         )
 
         # Retention Policy (Staging üzerinde temizlenir)
@@ -133,11 +130,11 @@ def run_end_to_end_pipeline():
 
         # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
         manifest = generate_run_manifest(
-            run_id=run_id,
-            db_path=str(staging_db),
-            input_source_path="data/processed/factory_orders.csv"
+            run_id=run_id, db_path=str(staging_db), input_source_path="data/processed/factory_orders.csv"
         )
-        print(f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)")
+        print(
+            f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)"
+        )
 
         # Environment değişkenlerini kaldır
         os.environ.pop("FACTORY_DB_PATH", None)
@@ -146,6 +143,7 @@ def run_end_to_end_pipeline():
 
         # Açık kalmış bağlantıları serbest bırak
         import gc
+
         gc.collect()
         time.sleep(0.5)
 
@@ -255,12 +253,13 @@ def run_end_to_end_pipeline():
         try:
             if canonical_db.exists():
                 from src.utils.db import get_db_connection
+
                 with get_db_connection(str(canonical_db)) as conn:
                     init_pipeline_runs_table(conn)
                     cur = conn.cursor()
                     cur.execute(
                         "INSERT OR REPLACE INTO pipeline_runs (run_id, timestamp, status) VALUES (?, datetime('now'), 'FAILED')",
-                        (run_id,)
+                        (run_id,),
                     )
             record_pipeline_run_metadata(run_id=run_id, status="FAILED")
         except Exception:

@@ -15,10 +15,13 @@ class ERPService:
         """Dahili ID'den ERP kodunu döner (örn: P01 -> MAT-10001)."""
         conn = get_db_connection(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT erp_code FROM erp_mapping
             WHERE entity_type = ? AND internal_id = ? AND erp_system = ? AND is_active = 1
-        """, (entity_type, internal_id, erp_system))
+        """,
+            (entity_type, internal_id, erp_system),
+        )
         row = cursor.fetchone()
         conn.close()
         return row[0] if row else None
@@ -28,10 +31,13 @@ class ERPService:
         """ERP kodundan dahili ID'yi döner (örn: MAT-10001 -> P01)."""
         conn = get_db_connection(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT internal_id FROM erp_mapping
             WHERE entity_type = ? AND erp_code = ? AND erp_system = ? AND is_active = 1
-        """, (entity_type, erp_code, erp_system))
+        """,
+            (entity_type, erp_code, erp_system),
+        )
         row = cursor.fetchone()
         conn.close()
         return row[0] if row else None

@@ -540,6 +540,7 @@ def test_validation_gate_blocks_overlapping_physics(tmp_path):
     with pytest.raises(ValueError, match="Fiziksel Kısıt İhlali"):
         validate_pipeline_run("RUN_TEST", db_path=str(db_path))
 
+
 def test_p0_run_scoped_artifact_isolation(tmp_path):
     """
     P0-3 Regresyon Testi:
@@ -586,6 +587,7 @@ def test_p0_run_scoped_artifact_isolation(tmp_path):
         manifest_data = json.load(f)
     assert "run_id" in manifest_data, "Manifest dosyasÄ± run_id iÃ§ermelidir."
     assert "artifacts" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
+
 
 def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
     """
@@ -654,10 +656,20 @@ def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
 
     # 4. Forecast governance kaydı simülasyonu (P1-3 config doğrulaması)
     conn = sqlite3.connect(db_file)
-    conn.execute("""
+    conn.execute(
+        """
         INSERT INTO forecast_model_lineage (product_id, selected_model, model_version, feature_version, hyperparameters, run_id)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, ("P01", "Holt-Winters", FORECAST_MODEL_VERSION, FORECAST_FEATURE_VERSION, json.dumps(HOLT_WINTERS_DEFAULT_PARAMS), test_run_id))
+    """,
+        (
+            "P01",
+            "Holt-Winters",
+            FORECAST_MODEL_VERSION,
+            FORECAST_FEATURE_VERSION,
+            json.dumps(HOLT_WINTERS_DEFAULT_PARAMS),
+            test_run_id,
+        ),
+    )
     conn.commit()
 
     # 5. Koşumu state machine kurallarına uygun olarak tamamla: RUNNING -> STAGING -> VALIDATE -> COMPLETED
@@ -681,7 +693,10 @@ def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
         assert len(sha) == 64
 
     # Kural C: forecast_model_lineage merkezi config ile eşleşmeli
-    cursor.execute("SELECT model_version, feature_version, hyperparameters FROM forecast_model_lineage WHERE run_id = ?", (test_run_id,))
+    cursor.execute(
+        "SELECT model_version, feature_version, hyperparameters FROM forecast_model_lineage WHERE run_id = ?",
+        (test_run_id,),
+    )
     f_row = cursor.fetchone()
     assert f_row[0] == FORECAST_MODEL_VERSION
     assert f_row[1] == FORECAST_FEATURE_VERSION

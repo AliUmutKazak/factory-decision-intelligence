@@ -52,6 +52,7 @@ def test_reschedule_event_persisted_to_db():
 
     assert count_after == count_before + 1, "Arıza olayı mes_execution_events tablosuna kaydedilmedi."
 
+
 def test_two_tier_hybrid_rescheduling_modes():
     """
     Kısa süreli arızalarda (<= 60 dk) FAST_LOCAL_REPAIR,
@@ -82,6 +83,7 @@ def test_two_tier_hybrid_rescheduling_modes():
     if result_major["status"] == "RESCHEDULED":
         assert result_major["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
         assert result_major["is_major_disruption"] is True
+
 
 def test_frozen_horizon_preserves_completed_and_running_tasks():
     """

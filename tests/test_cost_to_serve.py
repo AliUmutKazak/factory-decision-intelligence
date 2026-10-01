@@ -6,15 +6,33 @@ from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
 def test_economic_decision_engine_tmc_calculation():
     engine = EconomicDecisionEngine()
 
-    sched_df = pd.DataFrame([
-        {"job_id": "ORD-1", "start_min": 0, "end_min": 120, "duration": 120, "setup_duration": 30, "is_overtime": 0},
-        {"job_id": "ORD-2", "start_min": 120, "end_min": 360, "duration": 240, "setup_duration": 30, "is_overtime": 1},
-    ])
+    sched_df = pd.DataFrame(
+        [
+            {
+                "job_id": "ORD-1",
+                "start_min": 0,
+                "end_min": 120,
+                "duration": 120,
+                "setup_duration": 30,
+                "is_overtime": 0,
+            },
+            {
+                "job_id": "ORD-2",
+                "start_min": 120,
+                "end_min": 360,
+                "duration": 240,
+                "setup_duration": 30,
+                "is_overtime": 1,
+            },
+        ]
+    )
 
-    orders_df = pd.DataFrame([
-        {"job_id": "ORD-1", "due_date_min": 200, "customer_class": "STANDARD", "quantity": 100},
-        {"job_id": "ORD-2", "due_date_min": 300, "customer_class": "TIER_1", "quantity": 200},  # 60 dk gecikme
-    ])
+    orders_df = pd.DataFrame(
+        [
+            {"job_id": "ORD-1", "due_date_min": 200, "customer_class": "STANDARD", "quantity": 100},
+            {"job_id": "ORD-2", "due_date_min": 300, "customer_class": "TIER_1", "quantity": 200},  # 60 dk gecikme
+        ]
+    )
 
     result = engine.compute_total_manufacturing_cost(
         schedule_df=sched_df,

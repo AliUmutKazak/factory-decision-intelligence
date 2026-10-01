@@ -30,6 +30,7 @@ class CostParameters:
 @dataclass
 class ManufacturingCostBreakdown:
     """TMC (Total Manufacturing Cost) Kalemleri."""
+
     material_cost: float = 0.0
     labor_cost: float = 0.0
     overtime_cost: float = 0.0
@@ -106,12 +107,18 @@ class EconomicDecisionEngine:
         order_cost_list: list[dict[str, Any]] = []
 
         group_col = "job_id" if "job_id" in df.columns else "product_id"
-        job_summary = df.groupby(group_col).agg(
-            completion_min=("end_min", "max"),
-            start_min=("start_min", "min"),
-            job_run_min=(run_duration_col, "sum"),
-            job_setup_min=("setup_duration", "sum") if "setup_duration" in df.columns else (run_duration_col, lambda _: 0.0),
-        ).reset_index()
+        job_summary = (
+            df.groupby(group_col)
+            .agg(
+                completion_min=("end_min", "max"),
+                start_min=("start_min", "min"),
+                job_run_min=(run_duration_col, "sum"),
+                job_setup_min=("setup_duration", "sum")
+                if "setup_duration" in df.columns
+                else (run_duration_col, lambda _: 0.0),
+            )
+            .reset_index()
+        )
 
         if orders_df is not None and not orders_df.empty:
             merged = pd.merge(job_summary, orders_df, on=group_col, how="left")
@@ -147,15 +154,17 @@ class EconomicDecisionEngine:
 
             cts_order = direct_labor + direct_setup + tardy_cost + holding_cost
 
-            order_cost_list.append({
-                group_col: cid,
-                "customer_class": row["customer_class"],
-                "direct_labor_cost": round(direct_labor, 2),
-                "direct_setup_cost": round(direct_setup, 2),
-                "tardiness_cost": round(tardy_cost, 2),
-                "inventory_holding_cost": round(holding_cost, 2),
-                "cost_to_serve": round(cts_order, 2),
-            })
+            order_cost_list.append(
+                {
+                    group_col: cid,
+                    "customer_class": row["customer_class"],
+                    "direct_labor_cost": round(direct_labor, 2),
+                    "direct_setup_cost": round(direct_setup, 2),
+                    "tardiness_cost": round(tardy_cost, 2),
+                    "inventory_holding_cost": round(holding_cost, 2),
+                    "cost_to_serve": round(cts_order, 2),
+                }
+            )
 
             tardiness_cost_total += tardy_cost
             holding_cost_total += holding_cost

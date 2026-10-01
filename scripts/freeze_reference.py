@@ -32,6 +32,7 @@ def run_cmd(cmd_list):
         sys.exit(1)
     return res.stdout
 
+
 def freeze_reference_atomic():
     print("============================================================")
     print("1. Pipeline Calistiriliyor (main.py)...")
@@ -42,7 +43,9 @@ def freeze_reference_atomic():
     db_path = BASE_DIR / "data" / "factory.db"
     conn = get_db_connection(db_path)
     cur = conn.cursor()
-    cur.execute("SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1")
+    cur.execute(
+        "SELECT run_id, git_sha, status FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
+    )
     row = cur.fetchone()
     conn.close()
 
@@ -60,6 +63,7 @@ def freeze_reference_atomic():
         sys.exit(1)
 
     import json
+
     with open(meta_path, encoding="utf-8") as f:
         meta_data = json.load(f)
 
@@ -190,7 +194,7 @@ def freeze_reference_atomic():
         "run_id": run_id,
         "git_sha": git_sha,
         "timestamp": datetime.now().isoformat(),
-        "files": manifest_files
+        "files": manifest_files,
     }
 
     with open(staging_dir / "manifest.json", "w", encoding="utf-8") as f:
@@ -226,6 +230,7 @@ def freeze_reference_atomic():
 
         # 6. Disk Artifact & Run Retention Senkronizasyonu (Madde 23)
         from src.utils.lineage import apply_run_retention_policy
+
         apply_run_retention_policy(keep_last_n=20, db_path=str(BASE_DIR / "data" / "factory.db"))
         print("✓ Disk artifact snapshot retention senkronizasyonu tamamlandı.")
 
@@ -236,6 +241,7 @@ def freeze_reference_atomic():
             backup_dir.rename(ref_dir)
             print("↺ Rollback yapildi: Eski referans geri yuklendi.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     freeze_reference_atomic()

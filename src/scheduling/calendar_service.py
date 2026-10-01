@@ -4,7 +4,6 @@ Scheduler, Energy Analytics, Capacity ve Maintenance modüllerine standart takvi
 """
 
 
-
 class MachineCalendarService:
     MINUTES_IN_HOUR = 60
     HOURS_IN_DAY = 24

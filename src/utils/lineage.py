@@ -871,6 +871,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         "total_artifacts": len(manifest.get("artifacts", {})),
     }
 
+
 def record_input_source_lineage(run_id: str, db_path: str = None, input_source_path: str = None) -> int:
     """
     P1-2: Aktif run_id için girdi veri setlerinin (raw files, fixtures, master datasets)
@@ -889,51 +890,52 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     # 1. Ana girdi veri seti (orders / demand)
     input_ds = inputs_lineage.get("input_dataset", {})
     if input_ds.get("path") and input_ds.get("sha256"):
-        records.append((
-            run_id,
-            "demand_input",
-            "RAW_FILE",
-            input_ds["path"],
-            input_ds["sha256"],
-            input_ds.get("size_bytes", 0),
-            None
-        ))
+        records.append(
+            (
+                run_id,
+                "demand_input",
+                "RAW_FILE",
+                input_ds["path"],
+                input_ds["sha256"],
+                input_ds.get("size_bytes", 0),
+                None,
+            )
+        )
 
     # 2. Raw / Master Data dosyaları
     for name, meta in inputs_lineage.get("raw_source_data", {}).items():
-        records.append((
-            run_id,
-            name,
-            "MASTER_DATA",
-            meta.get("relative_path", name),
-            meta.get("sha256", ""),
-            meta.get("size_bytes", 0),
-            None
-        ))
+        records.append(
+            (
+                run_id,
+                name,
+                "MASTER_DATA",
+                meta.get("relative_path", name),
+                meta.get("sha256", ""),
+                meta.get("size_bytes", 0),
+                None,
+            )
+        )
 
     # 3. Fallback: Config parmak izini de bir konfigürasyon girdisi olarak kaydet
     cfg_fp = inputs_lineage.get("config_fingerprint", {})
     if cfg_fp.get("file") and cfg_fp.get("sha256"):
-        records.append((
-            run_id,
-            "config",
-            "CONFIG_FILE",
-            cfg_fp["file"],
-            cfg_fp["sha256"],
-            cfg_fp.get("size_bytes", 0),
-            None
-        ))
+        records.append(
+            (run_id, "config", "CONFIG_FILE", cfg_fp["file"], cfg_fp["sha256"], cfg_fp.get("size_bytes", 0), None)
+        )
 
     if not records:
         return 0
 
     conn = sqlite3.connect(active_db)
     cursor = conn.cursor()
-    cursor.executemany("""
+    cursor.executemany(
+        """
         INSERT OR REPLACE INTO input_source_lineage
         (run_id, source_name, source_type, source_path, sha256, size_bytes, row_count)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, records)
+    """,
+        records,
+    )
     conn.commit()
     conn.close()
 

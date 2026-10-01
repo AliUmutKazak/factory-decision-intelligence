@@ -35,6 +35,7 @@ WEEKLY_MINUTES_PER_MACHINE = WEEKLY_HOURS_PER_MACHINE * 60  # 5.760 dakika/makin
 # Tezgâh amortisman/işletme maliyetleri machines.csv'den okunur.
 # Bu değerler tesis genel operasyon ve operatör işçilik bazını temsil eder.
 
+
 @dataclass(frozen=True)
 class EconomicConfig:
     """Ekonomik Parametreler Tek Gerçek Kaynağı (Economic SSOT).
@@ -107,7 +108,9 @@ HOLT_WINTERS_DEFAULT_PARAMS = {
 UNITS_PER_BATCH = 25  # 1 Üretim Kolisi / Lot = 25 Perakende Adet
 AGGREGATE_CAPACITY_BUFFER = 0.10  # %10 Planlı duruş / bakım kapasite tamponu
 AGGREGATE_MAX_OVERTIME_HOURS = 48.0  # Haftalık azami fazla mesai saati
-AGGREGATE_HOLDING_COST_PER_BATCH = ECONOMIC_CONFIG.holding_cost_per_batch  # Parti başına haftalık stok elde tutma maliyeti (€/planning_lot)
+AGGREGATE_HOLDING_COST_PER_BATCH = (
+    ECONOMIC_CONFIG.holding_cost_per_batch
+)  # Parti başına haftalık stok elde tutma maliyeti (€/planning_lot)
 AGGREGATE_BACKLOG_PENALTY_PER_BATCH = ECONOMIC_CONFIG.backlog_penalty_per_batch  # Geciken parti cezası (€/planning_lot)
 AGGREGATE_INITIAL_INVENTORY = {"FAM_A": 40.0, "FAM_B": 20.0}
 
@@ -122,9 +125,9 @@ CPSAT_RANDOM_SEED = 42  # Tekrarlanabilirlik tohum değeri
 # P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Weighted-Sum Multi-Objective Scalarization)
 # Makespan ana bileşendir; setup süresi ikincil ceza olarak ağırlıklandırılır.
 # CP-SAT tamsayı (integer) aritmetiği gereği ağırlıklar tamsayı olarak tanımlanır.
-SCHEDULING_WEIGHT_MAKESPAN = 100  # alpha: Ana hedef (Makespan minimizasyonu)
-SCHEDULING_WEIGHT_SETUP = 1  # delta: Sıra bağımlı setup süresi cezası
-SCHEDULING_WEIGHT_TARDINESS = 0  # beta: Operasyonel termin (due date) entegrasyonu tamamlandığında devreye alınacaktır
+SCHEDULING_WEIGHT_MAKESPAN = 100  # alpha: Makespan minimizasyonu
+SCHEDULING_WEIGHT_SETUP = 1  # delta: Setup süresi cezası
+SCHEDULING_WEIGHT_TARDINESS = 10  # beta: Ağırlıklı gecikme cezası
 # Initial Machine Setup State (Planlama ufku başında tezgâhlarda takılı olan ürün/kalıp)
 # None verilirse ilk iş için ilave setup gerekmez (soğuk başlangıç/hazır varsayımı)
 INITIAL_MACHINE_STATE = {

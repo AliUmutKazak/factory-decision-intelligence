@@ -100,7 +100,9 @@ class ScenarioEngine:
                         reason=f"Scenario Shock: {shock.failed_machines[0]} Breakdown",
                     )
                     if res.get("status") in ["SUCCESS", "NO_IMPACT"]:
-                        simulated_makespan = max(base_makespan, float(res.get("new_makespan_min", base_makespan * 60)) / 60.0)
+                        simulated_makespan = max(
+                            base_makespan, float(res.get("new_makespan_min", base_makespan * 60)) / 60.0
+                        )
                     else:
                         simulated_makespan = base_makespan * 1.25
                 except Exception:
@@ -114,7 +116,9 @@ class ScenarioEngine:
                 try:
                     scaled_sku = sku_df.copy()
                     if "planned_qty" in scaled_sku.columns:
-                        scaled_sku["planned_qty"] = (scaled_sku["planned_qty"] * shock.demand_multiplier).round().astype(int)
+                        scaled_sku["planned_qty"] = (
+                            (scaled_sku["planned_qty"] * shock.demand_multiplier).round().astype(int)
+                        )
                     new_sched = run_cpsat_scheduling(sku_plan=scaled_sku)
                     if new_sched is not None and not new_sched.empty and "end_min" in new_sched.columns:
                         simulated_makespan = float(new_sched["end_min"].max()) / 60.0
@@ -161,11 +165,7 @@ class ScenarioEngine:
         # ---------------------------------------------------------
         unit_electricity_price = DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH * shock.electricity_price_multiplier
         # Talep artışı doğrudan enerji tüketimini artırır; arıza durumunda ise ek verimsizlik (%5) gelir
-        simulated_kwh = (
-            base_kwh
-            * shock.demand_multiplier
-            * (1.05 if shock.failed_machines else 1.0)
-        )
+        simulated_kwh = base_kwh * shock.demand_multiplier * (1.05 if shock.failed_machines else 1.0)
         energy_cost = simulated_kwh * unit_electricity_price
 
         # ---------------------------------------------------------
