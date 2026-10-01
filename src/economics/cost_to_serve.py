@@ -9,18 +9,22 @@ from typing import Any
 
 import pandas as pd
 
+from src.config import ECONOMIC_CONFIG
+
 
 @dataclass
 class CostParameters:
-    """Birim maliyet katsayıları ve ekonomik parametreler."""
-    labor_rate_per_hour: float = 25.0
-    overtime_multiplier: float = 1.5
-    setup_cost_per_hour: float = 40.0
-    holding_cost_per_unit_per_day: float = 0.50
-    energy_cost_per_kwh: float = 0.18
-    carbon_cost_per_ton: float = 50.0  # Emisyon ticaret sistemi (ETS) referansı
-    expedite_cost_flat: float = 150.0  # Hızlandırılmış nakliye/işleme sabit maliyeti
-    default_tardiness_cost_per_hour: float = 60.0
+    """Birim maliyet katsayıları ve ekonomik parametreler (Economic SSOT uyumlu)."""
+
+    labor_rate_per_hour: float = ECONOMIC_CONFIG.labor_rate_per_hour
+    overtime_multiplier: float = ECONOMIC_CONFIG.overtime_multiplier
+    setup_cost_per_hour: float = ECONOMIC_CONFIG.setup_cost_per_hour
+    holding_cost_per_unit_per_day: float = ECONOMIC_CONFIG.holding_cost_per_unit_per_day
+    energy_cost_per_kwh: float = ECONOMIC_CONFIG.energy_price_per_kwh
+    carbon_cost_per_ton: float = ECONOMIC_CONFIG.carbon_price_per_ton
+    expedite_cost_flat: float = ECONOMIC_CONFIG.expedite_cost_flat
+    default_tardiness_cost_per_hour: float = ECONOMIC_CONFIG.tardiness_cost_per_hour
+    currency: str = ECONOMIC_CONFIG.currency
 
 
 @dataclass

@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 # Dizin Hiyerarşisi
@@ -33,10 +34,40 @@ WEEKLY_MINUTES_PER_MACHINE = WEEKLY_HOURS_PER_MACHINE * 60  # 5.760 dakika/makin
 # 2. İktisadi & İşçilik Dönüşüm Parametreleri (Madde 14 Düzeltmesi)
 # Tezgâh amortisman/işletme maliyetleri machines.csv'den okunur.
 # Bu değerler tesis genel operasyon ve operatör işçilik bazını temsil eder.
-CURRENCY = "USD"
-LABOR_COST_STANDARD_HR = 450.0  # Standart saatlik adam/saat maliyeti ($/saat)
-OVERTIME_MULTIPLIER = 1.5  # Fazla mesai katsayısı
-LABOR_COST_OVERTIME_HR = LABOR_COST_STANDARD_HR * OVERTIME_MULTIPLIER  # 675.0 $/saat
+
+@dataclass(frozen=True)
+class EconomicConfig:
+    """Ekonomik Parametreler Tek Gerçek Kaynağı (Economic SSOT).
+
+    Tüm modüller (Cost-to-Serve, Scenario Engine, Aggregate Planning, Dashboard)
+    maliyet ve para birimi değerlerini buradan tüketir.
+    """
+
+    currency: str = "EUR"
+    labor_rate_per_hour: float = 25.0  # Standart operatör/işçilik baz maliyeti (€/saat)
+    overtime_multiplier: float = 1.5  # Fazla mesai çarpanı
+    setup_cost_per_hour: float = 40.0  # Hat hazırlık/ayar maliyeti (€/saat)
+    holding_cost_per_unit_per_day: float = 0.50  # Birim/gün stok tutma maliyeti (€)
+    holding_cost_per_batch: float = 25.0  # Parti başına haftalık stok tutma maliyeti (€/lot)
+    backlog_penalty_per_batch: float = 1500.0  # Geciken parti cezası (€/planning_lot)
+    energy_price_per_kwh: float = 0.18  # Endüstriyel elektrik baz fiyatı (€/kWh)
+    carbon_price_per_ton: float = 50.0  # Dahili karbon fiyatı referansı (€/tCO2e)
+    expedite_cost_flat: float = 150.0  # Hızlandırılmış sevkiyat sabit maliyeti (€)
+    tardiness_cost_per_hour: float = 60.0  # Termin gecikme cezası (€/saat)
+
+    @property
+    def labor_cost_overtime_hr(self) -> float:
+        return self.labor_rate_per_hour * self.overtime_multiplier
+
+
+# Global SSOT Örneği
+ECONOMIC_CONFIG = EconomicConfig()
+
+# Geriye dönük uyumluluk (Backward-compatibility) aliasları
+CURRENCY = ECONOMIC_CONFIG.currency
+LABOR_COST_STANDARD_HR = ECONOMIC_CONFIG.labor_rate_per_hour
+OVERTIME_MULTIPLIER = ECONOMIC_CONFIG.overtime_multiplier
+LABOR_COST_OVERTIME_HR = ECONOMIC_CONFIG.labor_cost_overtime_hr
 
 # 3. Çevre & Sürdürülebilirlik Parametreleri (GHG Protocol & Internal Carbon Pricing)
 # 0.440 tCO2e/MWh: T.C. ETKB elektrik emisyon faktörleri (iletim: 0.436, dağıtım: 0.469) aralığındaki sentetik orta nokta varsayımıdır (Synthetic Midpoint Assumption).
@@ -76,8 +107,8 @@ HOLT_WINTERS_DEFAULT_PARAMS = {
 UNITS_PER_BATCH = 25  # 1 Üretim Kolisi / Lot = 25 Perakende Adet
 AGGREGATE_CAPACITY_BUFFER = 0.10  # %10 Planlı duruş / bakım kapasite tamponu
 AGGREGATE_MAX_OVERTIME_HOURS = 48.0  # Haftalık azami fazla mesai saati
-AGGREGATE_HOLDING_COST_PER_BATCH = 25.0  # Parti başına haftalık stok elde tutma maliyeti ($/planning_lot)
-AGGREGATE_BACKLOG_PENALTY_PER_BATCH = 1500.0  # Geciken parti cezası ($/planning_lot)
+AGGREGATE_HOLDING_COST_PER_BATCH = ECONOMIC_CONFIG.holding_cost_per_batch  # Parti başına haftalık stok elde tutma maliyeti (€/planning_lot)
+AGGREGATE_BACKLOG_PENALTY_PER_BATCH = ECONOMIC_CONFIG.backlog_penalty_per_batch  # Geciken parti cezası (€/planning_lot)
 AGGREGATE_INITIAL_INVENTORY = {"FAM_A": 40.0, "FAM_B": 20.0}
 
 # 7. Detaylı Çizelgeleme & Parti Parametreleri (CP-SAT SSOT)
@@ -102,4 +133,4 @@ INITIAL_MACHINE_STATE = {
     "M03": "P04",
 }
 # P2 Scenario Parameters
-DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH = 0.18  # Endüstriyel elektrik baz fiyatı (€/kWh)
+DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH = ECONOMIC_CONFIG.energy_price_per_kwh  # Endüstriyel elektrik baz fiyatı (€/kWh)
