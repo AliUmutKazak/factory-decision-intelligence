@@ -513,7 +513,7 @@ def initialize_database(force_recreate=False, run_id=None):
             INSERT OR REPLACE INTO erp_mapping (entity_type, internal_id, erp_system, erp_code, description)
             VALUES (?, ?, ?, ?, ?)
         """, erp_seed_data)
-        conn.commit()    
+        conn.commit()
 
     # P1-2: Input Source Lineage Tablosu (Audit & Provenance)
     cursor.execute("""

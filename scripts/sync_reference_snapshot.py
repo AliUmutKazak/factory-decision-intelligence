@@ -1,9 +1,9 @@
 """
 P0-2: Reference snapshot ve metadata dosyalarını HEAD ve son aktif run_id ile senkronize eder.
 """
-from pathlib import Path
 import json
 import subprocess
+from pathlib import Path
 
 
 def sync_snapshots():
@@ -30,7 +30,7 @@ def sync_snapshots():
             continue
 
         try:
-            with open(p, "r", encoding="utf-8") as f:
+            with open(p, encoding="utf-8") as f:
                 data = json.load(f)
 
             updated = False

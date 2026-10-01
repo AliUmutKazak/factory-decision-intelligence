@@ -877,7 +877,7 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     SHA-256 ve meta verilerini input_source_lineage tablosuna kaydeder.
     """
     import sqlite3
-    from pathlib import Path
+
     from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
@@ -930,7 +930,7 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     conn = sqlite3.connect(active_db)
     cursor = conn.cursor()
     cursor.executemany("""
-        INSERT OR REPLACE INTO input_source_lineage 
+        INSERT OR REPLACE INTO input_source_lineage
         (run_id, source_name, source_type, source_path, sha256, size_bytes, row_count)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     """, records)

@@ -1,8 +1,10 @@
-import pytest
-import pandas as pd
 import sqlite3
-from src.scenarios.closed_loop import ClosedLoopEngine
+
+import pandas as pd
+import pytest
+
 from src.data.build_database_and_eda import initialize_database
+from src.scenarios.closed_loop import ClosedLoopEngine
 from src.utils.lineage import start_pipeline_run
 
 

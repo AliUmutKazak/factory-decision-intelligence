@@ -546,8 +546,8 @@ def test_p0_run_scoped_artifact_isolation(tmp_path):
     Her pipeline koÅŸumunun artifacts/runs/{run_id} altÄ±nda tÃ¼m DB, CSV ve
     manifest dosyalarÄ±yla tam izole bir paket oluÅŸturduÄŸunu doÄŸrular.
     """
-    from pathlib import Path
     import json
+    from pathlib import Path
 
     runs_root = Path("artifacts/runs")
     if not runs_root.exists() or not list(runs_root.iterdir()):
@@ -582,7 +582,7 @@ def test_p0_run_scoped_artifact_isolation(tmp_path):
     assert (latest_run_dir / "manifest.json").exists(), "manifest.json eksik."
 
     # Manifest iÃ§eriÄŸinin JSON olarak geÃ§erliliÄŸini sÄ±na
-    with open(latest_run_dir / "manifest.json", "r", encoding="utf-8") as f:
+    with open(latest_run_dir / "manifest.json", encoding="utf-8") as f:
         manifest_data = json.load(f)
     assert "run_id" in manifest_data, "Manifest dosyasÄ± run_id iÃ§ermelidir."
     assert "artifacts" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
@@ -598,6 +598,7 @@ def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
     """
     import json
     import sqlite3
+
     from src.config import FORECAST_FEATURE_VERSION, FORECAST_MODEL_VERSION, HOLT_WINTERS_DEFAULT_PARAMS
     from src.utils.lineage import (
         generate_run_id,
@@ -608,11 +609,11 @@ def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):
     )
 
     db_file = tmp_path / "factory_contract_test.db"
-    
+
     # 1. Pipeline runs ve diğer şemaları oluştur
     conn = sqlite3.connect(db_file)
     init_pipeline_runs_table(conn)
-    
+
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS input_source_lineage (

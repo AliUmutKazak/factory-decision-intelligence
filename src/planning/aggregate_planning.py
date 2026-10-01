@@ -26,7 +26,6 @@ from src.config import (
     AGGREGATE_CAPACITY_BUFFER,
     AGGREGATE_HOLDING_COST_PER_BATCH,
     AGGREGATE_INITIAL_INVENTORY,
-    AGGREGATE_MAX_OVERTIME_HOURS,
     DB_PATH,
     LABOR_COST_OVERTIME_HR,
     LABOR_COST_STANDARD_HR,
@@ -34,8 +33,8 @@ from src.config import (
     UNITS_PER_BATCH,
     WEEKLY_HOURS_PER_MACHINE,
 )
-from src.utils.db import get_db_connection
 from src.scheduling.calendar_service import MachineCalendarService
+from src.utils.db import get_db_connection
 
 OUTPUT_AGGREGATE_PATH = PROCESSED_DATA_DIR / "aggregate_plan.csv"
 OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"

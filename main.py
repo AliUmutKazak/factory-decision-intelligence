@@ -6,31 +6,29 @@ malzeme gereksinim planlaması, enerji ve karbon muhasebesi zincirini çalışt�
 """
 
 import os
+import shutil
 import sys
 import time
-import shutil
 from pathlib import Path
 
-
-from src.data.preprocessing import run_preprocessing
-from src.data.build_database_and_eda import initialize_database
-from src.forecasting.train_forecast import run_forecast_benchmark
-from src.planning.aggregate_planning import run_planning_pipeline
-from src.inventory.bom_mrp import run_mrp_engine
-from src.scheduling.schedule_cpsat import solve_cpsat_schedule
-from src.energy.energy_analytics import compute_energy_analytics
 from src.carbon.carbon_analytics import compute_carbon_analytics
+from src.data.build_database_and_eda import initialize_database
+from src.data.preprocessing import run_preprocessing
+from src.energy.energy_analytics import compute_energy_analytics
+from src.forecasting.train_forecast import run_forecast_benchmark
+from src.inventory.bom_mrp import run_mrp_engine
+from src.planning.aggregate_planning import run_planning_pipeline
+from src.scheduling.schedule_cpsat import solve_cpsat_schedule
 from src.utils.lineage import (
-    record_pipeline_run_metadata,
-    generate_run_id,
-    start_pipeline_run,
-    get_active_pipeline_run,
     apply_run_retention_policy,
+    generate_run_id,
     generate_run_manifest,
+    init_pipeline_runs_table,
     promote_run_to_active,
+    record_pipeline_run_metadata,
+    start_pipeline_run,
     update_pipeline_run_status,
     validate_pipeline_run,
-    init_pipeline_runs_table
 )
 
 
@@ -103,11 +101,11 @@ def run_end_to_end_pipeline():
         )
 
         validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
-        print(f"[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
+        print("[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
 
         # 3. AŞAMA: SEAL ARTIFACTS (Promotion'dan ÖNCE tüm mühürleme ve denetim kayıtları tamamlanır!)
-        print(f"[AUDIT] Artifacts & Metadata mühürleniyor (SEAL ARTIFACTS)...")
-        
+        print("[AUDIT] Artifacts & Metadata mühürleniyor (SEAL ARTIFACTS)...")
+
         # Gerçek sipariş sayısını staging veritabanından al
         actual_orders_count = 0
         try:
@@ -157,7 +155,7 @@ def run_end_to_end_pipeline():
         for attempt in range(max_retries):
             try:
                 shutil.copy2(staging_db, canonical_db)
-                
+
                 # Başarılı koşan koşumun artifact'lerini kanonik dizinlere terfi ettir (promote)
                 canonical_processed = base_dir / "data" / "processed"
                 canonical_reports = base_dir / "reports"

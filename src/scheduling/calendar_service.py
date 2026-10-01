@@ -3,7 +3,6 @@ MachineCalendarService: Fabrika Takvim ve Vardiya Yönetimi Tekil Gerçeklik Kay
 Scheduler, Energy Analytics, Capacity ve Maintenance modüllerine standart takvim semantiği sağlar.
 """
 
-from typing import Tuple, Dict, Any
 
 
 class MachineCalendarService:
@@ -24,7 +23,7 @@ class MachineCalendarService:
     WORKING_DAYS_PER_WEEK = 6  # Pzt - Cmt
 
     @classmethod
-    def get_week_and_day(cls, time_min: float) -> Tuple[int, int, float]:
+    def get_week_and_day(cls, time_min: float) -> tuple[int, int, float]:
         """
         Verilen mutlak dakika için (week_index, day_of_week, day_cursor_min) döner.
         day_of_week: 0=Pazartesi, ..., 5=Cumartesi, 6=Pazar

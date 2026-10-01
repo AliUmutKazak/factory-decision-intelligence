@@ -1,30 +1,25 @@
 import json
 import sys
 from pathlib import Path
-from datetime import datetime, timezone
 
 # Proje ana dizinini Python yoluna ekle
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-import sqlite3
 import pandas as pd
-import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from src.config import (
     DB_PATH,
     PLANNING_HORIZON_WEEKS,
     WEEKLY_HOURS_PER_MACHINE,
-    LABOR_COST_OVERTIME_HR,
 )
-from src.utils.lineage import get_active_pipeline_run
-from src.utils.db import get_db_connection
-from src.integration.rescheduler import ClosedLoopRescheduler
 from src.integration.mes_service import MESIntegrationService
+from src.integration.rescheduler import ClosedLoopRescheduler
+from src.utils.db import get_db_connection
+from src.utils.lineage import get_active_pipeline_run
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -81,7 +76,7 @@ def determine_system_status(tables):
     metadata_path = Path("reports/run_metadata.json")
     if metadata_path.exists():
         try:
-            with open(metadata_path, "r", encoding="utf-8") as f:
+            with open(metadata_path, encoding="utf-8") as f:
                 run_meta = json.load(f)
         except Exception as e:
             return "METADATA CORRUPTED", "error", f"reports/run_metadata.json okunamadı veya bozuk: {e}"
@@ -103,7 +98,7 @@ def determine_system_status(tables):
     solver_meta_path = Path("reports/schedule_solver_metadata.json")
     if solver_meta_path.exists():
         try:
-            with open(solver_meta_path, "r", encoding="utf-8") as f:
+            with open(solver_meta_path, encoding="utf-8") as f:
                 s_meta = json.load(f)
         except Exception as e:
             return "METADATA CORRUPTED", "error", f"Solver metadata dosyası bozuk: {e}"
@@ -316,7 +311,7 @@ with tab_summary:
 
     st.markdown("---")
     st.subheader("Temel Fabrika Soruları & Model Yanıtları")
-    
+
     mrp_df = get_table("mrp_plan", run_id_val)
     q_col1, q_col2 = st.columns(2)
     with q_col1:
@@ -339,8 +334,8 @@ with tab_summary:
         )
     with q_col2:
         st.info(
-            f"**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
-            f"480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
+            "**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
+            "480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
         )
         # 1. Taktik Seviye: LP Kısıt Bağlayıcılığı (Binding Machine)
         lp_bottleneck_machines = []
@@ -447,7 +442,7 @@ with tab_plan:
         "ℹ️ **Mimari Not:** Bu modül analitik bir **MRP-I Planlama Motorudur** (BOM Patlatma, Lot Sizing, Temin Süresi Kaydırma). "
         "Canlı sipariş yürütme, tedarikçi kapasite kısıtları ve fiili mal kabul takipleri işletmenin ana ERP sistemine (örn. IFS ERP) delege edilir."
     )
-    
+
     if mrp_df.empty:
         st.info("MRP plan verisi bulunamadı.")
     else:
@@ -601,7 +596,7 @@ with tab_scenarios:
         from src.scenarios.scenario_engine import ScenarioEngine
         engine = ScenarioEngine(db_path=DB_PATH)
         tradeoff_df = engine.run_all_scenarios()
-        
+
         if not tradeoff_df.empty:
             c1, c2, c3 = st.columns(3)
             best_cost_row = tradeoff_df.loc[tradeoff_df["Total Cost (€)"].idxmin()]
@@ -664,7 +659,7 @@ with tab_mes:
             st.caption(f"Kapalı çevrim analiz durumu: {e}")
 
         st.markdown("---")
-        
+
         st.markdown("### 📋 Canlı İş Emri Takip Matrisi (`mes_order_tracking`)")
         tracking_df = get_table("mes_order_tracking", run_id_val)
         if tracking_df.empty:
@@ -717,7 +712,7 @@ with tab_mes:
 
             if res.get("status") == "RESCHEDULED":
                 st.success("✅ Kapalı çevrim yeniden çizelgeleme başarıyla tamamlandı!")
-                
+
                 c_k1, c_k2, c_k3 = st.columns(3)
                 c_k1.metric("Eski Makespan", f"{res['old_makespan_min']:.0f} dk")
                 c_k2.metric("Yeni Makespan", f"{res['new_makespan_min']:.0f} dk", delta=f"+{res['delta_makespan_min']:.0f} dk", delta_color="inverse")

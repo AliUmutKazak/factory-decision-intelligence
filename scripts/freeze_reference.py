@@ -10,23 +10,21 @@ Garantiler:
 """
 
 import os
-import sys
 import shutil
-import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 from src.utils.db import get_db_connection
 
-from src.utils.lineage import generate_run_manifest, compute_file_hash
 
 def run_cmd(cmd_list):
     # Windows konsolunda UTF-8 (✓ vb. karakterler) kodlama hatası almamak için env zorlaması
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    
+
     res = subprocess.run(cmd_list, cwd=BASE_DIR, capture_output=True, text=True, encoding="utf-8", env=env)
     if res.returncode != 0:
         print(f"[ERROR] Komut basarisiz: {' '.join(cmd_list)}")
@@ -62,7 +60,7 @@ def freeze_reference_atomic():
         sys.exit(1)
 
     import json
-    with open(meta_path, "r", encoding="utf-8") as f:
+    with open(meta_path, encoding="utf-8") as f:
         meta_data = json.load(f)
 
     if meta_data.get("run_id") != run_id:

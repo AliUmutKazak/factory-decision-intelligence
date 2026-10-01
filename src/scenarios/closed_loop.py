@@ -4,10 +4,9 @@ Saha fiili üretim verilerini (Actuals) izler, plan sapmalarını (slippage) öl
 ve eşik aşımında yeniden çizelgeleme (Dynamic Replanning) kararını tetikler.
 """
 
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
 import os
-import sqlite3
+from dataclasses import dataclass
+
 import pandas as pd
 
 from src.utils.db import get_db_connection
@@ -20,7 +19,7 @@ class ReplanningTriggerDecision:
     total_delay_hours: float
     scrap_rate_pct: float
     requires_replanning: bool
-    trigger_reason: Optional[str] = None
+    trigger_reason: str | None = None
 
 
 class ClosedLoopEngine:
@@ -29,12 +28,12 @@ class ClosedLoopEngine:
     karşılaştıran ve kapalı çevrim kontrolünü sağlayan motor.
     """
 
-    def __init__(self, db_path: Optional[str] = None, slippage_threshold_pct: float = 10.0, max_delay_hours: float = 4.0):
+    def __init__(self, db_path: str | None = None, slippage_threshold_pct: float = 10.0, max_delay_hours: float = 4.0):
         self.db_path = db_path or os.environ.get("FACTORY_DB_PATH", "data/factory.db")
         self.slippage_threshold_pct = slippage_threshold_pct
         self.max_delay_hours = max_delay_hours
 
-    def ingest_mes_actuals(self, actuals_df: pd.DataFrame, run_id: Optional[str] = None) -> int:
+    def ingest_mes_actuals(self, actuals_df: pd.DataFrame, run_id: str | None = None) -> int:
         """
         MES üzerinden gelen fiili üretim ve duruş kayıtlarını veritabanına yazar.
         """
@@ -74,7 +73,7 @@ class ClosedLoopEngine:
         # Planlanan vs Gerçekleşen Makespan ve Gecikme Analizi
         total_planned_hours = (actuals_df["planned_end_hour"] - actuals_df["planned_start_hour"]).sum()
         total_actual_hours = (actuals_df["actual_end_hour"] - actuals_df["actual_start_hour"]).sum()
-        
+
         # Ek duruş sürelerini dahil et
         downtime_hours = actuals_df["downtime_hours"].sum() if "downtime_hours" in actuals_df.columns else 0.0
         effective_actual_hours = total_actual_hours + downtime_hours
