@@ -16,22 +16,30 @@ class MESIntegrationService:
         self.conn = get_db_connection()
         self.run_id = run_id or self._get_active_run_id()
 
-    def _get_active_run_id(self) -> str:
+    def _get_active_run_id(self) -> str | None:
+        """
+        Sadece aktif durumdaki en güncel pipeline_runs kaydını döner.
+        Sessizce geçmiş/inaktif koşulara geri düşmez (No silent fallback).
+        """
         cur = self.conn.cursor()
         try:
-            cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
+            cur.execute(
+                "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;"
+            )
             row = cur.fetchone()
-            if not row:
-                cur.execute("SELECT run_id FROM pipeline_runs ORDER BY timestamp DESC LIMIT 1;")
-                row = cur.fetchone()
-            return row[0] if row else "DEFAULT_RUN"
+            return row[0] if row else None
         finally:
             cur.close()
 
     def initialize_tracking_from_schedule(self) -> int:
         """
         Aktif 'production_schedule' verilerini alıp 'mes_order_tracking' tablosuna aktarır.
+        Yalnızca geçerli run_id'ye ait verileri işler; sessizce genel tabloya fallback yapmaz.
         """
+        if not self.run_id:
+            # Aktif koşu yoksa veri uyumsuzluğunu önlemek için işlem yapma
+            return 0
+
         # run_id kolonu tabloda var mı dinamik kontrol et
         cur = self.conn.cursor()
         cur.execute("PRAGMA table_info(production_schedule);")
@@ -46,16 +54,8 @@ class MESIntegrationService:
                 self.conn,
                 params=(self.run_id,),
             )
-            if df_schedule.empty:
-                df_schedule = pd.read_sql_query(
-                    "SELECT task_id, lot_id, product_id, machine_id, start_min, end_min FROM production_schedule;",
-                    self.conn,
-                )
         else:
-            df_schedule = pd.read_sql_query(
-                "SELECT task_id, lot_id, product_id, machine_id, start_min, end_min FROM production_schedule;",
-                self.conn,
-            )
+            df_schedule = pd.DataFrame()
 
         if df_schedule.empty:
             return 0

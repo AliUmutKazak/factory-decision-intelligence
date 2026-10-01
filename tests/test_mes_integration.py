@@ -67,3 +67,15 @@ def test_mes_machine_down_triggers_reschedule():
         event_type="MACHINE_DOWN", machine_id="M02", event_timestamp_min=120.0, delay_reason="Hidrolik basınç kaybı"
     )
     assert impact["reschedule_required"] is True, "Makine arızası anında reschedule tetiklemeli."
+
+def test_mes_service_strict_active_run_isolation():
+    """
+    Geçersiz veya inaktif bir run_id verildiğinde servisin sessizce
+    tüm tabloya geri düşmediğini (silent fallback olmadığını) doğrular.
+    """
+    # Var olmayan hayali bir run_id ile başlat
+    isolated_service = MESIntegrationService(run_id="NON_EXISTENT_GHOST_RUN_999")
+
+    # initialize_tracking_from_schedule çağrıldığında eski verileri sessizce çekmemeli
+    inserted_count = isolated_service.initialize_tracking_from_schedule()
+    assert inserted_count == 0
