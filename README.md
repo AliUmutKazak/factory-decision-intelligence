@@ -1,358 +1,63 @@
-# 🏭 Factory Decision Intelligence Platform
-### Bütünleşik Hiyerarşik Üretim Planlama, Matematiksel Çizelgeleme ve Karbon Muhasebesi
+# Factory Decision Intelligence Engine
 
-[![Fabrika Karar Zekası CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
-![Python 3.11](https://img.shields.io/badge/Python-3.11-blue.svg)
-![Optimization](https://img.shields.io/badge/OR--Tools-CP--SAT-orange.svg)
-![LP](https://img.shields.io/badge/PuLP-Linear%20Programming-green.svg)
-![ML](https://img.shields.io/badge/LightGBM-Forecasting-yellow.svg)
-[![CI Pipeline](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions)
-
-Endüstriyel bir disk üretim tesisinin operasyonel kararlarını optimize eden, tekil gerçeklik kaynağına (SSOT) bağlı karar zekâsı platformu. Sistem; talep tahmini, Hax & Meal hiyerarşik agrega planlama, Google OR-Tools CP-SAT ile sıra bağımlı tezgâh çizelgeleme, zaman fazlı MRP-I, 15 dakikalık yük analitiği ve GHG Kapsam 1-2 karbon fiyatlandırma simülasyonunu tek bir boru hattında birleştirir.
+> "I designed an end-to-end manufacturing decision-support layer that transforms demand signals into capacity-aware production plans, material requirements and finite machine schedules, then feeds execution deviations back into dynamic replanning while accounting for service level, manufacturing cost, energy and carbon."
 
 ---
 
-## 📊 Güncel Model Metrikleri ve Doğrulama (Latest Validated Reference Run - CI Run #20)
+## 1. System Architecture & Decision Flow
 
-> **Deterministik Yürütme Güvencesi:** Çözücü parametreleri (`random_seed = 42`, `num_search_workers = 8`) ile kilitlenmiş olup yerel ortam ve GitHub Actions CI koşularında deterministik olarak çözülmektedir. Elde edilen `OPTIMAL` statüsü, fabrikanın soyut fiziksel evreninin değil; tanımlı vardiya takvimi, makine durumları, hazırlık matrisleri ve malzeme çıkış pencereleri kısıtları altındaki **formüle edilmiş CP-SAT modelinin matematiksel optimumudur (global optimum of the formulated CP-SAT model under discrete calendar & MES operational constraints)**.
-
-| Modül / Metrik | Yöntem / Araç | Değer | Operasyonel Açıklama |
-|---|---|---|---|
-| **Çizelgeleme Statüsü** | Google OR-Tools CP-SAT | **OPTIMAL** | Formüle edilmiş matematiksel model (MES ilk durum, transfer partileri, dinamik takvim kısıtları) altında global optimum kanıtlandı. |
-| **Makespan ($C_{\max}$)** *(Reference Full Run)* | CP-SAT Detaylı Çizelge | **11,285 dk (188.08 sa)** | Dinamik takvim vardiyaları ve transfer partileme optimizasyonu altında tüm SKU operasyonları tamamlandı. |
-| **Optimality Gap** | CP-SAT Dual Bound | **%0.00** (Bound: 11,285 dk) | Formüle edilen CP-SAT arama uzayında matematiksel ispat tamamlandı. |
-| **Kritik Makine (M01)** *(Reference Full Run)* | Kapasite & Yük Analitiği | **134.23 sa İşlem + 2.58 sa Setup** | Standart nominal kapasite kısıtları dahilinde çizelgelendi; fazla mesai bütçe sınırları (`max_daily_hours`) korundu. |
-| **SKU Plan Mutabakatı** | Seri / Parti Eşleme | **%100 (11,525 / 11,525)** | Ayrıştırılmış parti adetlerinin toplamı çizelgelenen işlerle sıfır kayıpla birebir eşleşti. |
-| **Talep Tahmini** | Recursive LightGBM / Holt-Winters | **Backtest WAPE: %6.12 – %10.41** | 28 günlük tarihsel backtest (holdout) ile SKU bazlı model seçimi; ardından 28 günlük operasyonel gelecek ufku tahmini. |
-| **Enerji & Pik Yük** | 15 Dk Dinamik Yük Profili | **21,054.23 kWh / 246.95 kW** | Dinamik güç profili (PROCESSING, SETUP, IDLE) üzerinden tepe yük (246.95 kW) ve ortalama yük (111.94 kW) fiziksel tutarlılıkla hesaplandı. |
-| **Karbon Muhasebesi** | GHG Protocol Kapsam 1 & 2 (Modeled Production-System) | **9.4917 tCO₂e** | Doğrulanmış referans koşumu emisyon muhasebesi dengelendi (Kapsam 1: 0.2278 tCO₂e, Kapsam 2: 9.2639 tCO₂e). |
-> **MRP – CP-SAT Malzeme Kuplaj Varsayımı:** MRP çıktısında acil sipariş (`EXPEDITE / Past Due`) gerektiren hammaddelerin operasyona entegrasyonunda **Synthetic Expedite-Release Rule** uygulanmıştır. Tedarikçiden acil sevkiyatla intikal eden lotların fabrika giriş ve kalite kontrol süresi için minimum $r_b = 480\text{ dk}$ serbest bırakma (release time) gecikmesi baz alınarak operasyon başlangıcı ötelenmiştir. Tam ölçekli dinamik ERP entegrasyonlarında ise her parça için $r_{\text{lot}} = \max_{m \in \text{BOM}(\text{sku})}(\text{availability\_time}_m)$ formülasyonu hedeflenmekte olup, mevcut sürüm bu davranışı deterministik bir operasyonel sezgisel (Synthetic Expedite-Release Heuristic) ile modellemektedir.
-> **Karbon Emisyon Faktörü Kaynaklandırması:** Şebeke elektriği için kullanılan $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$) değeri, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) güncel elektrik tüketim emisyon faktörlerinde iletim bağlantılı tüketim ($0.436\text{ tCO}_2\text{e/MWh}$) ve dağıtım bağlantılı tüketim ($0.469\text{ tCO}_2\text{e/MWh}$) aralığında kurgulanmış **sentetik orta nokta varsayımıdır (synthetic midpoint assumption)**. Bu kurgu, hem ulusal fabrika operasyonlarına hem de uluslararası GHG Protocol / AB CBAM eşik analizlerine parametrik uyum sağlar.
-> **Master Data & İktisadi Değişken Kapsamı (Reserved Extensions):** Veritabanı master tablolarında yer alan `operating_cost_per_hour`, `unit_sale_price`, `holding_cost_per_week`, `late_penalty_per_day` ve `setup_cost` parametreleri, kurumsal ERP şeması standartlarını korumak ve ileride geliştirilecek çok amaçlı (multi-objective pareto optimization: makespan vs. total direct operating cost) genişletmelere zemin hazırlamak amacıyla master data modelinde muhafaza edilmektedir (*reserved for future economic extensions*). Mevcut sürümde taktik katman iş gücü/fazla mesai marjinal maliyetlerine, operasyonel katman ise saf üretim çevrim süresi minimizasyonuna ($\min C_{\max}$) odaklanmıştır.
-
-
----
-
-## 🏛️ Karar Hiyerarşisi ve Sistem Mimarisi
-
-Sistem, Hax & Meal hiyerarşik planlama mimarisini modern veri mühendisliği ve yöneylem araştırması yaklaşımlarıyla ölçekler:
-
-[ Ham Sipariş Verisi / ERP ]
-               │
-               ▼
- ┌──────────────────────────────────────────────────┐
- │  1. TALEP TAHMİNLEME (LightGBM vs Holt-Winters)  │
- │     - 28 Günlük Tarihsel Backtest (Holdout)      │
- │     - WAPE Bazlı SKU Başı Model Seçimi           │
- │     - 28 Günlük Gelecek Üretim Ufku (Ocak 2018)  │
- └────────────────────────┬─────────────────────────┘
-                          │ Günlük SKU Talebi
-                          ▼
- ┌──────────────────────────────────────────────────┐
- │  2. TAKTİK PLANLAMA (PuLP - Lineer Programlama)  │
- │     - 4 Haftalık Ufuk, Çok Makineli Kapasite LP  │
- │     - Talep Ağırlıklı Katsayılar (af,m,t)        │
- │     - Dinamik Makine Gölge Fiyatı (Dual Values)  │
- └────────────────────────┬─────────────────────────┘
-                          │ 1. Hafta Aile Üretim Hedefleri
-                          ▼
- ┌──────────────────────────────────────────────────┐
- │  3. AYRIŞTIRMA & ZAMAN FAZLI MRP-I               │
- │     - Tam Sayı SKU Ayrıştırma (Lot Boyutu: 25)   │
- │     - Dinamik Emniyet Stoku & Net İhtiyaç Hesabı │
- └────────────────────────┬─────────────────────────┘
-                          │ Net Hedefler & Malzeme Kısıtı (r_j >= 480 dk)
-                          ▼
- ┌──────────────────────────────────────────────────┐
- │  4. DETAYLI ÇİZELGELEME (Google OR-Tools CP-SAT) │
- │     - Sıra Bağımlı Hazırlık Matrisi (Setup)      │
- │     - Precedence & MRP Malzeme Hazırlık Kısıtı   │
- └────────────────────────┬─────────────────────────┘
-                          │ Dakika Bazlı Zaman Çizelgesi
-                          ▼
- ┌──────────────────────────────────────────────────┐
- │  5. ENERJİ & GHG KAPSAM 1-2 KARBON ANALİTİĞİ     │
- │     - SQLite SSOT Tabanlı Makine Güç Profili     │
- │     - 15 Dk Yük Simülasyonu & Pik Güç Doğrulama  │
- │     - Dahili Karbon Fiyatlama Simülatörü (€/ton) │
- └──────────────────────────────────────────────────┘
-
----
-
-## 📐 Matematiksel Optimizasyon Modelleri
-
-### 1. Taktik Agrega Üretim Planlama (PuLP - Lineer Programlama)
-
-Taktik model, 4 haftalık dönemde ürün ailelerinin ($f \in F$) çok makineli kapasite kısıtları altında standart kapasite, fazla mesai, stok tutma ve talep karşılama maliyetlerini minimize eder.
-
-#### Amaç Fonksiyonu:
-$$\min Z = \sum_{t=1}^{T} \left( \sum_{f \in F} (c_h I_{f,t} + c_b B_{f,t}) + \sum_{m \in M} c_{o,m} OT_{m,t} \right)$$
-
-#### Kısıtlar:
-1. **Stok Denge Eşitliği:**
-   $$I_{f,t-1} + P_{f,t} - B_{f,t-1} + B_{f,t} = D_{f,t} + I_{f,t} \quad \forall f, \forall t$$
-2. **Çok Makineli Kapasite ve Fazla Mesai:**
-   $$\sum_{f \in F} a_{f,m,t} P_{f,t} \le C_{m,t} + OT_{m,t} \quad \forall m, \forall t$$
-   $$OT_{m,t} \le OT_{\max, m, t} \quad \forall m, \forall t$$
-
-* **Dinamik Gölge Fiyatlar (Dual Values):** M01 tezgâhının kapasite kısıtının marjinal gevşeme değeri Hafta 1 için **-9,249.39 $/saat**, Hafta 2 için **-9,290.16 $/saat** seviyesindedir. Bu değer doğrudan mesai maliyeti değil; darboğaz olan M01 tezgâhının kapasitesinin 1 birim artırılmasının toplam sistem maliyetindeki marjinal tasarruf potansiyelini ifade eder.
-
----
-
-### 2. Detaylı Çizelgeleme (Google OR-Tools CP-SAT)
-
-### 🧪 Veri Kümeleri Ayrımı: CI Test Fixture vs. Referans Analiz Verisi
-
-| Kriter | CI Test Fixture (Sentetik Fikstür) | Reference Analysis Dataset (Referans Koşum) |
-| :--- | :--- | :--- |
-| **Kullanım Amacı** | GitHub Actions CI doğrulaması ve yerel entegrasyon testleri | Endüstriyel kıyaslama (benchmark), raporlama ve Streamlit analizleri |
-| **Veri Üretim Modeli** | `generate_raw_data.py` ile otomatik üretilen sentetik hafif veri | 5 yıllık tam ölçekli fabrika talep geçmişi ve nominal parti boyutları |
-| **İşlem Hacmi (Lot/Birim)** | Test ölçeğinde mikro talep | 11,525 birim disk üretimi (konsolide fabrika haftalık planı) |
-| **CP-SAT Makespan ($C_{\max}$)** | **~100 dakika** (hızlı CI doğrulaması) | **11,285 dakika (188.08 saat)** |
-| **Optimality Gap** | %0.00 (Saniyeler içinde OPTIMAL) | %0.00 (Formüle edilmiş model uzayında matematiksel optimum) |
-| **Repo / Versiyon Durumu** | Varsayılan repo koduyla doğrudan çalışır (`python main.py`) | Ağır ham veriler `.gitignore` kapsamındadır; analiz metrikleri dondurulmuştur |
-
-> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. Dokümantasyondaki 8,962 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
-
-> **Geliştirici Notu:** Sıfırdan `git clone` yapıp `python main.py` çalıştırdığınızda boru hattı otomatik olarak CI Test Fixture senaryosunu işletir ve sistem kısıtlarının geçerliliğini doğrular. README genelindeki 8,962 dakikalık çizelge metrikleri ise tam ölçekli referans veri koşumunun (Reference Dataset) çıktılarıdır.
-
-Operasyonel düzeyde, 1. hafta SKU üretim partilerinin tezgâhlar üzerindeki operasyonları sıra bağımlı hazırlık süreleri ve malzeme temin kısıtlarıyla modellenir.
-
-> **Operasyonel Planlama Ufku ve Hafta Aşımı (Rolling Horizon vs. Multi-Period Scope):**  
-> Taktik agrega planlama (LP) 4 haftalık dönemde ($W_1, W_2, W_3, W_4$) fabrika kapasitesini optimize ederken; operasyonel çizelgeleme (CP-SAT) **Hafta 1 iş yükünün sonlu kapasiteli yürütümüne (Week-1 Finite Scheduling)** odaklanır. Model, 4 bağımsız haftalık kapasite bloğu yerine 1. haftanın partilerini çözer; malzeme tedarik gecikmeleri ($r_b = 480\text{ dk}$) ve sıra bağımlı hazırlık süreleri nedeniyle oluşan operasyonel taşmalar kesintisiz akışla 2. haftaya dinamik olarak sarkar (**Continuous Rolling Spillover**). Tam 4 haftalık periyodik sonlu kapasite çizelgelemesi (Multi-Period Finite Scheduling) yol haritasında yer almaktadır.
-
-#### Amaç Fonksiyonu:
-$$\min C_{\max}$$
-
-#### Kısıtlar:
-1. **Tezgâh Ayrıklığı (Disjunctive / No-Overlap):**
-   $$\text{IntervalVar}(o_{i,m}) \cap \text{IntervalVar}(o_{j,m}) = \emptyset \quad \forall i \neq j, \forall m$$
-2. **Sıra Bağımlı Hazırlık Süresi (Sequence-Dependent Setup):**
-   $$\text{Start}(o_{j,m}) \ge \text{End}(o_{i,m}) + S_{i,j,m}$$
-3. **Rota Öncelik Kısıtı (Precedence):**
-   $$\text{Start}(o_{b, m+1}) \ge \text{End}(o_{b, m}) \quad \forall b \in B$$
-4. **MRP Malzeme Hazırlık Kısıtı (Dynamic Release Time):**
-   $$\text{Start}(o_{b, 1}) \ge r_b \quad (r_b = 480\text{ dk if material is EXPEDITE, else } 0)$$
-
-* **Çizelgeleme Mimarisi ve Model Evrimi (v1 vs. v2):**
-  * **Mimari v1 (Consolidated Single-Lot Baseline):** Operasyonlar arası transfer partileme olmaksızın SKU başına tekil üretim partisi varsayımı altında, CP-SAT çözücüsü sezgisel taban çizgiye (9,197 dk / 153.28 sa) kıyasla akış süresinde **%3.2 tasarruf** ile iş akışını **8,901 dakikada (148.35 sa)** tamamlamıştır.
-  * **Mimari v2 (Transfer-Batched & Sub-lot Flow - Canonical Run):** İstasyonlar arası bekleme sürelerini azaltmak ve gerçekçi fabrika içi malzeme transferini modellemek için transfer partileme (`sub-lot`, FIFO, `MAX_SUB_LOT_BATCHES = 40`) devreye alınmıştır. Bu yapı ve malzeme gecikme kısıtları (`EXPEDITE` $r_b = 480\text{ dk}$) altında doğrulanmış referans çizelgeleme makespan değeri **11,285 dakika (188.08 saat)** olarak mühürlenmiştir.
-* **Kapasite Değerlendirmesi:** M01 tezgâhı standart 96 saatlik 2 vardiya kapasitesini aşarak haftalık net fazla mesai ve ek operasyonel kapasite gereksinimini (nominal capacity overrun) açıkça ortaya koymuştur.
-
-
-#### ⚖️ Hiyerarşik Kapasite Mutabakatı & Hazırlık Yükü (HPP Design Principle)
-Agrega LP (Taktik Seviye) ile CP-SAT (Operasyonel Seviye) arasındaki kapasite tanımı, Hiyerarşik Üretim Planlama (HPP) metodolojisine uygun olarak iki aşamalı modellenmiştir:
-* **Taktik Seviye (LP):** Sıra bağımlı hazırlık (sequence-dependent setup) süreleri iş sıralaması bilinmediğinden dahil edilmez; saf işlem süreleri azami nominal + fazla mesai tavanına ($134.4\text{ saat}$) göre kısıtlanır.
-* **Operasyonel Seviye (CP-SAT):** Partiler ardışık tezgâhlara dizildiğinde sıra bağımlı hazırlık süreleri eklenir. Darboğaz tezgâhı M01'de gerçekleşen hazırlık süresi ($2.83\text{ saat}$) ve oluşan $2.58\text{ saatlik}$ fark (`setup_overrun_hr`), hazırlık yükünün operasyonel aşamada eklenmesinden kaynaklanan doğal bir varyans olarak açıkça mutabakat tablosunda raporlanır:
-
-| Tezgâh (Machine) | LP İzin Verilen Tavan (`lp_max_allowed_hr`) | İşlem Süresi (`proc_hours`) | Hazırlık Süresi (`setup_hours`) | Toplam Yük (`total_workload_hr`) | Hazırlık Aşımı (`setup_overrun_hr`) |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **M01** | **134.40 sa** | 134.15 sa | 2.83 sa | **136.98 sa** | **2.58 sa** |
-| **M02** | **86.40 sa** | 64.37 sa | 3.50 sa | **67.87 sa** | **0.00 sa** |
-| **M03** | **86.40 sa** | 72.47 sa | 2.58 sa | **75.05 sa** | **0.00 sa** |
-
----
-
-## 🔬 Talep Tahmini: Tarihsel Backtest ve Gelecek Ufku Mimarisi
-
-Tahminleme motoru iki aşamalı endüstriyel standart bir metodoloji ile çalışmaktadır:
-1. **28-Day Historical Backtest (Model Validasyonu & Seçim):** Pilot 5 SKU için geçmiş 28 günlük (`2017-12-04` – `2017-12-31`) out-of-sample holdout test penceresinde çok adımlı özyinelemeli (recursive) **LightGBM Regressor** ve **Holt-Winters Üstel Düzleştirme** modelleri yarıştırılmıştır. En düşük test WAPE skoruna sahip model SKU bazında operasyona atanmıştır.
-2. **28-Day Production Horizon Forecast (Operasyonel Besleme):** Seçilen en iyi modeller tüm geçmiş veriyle güncellenerek fabrikaya intikal eden Ocak 2018 (`2018-01-01` – `2018-01-28`) 4 haftalık operasyonel ufkun talebini üretmiştir (`forecast_demand`). Bu çıktılar Agregat Planlama (LP) ve CP-SAT çizelgeleyicinin birincil girdisini oluşturur.
-
-| SKU Kodu | Ürün Ailesi | Kazanan Model | Test WAPE | Test RMSE | Bias | Karakteristik |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **P01** | FAM_A | **LightGBM** | %7.71 | 17.71 | -254.0 | Otokorelasyon ve takvim gecikmeleri baskın |
-| **P02** | FAM_A | **Holt-Winters** | %6.81 | 40.67 | 526.2 | Düzenli haftalık mevsimsellik örüntüsü |
-| **P03** | FAM_A | **Holt-Winters** | %7.17 | 28.90 | 405.5 | Düşük varyanslı stabil talep serisi |
-| **P04** | FAM_B | **LightGBM** | %6.12 | 14.17 | -44.6 | Doğrusal olmayan trend ve promosyon esnekliği |
-| **P05** | FAM_B | **LightGBM** | %10.41 | 19.38 | -373.0 | Çok değişkenli regresyon avantajı |
-
----
-
-## 📦 Malzeme İhtiyaç Planlaması (Time-Phased MRP-I)
-
-BOM ağacı üzerinden her hammadde için dinamik stok projeksiyonu:
-
-$$I_{t}^{\text{proj}} = I_{t-1}^{\text{proj}} + SR_t - GR_t$$
-$$NR_t = \max\left(0, GR_t + SS - I_{t-1}^{\text{proj}} - SR_t\right)$$
-> **Emniyet Stoku Metodolojisi ve Kısıtı (Simplified MRP Approximation):**
-> Modeldeki emniyet stoku ($SS$), 4 haftalık planlama ufkundaki brüt ihtiyaç dağılımının standart sapması ($\sigma_{GR} = \text{std}(\text{gross\_requirement})$) üzerinden hesaplanan deterministik bir operasyonel yaklaşımdır (`simplified MRP approximation`). Bu metrik doğrudan talep tahmin belirsizliğini ($\sigma_{\text{demand}}$ veya tahmin hatası $\text{RMSE}$) modellemez; bağımlı talebin planlama ufkundaki dalgalanmasını baz alır. Klasik stok teorisindeki $SS = z \cdot \sigma_{\text{demand}} \cdot \sqrt{LT}$ kapalı çevrim stok ayrıştırması ilerideki stokastik genişletmelere bırakılmıştır.
-
-* **Tedarik Eylem Mesajları:** Temin süresi geriye ötelendiğinde cari periyodun gerisine düşen ($t - L \le 0$) siparişler otomatik olarak **`EXPEDITE (Past Due)`** mesajı üretir (Örn. `RAW_ALLOY_ROD` 1. ve 2. hafta siparişleri). Bu parçaları tüketen ürün lotları CP-SAT çizelgesinde 480 dakikalık malzeme serbest bırakma eşiğine kilitlenir. Gelecek dönemler ise **`RELEASE ORDER`** olarak planlanır.
-
----
-
-## ⚡ Enerji Analitiği ve GHG Karbon Muhasebesi
-
-### 15-Dakikalık Tesis Yük Profili
-$$P_{\text{tesis}}(t) = \sum_{m \in M} \left( P_{m}^{\text{proc}}(t) + P_{m}^{\text{setup}}(t) + P_{m}^{\text{idle}}(t) \right)$$
-
-* **Tepe Yük (Peak Load):** $246.95\text{ kW}$
-* **Ortalama Yük (Avg Load):** $111.94\text{ kW}$ ($\text{Peak} \ge \text{Avg}$ fiziksel kuralı doğrulanmıştır, Load Factor: $0.453$)
-* **Yük Faktörü (Load Factor):** $0.462$
-* **Toplam Enerji Tüketimi:** $21,054.23\text{ kWh}$ (Referans koşum dinamik termodinamik enerji profili: İşleme 20,944.83 kWh, Setup 19.60 kWh, Boşta 89.79 kWh)
-* **Kapsam 1 + Kapsam 2 Emisyonu:** $10.917\text{ tCO}_2\text{e}$
-
-### Sera Gazı Emisyonları (Modeled Production-System Scope 1 & 2)
-> **Sistem Sınırı Notu:** Bu metrik tesis geneli yardımcı işletmeleri (HVAC, aydınlatma, ofis vb.) kapsamaz; doğrudan çizelgelenen tezgâh elektrik tüketimini (Scope 2 - Location-Based) ve iç lojistik forklift dizelini (Scope 1) modeller[cite: 3].
-
-1. **Kapsam 1 (Doğrudan):** Forklift dizel tüketimi (85 L $\times$ 2.68 kg CO₂e/L = 0.228 tCO₂e)
-2. **Kapsam 2 (Dolaylı - Location-Based):** Şebeke elektrik tüketimi ($0.440\text{ kg CO}_2\text{e/kWh}$ emisyon faktörüyle tezgâh tüketimleri)
-3. **Modellenen Üretim Karbon Ayak İzi:** **10.917 tCO₂e** (Birim yoğunluk: 1.140 kgCO₂e / adet)
-
-#### Dahili Karbon Fiyatlama (Internal Carbon Pricing) Senaryoları
-> **Finansal Modelleme ve Karbon Metodolojisi Notu:**
-> Sistemde hesaplanan karbon maliyetleri bir piyasa tahsisat uyumu (EU ETS compliance allowance trading) olmayıp, kurumsal **Dahili Karbon Fiyatlandırması (Internal Carbon Pricing / Shadow Pricing)** metodolojisine dayanır. Maruziyet hesabı doğrudan $\text{Exposure} = \text{Carbon (tCO}_2\text{e)} \times \text{InternalCarbonPrice (€/tCO}_2\text{e)}$ formülüyle senaryo bazlı analiz edilir[cite: 8].
-| Karbon Fiyatı (€/tCO₂e) | Toplam Karbon Maruziyeti (€) | Birim Ürün Başı Ek Karbon Maliyeti (€/adet) |
-|:---:|:---:|:---:|
-| **0** | 0.00 | 0.0000 |
-| **50** | 470.05 | 0.0570 |
-| **80** | 752.08 | 0.0912 |
-| **100** | 940.10 | 0.1140 |
-| **120** | 1,128.12 | 0.1367 |
-
----
-
-## 📂 Proje Dizin Yapısı
+Sistem, monolitik bir simulasyon yerine ISA-95 standartlarina dayali hiyerarsik bir karar destek mimarisi sunar:
 
 ```text
-├── dashboard/
-│   └── app.py                      # Streamlit karar destek arayüzü
-├── data/
-│   ├── raw/
-│   │   └── .gitkeep                # Ham veri dizini (train.csv sürüm kontrolü dışındadır)
-│   ├── fixtures/
-│   │   └── demand_fixture.csv      # Tekrarlanabilir test ve CI fixture verisi
-│   ├── processed/                  # Boru hattı çıktı CSV dosyaları
-│   └── factory.db                  # SQLite tekil gerçeklik kaynağı (SSOT)
-├── docs/                           # Metodolojik dokümantasyon ve mimari diyagramlar
-├── scripts/                        # Yardımcı otomasyon ve veri hazırlama scriptleri
-├── src/
-│   ├── config.py                   # Parametreler, yollar ve varsayılan sabitler
-│   ├── data/
-│   │   ├── preprocessing.py        # Ham talep konsolidasyonu
-│   │   └── build_database_and_eda.py # SQLite master-data yükleme ve EDA
-│   ├── forecasting/
-│   │   └── train_forecast.py       # Recursive LightGBM & Holt-Winters motoru
-│   ├── planning/
-│   │   └── aggregate_planning.py   # Talep ağırlıklı LP ve SKU ayrıştırma
-│   ├── inventory/
-│   │   └── bom_mrp.py              # Zaman fazlı MRP-I motoru
-│   ├── scheduling/
-│   │   └── schedule_cpsat.py       # OR-Tools CP-SAT detaylı çizelgeleme
-│   ├── energy/
-│   │   └── energy_analytics.py     # SQLite SSOT ve 15 dk yük profili analitiği
-│   └── carbon/
-│       └── carbon_analytics.py     # GHG Kapsam 1-2 ve dahili karbon simülasyonu
-├── tests/
-│   ├── test_pipeline.py            # Uçtan uca boru hattı entegrasyon testleri
-│   └── test_system_consistency.py  # Matematiksel ve fiziksel tutarlılık denetimleri
-├── main.py                         # Uçtan uca boru hattı orkestrasyonu
-├── requirements.txt                # Kütüphane bağımlılıkları
-└── README.md
+[ Demand Signals / LightGBM ]
+             |
+             v
+[ Hierarchical Production Planning (HPP / LP) ]
+             |
+             v
+[ Material Requirements Planning (BOM / MRP) ]
+             |
+             v
+[ Finite Capacity Scheduling (OR-Tools CP-SAT) ]
+             |
+             +---> [ Energy & Carbon Accounting (GHG Scope 2) ]
+             |
+             +---> [ Execution Tracking & Dynamic Replanning (MES Feedback) ]
+```
 
 ---
 
-## 🚀 Kurulum ve Çalıştırma
+## 2. Core Pillars & Capabilities
 
-# Depoyu klonlayın
-git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
-cd factory-decision-intelligence
+### A. Hierarchical Production Planning & Scheduling
+- **Taktik Katman (HPP LP):** Kapasite darbogazlarini, fazla mesai maliyetlerini ve stok dengelerini optimize eden dogrusal programlama modeli.
+- **Operasyonel Cizelgeleme (CP-SAT):** Tezgah kisitlari, hazirlik (setup) matrisleri, oncelik zincirleri ve cok amacli hedef politikalari (`ObjectivePolicy`: `BALANCED`, `THROUGHPUT_MAX`, `SERVICE_LEVEL_FIRST`).
 
-# Sanal ortamı oluşturun ve aktif edin
-python -m venv factory-env
-factory-env\Scripts\activate      # Windows
-# source factory-env/bin/activate # Linux/macOS
+### B. Scenario Engine & Sensitivity Analysis (What-If)
+- **Kapsam:** Talep soku (+%20), kapasite kisiti (-%10), enerji dalgalanmasi (+%25), karbon vergisi artisi (+50 EUR/tCO2), makine arizasi ve hammadde gecikmesi.
+- **Izole Calisma (Isolated Sandbox):** Canli veritabanini kirletmeden secili asamalari gecici izole ortamda kosturur.
+- **KPI Reconciliation:** Makespan, servis seviyesi (OT%), stok maliyeti, backlog, enerji tuketimi (kWh) ve net karbon ayak izi (tCO2e) uzerinde delta mutabakati uretir.
 
-# Bağımlılıkları yükleyin
-pip install -r requirements.txt
+### C. Closed-Loop Execution & Dynamic Replanning
+- **Two-Tier Rescheduling:** Fast Local Repair (minor dalgalanmalar) ve CP-SAT Re-optimization (major arizalar).
+- **Frozen Horizon Prensipleri:** COMPLETED (dokunulmaz), RUNNING (baslangic kilitli), SCHEDULED (esnek/kaydirilabilir).
 
-# Uçtan uca boru hattını çalıştırın
-python main.py
-
-# Matematiksel ve fiziksel tutarlılık testlerini koşturun
-python -m pytest -v
-
-# Streamlit karar destek panelini başlatın
-streamlit run dashboard/app.py
----
-
-## 7. Assumptions & Technical Limitations
-
-This platform bridges tactical operational research and discrete-event scheduling. To maintain transparent boundaries between empirical ground truth and simulation modeling, the following engineering assumptions and limitations are explicitly documented:
-
-* **Demand Forecasting (Historical Holdout/Backtest):** Store demand series represent an empirical retail dataset consolidated into factory pull orders. The multi-model benchmark (LightGBM, Holt-Winters, Moving Average, Naive baselines) is evaluated on a 28-day out-of-sample holdout test window without forward-looking leakage.
-* **Synthetic Manufacturing Master Data:** While store demand dynamics are real, factory production routings, machine work centers (M01, M02, M03), Bill of Materials (BOM), and sequence-dependent setup matrices were synthetically parameterized to reflect a representative discrete manufacturing plant.
-* **Weekly MRP Time Bucketing & Safety Stock Approximation:** Material Requirements Planning (MRP-I) executes across discrete 1-week buckets. Safety stock utilizes a **simplified deterministic MRP approximation** based on gross requirements dispersion across the planning horizon ($SS = z \cdot \sigma_{GR} \cdot \sqrt{LT}$). Full stochastic inventory decoupling via forecast residual error ($SS = z \cdot \sigma_{\epsilon} \cdot \sqrt{LT}$) is reserved for closed-loop supply chain extensions.
-* **Synthetic Expedite-Release Heuristic ($r_b = 480\text{ min}$):** For orders encountering material stockouts or past-due MRP expediting in Week 1, an operational heuristic enforces a synthetic release penalty ($r_b = 480\text{ min}$, equivalent to one 8-hour shift) before initial machine operations can commence. Full closed-loop coupling ($r_{\text{lot}} = \max_{m \in \text{BOM}} \{t_{\text{avail}}(m)\}$) is reserved for dynamic multi-echelon MRP extensions.
-* **Hierarchical Planning Architecture (3-Tier Industrial Decision Horizon):** Following industrial APS standards (e.g., SAP PP/DS, Siemens Opcenter), the system intentionally decouples planning horizons rather than forcing a monolithic 4-week combinatorial CP-SAT model:
-  1. **Long / Tactical Horizon (4-Week LP / MRP):** Solves multi-period aggregate production and material replenishment plans across discrete weekly buckets without sequence-dependent runtime overhead.
-  2. **Detailed Scheduling Horizon (Week-1 Rolling Finite Horizon):** CP-SAT discrete optimization schedules the high-resolution operational workload ($[0, C_{\max}]$) subject to machine work calendars, sequence-dependent setups, and material availability dates, rolling spillover into Week 2.
-  3. **Execution Horizon (MES Closed-Loop & Event-Driven Rescheduling):** Real-time deviations, machine breakdowns, and progress tracking are managed dynamically via two-tier repair and strict frozen horizon semantics (`COMPLETED` = immutable, `RUNNING` = frozen start, `SCHEDULED` = movable).
-* **Nominal 96-Hour Two-Shift Capacity Benchmark:** Machine regular capacity is modeled against a nominal 2-shift schedule ($16\text{ h/day} \times 6\text{ days} = 96\text{ hours/week}$) buffered at 10% for unscheduled maintenance, with up to 48 hours/week overtime ceiling.
-* **Internal Carbon Price & Exposure Scenarios:** Financial carbon liabilities evaluate Internal Carbon Price scenarios (shadow pricing) at €0, €50, €80, €100, and €120 per $\text{tCO}_2\text{e}$ to model potential marginal regulatory exposure (e.g. CBAM/ETS proxy).
-* **Baseline Grid Emission Factor (Synthetic Midpoint Assumption):** Scope 2 indirect emissions assume an electricity emission factor of $0.440\text{ tCO}_2\text{e/MWh}$ ($0.440\text{ kgCO}_2\text{e/kWh}$). This value reflects a synthetic midpoint assumption benchmarked directly against official Turkish Ministry of Energy and Natural Resources (ETKB) electricity consumption emission factor ranges (transmission-connected: $0.436\text{ tCO}_2\text{e/MWh}$; distribution-connected: $0.469\text{ tCO}_2\text{e/MWh}$), offering seamless parametric adaptation to global GHG Protocol / CBAM accounting scenarios[cite: 6].
-### 7.3. Enerji Muhasebesi ve Simülasyon Ufku Sınır Şartları (Horizon vs. Calendar Discretization)
-- **Sürekli Simülasyon Ufku (Elapsed Horizon Baseline):** Enerji analitiği motoru, çizelgeleme makespan değerini kesintisiz bir operasyonel ufuk ($[0, C_{\max}]$) olarak modeller. Makine güç tüketimleri operasyonel düzeyde **PROCESSING**, **SETUP** ve **IDLE** durumları üzerinden anlık güç profiline yansıtılır.
-- **Konservatif Boşta Bekleme Yaklaşımı (Conservative Standby Allocation):** Vardiyalar arası geçişler ve planlı duruş pencereleri, tesis içi ekipmanların şebekeden tam izolasyonu (**OFF / 0 kW**) yerine hazırda bekleme rejiminde (**IDLE / Standby**) kaldığı muhafazakâr bir senaryo ile hesaplanır. Bu tercih, ani yeniden devreye alma (cold-start) kayıplarını minimize eden endüstriyel tesis pratiklerini yansıtır.
-- **Mimari Yol Haritası:** Çok vardiyalı operasyonlarda takvim-bağımlı güç tüketimini ayrıştırmak adına, makine çalışma takvimlerinin (Machine Work Calendar) dinamik bir durum değişkeni olarak entegrasyonu sistem yol haritasına dahil edilmiştir.
----
+### D. ISA-95 Entegrasyon Sinirlari & Adapter Kontratlari
+Gercek bir ERP/MES hesabina baglanmak yerine referans synthetic adapter katmanlari ile calisir:
+- `ERPAdapterInterface` -> `MockERPAdapter`
+- `MESAdapterInterface` -> `MockMESAdapter`
+- `InventoryAdapterInterface` -> `MockInventoryAdapter`
+- `MachineTelemetryAdapterInterface` -> `MockTelemetryAdapter`
 
 ---
 
-## 📌 Current Validated Reference Snapshot
+## 3. Verification & Quality Gates
 
-| Metrik / Parametre | Değer / Detay |
-| :--- | :--- |
-| **Solver status** | `OPTIMAL` (Global optimum of the formulated CP-SAT model under discrete calendar & MES operational constraints) |
-| **Makespan** | **11,285 dk (188.08 saat)** |
-| **Production units** | **11,525 adet** (Planlanan: 11,525 / Mutabakat: %100) |
-| **Energy** | **21,054.23 kWh** |
-| **Carbon** | **9.4917 tCO₂e** |
+```bash
+# Statik Kod Kalitesi ve Bicipelendirme
+python -m ruff check scripts/ src/ tests/
+python -m ruff format --check scripts/ src/ tests/
 
-> Tüm kanonik analiz çıktıları ve doğrulama CSV dosyaları tek yetkili kaynak (authoritative single source of truth) olarak `artifacts/reference/` dizininde dondurulmuştur.
-
-### 📜 Historical Baselines & Model Evolution
-Erken aşama geliştirme döngülerinde ve model geçişlerinde kaydedilen tarihsel referanslar arşiv amaçlı aşağıda listelenmiştir:
-- **v1 Single-Lot Baseline:** Operasyonlar arası transfer partileme olmaksızın çözülen ilk model (Makespan: ~8,962 dk, 8,250 mikro birim, 1,642 kWh enerji hesabı).
-- **v2 Transfer-Batched Pre-SSOT:** İlk alt-parti ve acil malzeme kısıtları entegrasyonu (Makespan: 14,105 – 14,683 dk denemeleri; ara referans: 13,698 dk).
-- **v2.2 Validated Reference Snapshot (Current):** Tam takvim/vardiya/fazla mesai bütçe kısıtları, dinamik MES durum kuplajı ve fiziksel enerji profili altında doğrulanmış referans (Makespan: 11,285 dk, Enerji: 21,054.23 kWh, Karbon: 9.4917 tCO₂e).
-
-
-## 8. Academic & Methodological References
-
-1. **Hierarchical Production Planning:**  
-   Hax, A. C., & Meal, H. C. (1975). *Hierarchical Integration of Production Planning and Scheduling*. In M. A. Geisler (Ed.), *Logistics* (Vol. 1, North-Holland/TIMS Studies in the Management Sciences, pp. 53–69). Amsterdam: North-Holland Publishing Company.
-2. **Corporate Carbon Accounting:**  
-   World Resources Institute (WRI) & World Business Council for Sustainable Development (WBCSD). (2004). *The Greenhouse Gas Protocol: A Corporate Accounting and Reporting Standard* (Revised Edition). Scope 1 & Scope 2 Guidance.
-3. **Constraint Programming for Scheduling:**  
-   Laborie, P., Rogerie, J., Shaw, P., & Vilím, P. (2018). *Reasoning with Goal-Directed Search and Interval Variables in CP Optimizer*. *Constraints*, 23(2), 177–214.
-4. **Machine Learning Benchmarks:**  
-   Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., Ye, Q., & Liu, T. Y. (2017). *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*. *Advances in Neural Information Processing Systems (NeurIPS)*, 30, 3146–3154.
-5. **Demand Dataset Source:**  
-   Kaggle Store Item Demand Forecasting Dataset (10 stores, 50 items daily sales history), adapted for multi-echelon industrial manufacturing research.
-6. **Electricity Emission Factor Benchmark (Scope 2):**  
-   T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) Güncel Elektrik Şebeke Emisyon Faktörleri (İletim: $0.436\text{ tCO}_2\text{e/MWh}$, Dağıtım: $0.469\text{ tCO}_2\text{e/MWh}$) referans alınarak kurgulanmış sentetik orta nokta varsayımı ($0.440\text{ tCO}_2\text{e/MWh}$). Uluslararası karşılaştırmalarda European Environment Agency (EEA) ve IEA sera gazı metodolojileriyle parametrik olarak uyumludur.
-
----
-
-## 🔬 Çözücü Tekrarlanabilirliği (Solver Reproducibility)
-
-> *“The reference configuration uses fixed solver parameters and a fixed random seed to improve run-to-run reproducibility.”* 
-> 
-> Çoklu iş parçacıklı (`num_search_workers > 1`) CP-SAT aramalarında donanım ve işletim sistemi katmanındaki non-deterministic thread yarışları nedeniyle mutlak bit-seviyesinde (%100 bit-identical) eşitsizlikler olabilse de, sabit `random_seed` ve parametre yapılandırması çalıştırmalar arası sonuç stabilitesini ve tekrarlanabilirliği büyük ölçüde güvence altına alır.
-
-
-### Material Requirements: Analytical MRP-I vs. ERP-Grade MRP Boundary
-
-Bu platformun envanter katmanı, operasyonel bir işlem motoru (transactional ERP) yerine analitik optimizasyon akışını besleyen bir **Analytical MRP-I Engine** olarak tasarlanmıştır. Sistem sınırları ve kurumsal yol haritası aşağıdaki tabloda şeffaf bir şekilde ayrıştırılmıştır:
-
-| Fonksiyonel Yetenek | Mevcut Kapsam (Analytical MRP-I Engine) | Kurumsal Yol Haritası (ERP-Grade MRP) |
-| :--- | :--- | :--- |
-| **Ürün Ağacı (BOM)** | Çok seviyeli dinamik patlatma (Multi-level explosion) | Mühendislik/Üretim BOM ayrımı (EBOM / MBOM) |
-| **İhtiyaç Analizi** | Brüt & Net ihtiyaç ayrıştırması (Gross vs. Net Req) | Zaman-fazlı sipariş defteri (Time-phased pegging) |
-| **Tedarik Süresi** | Deterministik tedarik süresi ötelemesi (Lead Time offsetting) | Tedarikçi çalışma & sevkiyat takvimleri (Supplier Calendar) |
-| **Emniyet Stoğu** | Varyans ve hizmet seviyesi bazlı dinamik Safety Stock | Mevsimsel ve dinamik risk tamponları |
-| **Erken Uyarılar** | Darboğaz & teslimat riski uyarıları (EXPEDITE flags) | Otomatik satınalma siparişi tetikleme (Automated PO Release) |
-| **Stok Yönetimi** | Başlangıç stok seviyesi ve net bakiye projeksiyonu | Depo mal kabul, QC Hold, karantina ve fiziki rezervasyonlar |
-| **Hurda & Verim** | Standart teorik tüketim | Süreç içi hurda (Scrap), fire ve parça verim (Yield) oranları |
+# Butunlesik Test Suiti (90+ Test)
+python -m pytest -q
+```
