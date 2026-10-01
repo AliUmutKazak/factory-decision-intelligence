@@ -185,3 +185,11 @@ INITIAL_MACHINE_STATE = {
 }
 # P2 Scenario Parameters
 DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH = ECONOMIC_CONFIG.energy_price_per_kwh  # Endüstriyel elektrik baz fiyatı (€/kWh)
+
+
+class ObjectivePolicy:
+    """Çizelgeleme ve senaryo motoru için çok amaçlı hedef politikaları."""
+
+    BALANCED = "BALANCED"
+    THROUGHPUT_MAX = "THROUGHPUT_MAX"
+    SERVICE_LEVEL_FIRST = "SERVICE_LEVEL_FIRST"
