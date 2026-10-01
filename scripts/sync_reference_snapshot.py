@@ -16,9 +16,7 @@ def get_latest_active_run_id() -> str:
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute(
-        "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
-    )
+    cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1")
     row = cur.fetchone()
     conn.close()
     if row and row[0]:
@@ -29,11 +27,7 @@ def get_latest_active_run_id() -> str:
 def sync_snapshots():
     # 1. Güncel HEAD commit sha
     try:
-        git_sha = (
-            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT_DIR)
-            .decode("utf-8")
-            .strip()
-        )
+        git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT_DIR).decode("utf-8").strip()
     except Exception as e:
         print(f"Git sha alınamadı: {e}")
         git_sha = "unknown"
