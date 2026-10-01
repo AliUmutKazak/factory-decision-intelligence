@@ -11,9 +11,8 @@ from src.config import (
     CPSAT_RANDOM_SEED,
     CPSAT_TIME_LIMIT_SECONDS,
     DB_PATH,
-    SCHEDULING_WEIGHT_MAKESPAN,
-    SCHEDULING_WEIGHT_SETUP,
-    SCHEDULING_WEIGHT_TARDINESS,
+    OBJECTIVE_POLICIES,
+    SchedulingObjectivePolicy,
 )
 from src.utils.db import get_db_connection
 
@@ -36,7 +35,11 @@ def get_initial_machine_states(conn) -> dict:
     return states
 
 
-def run_cpsat_scheduling(sku_plan=None, run_id=None):
+def run_cpsat_scheduling(
+    sku_plan=None,
+    run_id=None,
+    policy: SchedulingObjectivePolicy = SchedulingObjectivePolicy.BALANCED,
+):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = get_db_connection(DB_PATH)
     machine_initial_states = get_initial_machine_states(conn)
@@ -545,11 +548,17 @@ def run_cpsat_scheduling(sku_plan=None, run_id=None):
 
     total_weighted_tardiness = sum(tardiness_terms) if tardiness_terms else 0
 
+    # Seçilen işletme politikasına göre katsayıları yükle (Business Objective Layer)
+    weights = OBJECTIVE_POLICIES.get(policy, OBJECTIVE_POLICIES[SchedulingObjectivePolicy.BALANCED])
+    weight_makespan = weights.makespan_weight
+    weight_setup = weights.setup_weight
+    weight_tardiness = weights.tardiness_weight
+
     # Çok Amaçlı Karar Fonksiyonu: Makespan + Setup + Weighted Tardiness
     objective_expr = (
-        int(SCHEDULING_WEIGHT_MAKESPAN) * makespan
-        + int(SCHEDULING_WEIGHT_SETUP) * total_setup_duration
-        + int(SCHEDULING_WEIGHT_TARDINESS) * total_weighted_tardiness
+        int(weight_makespan) * makespan
+        + int(weight_setup) * total_setup_duration
+        + int(weight_tardiness) * total_weighted_tardiness
     )
     model.Minimize(objective_expr)
 

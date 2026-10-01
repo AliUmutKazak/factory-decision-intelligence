@@ -1,7 +1,7 @@
 {
   "run_id": "RUN-20260930-856a35",
   "run_timestamp": "2026-09-28T16:04:04.924049",
-  "git_sha": "e70264d0d8d402be86aa749ac08ed3392289d0ed",
+  "git_sha": "506ea8fc6e98da6e9743bf74262ecd3439cf4cc6",
   "data_source": "data/processed/factory_orders.csv",
   "forecast_origin": "2017-12-31",
   "forecast_method": "Hybrid_Backtest_Selection",

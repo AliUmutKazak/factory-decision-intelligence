@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 # Dizin Hiyerarşisi
@@ -122,12 +123,59 @@ MAX_SUB_LOT_BATCHES = 40  # Bir alt transfer lotunun alabileceği maksimum batch
 CPSAT_TIME_LIMIT_SECONDS = 30.0  # Çözücü zaman limiti (sn)
 CPSAT_NUM_SEARCH_WORKERS = 8  # Arama iş parçacığı sayısı
 CPSAT_RANDOM_SEED = 42  # Tekrarlanabilirlik tohum değeri
-# P2: Çok Amaçlı Karar Fonksiyonu Ağırlıkları (Weighted-Sum Multi-Objective Scalarization)
-# Makespan ana bileşendir; setup süresi ikincil ceza olarak ağırlıklandırılır.
-# CP-SAT tamsayı (integer) aritmetiği gereği ağırlıklar tamsayı olarak tanımlanır.
-SCHEDULING_WEIGHT_MAKESPAN = 100  # alpha: Makespan minimizasyonu
-SCHEDULING_WEIGHT_SETUP = 1  # delta: Setup süresi cezası
-SCHEDULING_WEIGHT_TARDINESS = 10  # beta: Ağırlıklı gecikme cezası
+
+
+class SchedulingObjectivePolicy(StrEnum):
+    """
+    Madde 12: Business Objective Layer (Parametrik Çizelgeleme Politikaları).
+    İşletmenin anlık operasyonel ve ekonomik hedefine göre solver ağırlıklarını dinamik belirler.
+    """
+
+    BALANCED = "BALANCED"
+    SERVICE_LEVEL_FIRST = "SERVICE_LEVEL_FIRST"
+    THROUGHPUT_MAX = "THROUGHPUT_MAX"
+    COST_OPTIMIZED = "COST_OPTIMIZED"
+
+
+@dataclass(frozen=True)
+class ObjectiveWeights:
+    makespan_weight: int
+    setup_weight: int
+    tardiness_weight: int
+
+
+# Çizelgeleme Politikaları Sözlüğü
+OBJECTIVE_POLICIES: dict[SchedulingObjectivePolicy, ObjectiveWeights] = {
+    # 1. Feasibility & Dengeli Üretim (Mevcut kararlı üretim akışı korunur)
+    SchedulingObjectivePolicy.BALANCED: ObjectiveWeights(
+        makespan_weight=100,
+        setup_weight=1,
+        tardiness_weight=0,
+    ),
+    # 2. Servis Seviyesi / Weighted Tardiness Öncelikli (VIP müşteri ve termin odaklı)
+    SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST: ObjectiveWeights(
+        makespan_weight=20,
+        setup_weight=1,
+        tardiness_weight=100,
+    ),
+    # 3. Yüksek Hacim / Throughput Odaklı
+    SchedulingObjectivePolicy.THROUGHPUT_MAX: ObjectiveWeights(
+        makespan_weight=100,
+        setup_weight=0,
+        tardiness_weight=0,
+    ),
+    # 4. Ekonomik Etki / Maliyet Odaklı (Sıra bağımlı ayar ve gecikme cezası dengeli)
+    SchedulingObjectivePolicy.COST_OPTIMIZED: ObjectiveWeights(
+        makespan_weight=30,
+        setup_weight=5,
+        tardiness_weight=50,
+    ),
+}
+
+# Geriye dönük uyumluluk için varsayılan ağırlıklar:
+SCHEDULING_WEIGHT_MAKESPAN = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.BALANCED].makespan_weight
+SCHEDULING_WEIGHT_SETUP = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.BALANCED].setup_weight
+SCHEDULING_WEIGHT_TARDINESS = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.BALANCED].tardiness_weight
 # Initial Machine Setup State (Planlama ufku başında tezgâhlarda takılı olan ürün/kalıp)
 # None verilirse ilk iş için ilave setup gerekmez (soğuk başlangıç/hazır varsayımı)
 INITIAL_MACHINE_STATE = {

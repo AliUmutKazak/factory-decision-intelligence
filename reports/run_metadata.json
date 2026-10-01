@@ -1,7 +1,7 @@
 {
     "run_id": "RUN-TEST-BOUND-002",
-    "run_timestamp": "2026-10-01T17:47:05.614836",
-    "git_sha": "ae412f5c1b7275f88f2d3609eaa40104d8008d98",
+    "run_timestamp": "2026-10-01T18:36:35.969976",
+    "git_sha": "506ea8fc6e98da6e9743bf74262ecd3439cf4cc6",
     "data_source": "factory_orders.csv",
     "forecast_origin": "2017-12-31",
     "forecast_method": "Hybrid_Backtest_Selection",
@@ -12,7 +12,7 @@
         "P04": "LightGBM",
         "P05": "LightGBM"
     },
-    "config_hash": "54f194942bf65591",
+    "config_hash": "59160df9f707624a",
     "status": "COMPLETED",
     "orders_count": 500,
     "environment": {

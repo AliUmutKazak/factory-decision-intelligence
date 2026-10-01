@@ -1,0 +1,66 @@
+import pandas as pd
+
+from src.config import DB_PATH, OBJECTIVE_POLICIES, SchedulingObjectivePolicy
+from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.utils.db import get_db_connection
+
+
+def test_objective_policies_configuration():
+    """Tüm politikaların eksiksiz tanımlandığını ve ağırlık hiyerarşisini doğrular."""
+    assert SchedulingObjectivePolicy.BALANCED in OBJECTIVE_POLICIES
+    assert SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST in OBJECTIVE_POLICIES
+    assert SchedulingObjectivePolicy.THROUGHPUT_MAX in OBJECTIVE_POLICIES
+    assert SchedulingObjectivePolicy.COST_OPTIMIZED in OBJECTIVE_POLICIES
+
+    # Servis seviyesi politikasında gecikme ağırlığı Makespan'e baskın olmalıdır
+    service_weights = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST]
+    assert service_weights.tardiness_weight > service_weights.makespan_weight
+
+    # Throughput odaklı politikada setup ve gecikme cezası sıfırlanmalıdır
+    throughput_weights = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.THROUGHPUT_MAX]
+    assert throughput_weights.setup_weight == 0
+    assert throughput_weights.tardiness_weight == 0
+
+
+def test_cpsat_dynamic_policy_execution(ensure_full_pipeline_database):
+    """Farklı politikalarla CP-SAT fonksiyonunun aktif run_id ile başarıyla çalıştığını doğrular."""
+    with get_db_connection(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1")
+        row = cur.fetchone()
+        active_run_id = row[0] if row else "TEST-POLICY-RUN"
+
+        sku_plan_real = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
+
+    # 1. Varsayılan (BALANCED) Politika ile Koşum
+    run_cpsat_scheduling(
+        sku_plan=sku_plan_real,
+        run_id=active_run_id,
+        policy=SchedulingObjectivePolicy.BALANCED,
+    )
+    with get_db_connection(DB_PATH) as conn:
+        df_balanced = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = ?",
+            conn,
+            params=(active_run_id,),
+        )
+
+    assert not df_balanced.empty
+    assert "start_min" in df_balanced.columns
+    assert "end_min" in df_balanced.columns
+
+    # 2. Servis Seviyesi Odaklı Politika ile Koşum (aynı aktif koşum altında güncellenir)
+    run_cpsat_scheduling(
+        sku_plan=sku_plan_real,
+        run_id=active_run_id,
+        policy=SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST,
+    )
+    with get_db_connection(DB_PATH) as conn:
+        df_service = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = ?",
+            conn,
+            params=(active_run_id,),
+        )
+
+    assert not df_service.empty
+    assert len(df_service) == len(df_balanced)
