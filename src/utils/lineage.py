@@ -641,19 +641,63 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
                 hasher.update(chunk)
         return hasher.hexdigest(), size
 
-    # 1. Output Artifacts Takibi
+    # 1. Output Artifacts Takibi (Staging-Aware Resolution)
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
-    files_to_track = [
-        Path(active_db),
-        root_dir / "reports" / "run_metadata.json",
-        root_dir / "reports" / "schedule_solver_metadata.json",
-        root_dir / "reports" / "forecast_model_metadata.json",
-    ]
+    db_p = Path(active_db)
 
-    processed_dir = getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed")
-    if Path(processed_dir).exists():
-        for p in Path(processed_dir).glob("*.csv"):
-            files_to_track.append(p)
+    # Staging/Run dizini tespiti: db_path staging altında ise öncelikli reports ve processed dizinlerini bul
+    reports_dirs = []
+    processed_dirs = []
+
+    if os.environ.get("FACTORY_REPORTS_DIR"):
+        reports_dirs.append(Path(os.environ["FACTORY_REPORTS_DIR"]))
+    if db_p.parent.name == "staging" or "staging" in db_p.parts:
+        if (db_p.parent / "reports").exists():
+            reports_dirs.append(db_p.parent / "reports")
+        if (db_p.parent / "processed").exists():
+            processed_dirs.append(db_p.parent / "processed")
+        if (db_p.parent.parent / "reports").exists():
+            reports_dirs.append(db_p.parent.parent / "reports")
+        if (db_p.parent.parent / "data" / "processed").exists():
+            processed_dirs.append(db_p.parent.parent / "data" / "processed")
+
+    # Run-scoped artifact dizini önceliği
+    run_dir = root_dir / "artifacts" / "runs" / run_id
+    if (run_dir / "reports").exists():
+        reports_dirs.append(run_dir / "reports")
+    if run_dir.exists():
+        reports_dirs.append(run_dir)
+        processed_dirs.append(run_dir)
+
+    # Canonical fallback
+    reports_dirs.append(root_dir / "reports")
+    if os.environ.get("FACTORY_PROCESSED_DIR"):
+        processed_dirs.append(Path(os.environ["FACTORY_PROCESSED_DIR"]))
+    processed_dirs.append(getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed"))
+
+    # İzlenecek temel dosyaları en öncelikli klasörden seç
+    target_json_names = [
+        "run_metadata.json",
+        "schedule_solver_metadata.json",
+        "forecast_model_metadata.json",
+    ]
+    files_to_track = [db_p]
+
+    for j_name in target_json_names:
+        for r_dir in reports_dirs:
+            cand = r_dir / j_name
+            if cand.exists():
+                files_to_track.append(cand)
+                break
+
+    # CSV dosyalarını staging-first önceliğiyle topla
+    tracked_csv_names = set()
+    for p_dir in processed_dirs:
+        if p_dir.exists():
+            for csv_file in p_dir.glob("*.csv"):
+                if csv_file.name not in tracked_csv_names:
+                    files_to_track.append(csv_file)
+                    tracked_csv_names.add(csv_file.name)
 
     manifest_entries = {}
     for file_path in files_to_track:
@@ -755,10 +799,15 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
         "inputs": inputs_lineage,
     }
 
-    manifest_path = root_dir / "reports" / "run_manifest.json"
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=4, ensure_ascii=False)
+    # Manifest'i hem varsa staging reports dizinine hem de canonical reports dizinine eşzamanlı mühürle
+    dest_paths = [root_dir / "reports" / "run_manifest.json"]
+    for r_dir in reports_dirs:
+        dest_paths.append(r_dir / "run_manifest.json")
+
+    for m_path in set(dest_paths):
+        m_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(m_path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=4, ensure_ascii=False)
 
     return manifest
 
