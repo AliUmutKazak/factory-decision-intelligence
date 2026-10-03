@@ -7,21 +7,41 @@ from pathlib import Path
 SRC_DIR = Path(__file__).resolve().parent
 BASE_DIR = SRC_DIR.parent
 
-# Test ve Staging izolasyonu için ortam değişkeni desteği
-_custom_data_dir = os.getenv("FACTORY_DATA_DIR")
-DATA_DIR = Path(_custom_data_dir) if _custom_data_dir else BASE_DIR / "data"
 
-_custom_processed_dir = os.getenv("FACTORY_PROCESSED_DIR")
-PROCESSED_DATA_DIR = Path(_custom_processed_dir) if _custom_processed_dir else DATA_DIR / "processed"
+def get_runtime_paths():
+    """
+    Çalışma anında güncel ortam değişkenlerini okuyarak izole staging
+    veya varsayılan kanonik dizin yollarını dinamik olarak döndürür.
+    """
+    custom_data = os.getenv("FACTORY_DATA_DIR")
+    data_dir = Path(custom_data) if custom_data else BASE_DIR / "data"
 
+    custom_processed = os.getenv("FACTORY_PROCESSED_DIR")
+    processed_dir = Path(custom_processed) if custom_processed else data_dir / "processed"
+
+    custom_reports = os.getenv("FACTORY_REPORTS_DIR")
+    reports_dir = Path(custom_reports) if custom_reports else BASE_DIR / "reports"
+
+    custom_db = os.getenv("FACTORY_DB_PATH")
+    db_path = Path(custom_db) if custom_db else data_dir / "factory.db"
+
+    return {
+        "base_dir": BASE_DIR,
+        "data_dir": data_dir,
+        "processed_dir": processed_dir,
+        "reports_dir": reports_dir,
+        "db_path": db_path,
+    }
+
+
+# Geriye dönük uyumluluk için modül seviyesinde değişkenler:
+_paths = get_runtime_paths()
+DATA_DIR = _paths["data_dir"]
+PROCESSED_DATA_DIR = _paths["processed_dir"]
 RAW_DATA_DIR = DATA_DIR / "raw"
 SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
-
-_custom_reports_dir = os.getenv("FACTORY_REPORTS_DIR")
-REPORTS_DIR = Path(_custom_reports_dir) if _custom_reports_dir else BASE_DIR / "reports"
-
-_custom_db_path = os.getenv("FACTORY_DB_PATH")
-DB_PATH = Path(_custom_db_path) if _custom_db_path else DATA_DIR / "factory.db"
+REPORTS_DIR = _paths["reports_dir"]
+DB_PATH = _paths["db_path"]
 CONFIG_PATH = SRC_DIR / "config.py"
 
 # 1. Ortak Fabrika Çalışma Takvimi (Madde 7 Düzeltmesi)

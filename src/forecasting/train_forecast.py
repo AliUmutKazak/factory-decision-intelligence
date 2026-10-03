@@ -13,6 +13,7 @@ from src.config import (
     FORECAST_MODEL_VERSION,
     HOLT_WINTERS_DEFAULT_PARAMS,
     PROCESSED_DATA_DIR,
+    get_runtime_paths,
 )
 from src.utils.db import get_db_connection
 
@@ -337,11 +338,26 @@ def run_forecast_benchmark(run_id=None):
     forecast_df["run_id"] = active_run_id
     lineage_df["run_id"] = active_run_id
 
-    forecast_df.to_csv(OUTPUT_FORECAST_PATH, index=False)
-    lineage_df.to_csv(os.path.join(PROCESSED_DATA_DIR, "forecast_model_lineage.csv"), index=False)
+    _rt_paths = get_runtime_paths()
+    _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
+    _rt_paths["reports_dir"].mkdir(parents=True, exist_ok=True)
 
-    with open("reports/forecast_model_metadata.json", "w", encoding="utf-8") as f:
-        json.dump(model_lineage_records, f, indent=2, ensure_ascii=False)
+    forecast_csv_path = _rt_paths["processed_dir"] / "forecast_demand.csv"
+    lineage_csv_path = _rt_paths["processed_dir"] / "forecast_model_lineage.csv"
+
+    forecast_df.to_csv(forecast_csv_path, index=False)
+    lineage_df.to_csv(lineage_csv_path, index=False)
+
+    forecast_meta = {
+        "run_id": active_run_id,
+        "feature_version": FORECAST_FEATURE_VERSION,
+        "model_version": FORECAST_MODEL_VERSION,
+        "horizon_days": FORECAST_HORIZON_DAYS,
+        "products_forecasted": int(forecast_df["product_id"].nunique()) if not forecast_df.empty else 0,
+        "total_forecast_records": int(len(forecast_df)),
+    }
+    with open(_rt_paths["reports_dir"] / "forecast_model_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(forecast_meta, f, indent=4)
 
     with get_db_connection(DB_PATH) as conn:
         forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")

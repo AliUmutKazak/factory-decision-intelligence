@@ -13,6 +13,7 @@ from src.config import (
     DB_PATH,
     OBJECTIVE_POLICIES,
     SchedulingObjectivePolicy,
+    get_runtime_paths,
 )
 from src.utils.db import get_db_connection
 
@@ -296,8 +297,9 @@ def run_cpsat_scheduling(
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-        os.makedirs("data/processed", exist_ok=True)
-        empty_df.to_csv("data/processed/production_schedule.csv", index=False)
+        _rt_paths = get_runtime_paths()
+        _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
+        empty_df.to_csv(_rt_paths["processed_dir"] / "production_schedule.csv", index=False)
         return empty_df
     tasks_df = pd.DataFrame(tasks)
 
@@ -753,12 +755,13 @@ def run_cpsat_scheduling(
         if col not in sched_df.columns:
             sched_df[col] = 0 if "min" in col or "units" in col or "count" in col else ""
 
-    os.makedirs("data/processed", exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
-    sched_df.to_csv("data/processed/production_schedule.csv", index=False)
+    _rt_paths = get_runtime_paths()
+    _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
+    _rt_paths["reports_dir"].mkdir(parents=True, exist_ok=True)
+    sched_df.to_csv(_rt_paths["processed_dir"] / "production_schedule.csv", index=False)
     if weekly_accounting_rows:
         accounting_df = pd.DataFrame(weekly_accounting_rows)
-        accounting_df.to_csv("data/processed/task_weekly_accounting.csv", index=False)
+        accounting_df.to_csv(_rt_paths["processed_dir"] / "task_weekly_accounting.csv", index=False)
 
     # P0 Madde 2 / Madde 20: Hafta bazlı kümülatif OT bütçe kontrolü (Source of Truth: weekly_accounting)
     if weekly_accounting_rows and weekly_machine_ot_budget_min:
@@ -843,8 +846,9 @@ def run_cpsat_scheduling(
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
     print()
     print("--- Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT) ---")
-    cap_plan_path = "data/processed/machine_capacity_plan.csv"
-    if os.path.exists(cap_plan_path):
+    _rt_paths = get_runtime_paths()
+    cap_plan_path = _rt_paths["processed_dir"] / "machine_capacity_plan.csv"
+    if cap_plan_path.exists():
         cap_df = pd.read_csv(cap_plan_path)
         w1_cap = cap_df[cap_df["period_week"] == 1]
         audit_records = []
