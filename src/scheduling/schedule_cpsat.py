@@ -616,18 +616,45 @@ def run_cpsat_scheduling(
     status_name = solver.StatusName(status)
     print(f"CP-SAT Çözücü Durumu: {status_name}")
 
-    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+    # -------------------------------------------------------------------------
+    # MADDE 15: Solver Robustness & Explicit Status Decision Tree
+    # -------------------------------------------------------------------------
+    proven_optimal = False
+
+    if status == cp_model.OPTIMAL:
+        proven_optimal = True
+        print("[SOLVER ROBUSTNESS] Durum: OPTIMAL -> Plan tam matematiksel optimum ile yayınlanıyor.")
+    elif status == cp_model.FEASIBLE:
+        proven_optimal = False
+        print("[SOLVER ROBUSTNESS] Durum: FEASIBLE -> Plan geçerli ancak 'not proven optimal' (Zaman/Gap kısıtı).")
+    elif status == cp_model.UNKNOWN:
+        conn.close()
+        raise TimeoutError(
+            f"[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/Çözüm Yok). "
+            f"Zaman limiti ({CPSAT_TIME_LIMIT_SECONDS}s) aşıldı ve geçerli bir başlangıç çözümü bulunamadı. "
+            "Safe Fallback / Retry stratejisi gerekiyor."
+        )
+    elif status == cp_model.INFEASIBLE:
         conn.close()
         raise RuntimeError(
-            f"CP-SAT scheduling failed to find a feasible solution. "
-            f"Solver status: {status_name}. Pipeline terminated immediately."
+            "[SOLVER ROBUSTNESS] Durum: INFEASIBLE. Model kısıtları (kapasite, takvim, öncüllük) aynı anda sağlanamıyor. "
+            "Relaxation Stratejisi (tardiness softening veya overtime artırımı) gereklidir."
         )
+    elif status == cp_model.MODEL_INVALID:
+        conn.close()
+        raise ValueError(
+            "[SOLVER ROBUSTNESS] Durum: MODEL_INVALID (Hard Failure). Kısıt veya değişken aralıklarında tutarsızlık var."
+        )
+    else:
+        conn.close()
+        raise RuntimeError(f"[SOLVER ROBUSTNESS] Beklenmeyen çözücü durumu: {status_name}. Pipeline sonlandırıldı.")
 
     best_makespan = int(solver.Value(makespan))
     total_setup_val = int(solver.Value(total_setup_duration)) if all_setup_terms else 0
     obj_val = float(solver.ObjectiveValue())
     best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
     gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
+    status_audit_tag = "OPTIMAL_PROVEN" if proven_optimal else "FEASIBLE_SUBOPTIMAL"
 
     total_tardiness_val = int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0
     print(
