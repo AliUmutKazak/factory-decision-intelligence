@@ -219,11 +219,11 @@ class ObjectiveWeights:
 
 # Çizelgeleme Politikaları Sözlüğü
 OBJECTIVE_POLICIES: dict[SchedulingObjectivePolicy, ObjectiveWeights] = {
-    # 1. Feasibility & Dengeli Üretim (Mevcut kararlı üretim akışı korunur)
+    # 1. Feasibility & Dengeli Üretim (Makespan ve Müşteri Termin Uyumu Dengesi - System Closure)
     SchedulingObjectivePolicy.BALANCED: ObjectiveWeights(
         makespan_weight=100,
         setup_weight=1,
-        tardiness_weight=0,
+        tardiness_weight=20,
     ),
     # 2. Servis Seviyesi / Weighted Tardiness Öncelikli (VIP müşteri ve termin odaklı)
     SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST: ObjectiveWeights(
