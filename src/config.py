@@ -62,10 +62,13 @@ class EconomicConfig:
     """Ekonomik Parametreler Tek Gerçek Kaynağı (Economic SSOT).
 
     Tüm modüller (Cost-to-Serve, Scenario Engine, Aggregate Planning, Dashboard)
-    maliyet ve para birimi değerlerini buradan tüketir.
+    maliyet, birim ve para birimi değerlerini doğrudan buradan tüketir.
     """
 
     currency: str = "EUR"
+    currency_symbol: str = "€"
+
+    # Baz Parametre Değerleri
     labor_rate_per_hour: float = 25.0  # Standart operatör/işçilik baz maliyeti (€/saat)
     overtime_multiplier: float = 1.5  # Fazla mesai çarpanı
     setup_cost_per_hour: float = 40.0  # Hat hazırlık/ayar maliyeti (€/saat)
@@ -77,9 +80,58 @@ class EconomicConfig:
     expedite_cost_flat: float = 150.0  # Hızlandırılmış sevkiyat sabit maliyeti (€)
     tardiness_cost_per_hour: float = 60.0  # Termin gecikme cezası (€/saat)
 
+    # Denetçi Madde 11 İsimlendirme Uyumluluğu (Alias Properties)
+    @property
+    def labor_standard_rate(self) -> float:
+        return self.labor_rate_per_hour
+
+    @property
+    def labor_overtime_rate(self) -> float:
+        return self.labor_rate_per_hour * self.overtime_multiplier
+
     @property
     def labor_cost_overtime_hr(self) -> float:
-        return self.labor_rate_per_hour * self.overtime_multiplier
+        return self.labor_overtime_rate
+
+    @property
+    def setup_rate(self) -> float:
+        return self.setup_cost_per_hour
+
+    @property
+    def holding_rate(self) -> float:
+        return self.holding_cost_per_unit_per_day
+
+    @property
+    def energy_rate(self) -> float:
+        return self.energy_price_per_kwh
+
+    @property
+    def carbon_price(self) -> float:
+        return self.carbon_price_per_ton
+
+    @property
+    def expedite_cost(self) -> float:
+        return self.expedite_cost_flat
+
+    @property
+    def tardiness_cost(self) -> float:
+        return self.tardiness_cost_per_hour
+
+    # Açık Birim Temsili (Explicit Units Mapping - Madde 11)
+    @property
+    def units(self) -> dict[str, str]:
+        return {
+            "labor_standard_rate": f"{self.currency}/hour",
+            "labor_overtime_rate": f"{self.currency}/hour",
+            "setup_rate": f"{self.currency}/hour",
+            "holding_rate": f"{self.currency}/unit/day",
+            "holding_batch_rate": f"{self.currency}/lot/week",
+            "backlog_rate": f"{self.currency}/batch",
+            "energy_rate": f"{self.currency}/kWh",
+            "carbon_price": f"{self.currency}/tCO2e",
+            "expedite_cost": f"{self.currency}",
+            "tardiness_cost": f"{self.currency}/hour",
+        }
 
 
 # Global SSOT Örneği
@@ -87,9 +139,10 @@ ECONOMIC_CONFIG = EconomicConfig()
 
 # Geriye dönük uyumluluk (Backward-compatibility) aliasları
 CURRENCY = ECONOMIC_CONFIG.currency
-LABOR_COST_STANDARD_HR = ECONOMIC_CONFIG.labor_rate_per_hour
+CURRENCY_SYMBOL = ECONOMIC_CONFIG.currency_symbol
+LABOR_COST_STANDARD_HR = ECONOMIC_CONFIG.labor_standard_rate
 OVERTIME_MULTIPLIER = ECONOMIC_CONFIG.overtime_multiplier
-LABOR_COST_OVERTIME_HR = ECONOMIC_CONFIG.labor_cost_overtime_hr
+LABOR_COST_OVERTIME_HR = ECONOMIC_CONFIG.labor_overtime_rate
 
 # 3. Çevre & Sürdürülebilirlik Parametreleri (GHG Protocol & Internal Carbon Pricing)
 # 0.440 tCO2e/MWh: T.C. ETKB elektrik emisyon faktörleri (iletim: 0.436, dağıtım: 0.469) aralığındaki sentetik orta nokta varsayımıdır (Synthetic Midpoint Assumption).
