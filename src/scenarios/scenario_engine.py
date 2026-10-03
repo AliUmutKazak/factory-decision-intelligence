@@ -9,8 +9,6 @@ Girdi şoklarını izole staging/sandbox ortamında simüle eder:
 
 import os
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
 
 import pandas as pd
 
@@ -87,12 +85,18 @@ class ScenarioEngine:
         else:
             base_makespan = 120.0
 
-        if not energy_df.empty and "grand_total_kwh" in energy_df.columns and float(energy_df["grand_total_kwh"].iloc[0]) > 0:
+        if (
+            not energy_df.empty
+            and "grand_total_kwh" in energy_df.columns
+            and float(energy_df["grand_total_kwh"].iloc[0]) > 0
+        ):
             base_kwh = float(energy_df["grand_total_kwh"].iloc[0])
         else:
             run_col = "duration_min" if "duration_min" in sched_df.columns else "duration"
             total_duration_hours = (
-                float(sched_df[run_col].sum()) / 60.0 if not sched_df.empty and run_col in sched_df.columns else base_makespan * 3.5
+                float(sched_df[run_col].sum()) / 60.0
+                if not sched_df.empty and run_col in sched_df.columns
+                else base_makespan * 3.5
             )
             base_kwh = max(10000.0, total_duration_hours * 45.0)
 
@@ -110,9 +114,7 @@ class ScenarioEngine:
         carbon_df = self._read_table_safe("carbon_kpis", self.db_path)
         orders_df = self._read_table_safe("orders", self.db_path)
 
-        base_makespan, base_kwh, base_tco2 = self._get_baseline_energy_carbon(
-            sched_df, energy_df, carbon_df
-        )
+        base_makespan, base_kwh, base_tco2 = self._get_baseline_energy_carbon(sched_df, energy_df, carbon_df)
 
         sim_sched = sched_df.copy() if not sched_df.empty else pd.DataFrame()
         sim_makespan = base_makespan
@@ -225,10 +227,16 @@ class ScenarioEngine:
             if total_cost == 0.0:
                 total_cost = round(energy_cost + carbon_cost + inventory_cost + (backlog * 50.0), 2)
         else:
-            inventory_cost = round(12 * 450.0 * shock.demand_multiplier * (1.2 if shock.material_delay_days > 0 else 1.0), 2)
+            inventory_cost = round(
+                12 * 450.0 * shock.demand_multiplier * (1.2 if shock.material_delay_days > 0 else 1.0), 2
+            )
             energy_cost = calc_energy_cost
             carbon_cost = calc_carbon_cost
-            overtime_cost = max(0.0, sim_makespan - 168.0) * ECONOMIC_CONFIG.labor_rate_per_hour * ECONOMIC_CONFIG.overtime_multiplier
+            overtime_cost = (
+                max(0.0, sim_makespan - 168.0)
+                * ECONOMIC_CONFIG.labor_rate_per_hour
+                * ECONOMIC_CONFIG.overtime_multiplier
+            )
             total_cost = round(energy_cost + carbon_cost + inventory_cost + overtime_cost + (backlog * 50.0), 2)
 
         return ScenarioResult(
