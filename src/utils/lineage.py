@@ -430,15 +430,56 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                             f"Görev {m_sorted.loc[i + 1, 'lot_id']} başlangıç: {next_start}"
                         )
 
-            ot_col = (
-                "overtime_minutes"
-                if "overtime_minutes" in sched_full.columns
-                else ("overtime_min" if "overtime_min" in sched_full.columns else None)
-            )
-            if ot_col:
-                total_ot = sched_full[ot_col].sum()
-                if total_ot > 60000:
-                    raise ValueError(f"[VALIDATION GATE FAIL] Fiziksel Fazla Mesai Sınırı Aşıldı: {total_ot} dk")
+            # -----------------------------------------------------------------
+            # MADDE 18: Machine x Week Bazlı Operasyonel Overtime Validation
+            # -----------------------------------------------------------------
+            # Global eşik (total_ot > 60000) yerine tezgâh ve hafta bazlı katı kural
+            weekly_acc_path = ROOT_DIR / "data" / "processed" / "task_weekly_accounting.csv"
+            allowed_w1_ot_min_by_machine = {"M01": 48 * 60}  # M01 W1 tavanı: 48h = 2880 dk
+
+            if weekly_acc_path.exists():
+                try:
+                    w_df = pd.read_csv(weekly_acc_path)
+                    if not w_df.empty and "machine_id" in w_df.columns and "week_index" in w_df.columns:
+                        ot_metric_col = next(
+                            (c for c in ["overtime_minutes", "ot_minutes", "overtime_min"] if c in w_df.columns), None
+                        )
+                        if ot_metric_col:
+                            for (m_id, w_idx), grp in w_df.groupby(["machine_id", "week_index"]):
+                                grp_ot = grp[ot_metric_col].sum()
+                                if w_idx == 0:
+                                    max_allowed = allowed_w1_ot_min_by_machine.get(str(m_id), 0)
+                                    if grp_ot > max_allowed:
+                                        raise ValueError(
+                                            f"[VALIDATION GATE FAIL] Tezgâh Hafta-1 OT Aşıldı! "
+                                            f"Tezgâh: {m_id}, Fiili OT: {grp_ot} dk, İzin Verilen: {max_allowed} dk"
+                                        )
+                                else:
+                                    # Hafta 2 ve sonrası (Spillover): Model A politikası gereği OT = 0 olmalıdır
+                                    if grp_ot > 0:
+                                        raise ValueError(
+                                            f"[VALIDATION GATE FAIL] Spillover Döneminde (Hafta {w_idx + 1}) Yetkisiz OT! "
+                                            f"Tezgâh: {m_id}, Fiili OT: {grp_ot} dk (Maksimum: 0 dk)"
+                                        )
+                except Exception as e:
+                    if "[VALIDATION GATE FAIL]" in str(e):
+                        raise
+            else:
+                # Yedek kontrol (fallback): production_schedule üzerindeki tezgâh toplamları
+                ot_col = (
+                    "overtime_minutes"
+                    if "overtime_minutes" in sched_full.columns
+                    else ("overtime_min" if "overtime_min" in sched_full.columns else None)
+                )
+                if ot_col:
+                    for m_id, grp in sched_full.groupby("machine_id"):
+                        m_ot = grp[ot_col].sum()
+                        max_allowed = allowed_w1_ot_min_by_machine.get(str(m_id), 0)
+                        if m_ot > max_allowed:
+                            raise ValueError(
+                                f"[VALIDATION GATE FAIL] Tezgâh Toplam OT Sınırı Aşıldı! "
+                                f"Tezgâh: {m_id}, Fiili OT: {m_ot} dk, İzin Verilen: {max_allowed} dk"
+                            )
 
         # 3.1. ENERJİ MUTABAKATI: Tesis Toplamı == Tezgah Toplamları
         cur.execute("PRAGMA table_info(energy_kpis)")
