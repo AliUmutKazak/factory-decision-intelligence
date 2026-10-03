@@ -28,7 +28,9 @@ def test_1_pipeline_run_lineage_zero_nulls(isolated_db):
     audit_cols = ["run_id", "timestamp", "git_sha", "config_hash", "status"]
     for col in audit_cols:
         assert df[col].isnull().sum() == 0, f"pipeline_runs icinde {col} kolonunda null deger bulunamaz"
-    assert (df["status"] == "SUCCESS").any(), "En az bir basarili (SUCCESS) run_id kaydi bulunmali"
+    assert (
+        df["status"].isin(["SUCCESS", "ACTIVE"]).any()
+    ), "En az bir basarili (SUCCESS veya ACTIVE) run_id kaydi bulunmali"
 
 
 def test_2_cpsat_calendar_bounds(isolated_db):

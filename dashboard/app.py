@@ -663,7 +663,7 @@ with tab_scenarios:
             c1, c2, c3 = st.columns(3)
             best_cost_row = tradeoff_df.loc[tradeoff_df["Total Cost (€)"].idxmin()]
             worst_cost_row = tradeoff_df.loc[tradeoff_df["Total Cost (€)"].idxmax()]
-            baseline_match = tradeoff_df[tradeoff_df["Scenario"] == "Baseline"]
+            baseline_match = tradeoff_df[tradeoff_df["Scenario"].str.upper() == "BASELINE"]
             baseline_row = baseline_match.iloc[0] if not baseline_match.empty else best_cost_row
 
             c1.metric("📌 Baz Senaryo Maliyeti", f"{baseline_row['Total Cost (€)']:,.2f} €")

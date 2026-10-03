@@ -1,4 +1,4 @@
-machine_id,processing_hours,setup_hours,idle_hours,processing_kwh,setup_kwh,idle_kwh,total_kwh,carbon_share_pct,scope_2_tco2e
-M01,134.3,0.0,52.3333,8251.85,0.0,42.39,8294.24,39.24,3.6495
-M02,65.4333,0.0,88.8333,3819.3867,0.0,51.5233,3870.91,18.31,1.7032
-M03,74.0333,0.0,79.75,8856.0167,0.0,114.84,8970.8567,42.44,3.9472
+machine_id,processing_hours,setup_hours,idle_hours,processing_kwh,setup_kwh,idle_kwh,total_kwh,run_id,carbon_share_pct,scope_2_tco2e
+M01,134.2667,0.0,28.8333,8246.7,0.0,23.355,8270.055,RUN-20261003-65c7fc,39.39,3.6388
+M02,65.0667,0.0,42.0833,3795.7133,0.0,24.4083,3820.1217,RUN-20261003-65c7fc,18.2,1.6809
+M03,74.0,0.0,33.5,8855.75,0.0,48.24,8903.99,RUN-20261003-65c7fc,42.41,3.9178
