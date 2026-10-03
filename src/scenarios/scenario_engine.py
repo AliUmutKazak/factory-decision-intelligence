@@ -225,10 +225,15 @@ class ScenarioEngine:
             carbon_cost = round(cost_breakdown.carbon_cost, 2) or calc_carbon_cost
             total_cost = round(cost_breakdown.total_manufacturing_cost, 2)
             if total_cost == 0.0:
-                total_cost = round(energy_cost + carbon_cost + inventory_cost + (backlog * 50.0), 2)
+                backlog_cost = (backlog / 50.0) * ECONOMIC_CONFIG.backlog_penalty_per_batch
+                total_cost = round(energy_cost + carbon_cost + inventory_cost + backlog_cost, 2)
         else:
+            baseline_batches = 12 * shock.demand_multiplier
             inventory_cost = round(
-                12 * 450.0 * shock.demand_multiplier * (1.2 if shock.material_delay_days > 0 else 1.0), 2
+                baseline_batches
+                * ECONOMIC_CONFIG.holding_cost_per_batch
+                * (1.2 if shock.material_delay_days > 0 else 1.0),
+                2,
             )
             energy_cost = calc_energy_cost
             carbon_cost = calc_carbon_cost
@@ -237,7 +242,8 @@ class ScenarioEngine:
                 * ECONOMIC_CONFIG.labor_rate_per_hour
                 * ECONOMIC_CONFIG.overtime_multiplier
             )
-            total_cost = round(energy_cost + carbon_cost + inventory_cost + overtime_cost + (backlog * 50.0), 2)
+            backlog_cost = (backlog / 50.0) * ECONOMIC_CONFIG.backlog_penalty_per_batch
+            total_cost = round(energy_cost + carbon_cost + inventory_cost + overtime_cost + backlog_cost, 2)
 
         return ScenarioResult(
             scenario=shock.name,
