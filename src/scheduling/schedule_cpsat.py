@@ -40,6 +40,7 @@ def run_cpsat_scheduling(
     sku_plan=None,
     run_id=None,
     policy: SchedulingObjectivePolicy = SchedulingObjectivePolicy.BALANCED,
+    hierarchical: bool = False,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     conn = get_db_connection(DB_PATH)
@@ -556,20 +557,41 @@ def run_cpsat_scheduling(
     weight_setup = weights.setup_weight
     weight_tardiness = weights.tardiness_weight
 
-    # Çok Amaçlı Karar Fonksiyonu: Makespan + Setup + Weighted Tardiness
-    objective_expr = (
-        int(weight_makespan) * makespan
-        + int(weight_setup) * total_setup_duration
-        + int(weight_tardiness) * total_weighted_tardiness
-    )
-    model.Minimize(objective_expr)
-
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(CPSAT_TIME_LIMIT_SECONDS)
     solver.parameters.num_search_workers = int(CPSAT_NUM_SEARCH_WORKERS)
     solver.parameters.random_seed = int(CPSAT_RANDOM_SEED)
 
-    status = solver.Solve(model)
+    if hierarchical and tardiness_terms:
+        # -------------------------------------------------------------
+        # MADDE 13: Lexicographic / Multi-Stage Optimization Mimari
+        # Aşama 1: Servis Seviyesi / Ağırlıklı Gecikme Minimizasyonu
+        # -------------------------------------------------------------
+        print("[LEXICOGRAPHIC] Aşama 1: Servis seviyesi (termin gecikmeleri) minimize ediliyor...")
+        model.Minimize(total_weighted_tardiness)
+        stage1_status = solver.Solve(model)
+
+        if stage1_status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            optimal_tardiness = int(solver.Value(total_weighted_tardiness))
+            print(f"[LEXICOGRAPHIC] Aşama 1 tamamlandı. Minimum Ağırlıklı Gecikme: {optimal_tardiness} dk")
+            # Optimal gecikme seviyesi kısıt olarak kilitlenir
+            model.Add(total_weighted_tardiness <= optimal_tardiness)
+
+        # Aşama 2: Operasyonel Verimlilik (Makespan + Setup Minimizasyonu)
+        print("[LEXICOGRAPHIC] Aşama 2: Termin kısıtı altında Makespan ve Setup minimize ediliyor...")
+        stage2_obj = int(weight_makespan) * makespan + int(weight_setup) * total_setup_duration
+        model.Minimize(stage2_obj)
+        status = solver.Solve(model)
+    else:
+        # Standart / Normalize edilmiş ağırlıklı amaç fonksiyonu
+        objective_expr = (
+            int(weight_makespan) * makespan
+            + int(weight_setup) * total_setup_duration
+            + int(weight_tardiness) * total_weighted_tardiness
+        )
+        model.Minimize(objective_expr)
+        status = solver.Solve(model)
+
     status_name = solver.StatusName(status)
     print(f"CP-SAT Çözücü Durumu: {status_name}")
 
