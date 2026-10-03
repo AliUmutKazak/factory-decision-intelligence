@@ -11,6 +11,7 @@ Gerçek 'Frozen Horizon' kurallarını uygular:
 
 from typing import Any
 
+from ortools.sat.python import cp_model
 import pandas as pd
 
 from src.utils.db import get_db_connection
@@ -32,6 +33,92 @@ class ClosedLoopRescheduler:
         row = cur.fetchone()
         return row[0] if row else "DEFAULT_RUN"
 
+    def _solve_cpsat_reschedule(
+        self,
+        df: pd.DataFrame,
+        machine_id: str,
+        down_start_min: float,
+        down_duration_min: float,
+        time_limit_sec: float = 10.0,
+    ) -> pd.DataFrame | None:
+        """Majör arıza durumunda serbest görevleri CP-SAT ile yeniden optimize eder."""
+        model = cp_model.CpModel()
+        down_end_min = down_start_min + down_duration_min
+        horizon = int(df["end_min"].max() + down_duration_min * 2 + 1440)
+
+        task_vars = {}
+        machine_intervals = {m: [] for m in df["machine_id"].unique()}
+
+        down_start_int = int(down_start_min)
+        down_dur_int = int(down_duration_min)
+        down_interval = model.NewFixedSizeIntervalVar(down_start_int, down_dur_int, f"breakdown_{machine_id}")
+        if machine_id in machine_intervals:
+            machine_intervals[machine_id].append(down_interval)
+
+        for _, row in df.iterrows():
+            tid = str(row["task_id"])
+            dur = max(1, int(row["duration_min"]))
+            m = row["machine_id"]
+            orig_start = int(row["start_min"])
+            orig_end = int(row["end_min"])
+
+            if orig_end <= down_start_min:
+                start_var = model.NewConstant(orig_start)
+                end_var = model.NewConstant(orig_end)
+                interval_var = model.NewFixedSizeIntervalVar(orig_start, dur, f"task_{tid}")
+            elif orig_start < down_start_min < orig_end:
+                new_dur = dur + down_dur_int
+                start_var = model.NewConstant(orig_start)
+                end_var = model.NewConstant(orig_start + new_dur)
+                interval_var = model.NewFixedSizeIntervalVar(orig_start, new_dur, f"task_{tid}")
+            else:
+                start_var = model.NewIntVar(0, horizon, f"start_{tid}")
+                end_var = model.NewIntVar(0, horizon, f"end_{tid}")
+                interval_var = model.NewIntervalVar(start_var, dur, end_var, f"task_{tid}")
+
+                # Stabilite kuralı: İşler eski başlangıçlarından daha erkene çekilemez
+                model.Add(start_var >= orig_start)
+
+                if m == machine_id:
+                    model.Add(start_var >= int(down_end_min))
+
+            task_vars[tid] = {"start": start_var, "end": end_var, "interval": interval_var}
+            if m in machine_intervals:
+                machine_intervals[m].append(interval_var)
+
+        for m, intervals in machine_intervals.items():
+            model.AddNoOverlap(intervals)
+
+        for _, lot_tasks in df.groupby("lot_id"):
+            sorted_tasks = lot_tasks.sort_values("operation_seq")
+            task_ids = sorted_tasks["task_id"].astype(str).tolist()
+            for i in range(len(task_ids) - 1):
+                prev_tid = task_ids[i]
+                next_tid = task_ids[i + 1]
+                if prev_tid in task_vars and next_tid in task_vars:
+                    model.Add(task_vars[next_tid]["start"] >= task_vars[prev_tid]["end"])
+
+        makespan = model.NewIntVar(int(df["end_min"].max()), horizon, "makespan")
+        for tv in task_vars.values():
+            model.Add(makespan >= tv["end"])
+        model.Minimize(makespan)
+
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = time_limit_sec
+        solver.parameters.num_workers = 4
+        status = solver.Solve(model)
+
+        if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+            df_opt = df.copy()
+            for idx, row in df_opt.iterrows():
+                tid = str(row["task_id"])
+                if tid in task_vars:
+                    df_opt.loc[idx, "start_min"] = float(solver.Value(task_vars[tid]["start"]))
+                    df_opt.loc[idx, "end_min"] = float(solver.Value(task_vars[tid]["end"]))
+            return df_opt
+
+        return None
+
     def reschedule_on_machine_breakdown(
         self,
         machine_id: str,
@@ -39,6 +126,7 @@ class ClosedLoopRescheduler:
         down_duration_min: float,
         reason: str = "Unplanned Breakdown",
         force_heuristic: bool = False,
+        commit: bool = True,
     ) -> dict[str, Any]:
         """Arıza şiddetine ve donmuş ufka göre iki seviyeli onarım uygular.
 
@@ -129,21 +217,58 @@ class ClosedLoopRescheduler:
                                 df.loc[t_next, "start_min"] += gap
                                 df.loc[t_next, "end_min"] += gap
 
+        # Majör arızalarda CP-SAT re-optimization çalıştırılır
+        if is_major_disruption:
+            opt_df = self._solve_cpsat_reschedule(
+                df=df_schedule.copy(),
+                machine_id=machine_id,
+                down_start_min=down_start_min,
+                down_duration_min=down_duration_min,
+            )
+            if opt_df is not None:
+                df = opt_df
+
         new_makespan = float(df["end_min"].max())
         delta_makespan = max(0.0, new_makespan - old_makespan)
 
-        # 3. Olayı mes_execution_events tablosuna yaz
-        cur = self.conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO mes_execution_events (
-                run_id, machine_id, event_type, event_timestamp_min,
-                actual_duration_min, delay_reason
-            ) VALUES (?, ?, 'MACHINE_DOWN', ?, ?, ?);
-            """,
-            (self.run_id, machine_id, down_start_min, down_duration_min, f"[{reschedule_mode}] {reason}"),
-        )
-        self.conn.commit()
+        # ---------------------------------------------------------------------
+        # MADDE 19: Closed-Loop DB Persistence (Source of Truth Synchronization)
+        # ---------------------------------------------------------------------
+        if commit:
+            cur = self.conn.cursor()
+            for _, row in df.iterrows():
+                cur.execute(
+                    """
+                    UPDATE production_schedule
+                    SET start_min = ?,
+                        end_min = ?
+                    WHERE run_id = ? AND task_id = ?;
+                    """,
+                    (
+                        float(row["start_min"]),
+                        float(row["end_min"]),
+                        self.run_id,
+                        str(row["task_id"]),
+                    ),
+                )
+
+            # 3. Olayı mes_execution_events tablosuna yaz
+            cur.execute(
+                """
+                INSERT INTO mes_execution_events (
+                    run_id, machine_id, event_type, event_timestamp_min,
+                    actual_duration_min, delay_reason
+                ) VALUES (?, ?, 'MACHINE_DOWN', ?, ?, ?);
+                """,
+                (
+                    self.run_id,
+                    machine_id,
+                    down_start_min,
+                    down_duration_min,
+                    f"[{reschedule_mode}] {reason}",
+                ),
+            )
+            self.conn.commit()
 
         return {
             "status": "RESCHEDULED",
