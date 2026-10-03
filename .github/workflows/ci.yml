@@ -31,9 +31,10 @@ jobs:
       run: |
         mkdir -p data/processed reports artifacts/reference
 
-    - name: "Quality Gate 1: Static Code Analysis (Ruff)"
+    - name: "Quality Gate 1: Static Code Analysis & Formatting (Ruff)"
       run: |
-        ruff check src/ tests/
+        ruff check src/ tests/ dashboard/ scripts/ main.py
+        ruff format --check src/ tests/ dashboard/ scripts/ main.py
 
     - name: "Quality Gate 2: Full Pipeline Execution (Integration Run)"
       run: |
