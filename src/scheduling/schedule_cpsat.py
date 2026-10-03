@@ -660,7 +660,11 @@ def run_cpsat_scheduling(
     print(
         f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika | Ağırlıklı Gecikme: {total_tardiness_val} dk"
     )
-    print(f"Bileşik Amaç Değeri (Objective): {obj_val:.1f} | Dual Bound: {best_bound:.1f} | Optimality Gap: %{gap:.2f}")
+    print(
+        f"Bileşik Amaç Değeri (Composite Objective): {obj_val:.1f} | "
+        f"Dual Bound (Composite): {best_bound:.1f} | "
+        f"Composite Optimality Gap: %{gap:.2f}"
+    )
 
     schedule_rows = []
     weekly_accounting_rows = []

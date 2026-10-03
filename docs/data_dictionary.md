@@ -79,5 +79,5 @@ Her analitik kosumun tekrarlanabilirligi ve izlenebilirligi icin merkezi yonetis
 - **`config_hash`**: Model ve solver hiperparametrelerinin MD5 ozeti.
 - **`data_source`**: Calistirilan veri kaynagi veya test fixture adi (orn: fixture_normal.csv).
 - **`forecast_origin`**: Tahminin basladigi referans tarihi (T_0).
-- **`solver_status` & `gap`**: CP-SAT cozucunun ulastigi durum (OPTIMAL / FEASIBLE) ve son optimality gap yuzdesi.
+- **`solver_status` & `gap`**: CP-SAT çözücünün ulaştığı durum (OPTIMAL / FEASIBLE) ve bileşik amaç fonksiyonuna (Makespan + Setup + Weighted Tardiness) ait bağıl optimality gap yüzdesi (`composite_optimality_gap`). Dual bound saf makespan'i değil, çok amaçlı skalarizasyonun alt sınırını temsil eder.
 - **`timestamps`**: Baslangic ve bitis zaman damgalari.
