@@ -490,7 +490,7 @@ with tab_plan:
             use_container_width=True,
         )
         st.caption(
-            "🔴 Kırmızı vurgulanan satırlar o hafta için bağlayıcı kısıtı (binding bottleneck) ve marjinal gevşeme değerini ($/hour) gösterir."
+            "🔴 Kırmızı vurgulanan satırlar o hafta için bağlayıcı kısıtı (binding bottleneck) ve marjinal gevşeme değerini (€/saat) gösterir."
         )
     else:
         st.info("Makine kapasite plan verisi bulunamadı.")
