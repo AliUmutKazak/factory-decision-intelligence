@@ -29,24 +29,44 @@ st.set_page_config(
 )
 
 
+class DashboardDataError(Exception):
+    """Dashboard veri erişim temel hata sınıfı."""
+
+    pass
+
+
+class QueryError(DashboardDataError):
+    """Veritabanı bağlantı, şema veya sorgu yürütme hatası."""
+
+    pass
+
+
 @st.cache_data(ttl=60)
 def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
-    """Veritabanından tabloyu güvenli şekilde çeker; run_id verilmişse ve tabloda varsa filtreler."""
-    if not Path(DB_PATH).exists():
+    """
+    Veritabanından tabloyu çeker.
+    Hata (QueryError) ile boş sonuç ayrımını garanti eder.
+    """
+    db_file = Path(DB_PATH)
+    if not db_file.exists():
         return pd.DataFrame()
+
     try:
         with get_db_connection(DB_PATH) as conn:
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table_name})")
-            columns = [row[1] for row in cursor.fetchall()]
+            rows = cursor.fetchall()
+            if not rows:
+                return pd.DataFrame()
 
+            columns = [row[1] for row in rows]
             if run_id and "run_id" in columns:
                 query = f"SELECT * FROM {table_name} WHERE run_id = ?"
                 return pd.read_sql(query, conn, params=[run_id])
             else:
                 return pd.read_sql(f"SELECT * FROM {table_name}", conn)
-    except Exception:
-        return pd.DataFrame()
+    except Exception as exc:
+        raise QueryError(f"Veritabanı sorgu hatası [{table_name}]: {exc}") from exc
 
 
 def safe_first_row(df: pd.DataFrame, default_keys: list) -> pd.Series:
@@ -165,28 +185,22 @@ def determine_system_status(tables):
 st.title("🏭 Factory Decision Intelligence Platform")
 st.caption("Talep Tahmini • Hiyerarşik Taktik Planlama • Zaman Fazlı MRP • CP-SAT Çizelgeleme • Enerji & Karbon")
 
-# --- 1. Aktif Pipeline Run Tespiti (Madde 22) ---
-active_run = get_active_pipeline_run()
-df_runs = get_table("pipeline_runs")
+# --- 1. Aktif Pipeline Run Tespiti (Zero Stale Data Contract) ---
+active_run = get_active_pipeline_run(allow_fallback=False)
 
-if active_run:
-    run_id_val = active_run.get("run_id", "N/A")
-    run_ts = active_run.get("timestamp", "N/A")
-    git_sha_val = active_run.get("git_sha", "N/A")
-    cfg_hash_val = active_run.get("config_hash", "N/A")
-    trigger_src = active_run.get("trigger_source", "N/A")
-    data_src_val = active_run.get("data_source", "N/A")
-elif not df_runs.empty:
-    completed_runs = df_runs[df_runs["status"].isin(["COMPLETED", "SUCCESS", "ACTIVE"])]
-    latest_run = completed_runs.iloc[-1] if not completed_runs.empty else df_runs.iloc[-1]
-    run_id_val = latest_run.get("run_id", "N/A")
-    run_ts = latest_run.get("timestamp", "N/A")
-    git_sha_val = latest_run.get("git_sha", "N/A")
-    cfg_hash_val = latest_run.get("config_hash", "N/A")
-    trigger_src = latest_run.get("trigger_source", "N/A")
-    data_src_val = latest_run.get("data_source", "N/A")
-else:
-    run_id_val = run_ts = git_sha_val = cfg_hash_val = trigger_src = data_src_val = "N/A"
+if not active_run:
+    st.error("🚫 **NO ACTIVE RUN**: Doğrulanmış ve aktif (ACTIVE) durumda bir pipeline koşumu bulunamadı.")
+    st.info(
+        "Eski veya tamamlanmamış (COMPLETED/FAILED) koşumların bayat verileri gösterilmez. Lütfen `python main.py` ile pipeline'ı çalıştırın."
+    )
+    st.stop()
+
+run_id_val = active_run.get("run_id", "N/A")
+run_ts = active_run.get("timestamp", "N/A")
+git_sha_val = active_run.get("git_sha", "N/A")
+cfg_hash_val = active_run.get("config_hash", "N/A")
+trigger_src = active_run.get("trigger_source", "N/A")
+data_src_val = active_run.get("data_source", "N/A")
 
 target_run_id = run_id_val if run_id_val != "N/A" else None
 
