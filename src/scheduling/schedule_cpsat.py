@@ -1,3 +1,24 @@
+"""CP-SAT Operasyonel Çizelgeleme ve Karar Motoru.
+
+Mimari Gerekçe (Madde 14 - Yöneylem Araştırması Tercihi):
+-------------------------------------------------------
+Çizelgeleme katmanında klasik MILP yerine Google OR-Tools CP-SAT'ın
+tercih edilme gerekçesi soyut "genel hız" iddiaları değildir. Performans
+tamamen problem yapısı ve veri büyüklüğüne bağlıdır.
+
+CP-SAT'ın seçilmesinin temel gerekçesi; operasyonel çizelgeleme alanına özgü
+yapıların mimariye doğal (natively) oturmasıdır:
+1. Interval Değişkenleri (Interval Variables)
+2. Çakışmama Kısıtları (No-Overlap Constraints)
+3. Katı Öncüllük Hiyerarşisi (Precedence Constraints)
+4. Sıra Bağımlı Hazırlık Matrisleri (Sequence-dependent Changeover & Setup Logic)
+5. Dinamik Vardiya Takvimi ve Önleyici Bakım Blokajları (Calendar & Maintenance Windows)
+
+Bu yapılar CP-SAT kısıt yayılımı (constraint propagation) ve SAT tabanlı
+öğrenme motorları tarafından çok daha kararlı ve doğrusal model karmaşasına
+(Big-M gevşekliği olmadan) girmeden çözülebilmektedir.
+"""
+
 import json
 import os
 from pathlib import Path
