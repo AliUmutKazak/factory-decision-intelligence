@@ -525,12 +525,15 @@ def run_cpsat_scheduling(
                 # 2. Hafta ve sonrası (Spillover): Model A politikası gereği W2+ gece fazla mesaisi açılamaz
                 model.Add(sum(act_vars) == 0)
 
-        # Hafta 1 tezgah toplam iş yükü fiili OT kısıtı:
-        # Tezgahta Hafta 1'de tamamlanan işlerin toplam süresi (Regular 5760 dk + allowed_ot_min) aşamaz.
-        if allowed_ot_min >= 0 and tids:
-            REGULAR_WEEK_MIN = 6 * 16 * 60  # 96 saat = 5760 dakika
-            week_1_durations = [all_tasks[tid]["duration"] for tid in tids]
-            model.Add(sum(week_1_durations) <= REGULAR_WEEK_MIN + allowed_ot_min)
+        # ---------------------------------------------------------------------
+        # MADDE 17: Rolling Horizon & Centralized Weekly Capacity Semantics
+        # ---------------------------------------------------------------------
+        # Statik knapsack kısıtı (sum(durations) <= 5760 + OT) kaldırıldı.
+        # Çözücü tek bir akıcı rolling horizon üzerinde çalışır; kapasite ve fazla
+        # mesai sınırları takvim blokları (break_intervals & week_ot_active_vars)
+        # ile doğrudan zaman çizgisinde yönetilir. Hafta bazlı yük dağılımı ve
+        # spillover takibi post-hoc varsayımlarla değil, takvime dayalı
+        # weekly_accounting_rows üzerinden merkezi olarak denetlenir.
 
         # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
         model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
