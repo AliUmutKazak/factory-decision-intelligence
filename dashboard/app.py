@@ -206,7 +206,7 @@ target_run_id = run_id_val if run_id_val != "N/A" else None
 
 # --- 2. Veri Setlerini Aktif Run ID'ye Göre Çek ---
 raw_tables = {
-    "pipeline_runs": df_runs,
+    "pipeline_runs": get_table("pipeline_runs"),
     "forecast_model_lineage": get_table("forecast_model_lineage", run_id=target_run_id),
     "energy_kpis": get_table("energy_kpis", run_id=target_run_id),
     "carbon_kpis": get_table("carbon_kpis", run_id=target_run_id),

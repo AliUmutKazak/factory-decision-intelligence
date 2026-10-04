@@ -6,9 +6,9 @@ capacity, and re-sequencing actions to support explainable AI (Agentic Copilot).
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 import json
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -26,7 +26,7 @@ class DecisionLedgerEntry:
     model_version: str = "v1.0.0"
     solver_version: str = "CP-SAT"
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
     def to_dict(self) -> dict[str, Any]:
@@ -71,4 +71,3 @@ class DecisionLedger:
 
     def to_json(self) -> str:
         return json.dumps([e.to_dict() for e in self.entries], indent=2)
-    

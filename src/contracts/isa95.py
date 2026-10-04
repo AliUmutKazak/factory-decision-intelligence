@@ -12,13 +12,12 @@ Bu modül:
    - Vendor-Specific ERP / MES Normalizer
 """
 
-from typing import Any
 import xml.etree.ElementTree as ET
+from typing import Any
 
 from src.contracts.schemas import (
     MESActual,
     ProductionOrder,
-    ProductionScheduleTask,
     ScheduleResult,
 )
 

@@ -1,6 +1,7 @@
 """Tests for Decision Ledger (Madde 34)."""
 
 import json
+
 from src.contracts.decision_ledger import DecisionLedger, DecisionLedgerEntry
 
 

@@ -3,11 +3,13 @@
 Gerçek SAP/MES sistemlerine bağlanmak yerine, ISA-95 entegrasyon sınırlarını
 belirleyen kontratların referans synthetic implementasyonlarını sağlar.
 """
+from __future__ import annotations
 
 from typing import Any
 
 import pandas as pd
 
+from src.contracts.schemas import MESActual, ProductionOrder
 from src.integration.interfaces import (
     ERPAdapterInterface,
     InventoryAdapterInterface,
@@ -79,7 +81,7 @@ class MockERPAdapter(ERPAdapterInterface):
             ]
         )
 
-    def fetch_canonical_orders(self) -> list["ProductionOrder"]:
+    def fetch_canonical_orders(self) -> list[ProductionOrder]:
         """Madde 26: ERP tablosunu Internal Canonical Pydantic sözleşmesine dönüştürür."""
         from src.contracts.schemas import ProductionOrder
 
@@ -125,7 +127,7 @@ class MockMESAdapter(MESAdapterInterface):
         )
         return True
 
-    def export_canonical_actuals(self) -> list["MESActual"]:
+    def export_canonical_actuals(self) -> list[MESActual]:
         """Madde 26: MES operasyon kayıtlarını Canonical MESActual sözleşmesine dönüştürür."""
         from src.contracts.schemas import MESActual
 
@@ -178,4 +180,4 @@ class MockTelemetryAdapter(MachineTelemetryAdapterInterface):
         }
         return telemetry_map.get(machine_id, 0.0)
 
-    
+

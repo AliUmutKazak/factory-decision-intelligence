@@ -1,6 +1,7 @@
 """Tests for Scheduling Benchmark Suite (Madde 32)."""
 
 import pandas as pd
+
 from src.scheduling.benchmark import BenchmarkTask, SchedulingBenchmarkSuite
 
 

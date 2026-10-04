@@ -11,8 +11,8 @@ Gerçek 'Frozen Horizon' kurallarını uygular:
 
 from typing import Any
 
-from ortools.sat.python import cp_model
 import pandas as pd
+from ortools.sat.python import cp_model
 
 from src.utils.db import get_db_connection
 

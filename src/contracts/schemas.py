@@ -6,6 +6,7 @@ Optimizasyon ve karar motoru sınırlarına giren kritik veri akışları
 
 from datetime import datetime
 from typing import Any, Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 
