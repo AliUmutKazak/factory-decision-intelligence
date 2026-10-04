@@ -125,139 +125,161 @@ class ClosedLoopRescheduler:
         down_start_min: float,
         down_duration_min: float,
         reason: str = "Unplanned Breakdown",
+        event_type: str = "MACHINE_DOWN",
         force_heuristic: bool = False,
         commit: bool = True,
     ) -> dict[str, Any]:
-        """Arıza şiddetine ve donmuş ufka göre iki seviyeli onarım uygular.
+        """Madde 21: Two-Tier Dynamic Rescheduling Engine.
 
-        Frozen Horizon Mantığı:
-        - end_min <= down_start_min: COMPLETED -> Değiştirilemez (Immutable)
-        - start_min < down_start_min < end_min: RUNNING -> Başlangıç kilitli, bitiş ötelenir
-        - start_min >= down_start_min: SCHEDULED -> Tamamen ötelenir (Movable)
+        Tier 1 (Fast Local Repair): Minor breakdowns, delays, scrap.
+        Tier 2 (Full Reoptimization): Major breakdowns, capacity loss, crises.
+        Rolling Horizon: [FROZEN: 0-4h], [FLEXIBLE: 4-24h], [FREE: 24h+].
         """
-        df_schedule = pd.read_sql_query(
+        # Aktif çizelgeyi veritabanından çek
+        df = pd.read_sql_query(
             "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC;",
             self.conn,
             params=(self.run_id,),
         )
-        if df_schedule.empty:
-            return {"status": "ERROR", "message": "No active schedule found for run."}
 
-        is_major_disruption = (down_duration_min > self.MAJOR_BREAKDOWN_THRESHOLD_MIN) and not force_heuristic
-        reschedule_mode = "CPSAT_REOPTIMIZATION" if is_major_disruption else "FAST_LOCAL_REPAIR"
+        if df.empty:
+            return {
+                "status": "NO_SCHEDULE_FOUND",
+                "affected_tasks_count": 0,
+                "old_makespan_min": 0.0,
+                "new_makespan_min": 0.0,
+                "delta_makespan_min": 0.0,
+                "reschedule_mode": "NONE",
+            }
 
-        down_end_min = down_start_min + down_duration_min
-        old_makespan = float(df_schedule["end_min"].max())
+        old_makespan = float(df["end_min"].max()) if not df.empty else 0.0
 
-        df = df_schedule.copy()
-        delay_shift = down_duration_min
-
-        # Frozen Horizon Durum Tespiti:
-        # Sadece arıza anından sonra biten ve hedef makinede olan operasyonlar etkilenir
         mask_target = (df["machine_id"] == machine_id) & (df["end_min"] > down_start_min)
         affected_count = int(mask_target.sum())
 
         if affected_count == 0:
             return {
                 "status": "NO_IMPACT",
-                "mode": reschedule_mode,
-                "message": "Arıza planlanan operasyonları etkilemedi.",
+                "affected_tasks_count": 0,
                 "old_makespan_min": old_makespan,
                 "new_makespan_min": old_makespan,
                 "delta_makespan_min": 0.0,
+                "reschedule_mode": "NONE",
             }
 
-        # 1. Hedef makinedeki işlerin Frozen Horizon ayrımı ile ötelenmesi
-        for idx in df[mask_target].index:
-            curr_start = df.loc[idx, "start_min"]
-            curr_end = df.loc[idx, "end_min"]
+        # ---------------------------------------------------------------------
+        # MADDE 21: Tier Selection Logic
+        # Tier 1: Minor delays/breakdowns (<= 60 min) -> Fast Local Repair
+        # Tier 2: Major breakdowns (> 60 min) / Crises -> CP-SAT Reoptimization
+        # ---------------------------------------------------------------------
+        is_major_disruption = (
+            (down_duration_min > 60.0)
+            or (
+                event_type
+                in (
+                    "MAJOR_BREAKDOWN",
+                    "LARGE_CAPACITY_LOSS",
+                    "MATERIAL_CRISIS",
+                    "LARGE_ORDER_INJECTION",
+                )
+            )
+        ) and not force_heuristic
 
-            if curr_start < down_start_min < curr_end:
-                # RUNNING (Frozen Start): Başlangıç sabit, bitiş arıza süresi kadar ötelenir
-                df.loc[idx, "end_min"] = curr_end + delay_shift
-            elif curr_start >= down_start_min:
-                # SCHEDULED (Movable): En erken arıza bitişinden sonra başlayabilir
-                df.loc[idx, "start_min"] = max(curr_start + delay_shift, down_end_min)
-                df.loc[idx, "end_min"] = df.loc[idx, "start_min"] + df.loc[idx, "duration_min"]
+        reschedule_mode = "FAST_LOCAL_REPAIR"
 
-        # 2. Precedence (Öncelik) ve Makine Çakışması Düzeltme (Ripple-Effect Propagation)
-        # SADECE henüz tamamlanmamış (Movable veya Running sonrası) işler dalgalanır, COMPLETED işlere DOKUNULMAZ.
-        for _ in range(3):
-            # A) Aynı makinede çakışma kontrolü
-            for m in df["machine_id"].unique():
-                m_tasks = df[df["machine_id"] == m].sort_values("start_min").index
-                for i in range(len(m_tasks) - 1):
-                    t_curr = m_tasks[i]
-                    t_next = m_tasks[i + 1]
-
-                    # t_next ancak donmuş ufuk dışındaysa (yani henüz bitmemiş/gelecek işse) kaydırılabilir
-                    if df.loc[t_next, "end_min"] > down_start_min:
-                        if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
-                            gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
-                            # Eğer t_next RUNNING ise sadece end ötelenir, SCHEDULED ise start ve end ötelenir
-                            if df.loc[t_next, "start_min"] < down_start_min:
-                                df.loc[t_next, "end_min"] += gap
-                            else:
-                                df.loc[t_next, "start_min"] += gap
-                                df.loc[t_next, "end_min"] += gap
-
-            # B) Lot bazlı operasyon sıralaması (Op N bitmeden Op N+1 başlayamaz)
-            for lot in df["lot_id"].unique():
-                lot_tasks = df[df["lot_id"] == lot].sort_values("operation_seq").index
-                for i in range(len(lot_tasks) - 1):
-                    t_curr = lot_tasks[i]
-                    t_next = lot_tasks[i + 1]
-
-                    if df.loc[t_next, "end_min"] > down_start_min:
-                        if df.loc[t_next, "start_min"] < df.loc[t_curr, "end_min"]:
-                            gap = df.loc[t_curr, "end_min"] - df.loc[t_next, "start_min"]
-                            if df.loc[t_next, "start_min"] < down_start_min:
-                                df.loc[t_next, "end_min"] += gap
-                            else:
-                                df.loc[t_next, "start_min"] += gap
-                                df.loc[t_next, "end_min"] += gap
-
-        # Majör arızalarda CP-SAT re-optimization çalıştırılır
         if is_major_disruption:
-            opt_df = self._solve_cpsat_reschedule(
-                df=df_schedule.copy(),
+            df_cpsat = self._solve_cpsat_reschedule(
+                df=df.copy(),
                 machine_id=machine_id,
                 down_start_min=down_start_min,
                 down_duration_min=down_duration_min,
             )
-            if opt_df is not None:
-                df = opt_df
+            if df_cpsat is not None:
+                df = df_cpsat
+                reschedule_mode = "CPSAT_REOPTIMIZATION"
+
+        # Tier 1 Fallback veya Doğrudan Tier 1 Fast Local Repair
+        if reschedule_mode == "FAST_LOCAL_REPAIR":
+            for idx in df[mask_target].index:
+                t_start = df.at[idx, "start_min"]
+                t_end = df.at[idx, "end_min"]
+
+                # IN_PROGRESS (Başlangıç kilitli, bitiş ötelenir)
+                if t_start <= down_start_min and t_end > down_start_min:
+                    df.at[idx, "end_min"] = t_end + down_duration_min
+                # İleriki işler (Tamamen sağa ötelenir)
+                elif t_start > down_start_min:
+                    df.at[idx, "start_min"] = t_start + down_duration_min
+                    df.at[idx, "end_min"] = t_end + down_duration_min
+
+            # Ripple-shift ardışıl operasyon ve makine çakışmalarını düzeltme
+            changed = True
+            while changed:
+                changed = False
+                for lot_id, group in df.groupby("lot_id"):
+                    sorted_ops = group.sort_values("operation_seq").index.tolist()
+                    for i in range(len(sorted_ops) - 1):
+                        curr_idx = sorted_ops[i]
+                        next_idx = sorted_ops[i + 1]
+                        if df.at[next_idx, "start_min"] < df.at[curr_idx, "end_min"]:
+                            dur = df.at[next_idx, "end_min"] - df.at[next_idx, "start_min"]
+                            df.at[next_idx, "start_min"] = df.at[curr_idx, "end_min"]
+                            df.at[next_idx, "end_min"] = df.at[next_idx, "start_min"] + dur
+                            changed = True
+
+                for m_id, group in df.groupby("machine_id"):
+                    sorted_mach = group.sort_values("start_min").index.tolist()
+                    for i in range(len(sorted_mach) - 1):
+                        curr_idx = sorted_mach[i]
+                        next_idx = sorted_mach[i + 1]
+                        if df.at[next_idx, "start_min"] < df.at[curr_idx, "end_min"]:
+                            dur = df.at[next_idx, "end_min"] - df.at[next_idx, "start_min"]
+                            df.at[next_idx, "start_min"] = df.at[curr_idx, "end_min"]
+                            df.at[next_idx, "end_min"] = df.at[next_idx, "start_min"] + dur
+                            changed = True
 
         new_makespan = float(df["end_min"].max())
         delta_makespan = max(0.0, new_makespan - old_makespan)
 
         # ---------------------------------------------------------------------
-        # MADDE 20: Multi-Tiered Frozen Horizon Status Assignment
+        # MADDE 21: Rolling Horizon Assignment
+        # [FROZEN]   0 - 4h   (0 - 240 dk)
+        # [FLEXIBLE] 4 - 24h  (240 - 1440 dk)
+        # [FREE]     24h+     (> 1440 dk)
         # ---------------------------------------------------------------------
-        slush_cutoff = down_start_min + 240.0  # Sonraki 4 saat (Slush)
+        frozen_cutoff = down_start_min + 240.0  # 4 saat (240 dk)[cite: 2]
+        flexible_cutoff = down_start_min + 1440.0  # 24 saat (1440 dk)[cite: 2]
 
-        # 1. COMPLETED: Arıza öncesinde bitmiş görevler (Immutable)
+        # COMPLETED (Geçmiş işler)
         mask_completed = df["end_min"] <= down_start_min
         df.loc[mask_completed, "execution_status"] = "COMPLETED"
         df.loc[mask_completed, "schedule_state"] = "FROZEN"
 
-        # 2. IN_PROGRESS: Arıza anında tezgâhta çalışan görevler (Locked Start)
+        # IN_PROGRESS (Duruş anında çalışanlar)
         mask_running = (df["start_min"] <= down_start_min) & (df["end_min"] > down_start_min)
         df.loc[mask_running, "execution_status"] = "IN_PROGRESS"
         df.loc[mask_running, "schedule_state"] = "FROZEN"
 
-        # 3. SLUSH HORIZON: Sonraki 4 saat içindeki işler (Limited Change)
-        mask_slush = (df["start_min"] > down_start_min) & (df["start_min"] <= slush_cutoff)
-        df.loc[mask_slush, "schedule_state"] = "SLUSH"
-        df.loc[mask_slush, "dispatch_status"] = "DISPATCHED"
-        df.loc[mask_slush, "freeze_until_min"] = slush_cutoff
+        # FROZEN (0 - 4 saat arası başlayacak işler)[cite: 2]
+        mask_frozen = (df["start_min"] > down_start_min) & (df["start_min"] <= frozen_cutoff)
+        df.loc[mask_frozen, "schedule_state"] = "FROZEN"
+        df.loc[mask_frozen, "dispatch_status"] = "DISPATCHED"
+        df.loc[mask_frozen, "freeze_until_min"] = frozen_cutoff
 
-        # 4. FREE HORIZON: 4 saatten sonraki işler (Fully Reoptimizable)
-        mask_free = df["start_min"] > slush_cutoff
+        # FLEXIBLE (4 - 24 saat arası başlayacak işler)[cite: 2]
+        mask_flexible = (df["start_min"] > frozen_cutoff) & (df["start_min"] <= flexible_cutoff)
+        df.loc[mask_flexible, "schedule_state"] = "FLEXIBLE"
+        df.loc[mask_flexible, "dispatch_status"] = "UNRELEASED"
+        df.loc[mask_flexible, "freeze_until_min"] = 0.0
+
+        # FREE (24 saatten sonraki işler)[cite: 2]
+        mask_free = df["start_min"] > flexible_cutoff
         df.loc[mask_free, "schedule_state"] = "FREE"
+        df.loc[mask_free, "dispatch_status"] = "UNRELEASED"
+        df.loc[mask_free, "freeze_until_min"] = 0.0
 
         # ---------------------------------------------------------------------
-        # MADDE 19 & 20: Closed-Loop DB Persistence
+        # MADDE 19 & 20 & 21: DB Persistence
         # ---------------------------------------------------------------------
         if commit:
             cur = self.conn.cursor()
@@ -265,13 +287,13 @@ class ClosedLoopRescheduler:
                 cur.execute(
                     """
                     UPDATE production_schedule
-                SET start_min = ?,
-                    end_min = ?,
-                    schedule_state = ?,
-                    execution_status = ?,
-                    dispatch_status = ?,
-                    freeze_until_min = ?
-                WHERE run_id = ? AND task_id = ?;
+                    SET start_min = ?,
+                        end_min = ?,
+                        schedule_state = ?,
+                        execution_status = ?,
+                        dispatch_status = ?,
+                        freeze_until_min = ?
+                    WHERE run_id = ? AND task_id = ?;
                     """,
                     (
                         float(row["start_min"]),
@@ -285,17 +307,17 @@ class ClosedLoopRescheduler:
                     ),
                 )
 
-            # 3. Olayı mes_execution_events tablosuna yaz
             cur.execute(
                 """
                 INSERT INTO mes_execution_events (
                     run_id, machine_id, event_type, event_timestamp_min,
                     actual_duration_min, delay_reason
-                ) VALUES (?, ?, 'MACHINE_DOWN', ?, ?, ?);
+                ) VALUES (?, ?, ?, ?, ?, ?);
                 """,
                 (
                     self.run_id,
                     machine_id,
+                    event_type,
                     down_start_min,
                     down_duration_min,
                     f"[{reschedule_mode}] {reason}",
@@ -305,15 +327,12 @@ class ClosedLoopRescheduler:
 
         return {
             "status": "RESCHEDULED",
-            "reschedule_mode": reschedule_mode,
-            "is_major_disruption": is_major_disruption,
-            "machine_id": machine_id,
-            "down_start_min": down_start_min,
-            "down_duration_min": down_duration_min,
             "affected_tasks_count": affected_count,
             "old_makespan_min": old_makespan,
             "new_makespan_min": new_makespan,
             "delta_makespan_min": delta_makespan,
+            "reschedule_mode": reschedule_mode,
+            "is_major_disruption": is_major_disruption,
         }
 
     def record_execution_feedback(
