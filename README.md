@@ -6,24 +6,33 @@
 
 ## 1. System Architecture & Decision Flow
 
-Sistem, monolitik bir simulasyon yerine ISA-95 standartlarina dayali hiyerarsik bir karar destek mimarisi sunar:
+Platform, standartta ayrı bir "Level" olarak yer almayan bağımsız bir katman değil; **ISA-95 Level 3 (MOM/MES) ile Level 4 (Kurumsal/ERP) arayüzü çevresinde konumlanan bir İleri Planlama ve Karar Zekası Katmanıdır (APS / Decision Intelligence Layer)**. Bilgi değişimi ve karar döngüsü kapalı çevrim olarak şu akışla işler:
 
 ```text
-[ Demand Signals / LightGBM ]
-             |
-             v
-[ Hierarchical Production Planning (HPP / LP) ]
-             |
-             v
-[ Material Requirements Planning (BOM / MRP) ]
-             |
-             v
-[ Finite Capacity Scheduling (OR-Tools CP-SAT) ]
-             |
-             +---> [ Energy & Carbon Accounting (GHG Scope 2) ]
-             |
-             +---> [ Execution Tracking & Dynamic Replanning (MES Feedback) ]
-```
+ERP (Level 4 Enterprise Boundary)
+ │
+ ▼
+Demand Forecasting (LightGBM)
+ │
+ ▼
+Tactical Planning (HPP / LP Multi-Period)
+ │
+ ▼
+Material Requirements Planning (BOM / MRP)
+ │
+ ▼
+Finite Capacity Scheduling (OR-Tools CP-SAT)
+ │
+ ├──► Energy & Carbon Accounting (GHG Scope 2)
+ │
+ ▼
+MES / Shopfloor Execution (Level 3 Operations)
+ │
+ ▼
+Actuals & Execution Deviations (Work Responses / Events)
+ │
+ ▼
+Dynamic Replanning (Two-Tier Repair / CP-SAT Re-optimization)
 
 ---
 
