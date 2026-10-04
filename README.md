@@ -63,6 +63,18 @@ Sistem, çift yönlü fiziksel varlık kontrolü gerektiren tam bir "Digital Twi
 Bu kapalı çevrim akış; **Cost**, **Service Level**, **Energy**, **Carbon**, **Scenario Simulation** ve **Data Lineage** boyutlarını tek bir bütünleşik karar yapısında birleştirir. Mimari, güncel literatürdeki *closed-loop decision intelligence* ve *agentic APS* araştırma eksenleriyle doğrudan uyumludur[cite: 4].
 
 ---
+### Explicit Scope Boundaries & Non-Goals (Madde 36)
+
+Sistemin matematiksel titizliğini ve doğrulanabilirliğini korumak amacıyla aşağıdaki bileşenler bilinçli olarak kapsam dışında bırakılmıştır:
+
+- **Predictive Maintenance ML:** Kestirimci bakım arıza tahminleri yerine kesin bakım pencereleri ve duruş rezervasyonları üzerinden deterministik çizelgeleme yapılır.
+- **Direct ERP/SAP Live Connectors:** Ağır ve kırılgan canlı ERP konnektörleri yerine ISA-95 Level 4 adapter sözleşmeleri ve staging veri modelleri kullanılır.
+- **SCADA/PLC Hardware Protocols:** Saha seviyesi (Level 1-2) sinyal işleme yerine MES (Level 3) iş emri ve duruş olayları işlenir.
+- **Distributed Microservices / K8s:** Erken dağıtık mimari karmaşıklığından kaçınılarak modüler, deterministik çekirdek kütüphane yapısı korunur.
+- **Unbounded 4-Week Horizon CP-SAT:** NP-hard çizelgeleme ufku pratik operasyonel sınırda tutulur; uzun vade taktiksel LP (Hax & Candea) modeline delege edilir.
+- **Full Bidirectional Digital Twin:** Çift yönlü fiziksel aktüasyon yerine telemetri ve MES olaylarını işleyen karar destek katmanı (Digital Shadow) hedeflenir.
+- **LLM as Optimizer:** Dil modelleri optimizasyon veya çizelgeleme çözücüsü yerine konulmaz; yalnızca Karar Defteri (Decision Ledger) üzerinden açıklanabilirlik ve karar gerekçelendirmesi sağlar.
+
 
 ## 2. Core Pillars & Capabilities
 
