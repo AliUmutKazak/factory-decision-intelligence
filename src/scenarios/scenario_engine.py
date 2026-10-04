@@ -21,6 +21,7 @@ from src.config import (
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
 from src.scheduling.service_level import evaluate_schedule_service_level
 from src.utils.db import get_db_connection
+from src.integration.rescheduler import ClosedLoopRescheduler
 
 
 @dataclass
@@ -121,8 +122,91 @@ class ScenarioEngine:
         sim_kwh = base_kwh
         sim_tco2 = base_tco2
 
-        # 1. Operasyonel Şok Simülasyonu
-        if shock.demand_multiplier != 1.0:
+        # 1. Operasyonel Şok Simülasyonu (Gerçek Çizelgeleme & Simülasyon Motoru)
+        if shock.failed_machines:
+            failed_m = shock.failed_machines[0]
+            try:
+                # Madde 21 Two-Tier Rescheduler'ı simülasyon modunda (commit=False) tetikle
+                rescheduler = ClosedLoopRescheduler(db_path=self.db_path)
+                resched_result = rescheduler.reschedule_on_machine_breakdown(
+                    machine_id=failed_m,
+                    down_start_min=480.0,  # 1. vardiya bitiminde arıza
+                    down_duration_min=480.0,  # 8 saat duruş
+                    reason=f"Scenario Simulation: {shock.name}",
+                    event_type="MAJOR_BREAKDOWN",
+                    commit=False,
+                )
+                sim_makespan = (
+                    resched_result["new_makespan_min"] / 60.0
+                    if resched_result["status"] == "RESCHEDULED"
+                    else base_makespan + 8.0
+                )
+
+                sim_sched_solved = rescheduler._solve_cpsat_reschedule(
+                    df=sched_df.copy(),
+                    machine_id=failed_m,
+                    down_start_min=480.0,
+                    down_duration_min=480.0,
+                )
+                if sim_sched_solved is not None and not sim_sched_solved.empty:
+                    sim_sched = sim_sched_solved
+                else:
+                    if not sim_sched.empty and "machine_id" in sim_sched.columns:
+                        mask = sim_sched["machine_id"] == failed_m
+                        sim_sched.loc[mask, "start_min"] += 480.0
+                        sim_sched.loc[mask, "end_min"] += 480.0
+                        sim_makespan = float(sim_sched["end_min"].max()) / 60.0
+            except Exception:
+                # İzolasyon/mock ortamları için emniyetli fallback
+                if not sim_sched.empty and "machine_id" in sim_sched.columns:
+                    mask = sim_sched["machine_id"] == failed_m
+                    sim_sched.loc[mask, "start_min"] += 480.0
+                    sim_sched.loc[mask, "end_min"] += 480.0
+                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
+                else:
+                    sim_makespan = base_makespan + 8.0
+
+            run_col = "duration_min" if "duration_min" in sim_sched.columns else "duration"
+            sim_work_hours = (
+                float(sim_sched[run_col].sum()) / 60.0
+                if not sim_sched.empty and run_col in sim_sched.columns
+                else base_makespan * 3.5
+            )
+            sim_kwh = max(base_kwh, sim_work_hours * 45.0 + (480.0 / 60.0 * 10.0))
+            sim_tco2 = round(sim_kwh * 0.00044, 2)
+
+        elif shock.material_delay_days > 0:
+            delay_min = shock.material_delay_days * 8.0 * 60.0
+            if not sim_sched.empty and "start_min" in sim_sched.columns:
+                # 1. Operasyonları geciktir ve ripple-shift ile zincirleme kısıtları çöz
+                first_ops = (
+                    sim_sched["operation_seq"] == 1
+                    if "operation_seq" in sim_sched.columns
+                    else sim_sched.index < max(1, len(sim_sched) // 3)
+                )
+                sim_sched.loc[first_ops, "start_min"] += delay_min
+                sim_sched.loc[first_ops, "end_min"] += delay_min
+
+                # Ardışıl operasyon bağlarını (precedence) koru
+                changed = True
+                while changed:
+                    changed = False
+                    for lot_id, group in sim_sched.groupby("lot_id"):
+                        sorted_ops = group.sort_values("operation_seq").index.tolist()
+                        for i in range(len(sorted_ops) - 1):
+                            curr_idx = sorted_ops[i]
+                            next_idx = sorted_ops[i + 1]
+                            if sim_sched.at[next_idx, "start_min"] < sim_sched.at[curr_idx, "end_min"]:
+                                dur = sim_sched.at[next_idx, "end_min"] - sim_sched.at[next_idx, "start_min"]
+                                sim_sched.at[next_idx, "start_min"] = sim_sched.at[curr_idx, "end_min"]
+                                sim_sched.at[next_idx, "end_min"] = sim_sched.at[next_idx, "start_min"] + dur
+                                changed = True
+
+                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
+            else:
+                sim_makespan = base_makespan + (shock.material_delay_days * 8.0)
+
+        elif shock.demand_multiplier != 1.0:
             sim_kwh = base_kwh * shock.demand_multiplier
             sim_tco2 = round(base_tco2 * shock.demand_multiplier, 2)
             if not sim_sched.empty:
@@ -133,33 +217,6 @@ class ScenarioEngine:
                     sim_makespan = float(sim_sched["end_min"].max()) / 60.0
             else:
                 sim_makespan = base_makespan * shock.demand_multiplier
-
-        elif shock.failed_machines:
-            sim_kwh = base_kwh * 1.05
-            sim_tco2 = round(base_tco2 * 1.05, 2)
-            if not sim_sched.empty and "machine_id" in sim_sched.columns:
-                failed_m = shock.failed_machines[0]
-                mask = sim_sched["machine_id"] == failed_m
-                down_dur = 480.0
-                sim_sched.loc[mask, "start_min"] += down_dur
-                sim_sched.loc[mask, "end_min"] += down_dur
-                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            else:
-                sim_makespan = base_makespan + 8.0
-
-        elif shock.material_delay_days > 0:
-            delay_min = shock.material_delay_days * 8.0 * 60.0
-            if not sim_sched.empty and "start_min" in sim_sched.columns:
-                first_ops = (
-                    sim_sched["operation_seq"] == 1
-                    if "operation_seq" in sim_sched.columns
-                    else sim_sched.index < max(1, len(sim_sched) // 3)
-                )
-                sim_sched.loc[first_ops, "start_min"] += delay_min
-                sim_sched.loc[first_ops, "end_min"] += delay_min
-                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            else:
-                sim_makespan = base_makespan + (shock.material_delay_days * 8.0)
 
         elif shock.capacity_multiplier != 1.0:
             scale = 1.0 / max(shock.capacity_multiplier, 0.1)

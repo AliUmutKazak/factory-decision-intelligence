@@ -29,9 +29,24 @@ class ClosedLoopRescheduler:
 
     def _get_active_run_id(self) -> str:
         cur = self.conn.cursor()
-        cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
-        row = cur.fetchone()
-        return row[0] if row else "DEFAULT_RUN"
+        try:
+            cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
+            row = cur.fetchone()
+            if row and row[0]:
+                return str(row[0])
+        except Exception:
+            pass
+
+        # pipeline_runs yoksa veya boşsa production_schedule üzerindeki en son run_id'ye bak
+        try:
+            cur.execute("SELECT run_id FROM production_schedule LIMIT 1;")
+            row = cur.fetchone()
+            if row and row[0]:
+                return str(row[0])
+        except Exception:
+            pass
+
+        return "DEFAULT_RUN"
 
     def _solve_cpsat_reschedule(
         self,
