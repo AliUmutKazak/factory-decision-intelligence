@@ -191,6 +191,72 @@ def test_scenario_engine_tradeoff_matrix(isolated_env):
     """
     from src.scenarios.scenario_engine import ScenarioEngine
 
+    # --- BURADAN BAŞLAYARAK EKLE: Madde 24 Baseline Seed ---
+    conn = get_db_connection(str(isolated_env["db_path"]))
+    sample_sched = pd.DataFrame(
+        [
+            {
+                "task_id": "T01",
+                "lot_id": "L01",
+                "product_id": "P01",
+                "operation_seq": 1,
+                "machine_id": "M01",
+                "start_min": 0.0,
+                "duration_min": 120.0,
+                "run_duration": 120.0,
+                "end_min": 120.0,
+            },
+            {
+                "task_id": "T02",
+                "lot_id": "L01",
+                "product_id": "P01",
+                "operation_seq": 2,
+                "machine_id": "M02",
+                "start_min": 120.0,
+                "duration_min": 180.0,
+                "run_duration": 180.0,
+                "end_min": 300.0,
+            },
+            {
+                "task_id": "T03",
+                "lot_id": "L02",
+                "product_id": "P01",
+                "operation_seq": 1,
+                "machine_id": "M01",
+                "start_min": 120.0,
+                "duration_min": 240.0,
+                "run_duration": 240.0,
+                "end_min": 360.0,
+            },
+            {
+                "task_id": "T04",
+                "lot_id": "L02",
+                "product_id": "P01",
+                "operation_seq": 2,
+                "machine_id": "M03",
+                "start_min": 360.0,
+                "duration_min": 300.0,
+                "run_duration": 300.0,
+                "end_min": 660.0,
+            },
+        ]
+    )
+    sample_sched.to_sql("production_schedule", conn, if_exists="replace", index=False)
+
+    sample_orders = pd.DataFrame(
+        [
+            {
+                "order_id": "ORD01",
+                "product_id": "P01",
+                "quantity": 100,
+                "due_date_min": 1000.0,
+            }
+        ]
+    )
+    sample_orders.to_sql("orders", conn, if_exists="replace", index=False)
+    conn.close()
+    # --- EKLENECEK KOD BURADA BİTİYOR ---
+
     engine = ScenarioEngine(db_path=isolated_env["db_path"])
     df = engine.run_all_scenarios()
 
@@ -243,3 +309,22 @@ def test_scenario_engine_tradeoff_matrix(isolated_env):
     # Karbon vergisi artışı sadece karbon maliyetini yükseltmeli
     assert carbon_shock["Carbon Cost (€)"] > baseline["Carbon Cost (€)"]
     assert carbon_shock["Carbon (tCO2e)"] == baseline["Carbon (tCO2e)"]
+
+
+def test_scenario_engine_raises_on_missing_data(tmp_path):
+    """Madde 24: Veritabanında çizelge yokken sahte default üretilmemeli,
+    ScenarioDataUnavailableError fırlatılmalıdır (Unknown != Zero != Default).
+    """
+    from src.scenarios.scenario_engine import (
+        ScenarioDataUnavailableError,
+        ScenarioEngine,
+        ScenarioShock,
+    )
+
+    empty_db = tmp_path / "empty_factory.db"
+    conn = get_db_connection(str(empty_db))
+    conn.close()
+
+    engine = ScenarioEngine(db_path=str(empty_db))
+    with pytest.raises(ScenarioDataUnavailableError):
+        engine.evaluate_scenario(ScenarioShock(name="BASELINE"))

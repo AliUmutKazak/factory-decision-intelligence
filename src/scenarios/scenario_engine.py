@@ -20,8 +20,17 @@ from src.config import (
 )
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
 from src.scheduling.service_level import evaluate_schedule_service_level
-from src.utils.db import get_db_connection
 from src.integration.rescheduler import ClosedLoopRescheduler
+from src.utils.db import get_db_connection
+
+
+class ScenarioDataUnavailableError(Exception):
+    """Madde 24: Veritabanında çizelge veya operasyonel veriler bulunamadığında
+    sahte default üretilmesini engelleyen karar zekâsı kural istisnası.
+    Unknown != Zero != Default.
+    """
+
+    pass
 
 
 @dataclass
@@ -67,24 +76,29 @@ class ScenarioEngine:
         }
 
     def _read_table_safe(self, table_name: str, db_path: str) -> pd.DataFrame:
-        conn = get_db_connection(db_path)
         try:
-            return pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            conn = get_db_connection(db_path)
+            try:
+                return pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            finally:
+                conn.close()
         except Exception:
             return pd.DataFrame()
-        finally:
-            conn.close()
 
     def _get_baseline_energy_carbon(
         self, sched_df: pd.DataFrame, energy_df: pd.DataFrame, carbon_df: pd.DataFrame
     ) -> tuple[float, float, float]:
-        """Çizelge ve KPI tablolarından güvenli baz makespan, kWh ve tCO2e türetir."""
-        if not sched_df.empty and "end_min" in sched_df.columns:
+        """Çizelge ve KPI tablolarından gerçek baz makespan, kWh ve tCO2e türetir.
+        Madde 24: Veri yoksa keyfi default atanamaz (Unknown != Zero != Default).
+        """
+        if not sched_df.empty and "end_min" in sched_df.columns and not sched_df["end_min"].isna().all():
             base_makespan = float(sched_df["end_min"].max()) / 60.0
         elif not energy_df.empty and "makespan_hours" in energy_df.columns:
             base_makespan = float(energy_df["makespan_hours"].iloc[0])
         else:
-            base_makespan = 120.0
+            raise ScenarioDataUnavailableError(
+                "DATA_UNAVAILABLE: Makespan türetilebilecek geçerli operasyonel veri yok."
+            )
 
         if (
             not energy_df.empty
@@ -94,12 +108,13 @@ class ScenarioEngine:
             base_kwh = float(energy_df["grand_total_kwh"].iloc[0])
         else:
             run_col = "duration_min" if "duration_min" in sched_df.columns else "duration"
-            total_duration_hours = (
-                float(sched_df[run_col].sum()) / 60.0
-                if not sched_df.empty and run_col in sched_df.columns
-                else base_makespan * 3.5
-            )
-            base_kwh = max(10000.0, total_duration_hours * 45.0)
+            if not sched_df.empty and run_col in sched_df.columns:
+                total_duration_hours = float(sched_df[run_col].sum()) / 60.0
+                base_kwh = total_duration_hours * 45.0
+            else:
+                raise ScenarioDataUnavailableError(
+                    "DATA_UNAVAILABLE: Enerji tüketimi hesaplanabilecek operasyonel veri yok."
+                )
 
         if not carbon_df.empty and "total_tco2e" in carbon_df.columns and float(carbon_df["total_tco2e"].iloc[0]) > 0:
             base_tco2 = float(carbon_df["total_tco2e"].iloc[0])
@@ -118,6 +133,13 @@ class ScenarioEngine:
         energy_df = self._read_table_safe("energy_kpis", self.db_path)
         carbon_df = self._read_table_safe("carbon_kpis", self.db_path)
         orders_df = self._read_table_safe("orders", self.db_path)
+
+        # Hem çizelge hem enerji tablosu yoksa/boşsa veri yoktur: hata fırlat
+        if sched_df.empty and (energy_df.empty or "makespan_hours" not in energy_df.columns):
+            raise ScenarioDataUnavailableError(
+                "DATA_UNAVAILABLE: production_schedule veya energy_kpis tablosu boş ya da okunamadı. "
+                "Senaryo simülasyonu sahte verilerle koşturulamaz (Unknown != Zero != Default)."
+            )
 
         base_makespan, base_kwh, base_tco2 = self._get_baseline_energy_carbon(sched_df, energy_df, carbon_df)
 
