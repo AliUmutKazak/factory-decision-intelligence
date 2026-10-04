@@ -36,7 +36,12 @@ from src.config import (
     SchedulingObjectivePolicy,
     get_runtime_paths,
 )
-from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
+from src.contracts.schemas import (
+    ScheduleInputPayload,
+    ScheduleSolverMetadata,
+    ScheduleTaskInput,
+    SolverStatus,
+)
 from src.utils.db import get_db_connection
 
 
@@ -329,6 +334,29 @@ def run_cpsat_scheduling(
         empty_df.to_csv(_rt_paths["processed_dir"] / "production_schedule.csv", index=False)
         return empty_df
     tasks_df = pd.DataFrame(tasks)
+
+    # -------------------------------------------------------------------------
+    # Faz 3 - Madde 3: Schedule Input Contracts & Pre-Solver Validation Shield
+    # -------------------------------------------------------------------------
+    input_task_contracts = [
+        ScheduleTaskInput(
+            task_id=str(t["task_id"]),
+            product_id=str(t["product_id"]),
+            machine_id=str(t["machine_id"]),
+            duration_min=int(t["duration"]),
+            due_date_min=int(t.get("due_date_min", t.get("due_date", 0))),
+            weight=float(t.get("weight", 1.0)),
+            earliest_start_min=int(t.get("earliest_start_min", 0)),
+            sequence_family=str(t.get("sequence_family")) if t.get("sequence_family") else None,
+        )
+        for _, t in tasks_df.iterrows()
+    ]
+    # CP-SAT'a girmeden önce tüm girdi yükünü Pydantic sözleşmesiyle mühürle
+    ScheduleInputPayload(
+        tasks=input_task_contracts,
+        time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+        random_seed=int(CPSAT_RANDOM_SEED),
+    )
 
     # -------------------------------------------------------------
     # CP-SAT MODEL TANIMI

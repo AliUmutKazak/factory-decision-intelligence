@@ -101,6 +101,7 @@ class ScheduleResult(BaseModel):
     total_cost_eur: float = Field(..., ge=0)
     tasks: list[ProductionScheduleTask] = Field(default_factory=list)
 
+
 class CurrencyCode(StrEnum):
     EUR = "EUR"
     USD = "USD"
@@ -122,6 +123,7 @@ class EnergyUnit(StrEnum):
 class MassUnit(StrEnum):
     KG = "kg"
     TON = "ton"
+
 
 class EconomicConfigModel(BaseModel):
     """Pydantic v2 SSOT Ekonomik Parametreler Sözleşmesi."""
@@ -192,6 +194,7 @@ class EconomicConfigModel(BaseModel):
             "tardiness_cost": f"{curr}/hour",
         }
 
+
 class InputLineageRecord(BaseModel):
     """Boru hattı girdi kaynağı soykütüğü sözleşmesi."""
 
@@ -212,6 +215,7 @@ class RunManifestModel(BaseModel):
     total_artifacts: int = Field(ge=0, description="İzlenen toplam çıktı artifact sayısı")
     artifacts: dict[str, Any] = Field(default_factory=dict, description="Çıktı dosyaları ve hash'leri")
     inputs: dict[str, Any] = Field(default_factory=dict, description="Girdi veri setleri, config ve ortam izleri")
+
 
 class SolverStatus(StrEnum):
     """OR-Tools CP-SAT çözücü durum sözleşmesi."""
@@ -235,6 +239,7 @@ class ScheduleSolverMetadata(BaseModel):
     random_seed: int = Field(default=42, description="Determinizm için kullanılan rastgele tohum")
     num_search_workers: int = Field(ge=1, description="Aramada kullanılan paralel iş parçacığı sayısı")
     time_limit_seconds: float = Field(gt=0.0, description="Çözücüye tanınan azami süre")
+
 
 class ScenarioShockModel(BaseModel):
     """Senaryo şok ve parametre manipülasyon sözleşmesi."""
@@ -261,3 +266,24 @@ class ScenarioResultModel(BaseModel):
     carbon_tco2e: float = Field(ge=0.0, description="Toplam karbon salımı (tCO2e)")
     carbon_cost_eur: float = Field(ge=0.0, description="Karbon vergisi/maliyeti (EUR)")
     total_cost_eur: float = Field(ge=0.0, description="Toplam ekonomik maliyet (EUR)")
+
+
+class ScheduleTaskInput(BaseModel):
+    """Tek bir üretim görevinin (operasyonunun) çizelgeleyici girdi sözleşmesi."""
+
+    task_id: str = Field(description="Benzersiz görev tanımlayıcısı (örn: P01_OP10)")
+    product_id: str = Field(description="Ürün kodu")
+    machine_id: str = Field(description="Atanacağı makine kodu")
+    duration_min: int = Field(gt=0, description="Operasyon işlem süresi (dakika, pozitif tam sayı)")
+    due_date_min: int = Field(ge=0, description="Teslim tarihi (dakika)")
+    weight: float = Field(default=1.0, ge=0.0, description="Gecikme ağırlık katsayısı")
+    earliest_start_min: int = Field(default=0, ge=0, description="MRP malzeme hazır olma zamanı (dakika)")
+    sequence_family: str | None = Field(default=None, description="Setup matrisi ürün ailesi/grubu")
+
+
+class ScheduleInputPayload(BaseModel):
+    """CP-SAT çözücüsüne beslenen doğrulanmış girdi veri kümesi."""
+
+    tasks: list[ScheduleTaskInput] = Field(min_length=1, description="Çizelgelenecek en az bir görev olmalıdır")
+    time_limit_seconds: float = Field(gt=0.0, description="Çözücü zaman limiti")
+    random_seed: int = Field(ge=0, description="Determinizm çekirdeği")
