@@ -913,6 +913,9 @@ def run_cpsat_scheduling(
         random_seed=int(CPSAT_RANDOM_SEED),
         num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
         time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+        makespan_min=int(solver.Value(makespan)),
+        total_setup_min=int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
+        total_tardiness_min=int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0,
     )
 
     # 2. Geriye dönük operasyonel zengin metadata (JSON raporu için)

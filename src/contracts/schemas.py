@@ -228,17 +228,24 @@ class SolverStatus(StrEnum):
 
 
 class ScheduleSolverMetadata(BaseModel):
-    """Çizelgeleme çözücüsü yürütme ve determinizm meta veri sözleşmesi."""
+    """CP-SAT veya sezgisel çizelgeleme çözücüsünün standart çalışma çıktısı sözleşmesi."""
 
-    run_id: str = Field(description="İlişkili pipeline koşum kimliği")
-    status: SolverStatus = Field(description="Çözücü nihai durum kodu")
-    proven_optimal: bool = Field(description="Çözümün matematiksel olarak kanıtlanmış optimum olup olmadığı")
-    wall_time_seconds: float = Field(ge=0.0, description="Çözücünün harcadığı toplam duvar saati süresi")
-    objective_value: float | None = Field(default=None, description="Bulunan en iyi hedef fonksiyon değeri")
-    best_objective_bound: float | None = Field(default=None, description="Matematiksel alt/üst sınır")
-    random_seed: int = Field(default=42, description="Determinizm için kullanılan rastgele tohum")
-    num_search_workers: int = Field(ge=1, description="Aramada kullanılan paralel iş parçacığı sayısı")
-    time_limit_seconds: float = Field(gt=0.0, description="Çözücüye tanınan azami süre")
+    run_id: str = Field(description="Çalışma kimliği")
+    status: SolverStatus = Field(description="Çözücü nihai durumu")
+    proven_optimal: bool = Field(description="Çözümün matematiksel olarak kanıtlanmış optimal olup olmadığı")
+    wall_time_seconds: float = Field(ge=0.0, description="Çözücünün harcadığı gerçek süre (saniye)")
+    objective_value: float = Field(description="Bileşik amaç fonksiyonu değeri (composite objective)")
+    best_objective_bound: float | None = Field(default=None, description="Dual bound / kanıtlanmış alt sınır")
+    random_seed: int = Field(default=42, ge=0, description="Rastgelelik çekirdeği")
+    num_search_workers: int = Field(default=4, gt=0, description="Kullanılan paralel iş parçacığı sayısı")
+    time_limit_seconds: float = Field(default=30.0, gt=0.0, description="Tanımlanan süre limiti (saniye)")
+
+    # Faz 3 - Madde 4: Çok Amaçlı Fonksiyon Ayrıştırması (Multi-Objective Decomposition)
+    makespan_min: int | None = Field(default=None, ge=0, description="Toplam tamamlanma süresi (dakika)")
+    total_setup_min: int | None = Field(
+        default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)"
+    )
+    total_tardiness_min: int | None = Field(default=None, ge=0, description="Toplam teslim gecikmesi (dakika)")
 
 
 class ScenarioShockModel(BaseModel):

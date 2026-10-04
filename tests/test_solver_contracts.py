@@ -131,3 +131,15 @@ def test_run_cpsat_scheduling_returns_valid_solver_metadata():
             assert df_meta.iloc[0]["status"] in ["OPTIMAL", "FEASIBLE"]
     finally:
         mem_conn.close()
+
+    # 1. Sözleşme tipi ve alan doğrulaması
+    assert isinstance(result, ScheduleSolverMetadata)
+    assert result.run_id == test_run_id
+    assert result.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    assert result.wall_time_seconds >= 0.0
+    assert result.objective_value is not None
+
+    # Faz 3 - Madde 4: Çok amaçlı metrik denetimi
+    assert result.makespan_min is not None and result.makespan_min > 0
+    assert result.total_setup_min is not None and result.total_setup_min >= 0
+    assert result.total_tardiness_min is not None and result.total_tardiness_min >= 0
