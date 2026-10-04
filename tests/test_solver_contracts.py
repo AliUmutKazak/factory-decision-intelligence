@@ -1,9 +1,14 @@
 """Tests for Schedule Solver Contracts, Status Enums, and Determinism Metadata (Faz 3 - Madde 1 & 2)."""
 
+import sqlite3
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
 import pytest
 from pydantic import ValidationError
 
 from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
+from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 
 
 def test_solver_status_enum_values():
@@ -76,3 +81,53 @@ def test_schedule_solver_metadata_invalid_time_limit():
             num_search_workers=2,
             time_limit_seconds=0.0,  # gt=0 kısıtına takılmalı
         )
+
+
+def test_run_cpsat_scheduling_returns_valid_solver_metadata():
+    """run_cpsat_scheduling fonksiyonunun ScheduleSolverMetadata döndürdüğünü ve DB'ye mühürlediğini doğrular."""
+    from src.config import DB_PATH
+
+    # Gerçek DB'yi in-memory klonlayarak tam şema ve veri izolasyonu sağlıyoruz
+    disk_conn = sqlite3.connect(DB_PATH)
+    mem_conn = sqlite3.connect(":memory:")
+    disk_conn.backup(mem_conn)
+    disk_conn.close()
+
+    # run_cpsat_scheduling içindeki conn.close() çağrısının DB'yi kapatmasını engelleyen wrapper
+    class NoCloseConnectionWrapper:
+        def __init__(self, target):
+            self._target = target
+
+        def close(self):
+            pass
+
+        def __getattr__(self, name):
+            return getattr(self._target, name)
+
+    wrapped_conn = NoCloseConnectionWrapper(mem_conn)
+    test_run_id = "RUN-TEST-CONTRACT-001"
+
+    try:
+        with (
+            patch("src.scheduling.schedule_cpsat.get_db_connection", return_value=wrapped_conn),
+            patch("src.scheduling.schedule_cpsat.CPSAT_TIME_LIMIT_SECONDS", 2),
+        ):
+            result = run_cpsat_scheduling(run_id=test_run_id)
+
+            # 1. Sözleşme tipi ve alan doğrulaması
+            assert isinstance(result, ScheduleSolverMetadata)
+            assert result.run_id == test_run_id
+            assert result.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+            assert result.wall_time_seconds >= 0.0
+            assert result.objective_value is not None
+
+            # 2. SQLite veritabanına mühürlenme denetimi
+            df_meta = pd.read_sql(
+                f"SELECT * FROM schedule_solver_metadata WHERE run_id = '{test_run_id}'",
+                mem_conn,
+            )
+            assert not df_meta.empty
+            assert df_meta.iloc[0]["run_id"] == test_run_id
+            assert df_meta.iloc[0]["status"] in ["OPTIMAL", "FEASIBLE"]
+    finally:
+        mem_conn.close()

@@ -36,6 +36,7 @@ from src.config import (
     SchedulingObjectivePolicy,
     get_runtime_paths,
 )
+from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
 from src.utils.db import get_db_connection
 
 
@@ -870,69 +871,74 @@ def run_cpsat_scheduling(
     else:
         optimality_gap = None
 
-    solver_metadata = [
-        {
-            "solver_name": "Google OR-Tools CP-SAT",
-            "solver_status": status_name,
-            "is_optimal": bool(status == cp_model.OPTIMAL),
-            "objective_value_min": obj_val,
-            "best_bound_min": best_bound,
-            "optimality_gap_pct": round(optimality_gap, 4) if optimality_gap is not None else None,
-            "solve_time_seconds": round(float(solver.WallTime()), 4),
-            "configured_num_search_workers": int(CPSAT_NUM_SEARCH_WORKERS),
-            "effective_num_search_workers": int(
-                getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)
-            ),
-            "num_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
-            "random_seed": int(CPSAT_RANDOM_SEED),
-            "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 0.0)),
-            "tasks_scheduled": len(sched_df),
-            "total_scheduled_units": int(sched_df["production_units"].sum())
-            if "production_units" in sched_df.columns
-            else 0,
-            "week_1_horizon_min": 7 * 24 * 60,
-            "cross_week_spillover_min": max(0, int(solver.Value(makespan) - (7 * 24 * 60))),
-            "cross_week_execution_allowed": 1,
-            "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
-            "ot_policy": "MODEL_A_WEEK1_ONLY",
-            "ot_policy_description": "Overtime authorized strictly for Week-1; cross-week spillover runs under regular shifts only.",
-            "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
-            "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
-            "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
-            "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
-            "mrp_qc_hold_enforced": 1,
-            "objective_makespan_min": int(solver.Value(makespan)),
-            "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
-            "total_objective_value": float(solver.ObjectiveValue()),
-        }
-    ]
+    effective_run_id = str(run_id) if run_id else "DEFAULT_RUN"
 
-    effective_run_id = run_id if run_id else "DEFAULT_RUN"
-    solver_meta_df = pd.DataFrame(solver_metadata)
-    solver_meta_df["run_id"] = effective_run_id
+    # 1. Pydantic v2 Tip-Güvenli Sözleşme Nesnesi
+    solver_status_enum = SolverStatus(status_name) if status_name in SolverStatus.__members__ else SolverStatus.FEASIBLE
+    contract_metadata = ScheduleSolverMetadata(
+        run_id=effective_run_id,
+        status=solver_status_enum,
+        proven_optimal=bool(status == cp_model.OPTIMAL),
+        wall_time_seconds=float(round(solver.WallTime(), 4)),
+        objective_value=float(round(obj_val, 4)),
+        best_objective_bound=float(round(best_bound, 4)) if (best_bound is not None and best_bound > 0) else None,
+        random_seed=int(CPSAT_RANDOM_SEED),
+        num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
+        time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+    )
+
+    # 2. Geriye dönük operasyonel zengin metadata (JSON raporu için)
+    raw_metadata_dict = {
+        "run_id": effective_run_id,
+        "solver_name": "Google OR-Tools CP-SAT",
+        "solver_status": status_name,
+        "is_optimal": bool(status == cp_model.OPTIMAL),
+        "objective_value_min": obj_val,
+        "best_bound_min": best_bound,
+        "optimality_gap_pct": round(optimality_gap, 4) if optimality_gap is not None else None,
+        "solve_time_seconds": round(float(solver.WallTime()), 4),
+        "configured_num_search_workers": int(CPSAT_NUM_SEARCH_WORKERS),
+        "effective_num_search_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
+        "num_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
+        "random_seed": int(CPSAT_RANDOM_SEED),
+        "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 0.0)),
+        "tasks_scheduled": len(sched_df),
+        "total_scheduled_units": int(sched_df["production_units"].sum())
+        if "production_units" in sched_df.columns
+        else 0,
+        "week_1_horizon_min": 7 * 24 * 60,
+        "cross_week_spillover_min": max(0, int(solver.Value(makespan) - (7 * 24 * 60))),
+        "cross_week_execution_allowed": 1,
+        "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
+        "ot_policy": "MODEL_A_WEEK1_ONLY",
+        "ot_policy_description": "Overtime authorized strictly for Week-1; cross-week spillover runs under regular shifts only.",
+        "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
+        "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
+        "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
+        "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
+        "mrp_qc_hold_enforced": 1,
+        "objective_makespan_min": int(solver.Value(makespan)),
+        "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
+        "total_objective_value": float(solver.ObjectiveValue()),
+    }
+
+    solver_meta_df = pd.DataFrame([contract_metadata.model_dump()])
     sched_df["run_id"] = effective_run_id
-    # -------------------------------------------------------------------------
-    # MADDE 20: Frozen Horizon & Multi-Tiered Execution Status Data Model
-    # -------------------------------------------------------------------------
     sched_df["schedule_state"] = "FREE"
     sched_df["execution_status"] = "SCHEDULED"
     sched_df["dispatch_status"] = "UNRELEASED"
     sched_df["freeze_until_min"] = 0.0
 
-    # İlk vardiyada (ilk 480 dk) başlayacak işleri sahaya sevk edilmiş (DISPATCHED) işaretle
     sched_df.loc[sched_df["start_min"] < 480.0, "dispatch_status"] = "DISPATCHED"
 
-    # Staging-aware reports path (Item 28)
     reports_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", "reports"))
     reports_dir.mkdir(parents=True, exist_ok=True)
     with open(reports_dir / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
-        json.dump(solver_metadata[0], f, indent=2, ensure_ascii=False)
+        json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
 
-    conn = get_db_connection(DB_PATH)
     sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
     solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
-    conn.close()
-    print("✓ production_schedule.csv ve schedule_solver_metadata güncellendi.")
+    print("✓ production_schedule ve schedule_solver_metadata güncellendi.")
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
     print()
@@ -1024,6 +1030,7 @@ def run_cpsat_scheduling(
 
     conn.close()
     print("--- CP-SAT Detaylı Çizelgeleme Tamamlandı ---\n")
+    return contract_metadata
 
 
 solve_cpsat_schedule = run_cpsat_scheduling
