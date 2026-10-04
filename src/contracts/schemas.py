@@ -296,3 +296,25 @@ class ScheduleInputPayload(BaseModel):
     tasks: list[ScheduleTaskInput] = Field(min_length=1, description="Çizelgelenecek en az bir görev olmalıdır")
     time_limit_seconds: float = Field(gt=0.0, description="Çözücü zaman limiti")
     random_seed: int = Field(ge=0, description="Determinizm çekirdeği")
+
+
+class ScheduleOutputTask(BaseModel):
+    """Çizelgeleme motorunun ürettiği tekil operasyon planı sözleşmesi."""
+
+    run_id: str = Field(description="Çizelgeleme koşu kimliği")
+    task_id: str = Field(description="Görev tanımlayıcısı")
+    product_id: str = Field(description="Ürün kodu")
+    machine_id: str = Field(description="Atanan makine kodu")
+    start_min: int = Field(ge=0, description="Operasyon başlangıç dakikası")
+    end_min: int = Field(ge=0, description="Operasyon bitiş dakikası")
+    duration_min: int = Field(gt=0, description="İşlem süresi (dakika)")
+    due_date_min: int = Field(ge=0, description="Teslim tarihi dakikası")
+    tardiness_min: int = Field(default=0, ge=0, description="Gecikme süresi (dakika)")
+
+    @field_validator("end_min")
+    @classmethod
+    def validate_end_after_start(cls, v: int, info) -> int:
+        start = info.data.get("start_min")
+        if start is not None and v < start:
+            raise ValueError(f"end_min ({v}) start_min ({start}) değerinden küçük olamaz.")
+        return v

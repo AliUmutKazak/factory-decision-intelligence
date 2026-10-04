@@ -38,6 +38,7 @@ from src.config import (
 )
 from src.contracts.schemas import (
     ScheduleInputPayload,
+    ScheduleOutputTask,
     ScheduleSolverMetadata,
     ScheduleTaskInput,
     SolverStatus,
@@ -967,7 +968,23 @@ def run_cpsat_scheduling(
     with open(reports_dir / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
         json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
 
-    sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+        # -------------------------------------------------------------------------
+        # Faz 3 - Madde 6: Schedule Output Contract & Database Sealing Shield
+        # -------------------------------------------------------------------------
+        for _, row in sched_df.iterrows():
+            ScheduleOutputTask(
+                run_id=effective_run_id,
+                task_id=str(row["task_id"]),
+                product_id=str(row["product_id"]),
+                machine_id=str(row["machine_id"]),
+                start_min=int(row["start_min"]),
+                end_min=int(row["end_min"]),
+                duration_min=int(row["duration_min"]),
+                due_date_min=int(row.get("due_date_min", row.get("due_date", 0))),
+                tardiness_min=int(row.get("tardiness_min", 0)),
+            )
+
+        sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
     solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
     print("✓ production_schedule ve schedule_solver_metadata güncellendi.")
 
