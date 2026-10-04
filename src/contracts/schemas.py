@@ -238,13 +238,15 @@ class ScheduleSolverMetadata(BaseModel):
     best_objective_bound: float | None = Field(default=None, description="Dual bound / kanıtlanmış alt sınır")
     random_seed: int = Field(default=42, ge=0, description="Rastgelelik çekirdeği")
     num_search_workers: int = Field(default=4, gt=0, description="Kullanılan paralel iş parçacığı sayısı")
-    time_limit_seconds: float = Field(default=30.0, gt=0.0, description="Tanımlanan süre limiti (saniye)")
+    time_limit_seconds: float = Field(
+        default=30.0,
+        ge=0.0,
+        description="Tanımlanan süre limiti (saniye, sezgiseller için 0 olabilir)",
+    )
 
     # Faz 3 - Madde 4: Çok Amaçlı Fonksiyon Ayrıştırması (Multi-Objective Decomposition)
     makespan_min: int | None = Field(default=None, ge=0, description="Toplam tamamlanma süresi (dakika)")
-    total_setup_min: int | None = Field(
-        default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)"
-    )
+    total_setup_min: int | None = Field(default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)")
     total_tardiness_min: int | None = Field(default=None, ge=0, description="Toplam teslim gecikmesi (dakika)")
 
 

@@ -20,6 +20,8 @@ from typing import Any
 
 import pandas as pd
 
+from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
+
 
 @dataclass
 class BenchmarkTask:
@@ -48,6 +50,23 @@ class BenchmarkResult:
             "Total Tardiness (hr)": round(self.total_tardiness, 2),
             "Total Setup Time (hr)": round(self.total_setup_time, 2),
         }
+
+    def to_solver_metadata(self, run_id: str = "HEURISTIC-RUN") -> ScheduleSolverMetadata:
+        """Sezgisel sonucunu standart ScheduleSolverMetadata sözleşmesine dönüştürür."""
+        return ScheduleSolverMetadata(
+            run_id=f"{run_id}-{self.method}",
+            status=SolverStatus.FEASIBLE,
+            proven_optimal=False,
+            wall_time_seconds=0.001,  # Sezgiseller anlık çalışır (< 1-2 ms)
+            objective_value=float(round(self.makespan + self.total_setup_time + self.total_tardiness, 4)),
+            best_objective_bound=None,
+            random_seed=42,
+            num_search_workers=1,
+            time_limit_seconds=0.0,
+            makespan_min=int(round(self.makespan * 60)),  # Saat -> Dakika dönüşümü
+            total_setup_min=int(round(self.total_setup_time * 60)),
+            total_tardiness_min=int(round(self.total_tardiness * 60)),
+        )
 
 
 class SchedulingBenchmarkSuite:
@@ -119,7 +138,7 @@ class SchedulingBenchmarkSuite:
             total_processing_time=total_proc_time,
         )
 
-    def run_cpsat_comparison(self, cpsat_result: dict[str, Any] | None = None) -> pd.DataFrame:
+    def run_cpsat_comparison(self, cpsat_result: dict[str, Any] | ScheduleSolverMetadata | None = None) -> pd.DataFrame:
         """Tüm sezgiselleri ve CP-SAT sonucunu birleştirip kıyaslama tablosu döner."""
         results = [
             self.run_heuristic("FIFO"),
@@ -128,18 +147,34 @@ class SchedulingBenchmarkSuite:
             self.run_heuristic("Greedy"),
         ]
 
-        # Eğer dışarıdan veya çözücüden bir CP-SAT sonucu verilmişse ekle
-        if cpsat_result:
-            results.append(
-                BenchmarkResult(
-                    method="CP-SAT (Exact)",
-                    makespan=float(cpsat_result.get("makespan", 0.0)),
-                    late_orders=int(cpsat_result.get("late_orders", 0)),
-                    total_tardiness=float(cpsat_result.get("total_tardiness", 0.0)),
-                    total_setup_time=float(cpsat_result.get("total_setup_time", 0.0)),
-                    total_processing_time=sum(t.processing_time for t in self.tasks),
+        # Eğer dışarıdan ScheduleSolverMetadata veya dict formatında CP-SAT sonucu verilmişse ekle
+        if cpsat_result is not None:
+            if isinstance(cpsat_result, ScheduleSolverMetadata):
+                makespan_hr = (cpsat_result.makespan_min or 0) / 60.0
+                setup_hr = (cpsat_result.total_setup_min or 0) / 60.0
+                tardiness_hr = (cpsat_result.total_tardiness_min or 0) / 60.0
+                late_orders = 1 if tardiness_hr > 0 else 0
+                results.append(
+                    BenchmarkResult(
+                        method="CP-SAT (Exact)",
+                        makespan=makespan_hr,
+                        late_orders=late_orders,
+                        total_tardiness=tardiness_hr,
+                        total_setup_time=setup_hr,
+                        total_processing_time=sum(t.processing_time for t in self.tasks),
+                    )
                 )
-            )
+            elif isinstance(cpsat_result, dict):
+                results.append(
+                    BenchmarkResult(
+                        method="CP-SAT (Exact)",
+                        makespan=float(cpsat_result.get("makespan", 0.0)),
+                        late_orders=int(cpsat_result.get("late_orders", 0)),
+                        total_tardiness=float(cpsat_result.get("total_tardiness", 0.0)),
+                        total_setup_time=float(cpsat_result.get("total_setup_time", 0.0)),
+                        total_processing_time=sum(t.processing_time for t in self.tasks),
+                    )
+                )
 
         df = pd.DataFrame([r.to_dict() for r in results])
         return df
