@@ -81,3 +81,24 @@ python -m ruff format --check scripts/ src/ tests/
 # Butunlesik Test Suiti (90+ Test)
 python -m pytest -q
 ```
+
+---
+
+## 4. Future Roadmap: Agentic AI & Planner Copilot (Madde 31)
+
+Sistem mimarisinde Üretici Yapay Zeka (LLM), doğrudan çizelge üreten bir kara kutu olarak **konumlandırılmaz**. Optimizasyon problemleri deterministik matematiksel modeller (CP-SAT / LP) gerektirir[cite: 6]. LLM/Agent mimarisi, deterministik motorun üzerinde bir **"Planner Copilot"** olarak kurgulanmıştır[cite: 6]:
+
+```text
+LLM / Agent
+    │  (Doğal dil senaryo talebi: "M01 tezgahı 6 saat durursa ne olur?")
+    ▼
+Validated Tools & Scenario Engine
+    │  (Doğrulanmış parametreler ve kısıtlar)
+    ▼
+OR-Tools CP-SAT Solver
+    │  (Deterministik matematiksel çözüm)
+    ▼
+Decision Result & Multi-Criteria Impact
+    │  (Cost, Service Level, Energy, Carbon)
+    ▼
+Human Approval & Lineage Audit
