@@ -18,6 +18,7 @@ from src.config import (
     ECONOMIC_CONFIG,
     ObjectivePolicy,
 )
+from src.contracts.schemas import ScenarioResultModel
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
 from src.integration.rescheduler import ClosedLoopRescheduler
 from src.scheduling.service_level import evaluate_schedule_service_level
@@ -56,6 +57,35 @@ class ScenarioResult:
     carbon_tco2e: float
     carbon_cost_eur: float
     total_cost_eur: float
+
+    def to_contract(self) -> ScenarioResultModel:
+        """Sonuçları Pydantic v2 sözleşmesi üzerinden doğrular ve mühürler."""
+        return ScenarioResultModel(
+            scenario=self.scenario,
+            makespan_hours=self.makespan_hours,
+            on_time_delivery_pct=self.on_time_delivery_pct,
+            inventory_holding_cost_eur=self.inventory_holding_cost_eur,
+            backlog_units=self.backlog_units,
+            energy_cost_eur=self.energy_cost_eur,
+            carbon_tco2e=self.carbon_tco2e,
+            carbon_cost_eur=self.carbon_cost_eur,
+            total_cost_eur=self.total_cost_eur,
+        )
+
+    @classmethod
+    def from_contract(cls, model: ScenarioResultModel) -> "ScenarioResult":
+        """Pydantic modelinden ScenarioResult nesnesi türetir."""
+        return cls(
+            scenario=model.scenario,
+            makespan_hours=model.makespan_hours,
+            on_time_delivery_pct=model.on_time_delivery_pct,
+            inventory_holding_cost_eur=model.inventory_holding_cost_eur,
+            backlog_units=model.backlog_units,
+            energy_cost_eur=model.energy_cost_eur,
+            carbon_tco2e=model.carbon_tco2e,
+            carbon_cost_eur=model.carbon_cost_eur,
+            total_cost_eur=model.total_cost_eur,
+        )
 
 
 class ScenarioEngine:

@@ -212,3 +212,52 @@ class RunManifestModel(BaseModel):
     total_artifacts: int = Field(ge=0, description="İzlenen toplam çıktı artifact sayısı")
     artifacts: dict[str, Any] = Field(default_factory=dict, description="Çıktı dosyaları ve hash'leri")
     inputs: dict[str, Any] = Field(default_factory=dict, description="Girdi veri setleri, config ve ortam izleri")
+
+class SolverStatus(StrEnum):
+    """OR-Tools CP-SAT çözücü durum sözleşmesi."""
+
+    OPTIMAL = "OPTIMAL"
+    FEASIBLE = "FEASIBLE"
+    INFEASIBLE = "INFEASIBLE"
+    MODEL_INVALID = "MODEL_INVALID"
+    UNKNOWN = "UNKNOWN"
+
+
+class ScheduleSolverMetadata(BaseModel):
+    """Çizelgeleme çözücüsü yürütme ve determinizm meta veri sözleşmesi."""
+
+    run_id: str = Field(description="İlişkili pipeline koşum kimliği")
+    status: SolverStatus = Field(description="Çözücü nihai durum kodu")
+    proven_optimal: bool = Field(description="Çözümün matematiksel olarak kanıtlanmış optimum olup olmadığı")
+    wall_time_seconds: float = Field(ge=0.0, description="Çözücünün harcadığı toplam duvar saati süresi")
+    objective_value: float | None = Field(default=None, description="Bulunan en iyi hedef fonksiyon değeri")
+    best_objective_bound: float | None = Field(default=None, description="Matematiksel alt/üst sınır")
+    random_seed: int = Field(default=42, description="Determinizm için kullanılan rastgele tohum")
+    num_search_workers: int = Field(ge=1, description="Aramada kullanılan paralel iş parçacığı sayısı")
+    time_limit_seconds: float = Field(gt=0.0, description="Çözücüye tanınan azami süre")
+
+class ScenarioShockModel(BaseModel):
+    """Senaryo şok ve parametre manipülasyon sözleşmesi."""
+
+    name: str = Field(description="Senaryo adı (örn: BASELINE, DEMAND_SURGE, MACHINE_OUTAGE)")
+    demand_multiplier: float = Field(default=1.0, ge=0.0, description="Talep ölçeklendirme çarpanı")
+    capacity_multiplier: float = Field(default=1.0, ge=0.0, description="Kapasite kullanılabilirlik çarpanı")
+    electricity_price_multiplier: float = Field(default=1.0, ge=0.0, description="Elektrik tarife çarpanı")
+    carbon_tax_delta_eur: float = Field(default=0.0, description="Karbon vergisi değişimi (EUR/ton)")
+    objective_policy: str = Field(default="BALANCED", description="Hedef fonksiyon optimizasyon politikası")
+    failed_machines: list[str] = Field(default_factory=list, description="Arızalı kabul edilen makine listesi")
+    material_delay_days: int = Field(default=0, ge=0, description="Tedarik gecikmesi (gün)")
+
+
+class ScenarioResultModel(BaseModel):
+    """Senaryo simülasyon çıktısı ve KPI sonuç sözleşmesi."""
+
+    scenario: str = Field(description="Simüle edilen senaryo adı")
+    makespan_hours: float = Field(ge=0.0, description="Toplam çizelge tamamlanma süresi (saat)")
+    on_time_delivery_pct: float = Field(ge=0.0, le=100.0, description="Zamanında teslimat oranı (%)")
+    inventory_holding_cost_eur: float = Field(ge=0.0, description="Stok elde tutma maliyeti (EUR)")
+    backlog_units: int = Field(ge=0, description="Karşılanamayan gecikmiş sipariş miktarı (adet)")
+    energy_cost_eur: float = Field(ge=0.0, description="Enerji tüketim maliyeti (EUR)")
+    carbon_tco2e: float = Field(ge=0.0, description="Toplam karbon salımı (tCO2e)")
+    carbon_cost_eur: float = Field(ge=0.0, description="Karbon vergisi/maliyeti (EUR)")
+    total_cost_eur: float = Field(ge=0.0, description="Toplam ekonomik maliyet (EUR)")
