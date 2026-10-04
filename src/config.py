@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from src.contracts.schemas import EconomicConfigModel
+
 # Dizin Hiyerarşisi
 SRC_DIR = Path(__file__).resolve().parent
 BASE_DIR = SRC_DIR.parent
@@ -57,81 +59,7 @@ WEEKLY_MINUTES_PER_MACHINE = WEEKLY_HOURS_PER_MACHINE * 60  # 5.760 dakika/makin
 # Bu değerler tesis genel operasyon ve operatör işçilik bazını temsil eder.
 
 
-@dataclass(frozen=True)
-class EconomicConfig:
-    """Ekonomik Parametreler Tek Gerçek Kaynağı (Economic SSOT).
-
-    Tüm modüller (Cost-to-Serve, Scenario Engine, Aggregate Planning, Dashboard)
-    maliyet, birim ve para birimi değerlerini doğrudan buradan tüketir.
-    """
-
-    currency: str = "EUR"
-    currency_symbol: str = "€"
-
-    # Baz Parametre Değerleri
-    labor_rate_per_hour: float = 25.0  # Standart operatör/işçilik baz maliyeti (€/saat)
-    overtime_multiplier: float = 1.5  # Fazla mesai çarpanı
-    setup_cost_per_hour: float = 40.0  # Hat hazırlık/ayar maliyeti (€/saat)
-    holding_cost_per_unit_per_day: float = 0.50  # Birim/gün stok tutma maliyeti (€)
-    holding_cost_per_batch: float = 25.0  # Parti başına haftalık stok tutma maliyeti (€/lot)
-    backlog_penalty_per_batch: float = 1500.0  # Geciken parti cezası (€/planning_lot)
-    energy_price_per_kwh: float = 0.18  # Endüstriyel elektrik baz fiyatı (€/kWh)
-    carbon_price_per_ton: float = 50.0  # Dahili karbon fiyatı referansı (€/tCO2e)
-    expedite_cost_flat: float = 150.0  # Hızlandırılmış sevkiyat sabit maliyeti (€)
-    tardiness_cost_per_hour: float = 60.0  # Termin gecikme cezası (€/saat)
-
-    # Denetçi Madde 11 İsimlendirme Uyumluluğu (Alias Properties)
-    @property
-    def labor_standard_rate(self) -> float:
-        return self.labor_rate_per_hour
-
-    @property
-    def labor_overtime_rate(self) -> float:
-        return self.labor_rate_per_hour * self.overtime_multiplier
-
-    @property
-    def labor_cost_overtime_hr(self) -> float:
-        return self.labor_overtime_rate
-
-    @property
-    def setup_rate(self) -> float:
-        return self.setup_cost_per_hour
-
-    @property
-    def holding_rate(self) -> float:
-        return self.holding_cost_per_unit_per_day
-
-    @property
-    def energy_rate(self) -> float:
-        return self.energy_price_per_kwh
-
-    @property
-    def carbon_price(self) -> float:
-        return self.carbon_price_per_ton
-
-    @property
-    def expedite_cost(self) -> float:
-        return self.expedite_cost_flat
-
-    @property
-    def tardiness_cost(self) -> float:
-        return self.tardiness_cost_per_hour
-
-    # Açık Birim Temsili (Explicit Units Mapping - Madde 11)
-    @property
-    def units(self) -> dict[str, str]:
-        return {
-            "labor_standard_rate": f"{self.currency}/hour",
-            "labor_overtime_rate": f"{self.currency}/hour",
-            "setup_rate": f"{self.currency}/hour",
-            "holding_rate": f"{self.currency}/unit/day",
-            "holding_batch_rate": f"{self.currency}/lot/week",
-            "backlog_rate": f"{self.currency}/batch",
-            "energy_rate": f"{self.currency}/kWh",
-            "carbon_price": f"{self.currency}/tCO2e",
-            "expedite_cost": f"{self.currency}",
-            "tardiness_cost": f"{self.currency}/hour",
-        }
+EconomicConfig = EconomicConfigModel
 
 
 # Global SSOT Örneği

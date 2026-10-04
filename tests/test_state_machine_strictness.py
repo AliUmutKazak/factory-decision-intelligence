@@ -1,7 +1,9 @@
 """Tests for Pipeline State Machine and Active Run Strictness (Faz 1 - Madde 7 & 8)."""
 
 import sqlite3
+
 import pytest
+
 from src.utils.lineage import (
     VALID_STATUS_TRANSITIONS,
     get_active_pipeline_run,
