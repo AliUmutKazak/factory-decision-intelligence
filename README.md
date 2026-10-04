@@ -1,12 +1,14 @@
 # Factory Decision Intelligence Engine
 
-> "I designed an end-to-end manufacturing decision-support layer that transforms demand signals into capacity-aware production plans, material requirements and finite machine schedules, then feeds execution deviations back into dynamic replanning while accounting for service level, manufacturing cost, energy and carbon."
+> "An open, Python-based, transparent APS / Decision Intelligence research-to-production architecture. It implements a closed-loop production decision-support system that transforms demand signals into capacity-aware production plans, material requirements and finite machine schedules, then feeds execution deviations back into dynamic replanning while accounting for service level, manufacturing cost, energy and carbon."
 
 ---
 
 ## 1. System Architecture & Decision Flow
 
-Platform, standartta ayrı bir "Level" olarak yer almayan bağımsız bir katman değil; **ISA-95 Level 3 (MOM/MES) ile Level 4 (Kurumsal/ERP) arayüzü çevresinde konumlanan bir İleri Planlama ve Karar Zekası Katmanıdır (APS / Decision Intelligence Layer)**. Bilgi değişimi ve karar döngüsü kapalı çevrim olarak şu akışla işler:
+Platform, standartta ayrı bir "Level" olarak yer almayan bağımsız bir katman değil; **ISA-95 Level 3 (MOM/MES) ile Level 4 (Kurumsal/ERP) arayüzü çevresinde konumlanan bir İleri Planlama ve Karar Zekası Katmanıdır (APS / Decision Intelligence Layer)**.
+
+Sistem, çift yönlü fiziksel varlık kontrolü gerektiren tam bir "Digital Twin" yerine; sahadan gelen telemetri ve MES geri bildirimlerini işleyen kapalı çevrim bir **"Decision-Support System" (Digital Shadow benzeri operasyonel katman)** olarak konumlandırılmıştır. Bilgi değişimi ve karar döngüsü kapalı çevrim olarak şu akışla işler:
 
 ```text
 ERP (Level 4 Enterprise Boundary)
@@ -33,6 +35,9 @@ Actuals & Execution Deviations (Work Responses / Events)
  │
  ▼
 Dynamic Replanning (Two-Tier Repair / CP-SAT Re-optimization)
+```
+
+Bu kapalı çevrim akış; **Cost**, **Service Level**, **Energy**, **Carbon**, **Scenario Simulation** ve **Data Lineage** boyutlarını tek bir bütünleşik karar yapısında birleştirir. Mimari, güncel literatürdeki *closed-loop decision intelligence* ve *agentic APS* araştırma eksenleriyle doğrudan uyumludur[cite: 4].
 
 ---
 
