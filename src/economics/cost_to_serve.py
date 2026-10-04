@@ -195,3 +195,60 @@ class EconomicDecisionEngine:
             total_manufacturing_cost=round(tmc, 2),
             cost_to_serve_by_order=order_cost_list,
         )
+
+@dataclass
+class TDABCVarianceResult:
+    order_id: str
+    planned_runtime_hours: float
+    actual_runtime_hours: float
+    capacity_cost_rate_per_hour: float
+    planned_cost: float
+    actual_cost: float
+    variance: float
+    primary_reason: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "order_id": self.order_id,
+            "planned_runtime_hours": round(self.planned_runtime_hours, 2),
+            "actual_runtime_hours": round(self.actual_runtime_hours, 2),
+            "planned_cost": round(self.planned_cost, 2),
+            "actual_cost": round(self.actual_cost, 2),
+            "variance": round(self.variance, 2),
+            "primary_reason": self.primary_reason,
+        }
+
+
+# EconomicDecisionEngine sınıfı içerisine eklenecek metot:
+def compute_tdabc_variance(
+    order_id: str,
+    planned_runtime_hours: float,
+    actual_runtime_hours: float,
+    capacity_cost_rate_per_hour: float,
+    downtime_hours: float = 0.0,
+) -> TDABCVarianceResult:
+    """Time-Driven Activity-Based Costing (TDABC) runtime variance calculator (Madde 33)."""
+    planned_cost = planned_runtime_hours * capacity_cost_rate_per_hour
+    actual_cost = actual_runtime_hours * capacity_cost_rate_per_hour
+    variance = actual_cost - planned_cost
+
+    if variance > 0.01:
+        if downtime_hours > 0.0:
+            primary_reason = f"downtime ({round(downtime_hours, 2)} hrs)"
+        else:
+            primary_reason = "speed_loss / micro_stops"
+    elif variance < -0.01:
+        primary_reason = "efficiency_gain"
+    else:
+        primary_reason = "on_target"
+
+    return TDABCVarianceResult(
+        order_id=order_id,
+        planned_runtime_hours=planned_runtime_hours,
+        actual_runtime_hours=actual_runtime_hours,
+        capacity_cost_rate_per_hour=capacity_cost_rate_per_hour,
+        planned_cost=planned_cost,
+        actual_cost=actual_cost,
+        variance=variance,
+        primary_reason=primary_reason,
+    )
