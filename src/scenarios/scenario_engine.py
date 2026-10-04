@@ -109,7 +109,11 @@ class ScenarioEngine:
         return base_makespan, base_kwh, base_tco2
 
     def evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
-        """Operasyonel ve finansal şokları değerlendirir."""
+        """Madde 23: Hibrit Senaryo Motoru.
+
+        - 3 Kritik Operasyonel Şok (Demand, Capacity, Material): Gerçek kısıt çözümü / rerun.
+        - Finansal Şoklar (Energy, CO2): Analitik duyarlılık (Sensitivity) analizi.
+        """
         sched_df = self._read_table_safe("production_schedule", self.db_path)
         energy_df = self._read_table_safe("energy_kpis", self.db_path)
         carbon_df = self._read_table_safe("carbon_kpis", self.db_path)
@@ -122,26 +126,16 @@ class ScenarioEngine:
         sim_kwh = base_kwh
         sim_tco2 = base_tco2
 
-        # 1. Operasyonel Şok Simülasyonu (Gerçek Çizelgeleme & Simülasyon Motoru)
+        # =====================================================================
+        # 1. OPERASYONEL RERUN / KISIT ÇÖZÜMLERİ (MADDE 23: 3 KRİTİK ŞOK)
+        # =====================================================================
+
+        # [Şok 1: Capacity Shock - M01 Unavailable]
         if shock.failed_machines:
             failed_m = shock.failed_machines[0]
             try:
-                # Madde 21 Two-Tier Rescheduler'ı simülasyon modunda (commit=False) tetikle
                 rescheduler = ClosedLoopRescheduler(db_path=self.db_path)
-                resched_result = rescheduler.reschedule_on_machine_breakdown(
-                    machine_id=failed_m,
-                    down_start_min=480.0,  # 1. vardiya bitiminde arıza
-                    down_duration_min=480.0,  # 8 saat duruş
-                    reason=f"Scenario Simulation: {shock.name}",
-                    event_type="MAJOR_BREAKDOWN",
-                    commit=False,
-                )
-                sim_makespan = (
-                    resched_result["new_makespan_min"] / 60.0
-                    if resched_result["status"] == "RESCHEDULED"
-                    else base_makespan + 8.0
-                )
-
+                # CP-SAT re-optimization ile makine takvimini kapatıp yeniden çöz
                 sim_sched_solved = rescheduler._solve_cpsat_reschedule(
                     df=sched_df.copy(),
                     machine_id=failed_m,
@@ -150,14 +144,22 @@ class ScenarioEngine:
                 )
                 if sim_sched_solved is not None and not sim_sched_solved.empty:
                     sim_sched = sim_sched_solved
+                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
                 else:
-                    if not sim_sched.empty and "machine_id" in sim_sched.columns:
-                        mask = sim_sched["machine_id"] == failed_m
-                        sim_sched.loc[mask, "start_min"] += 480.0
-                        sim_sched.loc[mask, "end_min"] += 480.0
-                        sim_makespan = float(sim_sched["end_min"].max()) / 60.0
+                    # Solver fallback (ripple shift)
+                    resched_result = rescheduler.reschedule_on_machine_breakdown(
+                        machine_id=failed_m,
+                        down_start_min=480.0,
+                        down_duration_min=480.0,
+                        event_type="MAJOR_BREAKDOWN",
+                        commit=False,
+                    )
+                    sim_makespan = (
+                        resched_result["new_makespan_min"] / 60.0
+                        if resched_result["status"] == "RESCHEDULED"
+                        else base_makespan + 8.0
+                    )
             except Exception:
-                # İzolasyon/mock ortamları için emniyetli fallback
                 if not sim_sched.empty and "machine_id" in sim_sched.columns:
                     mask = sim_sched["machine_id"] == failed_m
                     sim_sched.loc[mask, "start_min"] += 480.0
@@ -175,10 +177,11 @@ class ScenarioEngine:
             sim_kwh = max(base_kwh, sim_work_hours * 45.0 + (480.0 / 60.0 * 10.0))
             sim_tco2 = round(sim_kwh * 0.00044, 2)
 
+        # [Şok 2: Material Disruption - Raw Material Delay]
         elif shock.material_delay_days > 0:
             delay_min = shock.material_delay_days * 8.0 * 60.0
             if not sim_sched.empty and "start_min" in sim_sched.columns:
-                # 1. Operasyonları geciktir ve ripple-shift ile zincirleme kısıtları çöz
+                # MRP malzeme erişilebilirlik tarihini (release date) ötele
                 first_ops = (
                     sim_sched["operation_seq"] == 1
                     if "operation_seq" in sim_sched.columns
@@ -187,15 +190,27 @@ class ScenarioEngine:
                 sim_sched.loc[first_ops, "start_min"] += delay_min
                 sim_sched.loc[first_ops, "end_min"] += delay_min
 
-                # Ardışıl operasyon bağlarını (precedence) koru
+                # Rotalama (precedence) ve makine kısıtlarını sağa kaydırarak yeniden çöz
                 changed = True
                 while changed:
                     changed = False
-                    for lot_id, group in sim_sched.groupby("lot_id"):
+                    for _, group in sim_sched.groupby("lot_id"):
                         sorted_ops = group.sort_values("operation_seq").index.tolist()
                         for i in range(len(sorted_ops) - 1):
-                            curr_idx = sorted_ops[i]
-                            next_idx = sorted_ops[i + 1]
+                            curr_idx, next_idx = sorted_ops[i], sorted_ops[i + 1]
+                            if sim_sched.at[next_idx, "start_min"] < sim_sched.at[curr_idx, "end_min"]:
+                                dur = sim_sched.at[next_idx, "end_min"] - sim_sched.at[next_idx, "start_min"]
+                                sim_sched.at[next_idx, "start_min"] = sim_sched.at[curr_idx, "end_min"]
+                                sim_sched.at[next_idx, "end_min"] = sim_sched.at[next_idx, "start_min"] + dur
+                                changed = True
+
+                    for _, group in sim_sched.groupby("machine_id"):
+                        sorted_mach = group.sort_values("start_min").index.tolist()
+                        for i in range(len(sorted_mach) - 1):
+                            curr_idx, next_idx = (
+                                sorted_mach[i],
+                                sorted_mach[i + 1],
+                            )
                             if sim_sched.at[next_idx, "start_min"] < sim_sched.at[curr_idx, "end_min"]:
                                 dur = sim_sched.at[next_idx, "end_min"] - sim_sched.at[next_idx, "start_min"]
                                 sim_sched.at[next_idx, "start_min"] = sim_sched.at[curr_idx, "end_min"]
@@ -206,6 +221,7 @@ class ScenarioEngine:
             else:
                 sim_makespan = base_makespan + (shock.material_delay_days * 8.0)
 
+        # [Şok 3: Demand Shock - +20% Demand]
         elif shock.demand_multiplier != 1.0:
             sim_kwh = base_kwh * shock.demand_multiplier
             sim_tco2 = round(base_tco2 * shock.demand_multiplier, 2)
@@ -218,6 +234,7 @@ class ScenarioEngine:
             else:
                 sim_makespan = base_makespan * shock.demand_multiplier
 
+        # Kapasite düşüşü (-10% Capacity)
         elif shock.capacity_multiplier != 1.0:
             scale = 1.0 / max(shock.capacity_multiplier, 0.1)
             if not sim_sched.empty:
@@ -229,7 +246,9 @@ class ScenarioEngine:
             else:
                 sim_makespan = base_makespan * scale
 
-        # 2. Servis Seviyesi ve Gecikme (OTIF %)
+        # =====================================================================
+        # 2. SERVİS SEVİYESİ VE GECİKME (OTIF %)
+        # =====================================================================
         target_due_min = 168.0 * 60.0
         if shock.demand_multiplier > 1.0:
             service_kpis = evaluate_schedule_service_level(
@@ -248,7 +267,9 @@ class ScenarioEngine:
             on_time_pct = round(service_kpis.get("on_time_delivery_pct", 100.0), 1)
             backlog = int(service_kpis.get("late_quantity", 0))
 
-        # 3. Finansal Birim Fiyatlar & SSOT
+        # =====================================================================
+        # 3. FİNANSAL SENSITIVITY ANALİZİ (+25% Energy, +50 €/tCO2)
+        # =====================================================================
         unit_electricity_price = DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH * shock.electricity_price_multiplier
         if isinstance(CARBON_PRICE_SCENARIOS_EUR, list) and len(CARBON_PRICE_SCENARIOS_EUR) > 0:
             base_carb_rate = float(CARBON_PRICE_SCENARIOS_EUR[len(CARBON_PRICE_SCENARIOS_EUR) // 2])
@@ -262,6 +283,9 @@ class ScenarioEngine:
             energy_cost_per_kwh=unit_electricity_price,
             carbon_cost_per_ton=total_carb_rate,
         )
+
+        calc_energy_cost = round(sim_kwh * unit_electricity_price, 2)
+        calc_carbon_cost = round(sim_tco2 * total_carb_rate, 2)
 
         # 4. Ekonomik Karar Motoru (TMC)
         # Doğrudan deterministik enerji ve karbon maliyet hesapları
