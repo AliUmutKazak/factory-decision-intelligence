@@ -315,6 +315,10 @@ def run_cpsat_scheduling(
             "is_overtime",
             "calendar_shift",
             "release_time_min",
+            "schedule_state",
+            "execution_status",
+            "dispatch_status",
+            "freeze_until_min",
         ]
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
@@ -907,6 +911,16 @@ def run_cpsat_scheduling(
     solver_meta_df = pd.DataFrame(solver_metadata)
     solver_meta_df["run_id"] = effective_run_id
     sched_df["run_id"] = effective_run_id
+    # -------------------------------------------------------------------------
+    # MADDE 20: Frozen Horizon & Multi-Tiered Execution Status Data Model
+    # -------------------------------------------------------------------------
+    sched_df["schedule_state"] = "FREE"
+    sched_df["execution_status"] = "SCHEDULED"
+    sched_df["dispatch_status"] = "UNRELEASED"
+    sched_df["freeze_until_min"] = 0.0
+
+    # İlk vardiyada (ilk 480 dk) başlayacak işleri sahaya sevk edilmiş (DISPATCHED) işaretle
+    sched_df.loc[sched_df["start_min"] < 480.0, "dispatch_status"] = "DISPATCHED"
 
     # Staging-aware reports path (Item 28)
     reports_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", "reports"))

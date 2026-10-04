@@ -232,7 +232,32 @@ class ClosedLoopRescheduler:
         delta_makespan = max(0.0, new_makespan - old_makespan)
 
         # ---------------------------------------------------------------------
-        # MADDE 19: Closed-Loop DB Persistence (Source of Truth Synchronization)
+        # MADDE 20: Multi-Tiered Frozen Horizon Status Assignment
+        # ---------------------------------------------------------------------
+        slush_cutoff = down_start_min + 240.0  # Sonraki 4 saat (Slush)
+
+        # 1. COMPLETED: Arıza öncesinde bitmiş görevler (Immutable)
+        mask_completed = df["end_min"] <= down_start_min
+        df.loc[mask_completed, "execution_status"] = "COMPLETED"
+        df.loc[mask_completed, "schedule_state"] = "FROZEN"
+
+        # 2. IN_PROGRESS: Arıza anında tezgâhta çalışan görevler (Locked Start)
+        mask_running = (df["start_min"] <= down_start_min) & (df["end_min"] > down_start_min)
+        df.loc[mask_running, "execution_status"] = "IN_PROGRESS"
+        df.loc[mask_running, "schedule_state"] = "FROZEN"
+
+        # 3. SLUSH HORIZON: Sonraki 4 saat içindeki işler (Limited Change)
+        mask_slush = (df["start_min"] > down_start_min) & (df["start_min"] <= slush_cutoff)
+        df.loc[mask_slush, "schedule_state"] = "SLUSH"
+        df.loc[mask_slush, "dispatch_status"] = "DISPATCHED"
+        df.loc[mask_slush, "freeze_until_min"] = slush_cutoff
+
+        # 4. FREE HORIZON: 4 saatten sonraki işler (Fully Reoptimizable)
+        mask_free = df["start_min"] > slush_cutoff
+        df.loc[mask_free, "schedule_state"] = "FREE"
+
+        # ---------------------------------------------------------------------
+        # MADDE 19 & 20: Closed-Loop DB Persistence
         # ---------------------------------------------------------------------
         if commit:
             cur = self.conn.cursor()
@@ -240,13 +265,21 @@ class ClosedLoopRescheduler:
                 cur.execute(
                     """
                     UPDATE production_schedule
-                    SET start_min = ?,
-                        end_min = ?
-                    WHERE run_id = ? AND task_id = ?;
+                SET start_min = ?,
+                    end_min = ?,
+                    schedule_state = ?,
+                    execution_status = ?,
+                    dispatch_status = ?,
+                    freeze_until_min = ?
+                WHERE run_id = ? AND task_id = ?;
                     """,
                     (
                         float(row["start_min"]),
                         float(row["end_min"]),
+                        str(row.get("schedule_state", "FREE")),
+                        str(row.get("execution_status", "SCHEDULED")),
+                        str(row.get("dispatch_status", "UNRELEASED")),
+                        float(row.get("freeze_until_min", 0.0)),
                         self.run_id,
                         str(row["task_id"]),
                     ),

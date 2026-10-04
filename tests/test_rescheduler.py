@@ -39,7 +39,7 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
     conn = get_db_connection(str(db_file))
     cur = conn.cursor()
 
-    # production_schedule tablosunu izole test DB'sinde oluştur
+    # production_schedule tablosunu izole test DB'sinde oluştur (Madde 20 kolonlarıyla birlikte)
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS production_schedule (
@@ -51,7 +51,11 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
             duration_min REAL,
             start_min REAL,
             end_min REAL,
-            run_id TEXT
+            run_id TEXT,
+            schedule_state TEXT DEFAULT 'FREE',
+            execution_status TEXT DEFAULT 'SCHEDULED',
+            dispatch_status TEXT DEFAULT 'UNRELEASED',
+            freeze_until_min REAL DEFAULT 0.0
         );
         """
     )
@@ -61,8 +65,9 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
         """
         INSERT INTO production_schedule (
             task_id, lot_id, product_id, operation_seq, machine_id,
-            duration_min, start_min, end_min, run_id
-        ) VALUES ('T1', 'L1', 'P1', 1, 'M02', 60.0, 700.0, 760.0, ?);
+            duration_min, start_min, end_min, run_id,
+            schedule_state, execution_status, dispatch_status, freeze_until_min
+        ) VALUES ('T1', 'L1', 'P1', 1, 'M02', 60.0, 700.0, 760.0, ?, 'FREE', 'SCHEDULED', 'UNRELEASED', 0.0);
         """,
         (run_id,),
     )
@@ -104,12 +109,8 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
     sched_row = cur.fetchone()
     conn.close()
 
-    assert count_after == count_before + 1, (
-        "Arıza olayı mes_execution_events tablosuna kaydedilmedi."
-    )
-    assert sched_row is not None, (
-        "production_schedule tablosunda kayıt bulunamadı."
-    )
+    assert count_after == count_before + 1, "Arıza olayı mes_execution_events tablosuna kaydedilmedi."
+    assert sched_row is not None, "production_schedule tablosunda kayıt bulunamadı."
 
 
 def test_two_tier_hybrid_rescheduling_modes():
