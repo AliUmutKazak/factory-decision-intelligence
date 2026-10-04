@@ -11,30 +11,53 @@ Platform, standartta ayrı bir "Level" olarak yer almayan bağımsız bir katman
 Sistem, çift yönlü fiziksel varlık kontrolü gerektiren tam bir "Digital Twin" yerine; sahadan gelen telemetri ve MES geri bildirimlerini işleyen kapalı çevrim bir **"Decision-Support System" (Digital Shadow benzeri operasyonel katman)** olarak konumlandırılmıştır. Bilgi değişimi ve karar döngüsü kapalı çevrim olarak şu akışla işler:
 
 ```text
-ERP (Level 4 Enterprise Boundary)
- │
- ▼
-Demand Forecasting (LightGBM)
- │
- ▼
-Tactical Planning (HPP / LP Multi-Period)
- │
- ▼
-Material Requirements Planning (BOM / MRP)
- │
- ▼
-Finite Capacity Scheduling (OR-Tools CP-SAT)
- │
- ├──► Energy & Carbon Accounting (GHG Scope 2)
- │
- ▼
-MES / Shopfloor Execution (Level 3 Operations)
- │
- ▼
-Actuals & Execution Deviations (Work Responses / Events)
- │
- ▼
-Dynamic Replanning (Two-Tier Repair / CP-SAT Re-optimization)
+┌────────────────────────────────────────────────────────┐
+│ ERP / Business Systems                                 │
+│ Orders • BOM • Inventory                               │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Demand Intelligence                                    │
+│ Forecast / Backtest / Lineage                          │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Tactical Planning                                      │
+│ Hax & Meal / LP / Capacity                             │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Analytical MRP-I                                       │
+│ BOM / Lead Time / Availability                         │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Finite Scheduling                                      │
+│ CP-SAT / Setup / Maintenance / Service Level / Cost    │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ MES Dispatch / Execution                               │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                      Actuals / Events
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Closed Loop                                            │
+│ Variance / Freeze / Replan                             │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Decision Intelligence Crosscut                         │
+│ Cost • Service • Energy • Carbon • Scenario • Lineage  │
+│ Decision Ledger • Governance                           │
+└────────────────────────────────────────────────────────┘
 ```
 
 Bu kapalı çevrim akış; **Cost**, **Service Level**, **Energy**, **Carbon**, **Scenario Simulation** ve **Data Lineage** boyutlarını tek bir bütünleşik karar yapısında birleştirir. Mimari, güncel literatürdeki *closed-loop decision intelligence* ve *agentic APS* araştırma eksenleriyle doğrudan uyumludur[cite: 4].
