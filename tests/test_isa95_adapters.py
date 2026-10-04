@@ -70,3 +70,21 @@ def test_mock_telemetry_adapter_contract():
 
     power_unknown = telemetry.get_power_consumption_telemetry("M99_UNKNOWN")
     assert power_unknown == 0.0
+
+
+def test_canonical_contract_integration():
+    """Madde 26: ERP ve MES adaptörlerinin Canonical Pydantic nesneleri ürettiğini doğrular."""
+    from src.contracts.schemas import MESActual, ProductionOrder
+
+    erp = MockERPAdapter()
+    canonical_orders = erp.fetch_canonical_orders()
+    assert len(canonical_orders) > 0
+    assert all(isinstance(o, ProductionOrder) for o in canonical_orders)
+    assert canonical_orders[0].quantity > 0
+
+    mes = MockMESAdapter()
+    mes.record_execution_event("PROD_LOG", "M01", {"qty": 50})
+    canonical_actuals = mes.export_canonical_actuals()
+    assert len(canonical_actuals) == 1
+    assert isinstance(canonical_actuals[0], MESActual)
+    assert canonical_actuals[0].machine_id == "M01"

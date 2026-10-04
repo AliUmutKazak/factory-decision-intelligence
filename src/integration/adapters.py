@@ -79,6 +79,25 @@ class MockERPAdapter(ERPAdapterInterface):
             ]
         )
 
+    def fetch_canonical_orders(self) -> list["ProductionOrder"]:
+        """Madde 26: ERP tablosunu Internal Canonical Pydantic sözleşmesine dönüştürür."""
+        from src.contracts.schemas import ProductionOrder
+
+        df = self.fetch_sales_orders()
+        orders = []
+        for _, row in df.iterrows():
+            due = str(row["delivery_week"]) if "delivery_week" in row else str(row.get("delivery_date", "2026-W20"))
+            orders.append(
+                ProductionOrder(
+                    order_id=str(row["order_id"]),
+                    product_id=str(row["material_code"]),
+                    quantity=float(row["quantity"]),
+                    due_date=due,
+                    priority=int(row.get("priority", 1)),
+                )
+            )
+        return orders
+
 
 class MockMESAdapter(MESAdapterInterface):
     """ISA-95 Level 3 Manufacturing Operations Management Mock (MES / SCADA)."""
@@ -105,6 +124,25 @@ class MockMESAdapter(MESAdapterInterface):
             }
         )
         return True
+
+    def export_canonical_actuals(self) -> list["MESActual"]:
+        """Madde 26: MES operasyon kayıtlarını Canonical MESActual sözleşmesine dönüştürür."""
+        from src.contracts.schemas import MESActual
+
+        actuals = []
+        for idx, event in enumerate(self.events_log):
+            actuals.append(
+                MESActual(
+                    lot_id=f"LOT-{idx + 1:03d}",
+                    machine_id=event["machine_id"],
+                    operation_seq=1,
+                    actual_start_min=0.0,
+                    actual_end_min=60.0,
+                    produced_qty=50.0,
+                    scrap_qty=0.0,
+                )
+            )
+        return actuals
 
 
 class MockInventoryAdapter(InventoryAdapterInterface):
@@ -139,3 +177,5 @@ class MockTelemetryAdapter(MachineTelemetryAdapterInterface):
             "M04": 2.1,
         }
         return telemetry_map.get(machine_id, 0.0)
+
+    

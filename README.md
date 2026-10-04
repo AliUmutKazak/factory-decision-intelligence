@@ -42,12 +42,18 @@ Sistem, monolitik bir simulasyon yerine ISA-95 standartlarina dayali hiyerarsik 
 - **Two-Tier Rescheduling:** Fast Local Repair (minor dalgalanmalar) ve CP-SAT Re-optimization (major arizalar).
 - **Frozen Horizon Prensipleri:** COMPLETED (dokunulmaz), RUNNING (baslangic kilitli), SCHEDULED (esnek/kaydirilabilir).
 
-### D. ISA-95 Entegrasyon Sinirlari & Adapter Kontratlari
-Gercek bir ERP/MES hesabina baglanmak yerine referans synthetic adapter katmanlari ile calisir:
-- `ERPAdapterInterface` -> `MockERPAdapter`
-- `MESAdapterInterface` -> `MockMESAdapter`
-- `InventoryAdapterInterface` -> `MockInventoryAdapter`
-- `MachineTelemetryAdapterInterface` -> `MockTelemetryAdapter`
+### D. ISA-95 Entegrasyon Sınırları & Adapter Kontratları (Madde 26)
+Sistem, MESA International B2MML ve ANSI/ISA-95 standartları ile semantik olarak hizalanmış Canonical Contract mimarisi kullanır:
+
+```text
+Internal Canonical Contract (Pydantic v2)
+         │
+         ▼
+ISA-95 Semantic Alignment (ANSI/ISA-95 Part 2 & Part 3)
+         │
+         ├──► JSON API Adapter (Modern Cloud / REST)
+         ├──► B2MML / XML Adapter (MESA Standard Integration)
+         └──► Vendor-Specific Adapters (SAP S/4HANA, IFS, Siemens Opcenter)
 
 ---
 

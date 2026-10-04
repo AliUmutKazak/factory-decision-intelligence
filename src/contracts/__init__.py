@@ -1,3 +1,4 @@
+from src.contracts.isa95 import ISA95Adapter
 from src.contracts.schemas import (
     MachineEvent,
     MaterialAvailability,
@@ -9,6 +10,7 @@ from src.contracts.schemas import (
 )
 
 __all__ = [
+    "ISA95Adapter",
     "ProductionOrder",
     "MESActual",
     "MachineEvent",
