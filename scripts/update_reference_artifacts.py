@@ -3,7 +3,11 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+# Repo kök dizinini sys.path'e ekle
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.utils.lineage import get_active_pipeline_run
 
