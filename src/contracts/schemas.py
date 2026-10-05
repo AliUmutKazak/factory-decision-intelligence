@@ -367,3 +367,41 @@ class ScenarioDeltaReport(BaseModel):
     scenario_total_setup_min: float = Field(ge=0.0, description="Senaryo hazırlık süresi (dakika)")
     setup_delta_min: float = Field(description="Hazırlık süresi farkı (dakika)")
     impacted_tasks_count: int = Field(ge=0, description="Senaryodaki toplam çizelgelenen iş sayısı")
+
+
+# -------------------------------------------------------------------------
+# Faz 5: Dinamik Yeniden Çizelgeleme & MES Entegrasyonu Sözleşmeleri
+# -------------------------------------------------------------------------
+
+
+class RescheduleTriggerEvent(BaseModel):
+    """Yeniden çizelgelemeyi tetikleyen MES saha olayı."""
+
+    event_id: str = Field(description="Tetikleyici olay kimliği")
+    current_time_min: int = Field(ge=0, description="Olayın gerçekleştiği fabrika zamanı (dakika)")
+    freeze_horizon_min: int = Field(
+        default=60,
+        ge=0,
+        description="Şu andan itibaren dondurulacak ek tampon süre (dakika)",
+    )
+    delay_machine_id: str | None = Field(default=None, description="Gecikme/arıza yaşayan tezgâh kodu")
+    delay_duration_min: int = Field(default=0, ge=0, description="Meydana gelen ek duruş/gecikme (dakika)")
+    reason: str = Field(default="MES deviation detected")
+
+
+class ScheduleNervousnessReport(BaseModel):
+    """Eski ve yeni çizelge arasındaki kararlılık (nervousness) denetim raporu."""
+
+    total_tasks: int = Field(description="İncelenen toplam görev sayısı")
+    frozen_tasks_count: int = Field(description="Zamanı ve makinesi kilitlenen görev sayısı")
+    rescheduled_tasks_count: int = Field(description="Yeniden konumlandırılan görev sayısı")
+    machine_swapped_count: int = Field(description="Farklı tezgâha kaydırılan görev sayısı")
+    average_start_delta_min: float = Field(
+        description="Görevlerin başlangıç zamanlarındaki ortalama mutlak kayma (dakika)"
+    )
+    max_start_delta_min: float = Field(description="Bir görevin yaşadığı maksimum kayma (dakika)")
+    nervousness_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="0.0 (tam kararlı/değişimsiz) ile 1.0 (tam kaos/tüm işler değişti) arası dalgalanma skoru",
+    )
