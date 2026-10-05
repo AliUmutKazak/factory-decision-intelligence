@@ -31,7 +31,6 @@ from src.config import (
     CPSAT_NUM_SEARCH_WORKERS,
     CPSAT_RANDOM_SEED,
     CPSAT_TIME_LIMIT_SECONDS,
-    DB_PATH,
     OBJECTIVE_POLICIES,
     SchedulingObjectivePolicy,
     get_runtime_paths,
@@ -71,7 +70,9 @@ def run_cpsat_scheduling(
     hierarchical: bool = False,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
-    conn = get_db_connection(DB_PATH)
+    runtime = get_runtime_paths()
+    active_db_path = runtime["db_path"]
+    conn = get_db_connection(active_db_path)
     machine_initial_states = get_initial_machine_states(conn)
 
     # Madde 30: Machine state run-scope snapshot mühürleme
