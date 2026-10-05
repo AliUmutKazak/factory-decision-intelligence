@@ -167,7 +167,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
     # Taktik LP'den makine OT saatlerini oku (Hafta bazlı)
     weekly_machine_ot_hours = {}
     try:
-        conn = get_db_connection(DB_PATH)
+        conn = get_db_connection(active_db_path)
         cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
         conn.close()
         for _, r in cap_df.iterrows():
@@ -329,13 +329,13 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
     print("=" * 85)
 
     # 1. CSV Kayıtları
-    os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
     kpi_df = pd.DataFrame([kpi_summary])
     m_kpi_df = pd.DataFrame(machine_kpis)
 
     if not run_id:
         try:
-            conn_run = get_db_connection(DB_PATH)
+            conn_run = get_db_connection(active_db_path)
             cur_run = conn_run.cursor()
             cur_run.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1;")
             row_run = cur_run.fetchone()
@@ -356,18 +356,18 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
     profile_df["data_source"] = "ANALYTICAL_SIMULATION_ESTIMATE"
 
     # Normal calisma CSV kayitlari
-    kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
-    profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
+    kpi_df.to_csv(output_energy_kpi_path, index=False)
+    profile_df.to_csv(output_profile_path, index=False)
 
     # Normal calisma SQLite veritabani kayitlari
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(active_db_path)
     kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
     profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
     m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
     conn.close()
 
-    print(f"[OK] Enerji KPI'lari Kaydedildi: {OUTPUT_ENERGY_KPI_PATH}")
-    print(f"[OK] 15 Dakikalik Yuk Profili Kaydedildi: {OUTPUT_PROFILE_PATH}")
+    print(f"[OK] Enerji KPI'lari Kaydedildi: {output_energy_kpi_path}")
+    print(f"[OK] 15 Dakikalik Yuk Profili Kaydedildi: {output_profile_path}")
     print("[OK] SQLite 'energy_kpis' ve 'energy_profile_15min' tablolari guncellendi.")
     print("=" * 85)
 
