@@ -28,17 +28,12 @@ from src.config import (
     AGGREGATE_INITIAL_INVENTORY,
     LABOR_COST_OVERTIME_HR,
     LABOR_COST_STANDARD_HR,
-    PROCESSED_DATA_DIR,
     UNITS_PER_BATCH,
     WEEKLY_HOURS_PER_MACHINE,
     get_runtime_paths,
 )
 from src.scheduling.calendar_service import MachineCalendarService
 from src.utils.db import get_db_connection
-
-OUTPUT_AGGREGATE_PATH = PROCESSED_DATA_DIR / "aggregate_plan.csv"
-OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
-OUTPUT_MACHINE_CAPACITY_PATH = PROCESSED_DATA_DIR / "machine_capacity_plan.csv"
 
 
 def load_data(db_path=None):
@@ -601,7 +596,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
     print("=" * 85)
     print(final_family_plan.to_string(index=False))
 
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
 
     if run_id:
         final_family_plan["run_id"] = run_id
@@ -622,9 +617,9 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
     final_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
     conn.close()
 
-    print(f"[OK] Aile Taktik Planı Kaydedildi: {OUTPUT_AGGREGATE_PATH}")
-    print(f"[OK] SKU Üretim Hedefleri Kaydedildi: {OUTPUT_SKU_PLAN_PATH}")
-    print(f"[OK] Makine Kapasite Planı Kaydedildi: {OUTPUT_MACHINE_CAPACITY_PATH}")
+    print(f"[OK] Aile Taktik Planı Kaydedildi: {output_aggregate_path}")
+    print(f"[OK] SKU Üretim Hedefleri Kaydedildi: {output_sku_plan_path}")
+    print(f"[OK] Makine Kapasite Planı Kaydedildi: {output_machine_capacity_path}")
     print("[OK] SQLite 'aggregate_plan', 'sku_production_plan' ve 'machine_capacity_plan' güncellendi.")
     print("=" * 85)
 
