@@ -4,7 +4,6 @@ import pytest
 from pydantic import ValidationError
 
 from src.contracts.schemas import ScenarioResultModel, ScenarioShockModel
-
 from src.scenarios.scenario_engine import ScenarioResult
 
 
