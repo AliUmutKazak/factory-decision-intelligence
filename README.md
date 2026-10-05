@@ -1,139 +1,358 @@
-# Factory Decision Intelligence Engine
+# 🏭 Factory Decision Intelligence System
+### Enterprise Decision Support, Hierarchical Optimization (LP & CP-SAT), Green Manufacturing & Dynamic Rescheduling Platform
+### Endüstriyel Karar Destek, Hiyerarşik Optimizasyon (LP & CP-SAT), Yeşil İmalat ve Dinamik Yeniden Çizelgeleme Platformu
 
-> "An open, Python-based, transparent APS / Decision Intelligence research-to-production architecture. It implements a closed-loop production decision-support system that transforms demand signals into capacity-aware production plans, material requirements and finite machine schedules, then feeds execution deviations back into dynamic replanning while accounting for service level, manufacturing cost, energy and carbon."
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![OR-Tools](https://img.shields.io/badge/Google%20OR--Tools-CP--SAT-EA4335?style=flat&logo=google&logoColor=white)](https://developers.google.com/optimization)
+[![PuLP](https://img.shields.io/badge/PuLP-LP%20Optimization-4B8BBE?style=flat)](https://coin-or.github.io/pulp/)
+[![Tests](https://img.shields.io/badge/Pytest-161%2F161%20Passed-brightgreen?style=flat&logo=pytest&logoColor=white)]()
+[![Code Quality](https://img.shields.io/badge/Linter-Ruff%20Clean-black?style=flat)](https://beta.ruff.rs/docs/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
-## 1. System Architecture & Decision Flow
+## 🌐 Executive Summary / Yönetici Özeti
 
-Platform, standartta ayrı bir "Level" olarak yer almayan bağımsız bir katman değil; **ISA-95 Level 3 (MOM/MES) ile Level 4 (Kurumsal/ERP) arayüzü çevresinde konumlanan bir İleri Planlama ve Karar Zekası Katmanıdır (APS / Decision Intelligence Layer)**.
+### [TR] Sistem Özeti
+**Factory Decision Intelligence System**, ayrık imalat (discrete manufacturing) tesisleri için operasyonel araştırmalar (Operations Research), malzeme gereksinim planlaması (MRP-I), yeşil imalat (green manufacturing) ve gerçek zamanlı dinamik çizelgelemeyi bir araya getiren kurumsal seviyede bir karar destek motorudur. Taktiksel düzeydeki çok dönemli kapasite ve emisyon kararlarını, operasyonel düzeyde sıra bağımlı hazırlık sürelerine (SDST) sahip sonlu kapasiteli tezgah çizelgelerine bağlar. Atölye zeminindeki beklenmeyen aksaklıklarda (makine arızaları, acil siparişler) dondurulmuş ufuk (freeze horizon) ve çizelge gerginliği (schedule nervousness) metrikleriyle kararlı yeniden çizelgeleme yürütür.
 
-Sistem, çift yönlü fiziksel varlık kontrolü gerektiren tam bir "Digital Twin" yerine; sahadan gelen telemetri ve MES geri bildirimlerini işleyen kapalı çevrim bir **"Decision-Support System" (Digital Shadow benzeri operasyonel katman)** olarak konumlandırılmıştır. Bilgi değişimi ve karar döngüsü kapalı çevrim olarak şu akışla işler:
+### [EN] System Overview
+The **Factory Decision Intelligence System** is an enterprise-grade decision intelligence engine uniting Operations Research (OR), multi-level Material Requirements Planning (MRP-I), green manufacturing constraints, and dynamic shop-floor rescheduling for discrete manufacturing plants. It bridges aggregate tactical decisions (capacity, energy costs, carbon emission caps) with operational finite-capacity machine scheduling featuring Sequence-Dependent Setup Times (SDST). During stochastic events (breakdowns, hot orders), it executes controlled dynamic rescheduling governed by a freeze horizon and quantitative schedule nervousness metrics.
 
-```text
-┌────────────────────────────────────────────────────────┐
-│ ERP / Business Systems                                 │
-│ Orders • BOM • Inventory                               │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Demand Intelligence                                    │
-│ Forecast / Backtest / Lineage                          │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Tactical Planning                                      │
-│ Hax & Meal / LP / Capacity                             │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Analytical MRP-I                                       │
-│ BOM / Lead Time / Availability                         │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Finite Scheduling                                      │
-│ CP-SAT / Setup / Maintenance / Service Level / Cost    │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ MES Dispatch / Execution                               │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                      Actuals / Events
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Closed Loop                                            │
-│ Variance / Freeze / Replan                             │
-└───────────────────────────┬────────────────────────────┘
-                            │
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│ Decision Intelligence Crosscut                         │
-│ Cost • Service • Energy • Carbon • Scenario • Lineage  │
-│ Decision Ledger • Governance                           │
-└────────────────────────────────────────────────────────┘
+---
+
+## 📑 İçindekiler / Table of Contents
+1. [Sistem Mimarisi ve Karar Akışı / System Architecture](#-sistem-mimarisi-ve-karar-akışı--system-architecture)
+2. [Matematiksel Modelleme / Mathematical Formulations](#-matematiksel-modelleme--mathematical-formulations)
+   - [Taktiksel Katman: LP, Enerji ve Karbon Kısıtları / Tactical LP & Green Constraints](#1-taktiksel-katman-çok-dönemli-agrega-ve-yeşil-planlama-lp)
+   - [Operasyonel Katman: OR-Tools CP-SAT & SDST / Operational CP-SAT Model](#2-operasyonel-katman-kısıt-programlama-ile-çizelgeleme-cp-sat)
+3. [Malzeme Gereksinim Planlaması / Material Requirements Planning (MRP-I)](#-malzeme-gereksinim-planlaması-mrp-i)
+4. [Dinamik Müdahale & Karar Politikaları / Dynamic Policies & Rescheduling](#-dinamik-müdahale-karar-politikaları-ve-gerginlik-nervousness)
+5. [Standart Operasyon Prosedürleri / Standard Operating Procedures (SOPs)](#-standart-operasyon-prosedürleri-sops)
+6. [Kriptografik İzlenebilirlik / Lineage & Audit Trail](#-kriptografik-izlenebilirlik-lineage--audit-trail)
+7. [Teknoloji Yığını / Technology Stack](#-teknoloji-yığını--technology-stack)
+8. [API Servis Katmanı & Sözleşmeler / API Layer & Contracts](#-api-servis-katmanı-ve-uç-noktalar)
+9. [Karar Destek Kokpiti / Interactive Cockpit (Streamlit)](#-karar-destek-kokpiti-streamlit)
+10. [Kurulum, Test & Çalıştırma / Installation & Verification](#-kurulum-test-ve-çalıştırma-rehberi)
+11. [Docker ile Konteyner Dağıtımı / Docker Deployment](#-docker-ile-dağıtım)
+12. [Dizin Yapısı / Directory Tree](#-dizin-yapısı--directory-tree)
+
+---
+
+## 🏗️ Sistem Mimarisi ve Karar Akışı / System Architecture
+
+Sistem, endüstriyel karar piramidini hiyerarşik katmanlar halinde modeller:
+
+```mermaid
+graph TD
+    subgraph Katman 1: Veri Ambarı & ETL / Data Persistence
+        A[Staging Veri Ambarı / SQLite3] --> B[Siparişler, Çok Seviyeli BOM, İstasyon Rotaları]
+    end
+
+    subgraph Katman 2: Taktiksel Planlama & Yeşil İmalat / Tactical LP Layer
+        B --> C[Linear Programming - PuLP / HiGHS]
+        C --> D[Haftalık Lot Büyüklükleri & Güvenlik Stoğu]
+        C --> E[Fazla Mesai, Enerji Tüketimi & Karbon Emisyon Kotası]
+    end
+
+    subgraph Katman 3: Malzeme İhtiyaç Planlaması / MRP-I Engine
+        D --> F[BOM Patlatma & Net İhtiyaç Hesabı]
+        F --> G[Tedarikçi Teslim Süresi - Lead Time & MOQ]
+        G --> H[Bileşen Kısıtlı İmalat Başlangıç Pencereleri - Release Dates]
+    end
+
+    subgraph Katman 4: Operasyonel Çizelgeleme / Operational CP-SAT
+        E --> I[Constraint Programming Motoru - OR-Tools]
+        H --> I
+        I --> J[Sonlu Kapasiteli İş-Makine Eşleme]
+        I --> K[Sıra Bağımlı Hazırlık Süresi SDST Minimizasyonu]
+        I --> L[Vardiya, Mola ve Takvim Kısıtları]
+    end
+
+    subgraph Katman 5: Simülasyon, Yeniden Çizelgeleme & Denetim / Reactive Layer
+        J --> M[What-If Motoru: Makine Arızası Simülasyonu]
+        J --> N[What-If Motoru: Acil Sipariş / Hot-Order Enjeksiyonu]
+        M --> O[Dinamik Rescheduler / Dondurulmuş Ufuk - Freeze Horizon]
+        N --> O
+        O --> P[Çizelge Gerginliği - Nervousness Metrikleri]
+        O --> Q[SHA-256 İmzalı Lineage & Audit Log]
+    end
+
+    subgraph Katman 6: Servis & Görsel Kokpit / Presentation & API
+        P --> R[FastAPI REST API Servisi - Port 8000]
+        Q --> R
+        P --> S[Streamlit Karar Kokpiti & Plotly Gantt - Port 8501]
+        R --> S
 ```
 
-Bu kapalı çevrim akış; **Cost**, **Service Level**, **Energy**, **Carbon**, **Scenario Simulation** ve **Data Lineage** boyutlarını tek bir bütünleşik karar yapısında birleştirir. Mimari, güncel literatürdeki *closed-loop decision intelligence* ve *agentic APS* araştırma eksenleriyle doğrudan uyumludur[cite: 4].
-
----
-### Explicit Scope Boundaries & Non-Goals (Madde 36)
-
-Sistemin matematiksel titizliğini ve doğrulanabilirliğini korumak amacıyla aşağıdaki bileşenler bilinçli olarak kapsam dışında bırakılmıştır:
-
-- **Predictive Maintenance ML:** Kestirimci bakım arıza tahminleri yerine kesin bakım pencereleri ve duruş rezervasyonları üzerinden deterministik çizelgeleme yapılır.
-- **Direct ERP/SAP Live Connectors:** Ağır ve kırılgan canlı ERP konnektörleri yerine ISA-95 Level 4 adapter sözleşmeleri ve staging veri modelleri kullanılır.
-- **SCADA/PLC Hardware Protocols:** Saha seviyesi (Level 1-2) sinyal işleme yerine MES (Level 3) iş emri ve duruş olayları işlenir.
-- **Distributed Microservices / K8s:** Erken dağıtık mimari karmaşıklığından kaçınılarak modüler, deterministik çekirdek kütüphane yapısı korunur.
-- **Unbounded 4-Week Horizon CP-SAT:** NP-hard çizelgeleme ufku pratik operasyonel sınırda tutulur; uzun vade taktiksel LP (Hax & Candea) modeline delege edilir.
-- **Full Bidirectional Digital Twin:** Çift yönlü fiziksel aktüasyon yerine telemetri ve MES olaylarını işleyen karar destek katmanı (Digital Shadow) hedeflenir.
-- **LLM as Optimizer:** Dil modelleri optimizasyon veya çizelgeleme çözücüsü yerine konulmaz; yalnızca Karar Defteri (Decision Ledger) üzerinden açıklanabilirlik ve karar gerekçelendirmesi sağlar.
-
-
-## 2. Core Pillars & Capabilities
-
-### A. Hierarchical Production Planning & Scheduling
-- **Taktik Katman (HPP LP):** Kapasite darbogazlarini, fazla mesai maliyetlerini ve stok dengelerini optimize eden dogrusal programlama modeli.
-- **Operasyonel Cizelgeleme (CP-SAT):** Tezgah kisitlari, hazirlik (setup) matrisleri, oncelik zincirleri ve cok amacli hedef politikalari (`ObjectivePolicy`: `BALANCED`, `THROUGHPUT_MAX`, `SERVICE_LEVEL_FIRST`).
-
-### B. Scenario Engine & Sensitivity Analysis (What-If)
-- **Kapsam:** Talep soku (+%20), kapasite kisiti (-%10), enerji dalgalanmasi (+%25), karbon vergisi artisi (+50 EUR/tCO2), makine arizasi ve hammadde gecikmesi.
-- **Izole Calisma (Isolated Sandbox):** Canli veritabanini kirletmeden secili asamalari gecici izole ortamda kosturur.
-- **KPI Reconciliation:** Makespan, servis seviyesi (OT%), stok maliyeti, backlog, enerji tuketimi (kWh) ve net karbon ayak izi (tCO2e) uzerinde delta mutabakati uretir.
-
-### C. Closed-Loop Execution & Dynamic Replanning
-- **Two-Tier Rescheduling:** Fast Local Repair (minor dalgalanmalar) ve CP-SAT Re-optimization (major arizalar).
-- **Frozen Horizon Prensipleri:** COMPLETED (dokunulmaz), RUNNING (baslangic kilitli), SCHEDULED (esnek/kaydirilabilir).
-
-### D. ISA-95 Entegrasyon Sınırları & Adapter Kontratları (Madde 26)
-Sistem, MESA International B2MML ve ANSI/ISA-95 standartları ile semantik olarak hizalanmış Canonical Contract mimarisi kullanır:
-
-```text
-Internal Canonical Contract (Pydantic v2)
-         │
-         ▼
-ISA-95 Semantic Alignment (ANSI/ISA-95 Part 2 & Part 3)
-         │
-         ├──► JSON API Adapter (Modern Cloud / REST)
-         ├──► B2MML / XML Adapter (MESA Standard Integration)
-         └──► Vendor-Specific Adapters (SAP S/4HANA, IFS, Siemens Opcenter)
-
 ---
 
-## 3. Verification & Quality Gates
+## 📐 Matematiksel Modelleme / Mathematical Formulations
+
+### 1. Taktiksel Katman: Çok Dönemli Agrega ve Yeşil Planlama (LP)
+Model; müşteri taleplerini karşılarken üretim maliyeti, stok tutma maliyeti, fazla mesai maliyeti, gecikme (backlog) cezaları ile birlikte **enerji tüketim giderleri** ve **karbon salımı vergisi/kotalarını** bütüncül olarak minimize eder.
+
+#### İndeksler ve Kümeler (Sets & Indices)
+* $p \in P$: Nihai ürün aileleri ($p = 1, \dots, \vert{}P\vert{}$)
+* $t \in T$: Planlama dönemleri (Haftalar: $t = 1, \dots, N$)
+* $m \in M$: Makine / İstasyon grupları ($m = 1, \dots, \vert{}M\vert{}$)
+
+#### Parametreler (Parameters)
+* $D_{p,t}$: $t$ döneminde $p$ ürünü için müşteri talebi (adet)
+* $CAP_{m,t}^{reg}$: $m$ istasyonunun $t$ dönemindeki normal çalışma kapasitesi (saat)
+* $CAP_{m,t}^{ot\_max}$: $m$ istasyonunun azami fazla mesai limiti (saat)
+* $a_{p,m}$: Ürün $p$'nin $m$ istasyonunda birim işlenme süresi (saat/adet)
+* $c^p_{prod}$: Birim üretim maliyeti ($/adet)
+* $h_p$: Dönem sonu birim stok tutma maliyeti ($/adet/dönem)
+* $\pi_p$: Birim gecikmiş talep (backlog) cezası ($/adet)
+* $c^m_{ot}$: İstasyon bazlı saatlik fazla mesai ücreti ($/saat)
+* $e_p$: Ürün $p$'nin birim üretiminde harcanan enerji (kWh/adet)
+* $c_{energy}$: Birim elektrik enerjisi fiyatı ($/kWh)
+* $co2_p$: Ürün $p$'nin üretimi kaynaklı karbon salımı ($kg\ CO_2/adet$)
+* $c_{carbon}$: Karbon emisyon vergi katsayısı ($/kg\ CO_2$)
+* $CO2_{cap,t}$: $t$ döneminde yasal olarak aşılamayacak azami karbon salımı tavanı ($kg$)
+
+#### Karar Değişkenleri (Decision Variables)
+* $X_{p,t} \ge 0$: $t$ döneminde üretilecek $p$ ürün hacmi
+* $I_{p,t} \ge 0$: $t$ dönemi sonundaki $p$ ürün envanter düzeyi
+* $S_{p,t} \ge 0$: $t$ döneminde karşılanamayan gecikmiş talep miktarı (backlog)
+* $O_{m,t} \ge 0$: $t$ döneminde $m$ makinesinde uygulanan fazla mesai saati
+
+#### Amaç Fonksiyonu (Objective Function)
+$$\min Z = \sum_{t \in T} \Bigg[ \sum_{p \in P} \Big( c^p_{prod} X_{p,t} + h_p I_{p,t} + \pi_p S_{p,t} + \big(e_p \cdot c_{energy} + co2_p \cdot c_{carbon}\big) X_{p,t} \Big) + \sum_{m \in M} c^m_{ot} O_{m,t} \Bigg]$$
+
+#### Kısıtlar (Constraints)
+1. **Malzeme Dengesi ve Akış Kısıtı (Inventory Flow Balance):**
+   $$I_{p,t-1} + X_{p,t} + S_{p,t} - S_{p,t-1} - I_{p,t} = D_{p,t} \quad \forall p \in P, \forall t \in T$$
+2. **Kapasite ve Fazla Mesai Sınırı (Capacity & Overtime Upper Bound):**
+   $$\sum_{p \in P} a_{p,m} X_{p,t} \le CAP_{m,t}^{reg} + O_{m,t} \quad \forall m \in M, \forall t \in T$$
+   $$O_{m,t} \le CAP_{m,t}^{ot\_max} \quad \forall m \in M, \forall t \in T$$
+3. **Yeşil İmalat: Dönemsel Karbon Kotası (Carbon Emission Ceiling):**
+   $$\sum_{p \in P} co2_p X_{p,t} \le CO2_{cap,t} \quad \forall t \in T$$
+4. **Başlangıç Durumları (Boundary Conditions):**
+   $$I_{p,0} = Stok_{p}^{baslangic}, \quad S_{p,0} = 0 \quad \forall p \in P$$
+
+---
+
+### 2. Operasyonel Katman: Kısıt Programlama ile Çizelgeleme (CP-SAT)
+Google OR-Tools CP-SAT motoru ile sonlu kapasiteli, sıra bağımlı hazırlık süreli (SDST) operasyonel çizelge oluşturulur.
+
+#### Değişkenler ve Aralıklar (Interval Variables)
+Her bir üretim görevi $i \in J$ için çözücü üzerinde aralık değişkeni tanımlanır:
+$$Interval_i = [S_i, E_i, D_i] \implies E_i = S_i + D_i$$
+* $S_i \in [0, T_{max}]$: Operasyon başlangıç dakikası
+* $E_i \in [0, T_{max}]$: Operasyon bitiş dakikası
+* $D_i$: İşlem süresi (Processing Duration)
+
+#### Kısıtlar ve Mantıksal Kurallar
+1. **Kaynak Çakışmama Kısıtı (Disjunctive Resource / No-Overlap):**
+   Aynı tezgaha atanan herhangi iki operasyon $i$ ve $j$ zaman ekseninde örtüşemez:
+   $$\text{NoOverlap}\big(\{Interval_i \mid Makine(i) = m\}\big) \implies (E_i \le S_j) \lor (E_j \le S_i)$$
+2. **Sıra Bağımlı Hazırlık Süreleri (Sequence-Dependent Setup Times - SDST):**
+   $i$ ürün grubundan $j$ ürün grubuna geçişte tezgahta temizlik, kalıp değişimi veya ayar süresi ($\tau_{type(i), type(j)}$) zorunludur:
+   $$S_j \ge E_i + \tau_{type(i), type(j)} \quad (\text{eğer } j \text{ operasyonu } i\text{'nin hemen ardılı ise})$$
+3. **Teknolojik Öncelik İlişkileri (Routing Precedence Constraints):**
+   Aynı işin operasyonları proses sırasına uymak zorundadır:
+   $$S_{job, op+1} \ge E_{job, op}$$
+4. **Malzeme ve Tedarikçi Hazır Olma Kısıtı (Material Release Date):**
+   MRP patlatmasından gelen hammadde ve bileşenler depoya girmeden imalat başlatılamaz:
+   $$S_i \ge ReleaseTime_i$$
+5. **Amaç Fonksiyonu:**
+   Tamamlanma süresini (Makespan - $C_{max}$) ve termin gecikmelerini minimize etme:
+   $$\min \left( \alpha \cdot C_{max} + \beta \sum_{i \in J} \max(0, E_i - DueDate_i) \right)$$
+
+---
+
+## 📦 Malzeme Gereksinim Planlaması (MRP-I)
+
+Taktiksel LP planının ürettiği haftalık lot büyüklükleri, operasyonel seviyeye malzeme kısıtları olarak aktarılır:
+* **Çok Seviyeli BOM Patlatma (Explosion):** Üst montajdan hammaddeye kadar hiyerarşik çarpan hesabı.
+* **Tedarikçi Teslim Süresi Dengesi (Lead-Time Offsetting):** Parça temin süresi ($LT_k$) ve Minimum Sipariş Miktarı ($MOQ_k$) gözetilerek satın alma sipariş tarihleri geriye doğru çizelgelenir.
+* **Malzeme Kısıtlı Çizelgeleme (Material-Constrained Scheduling):** Her operasyon için $ReleaseTime_i$ değeri malzeme varış saatine kilitlenerek sahada parça bekleme israfı önlenir.
+
+---
+
+## ⚡ Dinamik Müdahale, Karar Politikaları ve Gerginlik (Nervousness)
+
+Atölye zemininde belirsizlikler gerçekleştiğinde uygulanan dinamik politikalar:
+
+### 1. Dondurulmuş Ufuk Politikası (Freeze Horizon Policy)
+Mevcut zamandan ($t_{now}$) itibaren belirlenen dondurma periyodu ($H_{freeze}$) içindeki operasyonlar sahada hazırlığı tamamlanmış veya işlem görmekte kabul edilir:
+$$S_i = S_i^{orijinal}, \quad Makine_i = Makine_i^{orijinal} \quad \forall i \text{ where } S_i \le t_{now} + H_{freeze}$$
+Bu operasyonların sırası ve makine atamaları yeniden çizelgelemede **değiştirilemez**.
+
+### 2. Çizelge Gerginliği Metrikleri (Schedule Nervousness Metrics)
+Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için iki metrik ölçülür:
+* **Başlangıç Zamanı Sapması (Start Time Displacement):**
+  $$\Delta S = \frac{1}{\vert{}J'\vert{}} \sum_{i \in J'} \vert{}S_i^{yeni} - S_i^{eski}\vert{}$$
+* **Sıra Değişimi Adedi (Sequence Inversion Count):**
+  Tezgahlardaki iş sıralamasının yer değiştirme sayısı.
+
+---
+
+## 📋 Standart Operasyon Prosedürleri (SOPs)
+
+### SOP-01: Rutin Haftalık Planlama Çevrimi (Weekly Planning Routine)
+1. **Veri Çekme:** Staging veritabanından güncel talep tahminleri ve envanter seviyeleri yüklenir.
+2. **LP Çalıştırma:** PuLP modeli koşturularak haftalık agrega üretim hacimleri, fazla mesailer ve karbon bütçesi hesaplanır.
+3. **MRP Patlatma:** Reçeteler (BOM) taranarak malzeme teslim tarihleri ve serbest bırakma saatleri ($ReleaseTime_i$) oluşturulur.
+4. **CP-SAT Çizelgeleme:** OR-Tools motoru haftalık sonlu kapasiteli çizelgeyi üretir.
+5. **Yayınlama:** Çizelge SQLite'a işlenir ve FastAPI/Streamlit üzerinden dağıtılır.
+
+### SOP-02: Makine Arızası Müdahale Prosedürü (Breakdown Response)
+1. **Arıza Girişi:** Arızalanan makine ID'si, arıza anı ($t_{breakdown}$) ve tahmini tamir süresi ($T_{repair}$) girilir.
+2. **Dondurma Uygulama:** $t_{breakdown} + H_{freeze}$ penceresindeki işler kilitlenir.
+3. **What-If Simülasyonu:** `/api/v1/what-if/breakdown` çağrılarak termin gecikmeleri simüle edilir.
+4. **Onay & Reschedule:** Kabul edilebilir senaryo seçilerek `/api/v1/reschedule` ile yeni çizelge yürürlüğe alınır.
+
+### SOP-03: Acil Sipariş Enjeksiyon Prosedürü (Hot-Order Injection)
+1. **Öncelik Tanımlama:** Acil sipariş yüksek öncelik bayrağı ve teslim tarihi ile sisteme verilir.
+2. **Çatışma Analizi:** `/api/v1/what-if/hot-order` çağrısı ile mevcut müşteri siparişlerinde oluşacak gecikmeler listelenir.
+3. **Kapasite Tahsisi:** Mümkünse mesai artışı, değilse düşük öncelikli işlerin ötelenmesiyle acil sipariş hatta enjekte edilir.
+
+---
+
+## 🛡️ Kriptografik İzlenebilirlik (Lineage & Audit Trail)
+
+Sistemdeki tüm simülasyon ve yeniden çizelgeleme kararları değiştirilemez denetim kütüğüne (Audit Trail) kaydedilir:
+* **Olay Kaydı:** Tetikleyici olay tipi (`BREAKDOWN`, `HOT_ORDER`, `PERIODIC`).
+* **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak mühürlenir.
+* **Denetim Tablosu:** SQLite `audit_log` tablosunda saklanır ve `/api/v1/audit-log` üzerinden denetlenebilir.
+
+---
+
+## 🧰 Teknoloji Yığını / Technology Stack
+
+| Alan / Layer | Teknoloji / Kütüphane | Versiyon / Standart | Açıklama |
+|---|---|---|---|
+| **Matematiksel Modelleme** | Google OR-Tools (CP-SAT), PuLP | Python Library | Ayrık kısıt programlama ve lineer programlama çözücüleri |
+| **Backend & REST Servis** | FastAPI, Uvicorn | 0.110+ | Asenkron, OpenAPI/Swagger destekli servis mimarisi |
+| **Veri Şeması & Doğrulama** | Pydantic | v2.x | Tip güvenliği ve veri sözleşmeleri (Contracts) |
+| **Karar Kokpiti & UI** | Streamlit, Plotly Express | 1.32+ | İnteraktif Gantt şeması, senaryo kıyası ve yönetici kokpiti |
+| **Veri Tabanı & Analitik** | SQLite3, Pandas, NumPy | Python Builtin / 2.x | Veri ambarı, staging hatları ve denetim logları |
+| **Test & Kalite Güvencesi**| Pytest, Ruff | 161 Tests / Clean | %100 geçen birim, regresyon ve entegrasyon testleri |
+| **Konteynerizasyon** | Docker, Docker Compose | Multi-Stage | Tek komutla orkestrasyon ve mikroservis dağıtımı |
+
+---
+
+## 🔌 API Servis Katmanı ve Uç Noktalar
+
+FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnteraktif Swagger arayüzüne `http://localhost:8000/docs` adresinden erişilebilir:
+
+| Metot | Uç Nokta (Endpoint) | Parametre / Gövde (Payload) | Açıklama |
+|---|---|---|---|
+| `GET` | `/health` | - | Servis canlılık ve veritabanı bağlantı kontrolü |
+| `GET` | `/api/v1/schedule/current` | - | SQLite üzerindeki aktif operasyonel çizelgeyi döndürür |
+| `POST` | `/api/v1/what-if/breakdown` | `{"machine_id": "M1", "start_time": 120, "duration": 60}` | Makine duruşunu simüle eder; gecikme ve sapma analizi sunar |
+| `POST` | `/api/v1/what-if/hot-order` | `{"order_id": "HOT_01", "due_date": 300, "tasks": [...]}` | Acil siparişin mevcut çizelge üzerindeki etkisini hesaplar |
+| `POST` | `/api/v1/reschedule` | `{"trigger_type": "...", "freeze_horizon": 60}` | Dondurulmuş ufuk kurallarıyla yeni çizelgeyi üretir ve kaydeder |
+| `GET` | `/api/v1/audit-log` | `?limit=50` | SHA-256 imzalı geçmiş simülasyon ve plan denetim loglarını listeler |
+
+---
+
+## 📊 Karar Destek Kokpiti (Streamlit)
+
+Streamlit karar paneli (`http://localhost:8501`), karar vericilere interaktif yetenekler sunar:
+* **Gantt Çizelgesi Görselleştirme:** Makine, ürün grubu ve SDST hazırlık sürelerinin zaman çizelgesindeki renkli dağılımı.
+* **Darboğaz & Kapasite Paneli:** İstasyon doluluk oranları, bekleme süreleri ve fazla mesai analizleri.
+* **What-If Simülatörü:** Web arayüzünden arıza veya acil sipariş tetikleyerek çizelgeleri yan yana karşılaştırma.
+* **Lineage & Audit Gezgini:** Sistem kararlarının ve kriptografik özetlerin denetim dökümü.
+
+---
+
+## 🚀 Kurulum, Test ve Çalıştırma Rehberi
+
+### 1. Yerel Python Ortamı Kurulumu
 
 ```bash
-# Statik Kod Kalitesi ve Bicipelendirme
-python -m ruff check scripts/ src/ tests/
-python -m ruff format --check scripts/ src/ tests/
+# 1. Depoyu klonlayın
+git clone [https://github.com/AliUmutKazak/factory-decision-intelligence.git](https://github.com/AliUmutKazak/factory-decision-intelligence.git)
+cd factory-decision-intelligence
 
-# Butunlesik Test Suiti (90+ Test)
-python -m pytest -q
+# 2. Sanal ortamı oluşturun ve aktifleştirin
+python -m venv factory-env
+# Windows:
+factory-env\Scripts\activate
+# Linux/macOS:
+source factory-env/bin/activate
+
+# 3. Bağımlılıkları yükleyin
+pip install -r requirements.txt
+```
+
+### 2. Kalite Güvencesi ve Testler (161 Test)
+
+Projedeki 161 birim, entegrasyon ve regresyon testini koşturmak için:
+
+```bash
+pytest tests/ -v
+```
+
+### 3. FastAPI Servisini Başlatma
+
+```bash
+uvicorn src.api.server:app --reload --port 8000
+```
+* **Swagger Arayüzü:** `http://localhost:8000/docs`
+* **Health Check:** `http://localhost:8000/health`
+
+### 4. Karar Destek Kokpitini Başlatma (Streamlit)
+
+Ayrı bir terminalde:
+```bash
+streamlit run dashboard/app.py
+```
+* **Kullanıcı Paneli:** `http://localhost:8501`
+
+---
+
+## 🐳 Docker ile Dağıtım
+
+Docker ve Docker Compose sayesinde tüm mimari izole konteynerlar olarak tek komutla ayağa kaldırılabilir:
+
+```bash
+# Servisleri derleyin ve başlatın
+docker compose up --build
+```
+
+* **FastAPI Backend:** `http://localhost:8000/docs`
+* **Streamlit Dashboard:** `http://localhost:8501`
+* **Durdurmak için:** `docker compose down`
+
+---
+
+## 📂 Dizin Yapısı / Directory Tree
+
+```text
+factory-decision-intelligence/
+├── data/                       # Üretim veritabanı (factory.db) ve staging tabloları
+├── dashboard/                  # Streamlit karar destek arayüzü
+│   └── app.py                  # Karar kokpiti, Gantt grafikleri ve senaryo paneli
+├── src/
+│   ├── api/                    # FastAPI REST servis mimarisi
+│   │   └── server.py           # Endpoint tanımları ve HTTP işleyicileri
+│   ├── contracts/              # Pydantic veri sözleşmeleri ve şemaları
+│   ├── planning/               # Kademe 1: Taktiksel LP Planlama (PuLP / HiGHS)
+│   ├── mrp/                    # Kademe 2: MRP-I, BOM patlatma ve lead-time dengeleme
+│   ├── scheduling/             # Kademe 3 & 5: CP-SAT Çizelgeleme ve What-If motoru
+│   │   ├── schedule_cpsat.py   # OR-Tools sonlu kapasite çizelgeleyicisi
+│   │   ├── what_if.py          # Arıza ve acil sipariş simülatörü
+│   │   └── rescheduler.py      # Freeze Horizon & Dinamik Rescheduler
+│   └── config.py               # Konfigürasyon, yollar ve ortam değişkenleri
+├── tests/                      # 161 adet birim, entegrasyon ve regresyon testi
+├── Dockerfile                  # Python 3.11-slim üretim Docker imaj reçetesi
+├── docker-compose.yml          # FastAPI ve Streamlit mikroservis orkestrasyonu
+├── .dockerignore               # Docker imaj filtreleme kuralları
+├── requirements.txt            # Python bağımlılık listesi
+└── README.md                   # Kapsamlı sistem ve mimari dokümantasyonu
 ```
 
 ---
 
-## 4. Future Roadmap: Agentic AI & Planner Copilot (Madde 31)
+## 📜 Lisans & Geliştirici / License & Author
 
-Sistem mimarisinde Üretici Yapay Zeka (LLM), doğrudan çizelge üreten bir kara kutu olarak **konumlandırılmaz**. Optimizasyon problemleri deterministik matematiksel modeller (CP-SAT / LP) gerektirir[cite: 6]. LLM/Agent mimarisi, deterministik motorun üzerinde bir **"Planner Copilot"** olarak kurgulanmıştır[cite: 6]:
-
-```text
-LLM / Agent
-    │  (Doğal dil senaryo talebi: "M01 tezgahı 6 saat durursa ne olur?")
-    ▼
-Validated Tools & Scenario Engine
-    │  (Doğrulanmış parametreler ve kısıtlar)
-    ▼
-OR-Tools CP-SAT Solver
-    │  (Deterministik matematiksel çözüm)
-    ▼
-Decision Result & Multi-Criteria Impact
-    │  (Cost, Service Level, Energy, Carbon)
-    ▼
-Human Approval & Lineage Audit
+* **Geliştirici / Author:** Ali Umut Kazak — Endüstri Mühendisi / Karar Zekası & Optimizasyon
+* **Lisans / License:** MIT Lisansı — Detaylar için `LICENSE` dosyasına bakınız.
