@@ -6,7 +6,7 @@ from typing import Any
 
 import pandas as pd
 
-from src.config import PROCESSED_DATA_DIR, RAW_DATA_DIR
+from src.config import RAW_DATA_DIR, get_runtime_paths
 
 
 class DemandSourceAdapter(ABC):
@@ -147,12 +147,14 @@ def run_preprocessing():
     Adaptör aracılığıyla standartlaştırılan sipariş verisine takvim öznitelikleri
     ekler ve üretim veritabanı için hazır hale getirir.
     """
+    runtime = get_runtime_paths()
+    processed_dir = runtime["processed_dir"]
     raw_path = RAW_DATA_DIR / "train.csv"
     fixture_name = os.environ.get("USE_FIXTURE", "demand_fixture.csv")
     if not fixture_name.endswith(".csv"):
         fixture_name = "demand_fixture.csv"
     fixture_path = RAW_DATA_DIR.parent / "fixtures" / fixture_name
-    output_path = PROCESSED_DATA_DIR / "factory_orders.csv"
+    output_path = processed_dir / "factory_orders.csv"
 
     # Veri kaynağı seçimi (Fail-Fast prensibiyle CI izolasyonu)
     if "USE_FIXTURE" in os.environ:
@@ -175,7 +177,7 @@ def run_preprocessing():
     # Madde 15: Production path fail-fast güvencesi (Bilinmeyen SKU geldiğinde sessiz filtreleme engellenir)
     # CI/Test ortamında esneklik istenirse ALLOW_UNMAPPED çevre değişkeniyle açılabilir, varsayılan False'tur.
     allow_unmapped_env = os.environ.get("ALLOW_UNMAPPED", "False").lower() in ("true", "1", "yes")
-    adapter = KaggleRetailDemandAdapter()
+    adapter = KaggleRetailDemandAdapter(allow_unmapped=allow_unmapped_env)
     factory_demand = adapter.adapt(data_source)
 
     # 1. Tarih kolonunu order_date olarak standartlaştır
@@ -207,7 +209,7 @@ def run_preprocessing():
     expected_cols = ["order_date", "product_id", "order_qty", "year", "month", "day_of_week", "is_weekend"]
     factory_demand = factory_demand[expected_cols]
 
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
     factory_demand.to_csv(output_path, index=False)
 
     print(f"[3/3] Konsolide fabrika talebi kaydedildi -> {output_path}")
