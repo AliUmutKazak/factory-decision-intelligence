@@ -615,6 +615,59 @@ def run_cpsat_scheduling(
     weight_setup = weights.setup_weight
     weight_tardiness = weights.tardiness_weight
 
+    # -------------------------------------------------------------
+    # Faz 4: Scaling & Heuristic Warm-Start (Solution Hinting)
+    # -------------------------------------------------------------
+    try:
+        # Rota kısıtlarına saygılı ve tezgâh yığılmasını önleyen simüle edilmiş EDD/FIFO sezgisel başlangıç
+        sim_machine_available = {m: 0 for m in machine_to_tasks.keys()}
+        sim_task_end = {}
+
+        # Kolon güvenliği: due_date veya due_date_min yoksa 0 kabul et
+        sort_cols = []
+        if "due_date_min" in tasks_df.columns:
+            sort_cols.append("due_date_min")
+        elif "due_date" in tasks_df.columns:
+            sort_cols.append("due_date")
+
+        sort_cols.extend([c for c in ["operation_seq", "sub_lot_index"] if c in tasks_df.columns])
+
+        sorted_tasks = tasks_df.sort_values(by=sort_cols) if sort_cols else tasks_df.copy()
+
+        for _, r in sorted_tasks.iterrows():
+            t_id = r["task_id"]
+            m_id = r["machine_id"]
+            dur = int(r["duration"])
+            rel = int(r.get("release_time", r.get("release_time_min", 0)))
+
+            # Öncelikli operasyonun bitiş zamanı kontrolü
+            pred_end = 0
+            op_seq = r["operation_seq"]
+            l_id = r["lot_id"]
+            if op_seq > 1:
+                prev_ops = tasks_df[(tasks_df["lot_id"] == l_id) & (tasks_df["operation_seq"] == op_seq - 1)]
+                if not prev_ops.empty:
+                    prev_tid = prev_ops.iloc[0]["task_id"]
+                    pred_end = sim_task_end.get(prev_tid, 0)
+
+            # Başlangıç zamanı: Tezgâhın boşalma anı, malzeme geliş tarihi ve önceki operasyon bitişinin maksimumu
+            h_start = max(sim_machine_available.get(m_id, 0), rel, pred_end)
+            h_end = h_start + dur
+
+            sim_machine_available[m_id] = h_end
+            sim_task_end[t_id] = h_end
+
+            # CP-SAT modeline başlangıç ipucunu (hint) ver
+            if t_id in all_tasks:
+                model.add_hint(all_tasks[t_id]["start"], h_start)
+                model.add_hint(all_tasks[t_id]["end"], h_end)
+
+        if sim_task_end:
+            h_makespan = max(sim_task_end.values())
+            model.add_hint(makespan, h_makespan)
+        print(f"[WARM-START] {len(sim_task_end)} görev için sezgisel başlangıç ipucu başarıyla yüklendi.")
+    except Exception as e:
+        print(f"[WARM-START] Sezgisel başlangıç ipucu üretilirken atlandı: {e}")
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = float(CPSAT_TIME_LIMIT_SECONDS)
     solver.parameters.num_search_workers = int(CPSAT_NUM_SEARCH_WORKERS)
@@ -954,7 +1007,38 @@ def run_cpsat_scheduling(
         "total_objective_value": float(solver.ObjectiveValue()),
     }
 
-    solver_meta_df = pd.DataFrame([contract_metadata.model_dump()])
+    solver_meta_dict = contract_metadata.model_dump()
+    # Geriye dönük uyumluluk ve Madde 24 Governance uyumu:
+    solver_meta_dict["solver_name"] = "OR-Tools CP-SAT"
+    solver_meta_dict["solver_status"] = str(contract_metadata.status)
+    solver_meta_dict["is_optimal"] = int(contract_metadata.proven_optimal)
+    solver_meta_dict["objective_value_min"] = float(
+        contract_metadata.objective_value or 0.0
+    )
+    solver_meta_dict["best_bound_min"] = (
+        float(contract_metadata.best_objective_bound)
+        if contract_metadata.best_objective_bound is not None
+        else float(contract_metadata.objective_value or 0.0)
+    )
+    if (
+        contract_metadata.objective_value
+        and contract_metadata.best_objective_bound
+    ):
+        gap = (
+            abs(
+                contract_metadata.objective_value
+                - contract_metadata.best_objective_bound
+            )
+            / max(abs(contract_metadata.objective_value), 1e-6)
+        ) * 100.0
+    else:
+        gap = 0.0
+    solver_meta_dict["optimality_gap_pct"] = round(gap, 4)
+    solver_meta_dict["solve_time_seconds"] = float(
+        contract_metadata.wall_time_seconds
+    )
+
+    solver_meta_df = pd.DataFrame([solver_meta_dict])
     sched_df["run_id"] = effective_run_id
     sched_df["schedule_state"] = "FREE"
     sched_df["execution_status"] = "SCHEDULED"
