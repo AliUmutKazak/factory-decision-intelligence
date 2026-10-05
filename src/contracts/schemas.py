@@ -318,3 +318,52 @@ class ScheduleOutputTask(BaseModel):
         if start is not None and v < start:
             raise ValueError(f"end_min ({v}) start_min ({start}) değerinden küçük olamaz.")
         return v
+
+
+# -------------------------------------------------------------------------
+# Faz 4 - Madde 2: What-If Senaryo ve Duyarlılık Analizi Sözleşmeleri
+# -------------------------------------------------------------------------
+
+
+class ScenarioType(StrEnum):
+    """What-If senaryo türleri."""
+
+    MACHINE_BREAKDOWN = "MACHINE_BREAKDOWN"
+    HOT_ORDER = "HOT_ORDER"
+    CAPACITY_CHANGE = "CAPACITY_CHANGE"
+
+
+class MachineBreakdownEvent(BaseModel):
+    """Makine arızası veya planlanmamış duruş olayı girdisi."""
+
+    machine_id: str = Field(description="Arızalanan tezgâh kodu")
+    start_min: int = Field(ge=0, description="Arıza başlangıç dakikası")
+    duration_min: int = Field(gt=0, description="Arıza/duruş süresi (dakika)")
+    description: str = Field(default="Unplanned machine breakdown", description="Duruş açıklaması")
+
+
+class HotOrderInjection(BaseModel):
+    """Acil / yüksek öncelikli sipariş girdisi."""
+
+    order_id: str = Field(description="Sipariş kimliği")
+    product_id: str = Field(description="Ürün kodu")
+    quantity: int = Field(gt=0, description="Üretim adedi")
+    due_date_min: int = Field(ge=0, description="Termin tarihi (dakika)")
+    priority_weight: int = Field(default=10, description="Acil sipariş için yüksek ceza ağırlığı")
+
+
+class ScenarioDeltaReport(BaseModel):
+    """Baz plan ile senaryo planı arasındaki KPI fark raporu."""
+
+    scenario_name: str = Field(description="Senaryo adı/etiketi")
+    scenario_type: ScenarioType = Field(description="Senaryo türü")
+    baseline_makespan_min: float = Field(ge=0.0, description="Baz plan makespan (dakika)")
+    scenario_makespan_min: float = Field(ge=0.0, description="Senaryo makespan (dakika)")
+    makespan_delta_min: float = Field(description="Makespan farkı (dakika)")
+    baseline_total_tardiness_min: float = Field(ge=0.0, description="Baz plan gecikme (dakika)")
+    scenario_total_tardiness_min: float = Field(ge=0.0, description="Senaryo gecikme (dakika)")
+    tardiness_delta_min: float = Field(description="Toplam gecikme farkı (dakika)")
+    baseline_total_setup_min: float = Field(ge=0.0, description="Baz plan hazırlık süresi (dakika)")
+    scenario_total_setup_min: float = Field(ge=0.0, description="Senaryo hazırlık süresi (dakika)")
+    setup_delta_min: float = Field(description="Hazırlık süresi farkı (dakika)")
+    impacted_tasks_count: int = Field(ge=0, description="Senaryodaki toplam çizelgelenen iş sayısı")
