@@ -1,4 +1,4 @@
-import json
+﻿import json
 import os
 
 import lightgbm as lgb
@@ -7,23 +7,21 @@ import pandas as pd
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from src.config import (
-    DB_PATH,
     FORECAST_FEATURE_VERSION,
     FORECAST_HORIZON_DAYS,
     FORECAST_MODEL_VERSION,
     HOLT_WINTERS_DEFAULT_PARAMS,
-    PROCESSED_DATA_DIR,
     get_runtime_paths,
 )
 from src.utils.db import get_db_connection
 
-OUTPUT_FORECAST_PATH = PROCESSED_DATA_DIR / "forecast_demand.csv"
 HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100
 
 
-def load_factory_demand():
-    conn = get_db_connection(DB_PATH)
+def load_factory_demand(db_path=None):
+    active_db_path = db_path or get_runtime_paths()["db_path"]
+    conn = get_db_connection(active_db_path)
     query = """
         SELECT order_date, product_id, order_qty as demand
         FROM orders
@@ -134,8 +132,9 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
     return evaluate_metrics(y_test, pred)
 
 
-def run_forecast_benchmark(run_id=None):
-    df_all = load_factory_demand()
+def run_forecast_benchmark(run_id=None, db_path=None):
+    active_db_path = db_path or get_runtime_paths()["db_path"]
+    df_all = load_factory_demand(active_db_path)
     products = sorted(df_all["product_id"].unique())
 
     benchmark_summary = []
@@ -329,7 +328,7 @@ def run_forecast_benchmark(run_id=None):
     active_run_id = run_id
     if not active_run_id:
         try:
-            with get_db_connection(DB_PATH) as _conn:
+            with get_db_connection(active_db_path) as _conn:
                 row = _conn.execute("SELECT run_id FROM pipeline_runs ORDER BY id DESC LIMIT 1").fetchone()
                 active_run_id = row[0] if row else "STANDALONE_RUN"
         except Exception:
@@ -372,7 +371,7 @@ def run_forecast_benchmark(run_id=None):
     with open(_rt_paths["reports_dir"] / "forecast_model_metadata.json", "w", encoding="utf-8") as f:
         json.dump(forecast_meta, f, indent=4)
 
-    with get_db_connection(DB_PATH) as conn:
+    with get_db_connection(active_db_path) as conn:
         forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
         lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
 

@@ -36,14 +36,44 @@ def get_runtime_paths():
     }
 
 
-# Geriye dönük uyumluluk için modül seviyesinde değişkenler:
-_paths = get_runtime_paths()
-DATA_DIR = _paths["data_dir"]
-PROCESSED_DATA_DIR = _paths["processed_dir"]
+# Geriye dönük uyumluluk ve dinamik Staging İzolasyonu:
+class _DynamicRuntimePath:
+    """Runtime ortam değişkenlerine duyarlı dinamik yol proxy'si."""
+    def __init__(self, key: str):
+        self._key = key
+
+    def _get_path(self) -> Path:
+        return get_runtime_paths()[self._key]
+
+    def __fspath__(self) -> str:
+        return str(self._get_path())
+
+    def __str__(self) -> str:
+        return str(self._get_path())
+
+    def __repr__(self) -> str:
+        return repr(self._get_path())
+
+    def __truediv__(self, other):
+        return self._get_path() / other
+
+    def __rtruediv__(self, other):
+        return Path(other) / self._get_path()
+
+    def __getattr__(self, name):
+        return getattr(self._get_path(), name)
+
+    def __eq__(self, other):
+        return self._get_path() == (other._get_path() if isinstance(other, _DynamicRuntimePath) else Path(other))
+
+
+DATA_DIR = _DynamicRuntimePath("data_dir")
+PROCESSED_DATA_DIR = _DynamicRuntimePath("processed_dir")
+REPORTS_DIR = _DynamicRuntimePath("reports_dir")
+DB_PATH = _DynamicRuntimePath("db_path")
+
 RAW_DATA_DIR = DATA_DIR / "raw"
 SYNTHETIC_DATA_DIR = DATA_DIR / "synthetic"
-REPORTS_DIR = _paths["reports_dir"]
-DB_PATH = _paths["db_path"]
 CONFIG_PATH = SRC_DIR / "config.py"
 
 # 1. Ortak Fabrika Çalışma Takvimi (Madde 7 Düzeltmesi)
