@@ -319,8 +319,12 @@ def run_forecast_benchmark(run_id=None, db_path=None):
     print(summary_df.to_string(index=False))
     print("-" * 85)
 
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
+    _rt_paths = get_runtime_paths()
+    processed_dir = _rt_paths.get("processed_data_dir") or (_rt_paths["data_dir"] / "processed")
+    reports_dir = _rt_paths.get("reports_dir") or (_rt_paths["data_dir"].parent / "reports")
+
+    os.makedirs(processed_dir, exist_ok=True)
+    os.makedirs(reports_dir, exist_ok=True)
 
     forecast_df = pd.DataFrame(final_forecast_records)
     lineage_df = pd.DataFrame(model_lineage_records)
@@ -368,14 +372,17 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                 "feature_version": FORECAST_FEATURE_VERSION,
             }
 
-    with open(_rt_paths["reports_dir"] / "forecast_model_metadata.json", "w", encoding="utf-8") as f:
+    output_forecast_path = processed_dir / "forecast_demand.csv"
+    forecast_df.to_csv(output_forecast_path, index=False)
+
+    with open(reports_dir / "forecast_model_metadata.json", "w", encoding="utf-8") as f:
         json.dump(forecast_meta, f, indent=4)
 
     with get_db_connection(active_db_path) as conn:
         forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
         lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
 
-    print(f"[OK] 28 Gunluk Gelecek Tahminleri Yazildi: {OUTPUT_FORECAST_PATH}")
+    print(f"[OK] 28 Gunluk Gelecek Tahminleri Yazildi: {output_forecast_path}")
     print(
         "[OK] Model Governance Metadata Kaydedildi: forecast_model_lineage tablosu & reports/forecast_model_metadata.json"
     )
