@@ -4,18 +4,20 @@ import numpy as np
 import pandas as pd
 
 from src.config import (
-    DB_PATH,
     INITIAL_INVENTORY,
     MRP_SERVICE_LEVEL_Z,
-    PROCESSED_DATA_DIR,
 )
 from src.utils.db import get_db_connection
 
-OUTPUT_MRP_PATH = PROCESSED_DATA_DIR / "mrp_plan.csv"
 
 
 def load_data():
-    conn = get_db_connection(DB_PATH)
+    runtime = get_runtime_paths()
+    active_db_path = db_path or runtime["db_path"]
+    processed_dir = runtime["processed_dir"]
+    output_mrp_path = processed_dir / "mrp_plan.csv"
+
+    conn = get_db_connection(active_db_path)
     sku_plan = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     bom = pd.read_sql("SELECT * FROM bom", conn)
     materials = pd.read_sql("SELECT * FROM materials", conn)
@@ -37,7 +39,7 @@ def calculate_gross_requirements(sku_plan, bom):
     return gross_req
 
 
-def run_mrp_engine(run_id=None):
+def run_mrp_engine(run_id=None, db_path=None):
     sku_plan, bom, materials = load_data()
     gross_df = calculate_gross_requirements(sku_plan, bom)
 
@@ -146,18 +148,18 @@ def run_mrp_engine(run_id=None):
     print("=" * 95)
 
     # SQLite ve CSV'ye Aktar
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
 
     if run_id:
         mrp_df["run_id"] = run_id
 
-    mrp_df.to_csv(OUTPUT_MRP_PATH, index=False)
+    mrp_df.to_csv(output_mrp_path, index=False)
 
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(active_db_path)
     mrp_df.to_sql("mrp_plan", conn, index=False, if_exists="replace")
     conn.close()
 
-    print(f"[OK] Zaman Fazlı MRP Planı Kaydedildi: {OUTPUT_MRP_PATH}")
+    print(f"[OK] Zaman Fazlı MRP Planı Kaydedildi: {output_mrp_path}")
     print("[OK] SQLite 'mrp_plan' tablosu güncellendi.")
 
 
