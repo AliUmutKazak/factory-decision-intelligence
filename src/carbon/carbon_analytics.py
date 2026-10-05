@@ -29,20 +29,22 @@ import pandas as pd
 
 from src.config import (
     CARBON_PRICE_SCENARIOS_EUR,
-    DB_PATH,
     DEFAULT_FORKLIFT_LITERS,
     DIESEL_EMISSION_FACTOR,
     GRID_EMISSION_FACTOR,
-    PROCESSED_DATA_DIR,
 )
+from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
-OUTPUT_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_analytics.csv"
-OUTPUT_MACHINE_CARBON_PATH = PROCESSED_DATA_DIR / "carbon_machine_kpis.csv"
 
 
-def compute_carbon_analytics(run_id=None):
-    conn = get_db_connection(DB_PATH)
+def compute_carbon_analytics(run_id=None, db_path=None):
+    runtime = get_runtime_paths()
+    active_db_path = db_path or runtime["db_path"]
+    processed_dir = runtime["processed_dir"]
+    output_carbon_path = processed_dir / "carbon_analytics.csv"
+    output_machine_carbon_path = processed_dir / "carbon_machine_kpis.csv"
+    conn = get_db_connection(active_db_path)
     energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn).iloc[0]
     machine_kpis_df = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
     conn.close()
@@ -117,7 +119,7 @@ def compute_carbon_analytics(run_id=None):
         "kgco2e_per_unit": round(kgco2e_per_unit, 4),
     }
 
-    os.makedirs(PROCESSED_DATA_DIR, exist_ok=True)
+    processed_dir.mkdir(parents=True, exist_ok=True)
     carbon_kpis_df = pd.DataFrame([carbon_summary])
 
     if run_id:
@@ -125,10 +127,10 @@ def compute_carbon_analytics(run_id=None):
         machine_kpis_df["run_id"] = run_id
         scen_df["run_id"] = run_id
 
-    carbon_kpis_df.to_csv(OUTPUT_CARBON_PATH, index=False)
-    machine_kpis_df.to_csv(OUTPUT_MACHINE_CARBON_PATH, index=False)
+    carbon_kpis_df.to_csv(output_carbon_path, index=False)
+    machine_kpis_df.to_csv(output_machine_carbon_path, index=False)
 
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(active_db_path)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS carbon_kpis (
