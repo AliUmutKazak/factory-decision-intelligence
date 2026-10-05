@@ -24,16 +24,15 @@ import os
 
 import pandas as pd
 
-from src.config import DB_PATH, PROCESSED_DATA_DIR
+from src.config import get_runtime_paths
 from src.scheduling.calendar_service import MachineCalendarService
 from src.utils.db import get_db_connection
 
-OUTPUT_ENERGY_KPI_PATH = PROCESSED_DATA_DIR / "energy_kpis.csv"
-OUTPUT_PROFILE_PATH = PROCESSED_DATA_DIR / "energy_profile_15min.csv"
 
 
-def load_data():
-    conn = get_db_connection(DB_PATH)
+def load_data(db_path=None):
+    active_db_path = db_path or get_runtime_paths()["db_path"]
+    conn = get_db_connection(active_db_path)
     schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
     routing_df = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
@@ -46,8 +45,9 @@ def load_data():
     return schedule_df, machines_df
 
 
-def load_machine_specs() -> dict:
-    conn = get_db_connection(DB_PATH)
+def load_machine_specs(db_path=None) -> dict:
+    active_db_path = db_path or get_runtime_paths()["db_path"]
+    conn = get_db_connection(active_db_path)
     df_m = pd.read_sql("SELECT * FROM machines", conn)
     conn.close()
 
@@ -63,14 +63,19 @@ def load_machine_specs() -> dict:
     return specs
 
 
-def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
+def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db_path=None):
+    runtime = get_runtime_paths()
+    active_db_path = db_path or runtime["db_path"]
+    processed_dir = runtime["processed_dir"]
+    output_energy_kpi_path = processed_dir / "energy_kpis.csv"
+    output_profile_path = processed_dir / "energy_profile_15min.csv"
     if schedule_df is None or machines_df is None:
-        loaded_sched, loaded_mach = load_data()
+        loaded_sched, loaded_mach = load_data(active_db_path)
         if schedule_df is None:
             schedule_df = loaded_sched
         if machines_df is None:
             machines_df = loaded_mach
-    machine_specs = load_machine_specs()
+    machine_specs = load_machine_specs(active_db_path)
     if schedule_df.empty or len(schedule_df) == 0:
         # Madde 12: 0 Uretim durumunda fiziksel sifir enerji dengesi
         facility_kpis = {
@@ -110,11 +115,11 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None):
         m_kpi_df["run_id"] = run_id
         profile_df["run_id"] = run_id
 
-        os.makedirs(os.path.dirname(OUTPUT_ENERGY_KPI_PATH), exist_ok=True)
-        kpi_df.to_csv(OUTPUT_ENERGY_KPI_PATH, index=False)
-        profile_df.to_csv(OUTPUT_PROFILE_PATH, index=False)
+        processed_dir.mkdir(parents=True, exist_ok=True)
+        kpi_df.to_csv(output_energy_kpi_path, index=False)
+        profile_df.to_csv(output_profile_path, index=False)
 
-        conn = get_db_connection(DB_PATH)
+        conn = get_db_connection(active_db_path)
         cur = conn.cursor()
         if run_id:
             # İlgili run_id varsa mükerrer kaydı önlemek için temizle
