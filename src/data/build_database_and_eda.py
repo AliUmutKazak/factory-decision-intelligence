@@ -4,13 +4,10 @@ import numpy as np
 import pandas as pd
 
 from src.config import (
-    DB_PATH,
-    PROCESSED_DATA_DIR,
     SYNTHETIC_DATA_DIR,
+    get_runtime_paths,
 )
 from src.utils.db import get_db_connection
-
-PROCESSED_ORDERS_PATH = PROCESSED_DATA_DIR / "factory_orders.csv"
 
 
 def analyze_demand_characteristics(orders_df: pd.DataFrame) -> pd.DataFrame:
@@ -162,7 +159,7 @@ def validate_master_data(data_dict):
         raise ValueError(f"[MASTER DATA ERROR] 'changeover_matrix' eksik ürün geçişleri içeriyor: {missing_pairs}")
 
 
-def initialize_database(force_recreate=False, run_id=None):
+def initialize_database(force_recreate=False, run_id=None, db_path=None):
     """
     Veritabanını SSOT (Single Source of Truth) ilkelerine uygun şekilde başlatır ve eşitler.
     Dosyayı tamamen silmek yerine idempotent tablo senkronizasyonu yapar ve
@@ -172,9 +169,12 @@ def initialize_database(force_recreate=False, run_id=None):
     from datetime import datetime
 
     gc.collect()
+    runtime = get_runtime_paths()
+    active_db_path = db_path or runtime["db_path"]
+    processed_orders_path = runtime["processed_dir"] / "factory_orders.csv"
 
-    if force_recreate and os.path.exists(DB_PATH):
-        conn_temp = get_db_connection(DB_PATH)
+    if force_recreate and os.path.exists(active_db_path):
+        conn_temp = get_db_connection(active_db_path)
         cur = conn_temp.cursor()
         cur.execute("PRAGMA foreign_keys = OFF;")
         # pipeline_runs hariç diğer tabloları temizle (denetim hafızasını koru)
@@ -190,7 +190,7 @@ def initialize_database(force_recreate=False, run_id=None):
         cur.execute("VACUUM;")
         conn_temp.close()
 
-    conn = get_db_connection(DB_PATH)
+    conn = get_db_connection(active_db_path)
     cursor = conn.cursor()
     # P0 Çözümü: Downstream tablolar pipeline başlangıcında DROP EDİLMEZ.
     # Önceki başarılı koşumun (RUN_ACTIVE) fiziksel verisi korunur.
@@ -586,7 +586,7 @@ def initialize_database(force_recreate=False, run_id=None):
     tables = [row[0] for row in cursor.fetchall()]
 
     print("SQLITE VERİTABANI DOĞRULAMASI:")
-    print(f"Konum: {DB_PATH}")
+    print(f"Konum: {active_db_path}")
     print(f"Yüklenen Tablolar ({len(tables)} adet): {', '.join(tables)}")
 
     for t in tables:
