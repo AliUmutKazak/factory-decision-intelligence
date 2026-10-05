@@ -176,8 +176,8 @@ def compute_carbon_analytics(run_id=None, db_path=None):
     scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="append")
     conn.close()
 
-    print(f"[OK] Karbon KPI'ları Kaydedildi: {OUTPUT_CARBON_PATH}")
-    print(f"[OK] Makine Karbon KPI'ları Kaydedildi: {OUTPUT_MACHINE_CARBON_PATH}")
+    print(f"[OK] Karbon KPI'ları Kaydedildi: {output_carbon_path}")
+    print(f"[OK] Makine Karbon KPI'ları Kaydedildi: {output_machine_carbon_path}")
     print("[OK] SQLite 'carbon_kpis', 'carbon_machine_kpis' ve 'carbon_price_scenarios' tabloları güncellendi.")
 
 
