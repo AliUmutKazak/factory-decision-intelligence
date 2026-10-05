@@ -348,24 +348,21 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
     import pandas as pd
 
     from src import config
+    from src.config import get_runtime_paths
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     root_dir = Path(__file__).resolve().parent.parent.parent
 
-    # Rapor dizini izolasyonu: db_path staging dizinindeyse oradaki reports/ önceliklidir
-    resolved_reports_dir = None
+    # Runtime path is authoritative; validation must never read canonical reports
+    # while an isolated staging environment is active.
     if reports_dir:
         resolved_reports_dir = Path(reports_dir)
+    elif os.environ.get("FACTORY_REPORTS_DIR"):
+        resolved_reports_dir = Path(os.environ["FACTORY_REPORTS_DIR"])
     elif db_path:
-        db_p = Path(db_path)
-        # Örn: staging/run_id/factory.db -> staging/run_id/reports
-        if (db_p.parent / "reports").exists():
-            resolved_reports_dir = db_p.parent / "reports"
-        elif (db_p.parent.parent / "reports").exists():
-            resolved_reports_dir = db_p.parent.parent / "reports"
-
-    if resolved_reports_dir is None:
-        resolved_reports_dir = root_dir / "reports"
+        resolved_reports_dir = Path(db_path).parent / "reports"
+    else:
+        resolved_reports_dir = Path(get_runtime_paths()["reports_dir"])
 
     conn = get_db_connection(active_db)
     try:
@@ -434,7 +431,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             # MADDE 18: Machine x Week Bazlı Operasyonel Overtime Validation
             # -----------------------------------------------------------------
             # Global eşik (total_ot > 60000) yerine tezgâh ve hafta bazlı katı kural
-            weekly_acc_path = ROOT_DIR / "data" / "processed" / "task_weekly_accounting.csv"
+            weekly_acc_path = Path(os.environ.get("FACTORY_PROCESSED_DIR", str(get_runtime_paths()["processed_dir"]))) / "task_weekly_accounting.csv"
             allowed_w1_ot_min_by_machine = {"M01": 48 * 60}  # M01 W1 tavanı: 48h = 2880 dk
 
             if weekly_acc_path.exists():
