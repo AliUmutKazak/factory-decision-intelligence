@@ -16,9 +16,15 @@ from src.config import (
     PLANNING_HORIZON_WEEKS,
     WEEKLY_HOURS_PER_MACHINE,
 )
+from src.contracts.schemas import (
+    HotOrderInjection,
+    MachineBreakdownEvent,
+    RescheduleTriggerEvent,
+)
 from src.integration.mes_service import MESIntegrationService
-from src.integration.rescheduler import ClosedLoopRescheduler
 from src.scheduling.benchmark import BenchmarkTask, SchedulingBenchmarkSuite
+from src.scheduling.rescheduler import DynamicRescheduler
+from src.scheduling.what_if import WhatIfEngine
 from src.utils.db import get_db_connection
 from src.utils.lineage import get_active_pipeline_run
 
@@ -907,46 +913,178 @@ with tab_mes:
             st.info("Kayıtlı plansız duruş veya olay bulunmuyor.")
 
     with col_m2:
-        st.markdown("### ⚡ Kapalı Çevrim Kriz & What-If Simülatörü")
-        st.caption("Sahada beklenmedik bir arıza oluştuğunda, donmuş ufuk korunarak çizelgenin yeni durumu hesaplanır.")
+        st.markdown("### ⚡ Karar Destek & Çizelgeleme Simülasyon Kokpiti")
 
-        with st.form("reschedule_sim_form"):
-            selected_machine = st.selectbox("Arızalanan Tezgâh:", ["M01", "M02", "M03"])
-            sim_down_start = st.number_input(
-                "Arıza Başlangıç Zamanı (Dakika):", min_value=0.0, max_value=20000.0, value=600.0, step=30.0
-            )
-            sim_down_dur = st.number_input(
-                "Duruş / Onarım Süresi (Dakika):", min_value=10.0, max_value=3000.0, value=120.0, step=15.0
-            )
-            sim_reason = st.text_input("Arıza Gerekçesi:", value="Plansız Mil/Rulman Hasarı")
+        sim_type = st.radio(
+            "Simülasyon Modu:",
+            [
+                "🚨 Makine Arızası (CP-SAT What-If)",
+                "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)",
+                "🔄 Dinamik Yeniden Çizelgeleme (Freeze Horizon)",
+            ],
+            index=0,
+        )
 
-            run_sim_btn = st.form_submit_button("🚨 Dinamik Yeniden Çizelgele (Reschedule)")
+        if sim_type == "🚨 Makine Arızası (CP-SAT What-If)":
+            with st.form("breakdown_sim_form"):
+                sel_machine = st.selectbox("Arızalanan Tezgâh:", ["M01", "M02", "M03"])
+                bd_start = st.number_input(
+                    "Arıza Başlangıç Zamanı (Dakika):",
+                    min_value=0,
+                    value=480,
+                    step=60,
+                )
+                bd_dur = st.number_input(
+                    "Duruş Süresi (Dakika):",
+                    min_value=15,
+                    value=180,
+                    step=15,
+                )
+                bd_reason = st.text_input("Arıza Nedeni:", value="Feeder Arızası")
+                run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)")
 
-        if run_sim_btn:
-            rescheduler = ClosedLoopRescheduler(run_id=run_id_val)
-            res = rescheduler.reschedule_on_machine_breakdown(
-                machine_id=selected_machine,
-                down_start_min=sim_down_start,
-                down_duration_min=sim_down_dur,
-                reason=sim_reason,
-            )
+            if run_bd_btn:
+                with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
+                    engine = WhatIfEngine()
+                    event = MachineBreakdownEvent(
+                        machine_id=sel_machine,
+                        start_min=int(bd_start),
+                        duration_min=int(bd_dur),
+                        reason=bd_reason,
+                    )
+                    b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
 
-            if res.get("status") == "RESCHEDULED":
-                st.success("✅ Kapalı çevrim yeniden çizelgeleme başarıyla tamamlandı!")
-
-                c_k1, c_k2, c_k3 = st.columns(3)
-                c_k1.metric("Eski Makespan", f"{res['old_makespan_min']:.0f} dk")
-                c_k2.metric(
+                st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
+                k1, k2, k3 = st.columns(3)
+                k1.metric(
                     "Yeni Makespan",
-                    f"{res['new_makespan_min']:.0f} dk",
-                    delta=f"+{res['delta_makespan_min']:.0f} dk",
+                    f"{report.scenario_makespan_min:,.0f} dk",
+                    delta=f"{report.makespan_delta_min:+,.0f} dk",
                     delta_color="inverse",
                 )
-                c_k3.metric("Etkilenen İş Sayısı", f"{res['affected_tasks_count']} görev")
-
-                st.warning(
-                    f"⚠️ **Karar Destek Notu:** {selected_machine} üzerindeki {sim_down_dur:.0f} dakikalık duruş, "
-                    f"fabrika toplam teslim süresini **{res['delta_makespan_min']:.0f} dakika ({res['delta_makespan_min'] / 60:.1f} saat)** öteledi."
+                k2.metric(
+                    "Gecikme (Tardiness)",
+                    f"{report.scenario_total_tardiness_min:,.0f} dk",
+                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                    delta_color="inverse",
                 )
-            else:
-                st.info(f"Sonuç: {res.get('message', 'İşlem tamamlandı.')}")
+                k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
+
+        elif sim_type == "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)":
+            with st.form("hot_order_form"):
+                ho_product = st.selectbox("Ürün Tipi:", ["P01", "P02", "P03", "P04", "P05"])
+                ho_qty = st.number_input("Sipariş Miktarı:", min_value=100, value=400, step=50)
+                ho_due = st.number_input(
+                    "İstenen Teslim Zamanı (Dakika):",
+                    min_value=100,
+                    value=2880,
+                    step=240,
+                )
+                ho_prio = st.slider(
+                    "Öncelik Ağırlığı:",
+                    min_value=1.0,
+                    max_value=10.0,
+                    value=5.0,
+                )
+                run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle")
+
+            if run_ho_btn:
+                with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
+                    engine = WhatIfEngine()
+                    injection = HotOrderInjection(
+                        order_id=f"HOT-{ho_product}-{int(ho_qty)}",
+                        product_id=ho_product,
+                        quantity=int(ho_qty),
+                        due_date_min=int(ho_due),
+                        priority_weight=float(ho_prio),
+                    )
+                    b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
+
+                st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
+                k1, k2, k3 = st.columns(3)
+                k1.metric(
+                    "Yeni Makespan",
+                    f"{report.scenario_makespan_min:,.0f} dk",
+                    delta=f"{report.makespan_delta_min:+,.0f} dk",
+                    delta_color="inverse",
+                )
+                k2.metric(
+                    "Gecikme (Tardiness)",
+                    f"{report.scenario_total_tardiness_min:,.0f} dk",
+                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                    delta_color="inverse",
+                )
+                k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
+
+        else:
+            with st.form("dynamic_resched_form"):
+                st.caption("Mevcut zamana kadar başlamış/bitmiş işler kilitlenir; kalan plan yeniden kurulur.")
+                curr_t = st.number_input(
+                    "Şu Anki Fabrika Zamanı (Dakika):",
+                    min_value=0,
+                    value=480,
+                    step=60,
+                )
+                freeze_h = st.number_input(
+                    "Freeze Horizon Tamponu (Dakika):",
+                    min_value=0,
+                    value=60,
+                    step=30,
+                )
+                dev_mac = st.selectbox("Sapma Yaşanan Tezgâh:", ["Yok", "M01", "M02", "M03"])
+                dev_dur = st.number_input(
+                    "Gecikme/Duruş Süresi (Dakika):",
+                    min_value=0,
+                    value=120,
+                    step=30,
+                )
+                run_resched_btn = st.form_submit_button("🔄 Freeze Horizon ile Yeniden Çizelgele")
+
+            if run_resched_btn:
+                with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
+                    rescheduler = DynamicRescheduler()
+                    trig = RescheduleTriggerEvent(
+                        event_id=f"EVT-UI-{int(curr_t)}",
+                        current_time_min=int(curr_t),
+                        freeze_horizon_min=int(freeze_h),
+                        delay_machine_id=None if dev_mac == "Yok" else dev_mac,
+                        delay_duration_min=int(dev_dur),
+                        reason="Kullanıcı arayüzü dinamik müdahalesi",
+                    )
+                    base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
+                        trigger=trig,
+                        new_run_id=f"UI_RESCHED_{int(curr_t)}",
+                    )
+
+                st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
+                n1, n2, n3 = st.columns(3)
+                n1.metric("Kilitlenen İşler", f"{n_rep.frozen_tasks_count} ad")
+                n2.metric("Tezgâhı Değişenler", f"{n_rep.machine_swapped_count} ad")
+                n3.metric("Sarsıntı (Nervousness)", f"{n_rep.nervousness_score:.4f}")
+
+                st.info(
+                    f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
+                    f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
+                )
+
+        st.markdown("---")
+        st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
+        audit_history = get_table("reschedule_audit_log")
+        if not audit_history.empty:
+            st.dataframe(
+                audit_history[
+                    [
+                        "audit_id",
+                        "trigger_event_id",
+                        "affected_machine_id",
+                        "delay_duration_min",
+                        "frozen_tasks_count",
+                        "nervousness_score",
+                        "created_at",
+                    ]
+                ].sort_values(by="created_at", ascending=False),
+                use_container_width=True,
+                height=220,
+            )
+        else:
+            st.caption("Henüz kayıtlı bir yeniden çizelgeleme denetimi yok.")
