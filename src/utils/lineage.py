@@ -666,6 +666,7 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     from pathlib import Path
 
     from src import config
+    from src.config import get_runtime_paths
 
     root_dir = Path(__file__).resolve().parent.parent.parent
 
@@ -679,39 +680,26 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
                 hasher.update(chunk)
         return hasher.hexdigest(), size
 
-    # 1. Output Artifacts Takibi (Staging-Aware Resolution)
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    # 1. Output Artifacts Takibi (Strict Runtime Resolution)
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
     db_p = Path(active_db)
 
-    # Staging/Run dizini tespiti: db_path staging altında ise öncelikli reports ve processed dizinlerini bul
-    reports_dirs = []
-    processed_dirs = []
+    # During a pipeline run, environment paths are authoritative.
+    reports_dirs = [Path(os.environ["FACTORY_REPORTS_DIR"])] if os.environ.get("FACTORY_REPORTS_DIR") else []
+    processed_dirs = [Path(os.environ["FACTORY_PROCESSED_DIR"])] if os.environ.get("FACTORY_PROCESSED_DIR") else []
 
-    if os.environ.get("FACTORY_REPORTS_DIR"):
-        reports_dirs.append(Path(os.environ["FACTORY_REPORTS_DIR"]))
-    if db_p.parent.name == "staging" or "staging" in db_p.parts:
-        if (db_p.parent / "reports").exists():
-            reports_dirs.append(db_p.parent / "reports")
-        if (db_p.parent / "processed").exists():
-            processed_dirs.append(db_p.parent / "processed")
-        if (db_p.parent.parent / "reports").exists():
-            reports_dirs.append(db_p.parent.parent / "reports")
-        if (db_p.parent.parent / "data" / "processed").exists():
-            processed_dirs.append(db_p.parent.parent / "data" / "processed")
+    runtime_paths = get_runtime_paths()
+    if not reports_dirs:
+        reports_dirs.append(Path(runtime_paths["reports_dir"]))
+    if not processed_dirs:
+        processed_dirs.append(Path(runtime_paths["processed_dir"]))
 
-    # Run-scoped artifact dizini önceliği
+    # Optional immutable run bundle, if it already exists.
     run_dir = root_dir / "artifacts" / "runs" / run_id
     if (run_dir / "reports").exists():
-        reports_dirs.append(run_dir / "reports")
-    if run_dir.exists():
-        reports_dirs.append(run_dir)
-        processed_dirs.append(run_dir)
-
-    # Canonical fallback
-    reports_dirs.append(root_dir / "reports")
-    if os.environ.get("FACTORY_PROCESSED_DIR"):
-        processed_dirs.append(Path(os.environ["FACTORY_PROCESSED_DIR"]))
-    processed_dirs.append(getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed"))
+        reports_dirs.insert(0, run_dir / "reports")
+    if (run_dir / "data" / "processed").exists():
+        processed_dirs.insert(0, run_dir / "data" / "processed")
 
     # İzlenecek temel dosyaları en öncelikli klasörden seç
     target_json_names = [
