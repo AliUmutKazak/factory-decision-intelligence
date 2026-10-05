@@ -405,3 +405,23 @@ class ScheduleNervousnessReport(BaseModel):
         le=1.0,
         description="0.0 (tam kararlı/değişimsiz) ile 1.0 (tam kaos/tüm işler değişti) arası dalgalanma skoru",
     )
+
+
+class RescheduleAuditEntry(BaseModel):
+    """Yeniden çizelgeleme denetim ve soyağacı (lineage) kayıt modeli."""
+
+    audit_id: str = Field(description="Benzersiz denetim kaydı kimliği")
+    trigger_event_id: str = Field(description="Tetikleyici MES olay kimliği")
+    previous_run_id: str = Field(description="Önceki çizelge koşu kimliği")
+    new_run_id: str = Field(description="Yeni çizelge koşu kimliği")
+    trigger_timestamp_min: int = Field(ge=0)
+    freeze_horizon_min: int = Field(ge=0)
+    affected_machine_id: str | None = None
+    delay_duration_min: int = Field(default=0, ge=0)
+    reason: str
+    total_tasks: int = Field(ge=0)
+    frozen_tasks_count: int = Field(ge=0)
+    rescheduled_tasks_count: int = Field(ge=0)
+    machine_swapped_count: int = Field(ge=0)
+    avg_start_delta_min: float = Field(ge=0.0)
+    nervousness_score: float = Field(ge=0.0, le=1.0)
