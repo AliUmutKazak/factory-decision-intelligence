@@ -26,12 +26,12 @@ from src.config import (
     AGGREGATE_CAPACITY_BUFFER,
     AGGREGATE_HOLDING_COST_PER_BATCH,
     AGGREGATE_INITIAL_INVENTORY,
-    DB_PATH,
     LABOR_COST_OVERTIME_HR,
     LABOR_COST_STANDARD_HR,
     PROCESSED_DATA_DIR,
     UNITS_PER_BATCH,
     WEEKLY_HOURS_PER_MACHINE,
+    get_runtime_paths,
 )
 from src.scheduling.calendar_service import MachineCalendarService
 from src.utils.db import get_db_connection
@@ -41,8 +41,9 @@ OUTPUT_SKU_PLAN_PATH = PROCESSED_DATA_DIR / "sku_production_plan.csv"
 OUTPUT_MACHINE_CAPACITY_PATH = PROCESSED_DATA_DIR / "machine_capacity_plan.csv"
 
 
-def load_data():
-    conn = get_db_connection(DB_PATH)
+def load_data(db_path=None):
+    active_db_path = db_path or get_runtime_paths()["db_path"]
+    conn = get_db_connection(active_db_path)
     forecast_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
     products_df = pd.read_sql("SELECT * FROM products", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
@@ -462,13 +463,18 @@ def validate_and_repair_disaggregation(sku_plan_df, family_plan_df, machine_capa
     return repaired_df, updated_family_df, any_repair
 
 
-def run_planning_pipeline(run_id=None, max_feedback_iters=3):
+def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
     """
     Hiyerarşik Üretim Planlama Motoru (Endüstriyel Kapalı Devre Re-Optimization)
     Alt seviye SKU fizibilitesi sağlanana kadar üst seviye Taktik LP'yi
     dinamik Iterative Capacity-Feedback kesitleriyle (cuts) yeniden çözer.
     """
-    forecast_df, products_df, routing_df, machines_df = load_data()
+
+    runtime = get_runtime_paths()
+    active_db_path = db_path or runtime["db_path"]
+    processed_dir = runtime["processed_dir"]
+
+    forecast_df, products_df, routing_df, machines_df = load_data(active_db_path)
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
     capacity_cuts = {}
@@ -602,11 +608,15 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3):
         final_sku_plan["run_id"] = run_id
         final_capacity_df["run_id"] = run_id
 
-    final_family_plan.to_csv(OUTPUT_AGGREGATE_PATH, index=False)
-    final_sku_plan.to_csv(OUTPUT_SKU_PLAN_PATH, index=False)
-    final_capacity_df.to_csv(OUTPUT_MACHINE_CAPACITY_PATH, index=False)
+    output_aggregate_path = processed_dir / "aggregate_plan.csv"
+    output_sku_plan_path = processed_dir / "sku_production_plan.csv"
+    output_machine_capacity_path = processed_dir / "machine_capacity_plan.csv"
 
-    conn = get_db_connection(DB_PATH)
+    final_family_plan.to_csv(output_aggregate_path, index=False)
+    final_sku_plan.to_csv(output_sku_plan_path, index=False)
+    final_capacity_df.to_csv(output_machine_capacity_path, index=False)
+
+    conn = get_db_connection(active_db_path)
     final_family_plan.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
     final_sku_plan.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
     final_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
