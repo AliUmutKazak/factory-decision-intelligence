@@ -33,27 +33,38 @@ def load_machine_maintenance_windows(conn: Any = None) -> list[MaintenanceWindow
     if conn is None:
         return []
 
-    try:
-        query = """
-            SELECT machine_id, start_min, end_min, maintenance_type, description
-            FROM machine_maintenance
-            WHERE is_active = 1
-        """
-        df = pd.read_sql(query, conn)
-        windows = []
-        for _, row in df.iterrows():
-            windows.append(
-                MaintenanceWindow(
-                    machine_id=str(row["machine_id"]),
-                    start_min=int(row["start_min"]),
-                    end_min=int(row["end_min"]),
-                    maintenance_type=str(row.get("maintenance_type", "PREVENTIVE")),
-                    description=str(row.get("description", "")),
-                )
-            )
-        return windows
-    except Exception:
+    # Missing optional table means no planned maintenance. Existing malformed
+    # data must fail fast instead of silently disabling the constraint.
+    table_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='machine_maintenance'"
+    ).fetchone()
+    if not table_row:
         return []
+
+    query = """
+        SELECT machine_id, start_min, end_min, maintenance_type, description
+        FROM machine_maintenance
+        WHERE is_active = 1
+        ORDER BY machine_id, start_min
+    """
+    df = pd.read_sql(query, conn)
+    windows = []
+    for _, row in df.iterrows():
+        if int(row["end_min"]) <= int(row["start_min"]):
+            raise ValueError(
+                f"[MAINTENANCE DATA ERROR] Invalid window for {row['machine_id']}: "
+                f"{row['start_min']}..{row['end_min']}"
+            )
+        windows.append(
+            MaintenanceWindow(
+                machine_id=str(row["machine_id"]),
+                start_min=int(row["start_min"]),
+                end_min=int(row["end_min"]),
+                maintenance_type=str(row.get("maintenance_type", "PREVENTIVE")),
+                description=str(row.get("description", "")),
+            )
+        )
+    return windows
 
 
 def inject_maintenance_intervals_into_model(
