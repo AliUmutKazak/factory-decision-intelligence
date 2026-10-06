@@ -83,3 +83,8 @@ def test_dynamic_reschedule_endpoint():
     assert data["status"] == "SUCCESS"
     assert "audit_id" in data
     assert "nervousness_report" in data
+    history = client.get("/api/v1/schedule/audit-log")
+    assert history.status_code == 200
+    entry = next(row for row in history.json() if row["audit_id"] == data["audit_id"])
+    assert entry["new_run_id"] == data["new_run_id"]
+    assert entry["created_at"]

@@ -91,6 +91,7 @@ RUN_SCOPED_REFERENCE_FILES = {
     "machine_capacity_plan.csv",
     "mrp_plan.csv",
     "production_schedule.csv",
+    "task_weekly_accounting.csv",
     "energy_kpis.csv",
     "energy_profile_15min.csv",
     "energy_machine_kpis.csv",

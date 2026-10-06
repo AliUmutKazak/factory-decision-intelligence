@@ -72,6 +72,8 @@ jobs:
     name: Clean Docker startup and persistent ACTIVE run
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      FACTORY_BUILD_GIT_SHA: ${{ github.sha }}
     steps:
     - uses: actions/checkout@v4
     - name: Build and prepare a fresh runtime

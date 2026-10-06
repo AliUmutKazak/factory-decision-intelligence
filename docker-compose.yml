@@ -1,5 +1,8 @@
 x-runtime: &runtime
-  build: .
+  build:
+    context: .
+    args:
+      FACTORY_BUILD_GIT_SHA: ${FACTORY_BUILD_GIT_SHA:-UNKNOWN}
   volumes:
     - ./data:/app/data
     - ./reports:/app/reports

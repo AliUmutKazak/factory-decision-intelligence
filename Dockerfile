@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+ARG FACTORY_BUILD_GIT_SHA=UNKNOWN
+ENV FACTORY_BUILD_GIT_SHA=${FACTORY_BUILD_GIT_SHA}
+LABEL org.opencontainers.image.revision=${FACTORY_BUILD_GIT_SHA}
 
 # Paket bagimliliklarini kopyala ve yukle
 COPY requirements.txt .

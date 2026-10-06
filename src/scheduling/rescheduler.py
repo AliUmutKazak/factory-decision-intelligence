@@ -209,17 +209,20 @@ class DynamicRescheduler:
             trigger_timestamp_min REAL, freeze_horizon_min REAL,
             affected_machine_id TEXT, delay_duration_min REAL, reason TEXT,
             total_tasks INTEGER, frozen_tasks_count INTEGER, rescheduled_tasks_count INTEGER,
-            machine_swapped_count INTEGER, avg_start_delta_min REAL, nervousness_score REAL
+            machine_swapped_count INTEGER, avg_start_delta_min REAL, nervousness_score REAL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )""")
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(reschedule_audit_log)")}
+        if "created_at" not in columns:
+            conn.execute("ALTER TABLE reschedule_audit_log ADD COLUMN created_at TEXT")
         conn.execute(
             """
-            INSERT OR REPLACE INTO reschedule_audit_log (
+            INSERT INTO reschedule_audit_log (
                 audit_id, trigger_event_id, previous_run_id, new_run_id,
                 trigger_timestamp_min, freeze_horizon_min, affected_machine_id,
                 delay_duration_min, reason, total_tasks, frozen_tasks_count,
                 rescheduled_tasks_count, machine_swapped_count, avg_start_delta_min,
-                nervousness_score
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                nervousness_score, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
             (
                 audit.audit_id,
@@ -299,6 +302,7 @@ class DynamicRescheduler:
                 accounting_cols = [
                     col
                     for col in (
+                        "run_id",
                         "task_id",
                         "machine_id",
                         "schedule_week",
@@ -543,6 +547,16 @@ class DynamicRescheduler:
 
             if new_sched.empty:
                 raise ValueError("[RESCHEDULE] Solver yeni schedule üretmedi.")
+
+            frozen_mask = new_sched["task_id"].astype(str).isin(frozen)
+            new_sched.loc[frozen_mask, "schedule_state"] = "FROZEN"
+            new_sched.loc[frozen_mask, "freeze_until_min"] = trigger.current_time_min + trigger.freeze_horizon_min
+            if not track_df.empty:
+                execution_states = {str(row.task_id): row.status for row in track_df.itertuples()}
+                for index, task in new_sched.iterrows():
+                    state = execution_states.get(str(task["task_id"]))
+                    if state in {"IN_PROGRESS", "COMPLETED"}:
+                        new_sched.loc[index, "execution_status"] = state
 
             for task_id, (machine, start, end) in frozen.items():
                 row = new_sched[new_sched["task_id"].astype(str) == task_id]

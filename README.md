@@ -322,6 +322,7 @@ Docker Compose ilk başlangıçta pipeline çalıştırır, bundle ve ACTIVE run
 
 ```bash
 # Servisleri derleyin ve başlatın
+export FACTORY_BUILD_GIT_SHA=$(git rev-parse HEAD)
 docker compose up --build -d --wait --wait-timeout 240 api dashboard
 ```
 

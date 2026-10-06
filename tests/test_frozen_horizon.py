@@ -57,6 +57,7 @@ def test_multi_tiered_state_transitions_on_breakdown():
         row_new = df_resched[df_resched["task_id"] == tid].iloc[0]
         assert row_new["start_min"] == row["start_min"], f"{tid} COMPLETED işin başlangıcı değişmiş!"
         assert row_new["end_min"] == row["end_min"], f"{tid} COMPLETED işin bitişi değişmiş!"
+        assert row_new["schedule_state"] == "FROZEN"
 
     # 2. IN_PROGRESS -> Locked start (Arıza anında çalışan işin başlangıcı korunur)
     running_tasks = df_init[(df_init["start_min"] <= down_start) & (df_init["end_min"] > down_start)]

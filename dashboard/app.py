@@ -44,7 +44,7 @@ class QueryError(DashboardDataError):
 
 
 @st.cache_data(ttl=60)
-def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
+def get_table(table_name: str, run_id: str = None, optional: bool = False) -> pd.DataFrame:
     """
     Veritabanından tabloyu çeker.
     Hata (QueryError) ile boş sonuç ayrımını garanti eder.
@@ -59,10 +59,18 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
             cursor.execute(f"PRAGMA table_info({table_name})")
             rows = cursor.fetchall()
             if not rows:
+                if optional:
+                    return pd.DataFrame()
                 raise QueryError(f"Required table is missing: {table_name}")
 
             columns = [row[1] for row in rows]
             if run_id:
+                if table_name == "reschedule_audit_log" and {"previous_run_id", "new_run_id"} <= set(columns):
+                    return pd.read_sql(
+                        "SELECT * FROM reschedule_audit_log WHERE new_run_id = ? OR previous_run_id = ? ORDER BY rowid DESC",
+                        conn,
+                        params=[run_id, run_id],
+                    )
                 if "run_id" not in columns:
                     raise QueryError(f"{table_name} run_id kolonu olmadan dashboard'a verilemez.")
                 query = f"SELECT * FROM {table_name} WHERE run_id = ?"
@@ -1062,20 +1070,24 @@ with tab_mes:
 
         st.markdown("---")
         st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
-        audit_history = get_table("reschedule_audit_log", run_id_val)
+        audit_history = get_table("reschedule_audit_log", run_id_val, optional=True)
         if not audit_history.empty:
             st.dataframe(
                 audit_history[
                     [
-                        "audit_id",
-                        "trigger_event_id",
-                        "affected_machine_id",
-                        "delay_duration_min",
-                        "frozen_tasks_count",
-                        "nervousness_score",
-                        "created_at",
+                        column
+                        for column in [
+                            "audit_id",
+                            "trigger_event_id",
+                            "affected_machine_id",
+                            "delay_duration_min",
+                            "frozen_tasks_count",
+                            "nervousness_score",
+                            "created_at",
+                        ]
+                        if column in audit_history
                     ]
-                ].sort_values(by="created_at", ascending=False),
+                ],
                 use_container_width=True,
                 height=220,
             )

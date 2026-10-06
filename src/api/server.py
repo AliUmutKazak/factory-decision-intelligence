@@ -179,7 +179,7 @@ def get_reschedule_audit_log(
         df = pd.read_sql(
             "SELECT * FROM reschedule_audit_log "
             "WHERE new_run_id = ? OR previous_run_id = ? "
-            "ORDER BY created_at DESC LIMIT ?",
+            "ORDER BY rowid DESC LIMIT ?",
             conn,
             params=(active_run_id, active_run_id, limit),
         )

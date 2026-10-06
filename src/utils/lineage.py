@@ -35,6 +35,9 @@ def generate_run_id():
 
 
 def get_git_sha():
+    build_sha = os.environ.get("FACTORY_BUILD_GIT_SHA")
+    if build_sha and build_sha != "UNKNOWN":
+        return build_sha
     try:
         return (
             subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, cwd=ROOT_DIR)
