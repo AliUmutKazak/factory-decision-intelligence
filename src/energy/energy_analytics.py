@@ -28,7 +28,6 @@ from src.scheduling.calendar_service import MachineCalendarService
 from src.utils.db import get_db_connection
 
 
-
 def load_data(db_path=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
