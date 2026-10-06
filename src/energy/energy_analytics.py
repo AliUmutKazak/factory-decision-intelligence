@@ -20,21 +20,18 @@ gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji 
 ===============================================================================
 """
 
-
 import pandas as pd
 
 from src.config import get_runtime_paths
 from src.scheduling.calendar_service import MachineCalendarService
-from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
+from src.utils.db import get_active_run_id, get_db_connection, persist_run_scoped_dataframe
 
 
 def load_data(db_path=None, run_id=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
     if run_id is not None:
-        schedule_df = pd.read_sql(
-            "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(str(run_id),)
-        )
+        schedule_df = pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(str(run_id),))
     else:
         schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
@@ -116,7 +113,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
         m_kpi_df = pd.DataFrame(machine_kpis)
         profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
 
-         kpi_df["run_id"] = run_id
+        kpi_df["run_id"] = run_id
         m_kpi_df["run_id"] = run_id
         profile_df["run_id"] = run_id
 

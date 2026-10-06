@@ -68,6 +68,7 @@ class ClosedLoopRescheduler:
 
         if commit:
             import sqlite3
+
             conn = sqlite3.connect(self._engine.disk_db_path)
             try:
                 conn.execute(

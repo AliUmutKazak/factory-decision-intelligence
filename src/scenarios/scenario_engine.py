@@ -108,7 +108,21 @@ class ScenarioEngine:
     def _read_table_safe(self, table_name: str, db_path: str, run_id: str | None = None) -> pd.DataFrame:
         conn = get_db_connection(db_path)
         try:
-            run_scoped = {"orders", "forecast_demand", "forecast_model_lineage", "aggregate_plan", "sku_production_plan", "machine_capacity_plan", "mrp_plan", "production_schedule", "energy_kpis", "energy_machine_kpis", "carbon_kpis", "carbon_machine_kpis", "carbon_price_scenarios"}
+            run_scoped = {
+                "orders",
+                "forecast_demand",
+                "forecast_model_lineage",
+                "aggregate_plan",
+                "sku_production_plan",
+                "machine_capacity_plan",
+                "mrp_plan",
+                "production_schedule",
+                "energy_kpis",
+                "energy_machine_kpis",
+                "carbon_kpis",
+                "carbon_machine_kpis",
+                "carbon_price_scenarios",
+            }
             if run_id and table_name in run_scoped:
                 return pd.read_sql(f"SELECT * FROM {table_name} WHERE run_id = ?", conn, params=(str(run_id),))
             return pd.read_sql(f"SELECT * FROM {table_name}", conn)
@@ -192,6 +206,7 @@ class ScenarioEngine:
             try:
                 rescheduler = DynamicRescheduler(disk_db_path=self.db_path)
                 from src.contracts.schemas import RescheduleTriggerEvent
+
                 trigger = RescheduleTriggerEvent(
                     event_id=f"SCENARIO-{shock.name.replace(' ', '-').upper()}",
                     current_time_min=480,
@@ -275,9 +290,7 @@ class ScenarioEngine:
                     sim_sched["end_min"] = sim_sched["start_min"] + sim_sched[run_col]
                     sim_makespan = float(sim_sched["end_min"].max()) / 60.0
             else:
-                raise ScenarioDataUnavailableError(
-                    "SCENARIO_SOLVE_FAILED: Demand shock requires a baseline schedule."
-                )
+                raise ScenarioDataUnavailableError("SCENARIO_SOLVE_FAILED: Demand shock requires a baseline schedule.")
 
         # Kapasite düşüşü (-10% Capacity)
         elif shock.capacity_multiplier != 1.0:

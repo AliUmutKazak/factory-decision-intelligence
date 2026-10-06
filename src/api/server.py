@@ -21,6 +21,7 @@ class DynamicRescheduleRequest(BaseModel):
     trigger: RescheduleTriggerEvent
     new_run_id: str | None = None
 
+
 app = FastAPI(
     title="Factory Decision Intelligence API",
     description="Taktik LP, CP-SAT Operasyonel Çizelgeleme, What-If ve Dinamik Rescheduling Servisi",
@@ -39,9 +40,7 @@ def health_check() -> dict[str, str]:
     return {"status": "HEALTHY", "service": "factory-decision-intelligence"}
 
 
-@app.get(
-    "/api/v1/schedule/current", tags=["Schedule Query"]
-)
+@app.get("/api/v1/schedule/current", tags=["Schedule Query"])
 def get_current_schedule(
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[dict[str, Any]]:
@@ -64,9 +63,7 @@ def get_current_schedule(
         conn.close()
 
 
-@app.get(
-    "/api/v1/schedule/solver-metadata", tags=["Schedule Query"]
-)
+@app.get("/api/v1/schedule/solver-metadata", tags=["Schedule Query"])
 def get_solver_metadata() -> dict[str, Any]:
     conn = get_db()
     try:
@@ -92,9 +89,7 @@ def get_solver_metadata() -> dict[str, Any]:
         conn.close()
 
 
-@app.post(
-    "/api/v1/schedule/what-if/breakdown", tags=["What-If Scenarios"]
-)
+@app.post("/api/v1/schedule/what-if/breakdown", tags=["What-If Scenarios"])
 def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()
@@ -113,9 +108,7 @@ def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
         ) from exc
 
 
-@app.post(
-    "/api/v1/schedule/what-if/hot-order", tags=["What-If Scenarios"]
-)
+@app.post("/api/v1/schedule/what-if/hot-order", tags=["What-If Scenarios"])
 def simulate_hot_order(injection: HotOrderInjection) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()

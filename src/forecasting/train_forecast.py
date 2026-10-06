@@ -1,5 +1,4 @@
-﻿import json
-import os
+import json
 
 import lightgbm as lgb
 import numpy as np
@@ -13,7 +12,7 @@ from src.config import (
     HOLT_WINTERS_DEFAULT_PARAMS,
     get_runtime_paths,
 )
-from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
+from src.utils.db import get_active_run_id, get_db_connection, persist_run_scoped_dataframe
 
 HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100

@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from src import config
 from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
@@ -382,7 +383,11 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                 raise ValueError(f"[VALIDATION GATE FAIL] {tbl} için {run_id} verisi yok.")
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
-        sched_df = pd.read_sql("SELECT lot_id, product_id, production_units FROM production_schedule WHERE run_id = ?", conn, params=(run_id,))
+        sched_df = pd.read_sql(
+            "SELECT lot_id, product_id, production_units FROM production_schedule WHERE run_id = ?",
+            conn,
+            params=(run_id,),
+        )
         sku_plan_df = pd.read_sql(
             "SELECT product_id, planned_units FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
             conn,
@@ -421,7 +426,10 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             # MADDE 18: Machine x Week Bazlı Operasyonel Overtime Validation
             # -----------------------------------------------------------------
             # Global eşik (total_ot > 60000) yerine tezgâh ve hafta bazlı katı kural
-            weekly_acc_path = Path(os.environ.get("FACTORY_PROCESSED_DIR", str(get_runtime_paths()["processed_dir"]))) / "task_weekly_accounting.csv"
+            weekly_acc_path = (
+                Path(os.environ.get("FACTORY_PROCESSED_DIR", str(get_runtime_paths()["processed_dir"])))
+                / "task_weekly_accounting.csv"
+            )
             allowed_w1_ot_min_by_machine = {"M01": 48 * 60}  # M01 W1 tavanı: 48h = 2880 dk
 
             if weekly_acc_path.exists():

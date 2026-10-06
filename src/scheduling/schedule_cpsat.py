@@ -41,6 +41,7 @@ from src.contracts.schemas import (
     ScheduleTaskInput,
     SolverStatus,
 )
+from src.scheduling.maintenance import load_machine_maintenance_windows
 from src.utils.db import get_db_connection, persist_run_scoped_dataframe
 
 
@@ -550,9 +551,7 @@ def run_cpsat_scheduling(
                     end = min(horizon, int(mw.end_min))
                     if end > start:
                         break_intervals.append(
-                            model.NewFixedSizeIntervalVar(
-                                start, end - start, f"maintenance_{mid}_{start}_{end}"
-                            )
+                            model.NewFixedSizeIntervalVar(start, end - start, f"maintenance_{mid}_{start}_{end}")
                         )
         if str(mid) not in machine_ot_hours:
             raise ValueError(f"Eksik makine takvim verisi (fail-fast): Tezgah {mid} icin OT limiti tanimlanmamis!")
@@ -1067,31 +1066,21 @@ def run_cpsat_scheduling(
     solver_meta_dict["solver_name"] = "OR-Tools CP-SAT"
     solver_meta_dict["solver_status"] = str(contract_metadata.status)
     solver_meta_dict["is_optimal"] = int(contract_metadata.proven_optimal)
-    solver_meta_dict["objective_value_min"] = float(
-        contract_metadata.objective_value or 0.0
-    )
+    solver_meta_dict["objective_value_min"] = float(contract_metadata.objective_value or 0.0)
     solver_meta_dict["best_bound_min"] = (
         float(contract_metadata.best_objective_bound)
         if contract_metadata.best_objective_bound is not None
         else float(contract_metadata.objective_value or 0.0)
     )
-    if (
-        contract_metadata.objective_value
-        and contract_metadata.best_objective_bound
-    ):
+    if contract_metadata.objective_value and contract_metadata.best_objective_bound:
         gap = (
-            abs(
-                contract_metadata.objective_value
-                - contract_metadata.best_objective_bound
-            )
+            abs(contract_metadata.objective_value - contract_metadata.best_objective_bound)
             / max(abs(contract_metadata.objective_value), 1e-6)
         ) * 100.0
     else:
         gap = 0.0
     solver_meta_dict["optimality_gap_pct"] = round(gap, 4)
-    solver_meta_dict["solve_time_seconds"] = float(
-        contract_metadata.wall_time_seconds
-    )
+    solver_meta_dict["solve_time_seconds"] = float(contract_metadata.wall_time_seconds)
 
     solver_meta_df = pd.DataFrame([solver_meta_dict])
     sched_df["run_id"] = effective_run_id

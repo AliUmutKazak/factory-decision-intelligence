@@ -25,9 +25,7 @@ class DecisionLedgerEntry:
     expected_kpi_impact: dict[str, Any] = field(default_factory=dict)
     model_version: str = "v1.0.0"
     solver_version: str = "CP-SAT"
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

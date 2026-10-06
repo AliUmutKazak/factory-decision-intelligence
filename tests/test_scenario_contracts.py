@@ -30,6 +30,7 @@ def test_scenario_result_dataclass_contract_roundtrip():
     assert roundtrip.scenario == dc.scenario
     assert roundtrip.total_cost_eur == dc.total_cost_eur
 
+
 def test_scenario_shock_valid_defaults():
     """Geçerli varsayılan değerlerle ScenarioShockModel nesnesinin başarıyla oluşturulduğunu doğrular."""
     shock = ScenarioShockModel(name="BASELINE")
@@ -95,7 +96,7 @@ def test_scenario_result_valid():
     "invalid_kwargs",
     [
         {"on_time_delivery_pct": 105.0},  # %100'den büyük olamaz
-        {"on_time_delivery_pct": -5.0},   # %0'dan küçük olamaz
+        {"on_time_delivery_pct": -5.0},  # %0'dan küçük olamaz
         {"makespan_hours": -1.0},
         {"inventory_holding_cost_eur": -100.0},
         {"backlog_units": -5},

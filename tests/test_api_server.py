@@ -33,6 +33,8 @@ def test_what_if_breakdown_endpoint():
     data = response.json()
     assert data["status"] == "SUCCESS"
     assert "comparison_report" in data
+
+
 def test_what_if_hot_order_endpoint():
     payload = {
         "order_id": "HOT-API-TEST-01",

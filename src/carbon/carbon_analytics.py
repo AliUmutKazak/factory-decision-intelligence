@@ -23,7 +23,6 @@ Gerçek Sistem Bağlantı Mimarisi:
 ===============================================================================
 """
 
-
 import pandas as pd
 
 from src.config import (
@@ -33,8 +32,7 @@ from src.config import (
     GRID_EMISSION_FACTOR,
     get_runtime_paths,
 )
-from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
-
+from src.utils.db import get_active_run_id, get_db_connection, persist_run_scoped_dataframe
 
 
 def compute_carbon_analytics(run_id=None, db_path=None):
@@ -47,12 +45,8 @@ def compute_carbon_analytics(run_id=None, db_path=None):
     output_carbon_path = processed_dir / "carbon_analytics.csv"
     output_machine_carbon_path = processed_dir / "carbon_machine_kpis.csv"
     conn = get_db_connection(active_db_path)
-    energy_kpi_df = pd.read_sql(
-        "SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(str(run_id),)
-    )
-    machine_kpis_df = pd.read_sql(
-        "SELECT * FROM energy_machine_kpis WHERE run_id = ?", conn, params=(str(run_id),)
-    )
+    energy_kpi_df = pd.read_sql("SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(str(run_id),))
+    machine_kpis_df = pd.read_sql("SELECT * FROM energy_machine_kpis WHERE run_id = ?", conn, params=(str(run_id),))
     if energy_kpi_df.empty:
         conn.close()
         raise RuntimeError(f"[CARBON] Energy KPI bulunamadı for run_id={run_id}.")

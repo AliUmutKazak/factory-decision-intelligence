@@ -121,8 +121,10 @@ class EconomicDecisionEngine:
         order_cost_list: list[dict[str, Any]] = []
 
         group_col = "job_id" if "job_id" in df.columns else "product_id"
-        setup_group_col = "setup_before_min" if "setup_before_min" in df.columns else (
-            "setup_duration" if "setup_duration" in df.columns else run_duration_col
+        setup_group_col = (
+            "setup_before_min"
+            if "setup_before_min" in df.columns
+            else ("setup_duration" if "setup_duration" in df.columns else run_duration_col)
         )
         job_summary = (
             df.groupby(group_col)
@@ -213,6 +215,7 @@ class EconomicDecisionEngine:
             total_manufacturing_cost=round(tmc, 2),
             cost_to_serve_by_order=order_cost_list,
         )
+
 
 @dataclass
 class TDABCVarianceResult:

@@ -3,6 +3,7 @@
 Gerçek SAP/MES sistemlerine bağlanmak yerine, ISA-95 entegrasyon sınırlarını
 belirleyen kontratların referans synthetic implementasyonlarını sağlar.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -179,5 +180,3 @@ class MockTelemetryAdapter(MachineTelemetryAdapterInterface):
             "M04": 2.1,
         }
         return telemetry_map.get(machine_id, 0.0)
-
-

@@ -52,8 +52,7 @@ def load_machine_maintenance_windows(conn: Any = None) -> list[MaintenanceWindow
     for _, row in df.iterrows():
         if int(row["end_min"]) <= int(row["start_min"]):
             raise ValueError(
-                f"[MAINTENANCE DATA ERROR] Invalid window for {row['machine_id']}: "
-                f"{row['start_min']}..{row['end_min']}"
+                f"[MAINTENANCE DATA ERROR] Invalid window for {row['machine_id']}: {row['start_min']}..{row['end_min']}"
             )
         windows.append(
             MaintenanceWindow(

@@ -34,8 +34,7 @@ def get_db_connection(db_path=None):
 def get_active_run_id(conn: sqlite3.Connection) -> str:
     """Return the sole ACTIVE pipeline run; fail fast when none exists."""
     row = conn.execute(
-        "SELECT run_id FROM pipeline_runs "
-        "WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
+        "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
     ).fetchone()
     if not row or not row[0]:
         raise RuntimeError("[RUN GOVERNANCE] ACTIVE run bulunamadı.")
@@ -59,9 +58,7 @@ def persist_run_scoped_dataframe(
     scoped = df.copy()
     scoped["run_id"] = scoped["run_id"].astype(str)
     if not (scoped["run_id"] == str(run_id)).all():
-        raise ValueError(
-            f"[RUN GOVERNANCE] {table_name}: DataFrame birden fazla run_id içeriyor."
-        )
+        raise ValueError(f"[RUN GOVERNANCE] {table_name}: DataFrame birden fazla run_id içeriyor.")
 
     conn.execute(f"DELETE FROM {table_name} WHERE run_id = ?", (str(run_id),))
     scoped.to_sql(table_name, conn, index=False, if_exists="append")
