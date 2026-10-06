@@ -1090,11 +1090,12 @@ def run_cpsat_scheduling(
         if col not in sched_df.columns:
             sched_df[col] = 0 if "min" in col or "units" in col or "count" in col else ""
 
-    if persist_outputs:
-        sched_df.to_csv(processed_path / "production_schedule.csv", index=False)
-        if weekly_accounting_rows:
-            accounting_df = pd.DataFrame(weekly_accounting_rows)
-            accounting_df.to_csv(processed_path / "task_weekly_accounting.csv", index=False)
+    effective_run_id = str(run_id) if run_id else "DEFAULT_RUN"
+    sched_df["run_id"] = effective_run_id
+    if persist_outputs and weekly_accounting_rows:
+        accounting_df = pd.DataFrame(weekly_accounting_rows)
+        accounting_df["run_id"] = effective_run_id
+        accounting_df.to_csv(processed_path / "task_weekly_accounting.csv", index=False)
 
     # P0 Madde 2 / Madde 20: Hafta bazlı kümülatif OT bütçe kontrolü (Source of Truth: weekly_accounting)
     if weekly_accounting_rows and weekly_machine_ot_budget_min:
@@ -1207,6 +1208,7 @@ def run_cpsat_scheduling(
     sched_df.loc[sched_df["start_min"] < 480.0, "dispatch_status"] = "DISPATCHED"
 
     if persist_outputs:
+        sched_df.to_csv(processed_path / "production_schedule.csv", index=False)
         with open(reports_path / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
             json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
     # -------------------------------------------------------------------------

@@ -47,6 +47,7 @@ def isolate_mutating_integration_tests(request, tmp_path, monkeypatch, ensure_fu
         "test_rescheduler",
         "test_mes_integration",
         "test_objective_policies",
+        "test_what_if_engine",
     }:
         return
     import src.config as cfg

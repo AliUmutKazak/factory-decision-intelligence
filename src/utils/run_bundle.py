@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import sqlite3
@@ -117,4 +118,25 @@ def verify_run_bundle(bundle_dir: str | Path, expected_run_id: str) -> dict:
         actual_hash = sha256_file(path)
         if actual_hash != expected.get("sha256"):
             raise RunBundleError(f"Bundle hash mismatch: {relative}: {actual_hash} != {expected.get('sha256')}")
+        if path.suffix == ".csv" and path.name in {
+            "forecast_demand.csv",
+            "forecast_model_lineage.csv",
+            "aggregate_plan.csv",
+            "sku_production_plan.csv",
+            "machine_capacity_plan.csv",
+            "mrp_plan.csv",
+            "production_schedule.csv",
+            "energy_kpis.csv",
+            "energy_profile_15min.csv",
+            "energy_machine_kpis.csv",
+            "carbon_analytics.csv",
+            "carbon_machine_kpis.csv",
+            "carbon_price_scenarios.csv",
+        }:
+            with path.open(newline="", encoding="utf-8") as handle:
+                rows = csv.DictReader(handle)
+                if "run_id" not in (rows.fieldnames or []):
+                    raise RunBundleError(f"Bundle CSV has no run_id: {relative}")
+                if any(str(row["run_id"]) != str(expected_run_id) for row in rows):
+                    raise RunBundleError(f"Bundle CSV run_id mismatch: {relative}")
     return manifest

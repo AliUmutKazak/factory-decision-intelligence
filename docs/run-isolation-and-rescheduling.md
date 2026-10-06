@@ -20,4 +20,4 @@ Machine downtime and material release delays are solver constraints. Demand/capa
 
 The solver enforces exact processing/setup overlap against the W1 overtime budget. W2+ overtime is prohibited. Transfer lots are capped to fit a regular shift, including throughput shocks. Initial setup ends at the first operation start, keeping solver constraints and exported accounting consistent.
 
-OR-Tools is pinned to 9.14.6206 after native crashes were observed with 9.15.6755 during this workload. Validation covers solver feasibility rather than assuming an optimum from a time-limited solve. CI verifies the ACTIVE bundle hashes, database lineage and physics, followed by the full test suite.
+OR-Tools is pinned to 9.14.6206 and single-worker search. Native crashes were observed with the parallel portfolio in both 9.15 and 9.14 during this workload. Validation covers solver feasibility rather than assuming an optimum from a time-limited solve. CI verifies the ACTIVE bundle hashes, database lineage and physics, followed by the full test suite.

@@ -423,6 +423,9 @@ class DynamicRescheduler:
             "files": files,
         }
         (bundle_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        from src.utils.run_bundle import verify_run_bundle
+
+        verify_run_bundle(bundle_dir, run_id)
         return bundle_dir
 
     def scan_pending_mes_events(

@@ -33,7 +33,7 @@ from src.utils.lineage import (
     update_pipeline_run_status,
     validate_pipeline_run,
 )
-from src.utils.run_bundle import export_run_database, seal_run_bundle
+from src.utils.run_bundle import export_run_database, seal_run_bundle, verify_run_bundle
 from src.utils.runtime_lock import run_mutation_lock
 
 
@@ -162,6 +162,7 @@ def _run_end_to_end_pipeline(run_id):
         shutil.copytree(staging_processed, run_artifacts_dir / "data" / "processed")
         shutil.copytree(staging_reports, run_artifacts_dir / "reports")
         seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")
+        verify_run_bundle(run_artifacts_dir, run_id)
 
         # ACTIVE and ARCHIVED are switched inside the private staging database.
         # Publishing a complete DB through same-filesystem os.replace is the
