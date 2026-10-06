@@ -41,7 +41,7 @@ from src.contracts.schemas import (
     ScheduleTaskInput,
     SolverStatus,
 )
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, persist_run_scoped_dataframe
 
 
 def get_initial_machine_states(conn) -> dict:
@@ -338,7 +338,8 @@ def run_cpsat_scheduling(
         ]
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
-        empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
+        persist_run_scoped_dataframe(conn, "production_schedule", empty_df, str(run_id))
+        conn.commit()
         if persist_outputs:
             empty_df.to_csv(processed_path / "production_schedule.csv", index=False)
         return empty_df
@@ -950,13 +951,11 @@ def run_cpsat_scheduling(
         if col not in sched_df.columns:
             sched_df[col] = 0 if "min" in col or "units" in col or "count" in col else ""
 
-    _rt_paths = get_runtime_paths()
-    _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
-    _rt_paths["reports_dir"].mkdir(parents=True, exist_ok=True)
-    sched_df.to_csv(_rt_paths["processed_dir"] / "production_schedule.csv", index=False)
-    if weekly_accounting_rows:
-        accounting_df = pd.DataFrame(weekly_accounting_rows)
-        accounting_df.to_csv(_rt_paths["processed_dir"] / "task_weekly_accounting.csv", index=False)
+    if persist_outputs:
+        sched_df.to_csv(processed_path / "production_schedule.csv", index=False)
+        if weekly_accounting_rows:
+            accounting_df = pd.DataFrame(weekly_accounting_rows)
+            accounting_df.to_csv(processed_path / "task_weekly_accounting.csv", index=False)
 
     # P0 Madde 2 / Madde 20: Hafta bazlı kümülatif OT bütçe kontrolü (Source of Truth: weekly_accounting)
     if weekly_accounting_rows and weekly_machine_ot_budget_min:
@@ -1098,8 +1097,9 @@ def run_cpsat_scheduling(
                 tardiness_min=int(row.get("tardiness_min", 0)),
             )
 
-        sched_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-    solver_meta_df.to_sql("schedule_solver_metadata", conn, if_exists="replace", index=False)
+        persist_run_scoped_dataframe(conn, "production_schedule", sched_df, effective_run_id)
+        persist_run_scoped_dataframe(conn, "schedule_solver_metadata", solver_meta_df, effective_run_id)
+        conn.commit()
     print("✓ production_schedule ve schedule_solver_metadata güncellendi.")
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
