@@ -80,9 +80,7 @@ def persist_run_scoped_dataframe(
 
     columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
     if "run_id" not in columns:
-        raise ValueError(
-            f"[RUN GOVERNANCE] {table_name}: mevcut tablo run_id kolonu taşımıyor; migration gerekli."
-        )
+        raise ValueError(f"[RUN GOVERNANCE] {table_name}: mevcut tablo run_id kolonu taşımıyor; migration gerekli.")
 
     conn.execute("SAVEPOINT persist_run_scope")
     try:
