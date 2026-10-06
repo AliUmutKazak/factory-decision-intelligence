@@ -7,7 +7,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel
 
-from src.config import DB_PATH
+from src.config import get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
@@ -29,7 +29,7 @@ app = FastAPI(
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_runtime_paths()["db_path"])
     conn.row_factory = sqlite3.Row
     return conn
 

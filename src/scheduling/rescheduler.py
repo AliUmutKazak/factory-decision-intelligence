@@ -6,7 +6,7 @@ import uuid
 import numpy as np
 import pandas as pd
 
-from src.config import DB_PATH
+from src.config import get_runtime_paths
 from src.contracts.schemas import (
     RescheduleAuditEntry,
     RescheduleTriggerEvent,
@@ -20,8 +20,8 @@ from src.scheduling.what_if import NoCloseConnectionWrapper
 class DynamicRescheduler:
     """Orchestrates event-driven rescheduling, freeze horizons, and audit logging."""
 
-    def __init__(self, disk_db_path: str = DB_PATH):
-        self.disk_db_path = disk_db_path
+    def __init__(self, disk_db_path: str | None = None):
+        self.disk_db_path = str(disk_db_path or get_runtime_paths()["db_path"])
 
     def _create_isolated_connection(self) -> sqlite3.Connection:
         disk_conn = sqlite3.connect(self.disk_db_path)

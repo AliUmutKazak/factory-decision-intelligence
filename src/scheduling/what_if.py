@@ -4,7 +4,7 @@ import sqlite3
 
 import pandas as pd
 
-from src.config import DB_PATH, PRODUCTION_BATCH_SIZE
+from src.config import PRODUCTION_BATCH_SIZE, get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
@@ -46,8 +46,8 @@ class NoCloseConnectionWrapper:
 class WhatIfEngine:
     """Orchestrates sensitivity analysis and scenario simulation on top of CP-SAT scheduler."""
 
-    def __init__(self, disk_db_path: str = DB_PATH):
-        self.disk_db_path = disk_db_path
+    def __init__(self, disk_db_path: str | None = None):
+        self.disk_db_path = str(disk_db_path or get_runtime_paths()["db_path"])
 
     def _create_isolated_connection(self) -> sqlite3.Connection:
         disk_conn = sqlite3.connect(self.disk_db_path)

@@ -5,7 +5,7 @@ arasında çift yönlü kimlik çözümleme ve eşleme sağlar.
 
 import pandas as pd
 
-from src.config import DB_PATH
+from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
 
@@ -13,7 +13,7 @@ class ERPService:
     @classmethod
     def get_erp_code(cls, entity_type: str, internal_id: str, erp_system: str = "SAP_S4HANA") -> str | None:
         """Dahili ID'den ERP kodunu döner (örn: P01 -> MAT-10001)."""
-        conn = get_db_connection(DB_PATH)
+        conn = get_db_connection(get_runtime_paths()["db_path"])
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -29,7 +29,7 @@ class ERPService:
     @classmethod
     def get_internal_id(cls, entity_type: str, erp_code: str, erp_system: str = "SAP_S4HANA") -> str | None:
         """ERP kodundan dahili ID'yi döner (örn: MAT-10001 -> P01)."""
-        conn = get_db_connection(DB_PATH)
+        conn = get_db_connection(get_runtime_paths()["db_path"])
         cursor = conn.cursor()
         cursor.execute(
             """
@@ -45,7 +45,7 @@ class ERPService:
     @classmethod
     def get_mapping_table(cls, entity_type: str | None = None) -> pd.DataFrame:
         """Tüm aktif eşlemeleri DataFrame olarak döner."""
-        conn = get_db_connection(DB_PATH)
+        conn = get_db_connection(get_runtime_paths()["db_path"])
         if entity_type:
             df = pd.read_sql(
                 "SELECT * FROM erp_mapping WHERE entity_type = ? AND is_active = 1",

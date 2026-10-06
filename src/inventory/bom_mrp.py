@@ -6,22 +6,22 @@ import pandas as pd
 from src.config import (
     INITIAL_INVENTORY,
     MRP_SERVICE_LEVEL_Z,
+    get_runtime_paths,
 )
 from src.utils.db import get_db_connection
 
 
 
-def load_data():
+def load_data(db_path=None):
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
-    processed_dir = runtime["processed_dir"]
-    output_mrp_path = processed_dir / "mrp_plan.csv"
 
     conn = get_db_connection(active_db_path)
     sku_plan = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     bom = pd.read_sql("SELECT * FROM bom", conn)
     materials = pd.read_sql("SELECT * FROM materials", conn)
     conn.close()
+
     return sku_plan, bom, materials
 
 
@@ -40,7 +40,7 @@ def calculate_gross_requirements(sku_plan, bom):
 
 
 def run_mrp_engine(run_id=None, db_path=None):
-    sku_plan, bom, materials = load_data()
+    sku_plan, bom, materials = load_data(db_path=db_path)
     gross_df = calculate_gross_requirements(sku_plan, bom)
 
     periods = sorted(gross_df["period_week"].unique())
@@ -148,6 +148,11 @@ def run_mrp_engine(run_id=None, db_path=None):
     print("=" * 95)
 
     # SQLite ve CSV'ye Aktar
+    runtime = get_runtime_paths()
+    processed_dir = runtime["processed_dir"]
+    output_mrp_path = processed_dir / "mrp_plan.csv"
+    active_db_path = db_path or runtime["db_path"]
+
     processed_dir.mkdir(parents=True, exist_ok=True)
 
     if run_id:

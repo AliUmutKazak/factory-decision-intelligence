@@ -209,7 +209,7 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
 
     # 1. İşlenmiş sipariş verisini aktar
     try:
-        orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
+        orders_df = pd.read_csv(processed_orders_path)
         if orders_df.empty:
             raise pd.errors.EmptyDataError("Dosya bos")
     except (FileNotFoundError, pd.errors.EmptyDataError):
