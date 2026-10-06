@@ -47,10 +47,17 @@ def get_current_schedule(
 ) -> list[dict[str, Any]]:
     conn = get_db()
     try:
-        df = pd.read_sql(
-            "SELECT * FROM production_schedule ORDER BY start_min ASC LIMIT ?",
+        active = pd.read_sql(
+            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1",
             conn,
-            params=(limit,),
+        )
+        if active.empty:
+            raise HTTPException(status_code=409, detail="ACTIVE run bulunamadı.")
+        active_run_id = str(active.iloc[0]["run_id"])
+        df = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC LIMIT ?",
+            conn,
+            params=(active_run_id, limit),
         )
         return df.to_dict(orient="records")
     finally:
@@ -63,9 +70,17 @@ def get_current_schedule(
 def get_solver_metadata() -> dict[str, Any]:
     conn = get_db()
     try:
-        df = pd.read_sql(
-            "SELECT * FROM schedule_solver_metadata ORDER BY id DESC LIMIT 1",
+        active = pd.read_sql(
+            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1",
             conn,
+        )
+        if active.empty:
+            raise HTTPException(status_code=409, detail="ACTIVE run bulunamadı.")
+        active_run_id = str(active.iloc[0]["run_id"])
+        df = pd.read_sql(
+            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? ORDER BY id DESC LIMIT 1",
+            conn,
+            params=(active_run_id,),
         )
         if df.empty:
             raise HTTPException(
