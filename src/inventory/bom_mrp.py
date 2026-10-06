@@ -6,16 +6,18 @@ from src.config import (
     MRP_SERVICE_LEVEL_Z,
     get_runtime_paths,
 )
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, persist_run_scoped_dataframe
 
 
-
-def load_data(db_path=None):
+def load_data(db_path=None, run_id=None):
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
 
     conn = get_db_connection(active_db_path)
-    sku_plan = pd.read_sql("SELECT * FROM sku_production_plan", conn)
+    if run_id is not None:
+        sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE run_id = ?", conn, params=(str(run_id),))
+    else:
+        sku_plan = pd.read_sql("SELECT * FROM sku_production_plan", conn)
     bom = pd.read_sql("SELECT * FROM bom", conn)
     materials = pd.read_sql("SELECT * FROM materials", conn)
     conn.close()
@@ -38,7 +40,7 @@ def calculate_gross_requirements(sku_plan, bom):
 
 
 def run_mrp_engine(run_id=None, db_path=None):
-    sku_plan, bom, materials = load_data(db_path=db_path)
+    sku_plan, bom, materials = load_data(db_path=db_path, run_id=run_id)
     gross_df = calculate_gross_requirements(sku_plan, bom)
 
     periods = sorted(gross_df["period_week"].unique())
@@ -159,7 +161,8 @@ def run_mrp_engine(run_id=None, db_path=None):
     mrp_df.to_csv(output_mrp_path, index=False)
 
     conn = get_db_connection(active_db_path)
-    mrp_df.to_sql("mrp_plan", conn, index=False, if_exists="replace")
+    persist_run_scoped_dataframe(conn, "mrp_plan", mrp_df, str(run_id))
+    conn.commit()
     conn.close()
 
     print(f"[OK] Zaman Fazlı MRP Planı Kaydedildi: {output_mrp_path}")
