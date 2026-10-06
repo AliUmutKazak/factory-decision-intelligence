@@ -7,6 +7,8 @@ import re
 import sqlite3
 from pathlib import Path
 
+import pandas as pd
+
 from src.config import DB_PATH
 
 _SQLITE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -44,6 +46,28 @@ def get_active_run_id(conn: sqlite3.Connection) -> str:
     return str(row[0])
 
 
+def _sqlite_value(value):
+    """Convert a pandas/numpy scalar to a sqlite3-compatible Python value."""
+    try:
+        if bool(pd.isna(value)):
+            return None
+    except (TypeError, ValueError):
+        pass
+
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except (AttributeError, ValueError):
+            pass
+
+    if hasattr(value, "isoformat") and not isinstance(value, (str, bytes)):
+        try:
+            return value.isoformat()
+        except (AttributeError, TypeError, ValueError):
+            pass
+    return value
+
+
 def persist_run_scoped_dataframe(
     conn: sqlite3.Connection,
     table_name: str,
@@ -53,7 +77,9 @@ def persist_run_scoped_dataframe(
     """Persist exactly one run version without destroying historical runs.
 
     The first write is allowed to create the table. Subsequent writes replace
-    only rows for the requested run_id, never rows belonging to other runs.
+    only rows for the requested run_id. Existing-table writes use sqlite3
+    directly so pandas ``to_sql`` cannot implicitly commit and invalidate the
+    savepoint guarding the delete+insert operation.
     """
     if not run_id:
         raise ValueError(f"[RUN GOVERNANCE] {table_name}: run_id zorunludur.")
@@ -78,14 +104,31 @@ def persist_run_scoped_dataframe(
         scoped.to_sql(table_name, conn, index=False, if_exists="append")
         return
 
-    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
-    if "run_id" not in columns:
+    table_columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
+    if "run_id" not in table_columns:
         raise ValueError(f"[RUN GOVERNANCE] {table_name}: mevcut tablo run_id kolonu taşımıyor; migration gerekli.")
+
+    frame_columns = [str(column) for column in scoped.columns]
+    invalid_columns = [column for column in frame_columns if not _SQLITE_IDENTIFIER.fullmatch(column)]
+    if invalid_columns:
+        raise ValueError(f"[RUN GOVERNANCE] {table_name}: geçersiz kolon adları: {invalid_columns}")
+
+    unknown_columns = set(frame_columns) - table_columns
+    if unknown_columns:
+        raise ValueError(
+            f"[RUN GOVERNANCE] {table_name}: tablo şeması yeni kolonları içermiyor: {sorted(unknown_columns)}"
+        )
+
+    quoted_columns = ", ".join(f'"{column}"' for column in frame_columns)
+    placeholders = ", ".join("?" for _ in frame_columns)
+    insert_sql = f'INSERT INTO "{table_name}" ({quoted_columns}) VALUES ({placeholders})'
+    rows = [tuple(_sqlite_value(value) for value in row) for row in scoped.itertuples(index=False, name=None)]
 
     conn.execute("SAVEPOINT persist_run_scope")
     try:
-        conn.execute(f"DELETE FROM {table_name} WHERE run_id = ?", (str(run_id),))
-        scoped.to_sql(table_name, conn, index=False, if_exists="append")
+        conn.execute(f'DELETE FROM "{table_name}" WHERE run_id = ?', (str(run_id),))
+        if rows:
+            conn.executemany(insert_sql, rows)
         conn.execute("RELEASE SAVEPOINT persist_run_scope")
     except Exception:
         conn.execute("ROLLBACK TO SAVEPOINT persist_run_scope")
