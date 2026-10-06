@@ -1,138 +1,122 @@
 {
-    "run_id": {
-        "run_id": "RUN-20261003-fd556c",
-        "timestamp": "2026-10-03T18:46:06.649141",
-        "status": "ACTIVE",
-        "orders_count": 9130
-    },
-    "created_at": "2026-10-03T19:03:51.707386",
-    "total_artifacts": 18,
+    "run_id": "RUN-20261006-e437bf",
+    "created_at": "2026-10-06T20:41:01.088467",
+    "total_artifacts": 17,
     "artifacts": {
-        "factory.db": {
-            "size_bytes": 667648,
-            "sha256": "80cfb3124c636fd469f873e4905422754c406ade40f1ad94611ed8f909c2b3cf",
-            "relative_path": "factory.db"
+        "factory_staging_RUN-20261006-e437bf.db": {
+            "size_bytes": 1626112,
+            "sha256": "67cc32d87deff7cf420c994fc5d8ffa772709b33f2b14435184046c3b165d216",
+            "relative_path": "runs/RUN-20261006-e437bf/factory_staging_RUN-20261006-e437bf.db"
         },
         "run_metadata.json": {
-            "size_bytes": 934,
-            "sha256": "6d0e9acec90589afc119bd90f14c4407142d9270085413c43bdacf3b874c493c",
-            "relative_path": "reports\\run_metadata.json"
+            "size_bytes": 933,
+            "sha256": "9acc86822735c10e4de8d807929f4e316f0133bd561b7fd8c3792f1a14232a54",
+            "relative_path": "runs/RUN-20261006-e437bf/reports/run_metadata.json"
         },
         "schedule_solver_metadata.json": {
-            "size_bytes": 1187,
-            "sha256": "b5e6fa99aef7121ef89bf30c85a918c9c477d278198b91d3d9b256c6a74f4320",
-            "relative_path": "reports\\schedule_solver_metadata.json"
+            "size_bytes": 1199,
+            "sha256": "046dada421b93786ae92e19e539a3e9ba891eee320801290d50c2fe68f495f60",
+            "relative_path": "runs/RUN-20261006-e437bf/reports/schedule_solver_metadata.json"
         },
         "forecast_model_metadata.json": {
-            "size_bytes": 1363,
-            "sha256": "1db51f323d1ebcdece4ce57d81055166a4cbbb86cb9e438bf59e1dd6f2459b6f",
-            "relative_path": "reports\\forecast_model_metadata.json"
-        },
-        "aggregate_plan.csv": {
-            "size_bytes": 646,
-            "sha256": "6c3f59092ed640459c0e5fc767a3e53b16cdde05d051501a8088c532b07784ca",
-            "relative_path": "data\\processed\\aggregate_plan.csv"
-        },
-        "carbon_analytics.csv": {
-            "size_bytes": 113,
-            "sha256": "fc0ed63126e051ae199cb0495ace5a43c2e435e2c5119335c721c98d6e1dfa7d",
-            "relative_path": "data\\processed\\carbon_analytics.csv"
-        },
-        "carbon_machine_kpis.csv": {
-            "size_bytes": 389,
-            "sha256": "ecc57b21bd4830a9dff111893d95a7a91812899a5d30945bbe0fb3713ba2d977",
-            "relative_path": "data\\processed\\carbon_machine_kpis.csv"
+            "size_bytes": 1309,
+            "sha256": "acb73099694ff8346738b0cc0108b3baadab0da7dba4007858607d4fc4128deb",
+            "relative_path": "runs/RUN-20261006-e437bf/reports/forecast_model_metadata.json"
         },
         "energy_kpis.csv": {
-            "size_bytes": 363,
-            "sha256": "110dfd345bc6fc52bef5a6c998e6862c058a5cef7e3fa0188f0af1a7fa6555dd",
-            "relative_path": "data\\processed\\energy_kpis.csv"
+            "size_bytes": 360,
+            "sha256": "85e4f83b8bef38eb10c6ba291f0bb595d90a32e83ee7ac18fd9bb3eac3b3df84",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/energy_kpis.csv"
         },
         "energy_profile_15min.csv": {
-            "size_bytes": 55819,
-            "sha256": "42454d91e85c02d841e9690a3e8f43e6f21e8cdf449c38fed3ea679cb4d612af",
-            "relative_path": "data\\processed\\energy_profile_15min.csv"
+            "size_bytes": 61906,
+            "sha256": "2a67421d8fe78a78f6f9ccfb8b4ca5865b61c2badba76a110992e026128634bf",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/energy_profile_15min.csv"
         },
-        "factory_orders.csv": {
-            "size_bytes": 285342,
-            "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
-            "relative_path": "data\\processed\\factory_orders.csv"
-        },
-        "forecast_demand.csv": {
-            "size_bytes": 10085,
-            "sha256": "1a1d361fc61d612d059707bf08d4c26c528e0ad3418a32ca880d3ae31c1b72a1",
-            "relative_path": "data\\processed\\forecast_demand.csv"
-        },
-        "forecast_model_lineage.csv": {
-            "size_bytes": 11863,
-            "sha256": "c789d77954ae86cb9c56bf8a5bff7782c5354cec116446bce32033dde724f1a4",
-            "relative_path": "data\\processed\\forecast_model_lineage.csv"
-        },
-        "machine_capacity_plan.csv": {
-            "size_bytes": 874,
-            "sha256": "bc11e8ac9ca9a072ef2848bc399d9db874a3e50886bec72fe040d8063173f871",
-            "relative_path": "data\\processed\\machine_capacity_plan.csv"
+        "aggregate_plan.csv": {
+            "size_bytes": 546,
+            "sha256": "d36a2881bf6c60a43193815b5fdea11a476a7ba17db43a26d9aa1d5ac3a208fc",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/aggregate_plan.csv"
         },
         "mrp_plan.csv": {
-            "size_bytes": 2055,
-            "sha256": "7de19eceb47377141e859afc68858ebfd9427b83f68d510c9ad30bdbfd1a25c0",
-            "relative_path": "data\\processed\\mrp_plan.csv"
-        },
-        "production_schedule.csv": {
-            "size_bytes": 4450,
-            "sha256": "1a1e527b31dd7b8e6fc93014dac842f855a292220f7cd2556b130dffeeccdd33",
-            "relative_path": "data\\processed\\production_schedule.csv"
-        },
-        "schedule_solver_metadata.csv": {
-            "size_bytes": 826,
-            "sha256": "3571217caf26d37a5c2440be33020130d5a2154b6e9c1f56a0d5b81ab647e9a2",
-            "relative_path": "data\\processed\\schedule_solver_metadata.csv"
-        },
-        "sku_production_plan.csv": {
-            "size_bytes": 1016,
-            "sha256": "5fccefa6a2f4dd653d6ca1603338f6ce269ee63f8999641f17d3b306597309c9",
-            "relative_path": "data\\processed\\sku_production_plan.csv"
+            "size_bytes": 2041,
+            "sha256": "29b6eb16927a438ce4918ab9cb3b2d583348b02f81ec9d43b61a8ad46aff39e0",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/mrp_plan.csv"
         },
         "task_weekly_accounting.csv": {
-            "size_bytes": 1439,
-            "sha256": "07c22527405baa539b2b980b40879ea1d24f8f4f9fb267a956249040d1ce75f5",
-            "relative_path": "data\\processed\\task_weekly_accounting.csv"
+            "size_bytes": 2124,
+            "sha256": "31a12d18dec3177e329f4c11e2de2f0cd97c882a2dd6d67e864937cc0be834db",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/task_weekly_accounting.csv"
+        },
+        "carbon_analytics.csv": {
+            "size_bytes": 111,
+            "sha256": "ae78d9667a7ce28c3fae0b96f9cec30a3bdca48c5e2965bcf3509d8241783afa",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/carbon_analytics.csv"
+        },
+        "factory_orders.csv": {
+            "size_bytes": 55276,
+            "sha256": "b8f20d06529855bca471d52fd83465a962284e3f34611963e584c3985ec8617b",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/factory_orders.csv"
+        },
+        "forecast_demand.csv": {
+            "size_bytes": 10000,
+            "sha256": "14afa030c336ba86adb63a08f1b39aff18d62c89b3fa30b77d41e23f241fde98",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/forecast_demand.csv"
+        },
+        "carbon_machine_kpis.csv": {
+            "size_bytes": 393,
+            "sha256": "83f566ce63a4d25632853841ab86137bf869d60c842429682f6720bab7589340",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/carbon_machine_kpis.csv"
+        },
+        "forecast_model_lineage.csv": {
+            "size_bytes": 11667,
+            "sha256": "9b474c1b4e3876dbe89690fe41214cbe81aa18b9a4f6b35625b6946b2a16e73e",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/forecast_model_lineage.csv"
+        },
+        "machine_capacity_plan.csv": {
+            "size_bytes": 869,
+            "sha256": "5d80cd449d8f640ec6d956489ae5a6c7f9561cf95e3ad1fce451fed0a3ab994e",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/machine_capacity_plan.csv"
+        },
+        "sku_production_plan.csv": {
+            "size_bytes": 995,
+            "sha256": "1b1663b21ecdd4258fbc56f6b30d4ba43c8b4390733867b77946a4ce85e5e62c",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/sku_production_plan.csv"
+        },
+        "production_schedule.csv": {
+            "size_bytes": 6602,
+            "sha256": "b7cf4dc7d4b7958ac5e50359c09e9984242d48de569def6faa33493399eaf0ff",
+            "relative_path": "runs/RUN-20261006-e437bf/data/processed/production_schedule.csv"
         }
     },
     "inputs": {
         "input_dataset": {
-            "path": "data\\processed\\factory_orders.csv",
-            "sha256": "97dba5a6cf430c26bac5a1e2ef2bb8a30148b073c0cd7a185973b4879d80eae2",
-            "size_bytes": 285342,
+            "path": "runs/RUN-20261006-e437bf/data/processed/factory_orders.csv",
+            "sha256": "b8f20d06529855bca471d52fd83465a962284e3f34611963e584c3985ec8617b",
+            "size_bytes": 55276,
             "adapter": "KaggleRetailDemandAdapter",
             "mapping_version": "canonical-v1"
         },
-        "raw_source_data": {
-            "train.csv": {
-                "size_bytes": 17333449,
-                "sha256": "038f25690a65149c94f86ddd3deceda20c037a5cfd754cafdfc539a72992f2ed",
-                "relative_path": "data\\raw\\train.csv"
-            }
-        },
+        "raw_source_data": {},
         "config_fingerprint": {
             "file": "src/config.py",
-            "sha256": "92e68e3d9f952ae0687fcbcce429b235208f1cc30ae252d3c2688a0c06c11591",
-            "size_bytes": 9354
+            "sha256": "51b0894b2abd67df87f544facbb68dcf947dde9bc0179b4abade229c91b1d72a",
+            "size_bytes": 9454
         },
         "environment": {
-            "python_version": "3.13.9",
+            "python_version": "3.12.14",
             "solver_versions": {
-                "ortools_cpsat": "9.15.6755"
+                "ortools_cpsat": "9.14.6206"
             },
             "requirements_fingerprint": {
                 "file": "requirements.txt",
-                "sha256": "c36f7c61ac9c0544d830721913a28669dbd860cc1569d79644317e8a4b93a563",
-                "size_bytes": 384
+                "sha256": "e5b27182f650ceb180de616ee3fc50b8748ddf7786a2a84d257f174e6f403ce3",
+                "size_bytes": 474
             },
             "lockfile_fingerprint": {
                 "file": "requirements.lock",
-                "sha256": "cea86fcbe121a26f3e5bfbc457af586632bba7e6359b8fdc006a6a57ba7ca8ac",
-                "size_bytes": 1107
+                "sha256": "57b0c0a58de339a513aab5ad706496147477d6a8ee7fa59dc27d4fbc5b83cb89",
+                "size_bytes": 1201
             }
         }
     }
