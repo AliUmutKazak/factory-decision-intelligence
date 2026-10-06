@@ -68,10 +68,17 @@ def run_cpsat_scheduling(
     run_id=None,
     policy: SchedulingObjectivePolicy = SchedulingObjectivePolicy.BALANCED,
     hierarchical: bool = False,
+    processed_dir=None,
+    reports_dir=None,
+    frozen_task_positions=None,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
     active_db_path = runtime["db_path"]
+    processed_path = Path(processed_dir) if processed_dir is not None else Path(runtime["processed_dir"])
+    reports_path = Path(reports_dir) if reports_dir is not None else Path(runtime["reports_dir"])
+    processed_path.mkdir(parents=True, exist_ok=True)
+    reports_path.mkdir(parents=True, exist_ok=True)
     conn = get_db_connection(active_db_path)
     machine_initial_states = get_initial_machine_states(conn)
 
@@ -331,9 +338,7 @@ def run_cpsat_scheduling(
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-        _rt_paths = get_runtime_paths()
-        _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
-        empty_df.to_csv(_rt_paths["processed_dir"] / "production_schedule.csv", index=False)
+        empty_df.to_csv(processed_path / "production_schedule.csv", index=False)
         return empty_df
     tasks_df = pd.DataFrame(tasks)
 
@@ -399,6 +404,29 @@ def run_cpsat_scheduling(
         if mid not in machine_to_tasks:
             machine_to_tasks[mid] = []
         machine_to_tasks[mid].append(tid)
+
+    # P0-3: Freeze horizon is a solver-level hard constraint.
+    # The solver may optimize every non-frozen task, but frozen task start/end
+    # positions cannot move and their machine remains fixed by the routing.
+    if frozen_task_positions:
+        missing_frozen = []
+        for frozen_tid, frozen_spec in frozen_task_positions.items():
+            if frozen_tid not in all_tasks:
+                missing_frozen.append(str(frozen_tid))
+                continue
+            frozen_machine, frozen_start, frozen_end = frozen_spec
+            task_info = all_tasks[frozen_tid]
+            if str(task_info["machine_id"]) != str(frozen_machine):
+                raise ValueError(
+                    f"[FREEZE CONSTRAINT FAIL] Task {frozen_tid} machine mismatch: "
+                    f"baseline={frozen_machine}, routing={task_info['machine_id']}"
+                )
+            model.Add(task_info["start"] == int(round(frozen_start)))
+            model.Add(task_info["end"] == int(round(frozen_end)))
+        if missing_frozen:
+            raise ValueError(
+                f"[FREEZE CONSTRAINT FAIL] Frozen task(s) missing from regenerated model: {missing_frozen[:20]}"
+            )
 
     # 1. Rota Öncelik Kısıtı (Precedence: Op 1 -> Op 2 -> Op 3)
     for lid, group in tasks_df.groupby("lot_id"):
@@ -1048,9 +1076,7 @@ def run_cpsat_scheduling(
 
     sched_df.loc[sched_df["start_min"] < 480.0, "dispatch_status"] = "DISPATCHED"
 
-    reports_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", "reports"))
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    with open(reports_dir / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
+    with open(reports_path / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
         json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
 
         # -------------------------------------------------------------------------
@@ -1076,8 +1102,7 @@ def run_cpsat_scheduling(
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
     print()
     print("--- Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT) ---")
-    _rt_paths = get_runtime_paths()
-    cap_plan_path = _rt_paths["processed_dir"] / "machine_capacity_plan.csv"
+    cap_plan_path = processed_path / "machine_capacity_plan.csv"
     if cap_plan_path.exists():
         cap_df = pd.read_csv(cap_plan_path)
         w1_cap = cap_df[cap_df["period_week"] == 1]
