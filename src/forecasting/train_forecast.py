@@ -13,21 +13,30 @@ from src.config import (
     HOLT_WINTERS_DEFAULT_PARAMS,
     get_runtime_paths,
 )
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
 
 HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100
 
 
-def load_factory_demand(db_path=None):
+def load_factory_demand(db_path=None, run_id=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
-    query = """
-        SELECT order_date, product_id, order_qty as demand
-        FROM orders
-        ORDER BY order_date, product_id
-    """
-    df = pd.read_sql(query, conn)
+    if run_id is not None:
+        query = """
+            SELECT order_date, product_id, order_qty AS demand
+            FROM orders
+            WHERE run_id = ?
+            ORDER BY order_date, product_id
+        """
+        df = pd.read_sql(query, conn, params=(str(run_id),))
+    else:
+        query = """
+            SELECT order_date, product_id, order_qty AS demand
+            FROM orders
+            ORDER BY order_date, product_id
+        """
+        df = pd.read_sql(query, conn)
     conn.close()
     df["order_date"] = pd.to_datetime(df["order_date"])
     return df
@@ -134,7 +143,7 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
 
 def run_forecast_benchmark(run_id=None, db_path=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
-    df_all = load_factory_demand(active_db_path)
+    df_all = load_factory_demand(active_db_path, run_id=run_id)
     products = sorted(df_all["product_id"].unique())
 
     benchmark_summary = []
@@ -320,11 +329,10 @@ def run_forecast_benchmark(run_id=None, db_path=None):
     print("-" * 85)
 
     _rt_paths = get_runtime_paths()
-    processed_dir = _rt_paths.get("processed_data_dir") or (_rt_paths["data_dir"] / "processed")
-    reports_dir = _rt_paths.get("reports_dir") or (_rt_paths["data_dir"].parent / "reports")
-
-    os.makedirs(processed_dir, exist_ok=True)
-    os.makedirs(reports_dir, exist_ok=True)
+    processed_dir = _rt_paths["processed_dir"]
+    reports_dir = _rt_paths["reports_dir"]
+    processed_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir.mkdir(parents=True, exist_ok=True)
 
     forecast_df = pd.DataFrame(final_forecast_records)
     lineage_df = pd.DataFrame(model_lineage_records)
@@ -333,20 +341,15 @@ def run_forecast_benchmark(run_id=None, db_path=None):
     if not active_run_id:
         try:
             with get_db_connection(active_db_path) as _conn:
-                row = _conn.execute("SELECT run_id FROM pipeline_runs ORDER BY id DESC LIMIT 1").fetchone()
-                active_run_id = row[0] if row else "STANDALONE_RUN"
-        except Exception:
-            active_run_id = "STANDALONE_RUN"
+                active_run_id = get_active_run_id(_conn)
+        except Exception as exc:
+            raise RuntimeError("[FORECAST] run_id belirtilmeli veya ACTIVE run bulunmalıdır.") from exc
 
     forecast_df["run_id"] = active_run_id
     lineage_df["run_id"] = active_run_id
 
-    _rt_paths = get_runtime_paths()
-    _rt_paths["processed_dir"].mkdir(parents=True, exist_ok=True)
-    _rt_paths["reports_dir"].mkdir(parents=True, exist_ok=True)
-
-    forecast_csv_path = _rt_paths["processed_dir"] / "forecast_demand.csv"
-    lineage_csv_path = _rt_paths["processed_dir"] / "forecast_model_lineage.csv"
+    forecast_csv_path = processed_dir / "forecast_demand.csv"
+    lineage_csv_path = processed_dir / "forecast_model_lineage.csv"
 
     forecast_df.to_csv(forecast_csv_path, index=False)
     lineage_df.to_csv(lineage_csv_path, index=False)
@@ -373,14 +376,14 @@ def run_forecast_benchmark(run_id=None, db_path=None):
             }
 
     output_forecast_path = processed_dir / "forecast_demand.csv"
-    forecast_df.to_csv(output_forecast_path, index=False)
 
     with open(reports_dir / "forecast_model_metadata.json", "w", encoding="utf-8") as f:
         json.dump(forecast_meta, f, indent=4)
 
     with get_db_connection(active_db_path) as conn:
-        forecast_df.to_sql("forecast_demand", conn, index=False, if_exists="replace")
-        lineage_df.to_sql("forecast_model_lineage", conn, index=False, if_exists="replace")
+        persist_run_scoped_dataframe(conn, "forecast_demand", forecast_df, str(active_run_id))
+        persist_run_scoped_dataframe(conn, "forecast_model_lineage", lineage_df, str(active_run_id))
+        conn.commit()
 
     print(f"[OK] 28 Gunluk Gelecek Tahminleri Yazildi: {output_forecast_path}")
     print(
