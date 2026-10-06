@@ -24,8 +24,10 @@ def test_closed_loop_machine_breakdown_impact():
 
     assert result["status"] == "RESCHEDULED"
     assert result["affected_tasks_count"] > 0
-    assert result["new_makespan_min"] >= result["old_makespan_min"]
-    assert result["delta_makespan_min"] >= 0.0
+    # A time-limited baseline is feasible, not proven optimal. Reoptimization
+    # can improve it even after adding downtime; report the actual signed change.
+    assert result["new_makespan_min"] > 0
+    assert result["delta_makespan_min"] == result["new_makespan_min"] - result["old_makespan_min"]
 
 
 def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
@@ -115,13 +117,10 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
 
 
 def test_minor_and_major_delays_use_authoritative_solver():
-    """Kısa süreli arızalarda (<= 60 dk) FAST_LOCAL_REPAIR,
-
-    büyük duruşlarda (> 60 dk) CPSAT_REOPTIMIZATION modunun tetiklendiğini doğrular.
-    """
+    """Kısa ve uzun duruşların aynı yetkili CP-SAT motorunu kullandığını doğrular."""
     rescheduler = ClosedLoopRescheduler()
 
-    # 1. Küçük gecikme (15 dk) -> Fast-path heuristic
+    # 1. Küçük gecikme (15 dk)
     result_minor = rescheduler.reschedule_on_machine_breakdown(
         machine_id="M01",
         down_start_min=10.0,

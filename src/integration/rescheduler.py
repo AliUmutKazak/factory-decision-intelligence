@@ -110,7 +110,7 @@ class ClosedLoopRescheduler:
             "affected_tasks_count": int(report.rescheduled_tasks_count),
             "old_makespan_min": old_makespan,
             "new_makespan_min": new_makespan,
-            "delta_makespan_min": max(0.0, new_makespan - old_makespan),
+            "delta_makespan_min": new_makespan - old_makespan,
             "reschedule_mode": "CPSAT_REOPTIMIZATION",
             "is_major_disruption": down_duration_min > 60.0,
             "previous_run_id": audit.previous_run_id,
