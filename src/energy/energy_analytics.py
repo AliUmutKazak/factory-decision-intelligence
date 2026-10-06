@@ -20,7 +20,6 @@ gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji 
 ===============================================================================
 """
 
-import os
 
 import pandas as pd
 
