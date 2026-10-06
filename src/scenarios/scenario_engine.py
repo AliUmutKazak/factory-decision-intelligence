@@ -20,7 +20,6 @@ from src.config import (
 )
 from src.contracts.schemas import ScenarioResultModel
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
-from src.integration.rescheduler import ClosedLoopRescheduler
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.service_level import evaluate_schedule_service_level
 from src.utils.db import get_active_run_id, get_db_connection
@@ -261,7 +260,9 @@ class ScenarioEngine:
 
                 sim_makespan = float(sim_sched["end_min"].max()) / 60.0
             else:
-                sim_makespan = base_makespan + (shock.material_delay_days * 8.0)
+                raise ScenarioDataUnavailableError(
+                    "SCENARIO_SOLVE_FAILED: Material delay requires a baseline schedule."
+                )
 
         # [Şok 3: Demand Shock - +20% Demand]
         elif shock.demand_multiplier != 1.0:
@@ -274,7 +275,9 @@ class ScenarioEngine:
                     sim_sched["end_min"] = sim_sched["start_min"] + sim_sched[run_col]
                     sim_makespan = float(sim_sched["end_min"].max()) / 60.0
             else:
-                sim_makespan = base_makespan * shock.demand_multiplier
+                raise ScenarioDataUnavailableError(
+                    "SCENARIO_SOLVE_FAILED: Demand shock requires a baseline schedule."
+                )
 
         # Kapasite düşüşü (-10% Capacity)
         elif shock.capacity_multiplier != 1.0:
@@ -286,7 +289,9 @@ class ScenarioEngine:
                     sim_sched["end_min"] = sim_sched["start_min"] + sim_sched[run_col]
                     sim_makespan = float(sim_sched["end_min"].max()) / 60.0
             else:
-                sim_makespan = base_makespan * scale
+                raise ScenarioDataUnavailableError(
+                    "SCENARIO_SOLVE_FAILED: Capacity shock requires a baseline schedule."
+                )
 
         # =====================================================================
         # 2. SERVİS SEVİYESİ VE GECİKME (OTIF %)
