@@ -71,9 +71,20 @@ class EconomicDecisionEngine:
         df = schedule_df.copy()
 
         # 1. Setup & İşçilik Süreleri
-        run_duration_col = "duration" if "duration" in df.columns else "run_duration"
+        if "duration_min" in df.columns:
+            run_duration_col = "duration_min"
+        elif "duration" in df.columns:
+            run_duration_col = "duration"
+        else:
+            run_duration_col = "run_duration"
+
         total_run_min = float(df[run_duration_col].sum()) if run_duration_col in df.columns else 0.0
-        total_setup_min = float(df["setup_duration"].sum()) if "setup_duration" in df.columns else 0.0
+        if "setup_before_min" in df.columns:
+            total_setup_min = float(df["setup_before_min"].sum())
+        elif "setup_duration" in df.columns:
+            total_setup_min = float(df["setup_duration"].sum())
+        else:
+            total_setup_min = 0.0
 
         run_hours = total_run_min / 60.0
         setup_hours = total_setup_min / 60.0
@@ -85,11 +96,14 @@ class EconomicDecisionEngine:
         # 2. Fazla Mesai (Overtime) Maliyeti
         # Hafta 1 sınırı (168 saat / 10080 dk) üstü veya overtime bayrağı
         overtime_min = 0.0
-        if "is_overtime" in df.columns:
-            overtime_min = float(df[df["is_overtime"] == 1][run_duration_col].sum())
+        if "overtime_minutes" in df.columns:
+            overtime_min = float(df["overtime_minutes"].sum())
+        elif "is_overtime" in df.columns:
+            overtime_min = float(df.loc[df["is_overtime"] == 1, run_duration_col].sum())
         elif "end_min" in df.columns:
-            # Standart haftalık vardiya sınırını (ör. 120 saat) aşan kısımlar
-            overtime_min = max(0.0, float(df["end_min"].max() - (5 * 24 * 60)))
+            # Fallback yalnızca schedule çıktısında explicit OT muhasebesi yoksa kullanılır.
+            weekly_regular_min = 6 * 16 * 60
+            overtime_min = max(0.0, float(df["end_min"].max() - weekly_regular_min))
 
         overtime_hours = overtime_min / 60.0
         overtime_cost = overtime_hours * (self.params.labor_rate_per_hour * self.params.overtime_multiplier)
@@ -107,15 +121,19 @@ class EconomicDecisionEngine:
         order_cost_list: list[dict[str, Any]] = []
 
         group_col = "job_id" if "job_id" in df.columns else "product_id"
+        setup_group_col = "setup_before_min" if "setup_before_min" in df.columns else (
+            "setup_duration" if "setup_duration" in df.columns else run_duration_col
+        )
         job_summary = (
             df.groupby(group_col)
             .agg(
                 completion_min=("end_min", "max"),
                 start_min=("start_min", "min"),
                 job_run_min=(run_duration_col, "sum"),
-                job_setup_min=("setup_duration", "sum")
-                if "setup_duration" in df.columns
-                else (run_duration_col, lambda _: 0.0),
+                job_setup_min=(setup_group_col, "sum"),
+                quantity=("production_units", "sum")
+                if "production_units" in df.columns
+                else (run_duration_col, lambda x: len(x)),
             )
             .reset_index()
         )
@@ -131,7 +149,7 @@ class EconomicDecisionEngine:
         if "customer_class" not in merged.columns:
             merged["customer_class"] = "STANDARD"
         if "quantity" not in merged.columns:
-            merged["quantity"] = 100
+            merged["quantity"] = 0.0
 
         for _, row in merged.iterrows():
             cid = row[group_col]
