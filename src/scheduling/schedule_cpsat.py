@@ -71,14 +71,16 @@ def run_cpsat_scheduling(
     processed_dir=None,
     reports_dir=None,
     frozen_task_positions=None,
+    persist_outputs: bool = True,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
     active_db_path = runtime["db_path"]
     processed_path = Path(processed_dir) if processed_dir is not None else Path(runtime["processed_dir"])
     reports_path = Path(reports_dir) if reports_dir is not None else Path(runtime["reports_dir"])
-    processed_path.mkdir(parents=True, exist_ok=True)
-    reports_path.mkdir(parents=True, exist_ok=True)
+    if persist_outputs:
+        processed_path.mkdir(parents=True, exist_ok=True)
+        reports_path.mkdir(parents=True, exist_ok=True)
     conn = get_db_connection(active_db_path)
     machine_initial_states = get_initial_machine_states(conn)
 
@@ -338,7 +340,8 @@ def run_cpsat_scheduling(
         empty_df = pd.DataFrame(columns=canonical_schedule_cols)
         empty_df["run_id"] = run_id if run_id else "DEFAULT_RUN"
         empty_df.to_sql("production_schedule", conn, if_exists="replace", index=False)
-        empty_df.to_csv(processed_path / "production_schedule.csv", index=False)
+        if persist_outputs:
+            empty_df.to_csv(processed_path / "production_schedule.csv", index=False)
         return empty_df
     tasks_df = pd.DataFrame(tasks)
 
@@ -1076,8 +1079,9 @@ def run_cpsat_scheduling(
 
     sched_df.loc[sched_df["start_min"] < 480.0, "dispatch_status"] = "DISPATCHED"
 
-    with open(reports_path / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
-        json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
+    if persist_outputs:
+        with open(reports_path / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
+            json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
 
         # -------------------------------------------------------------------------
         # Faz 3 - Madde 6: Schedule Output Contract & Database Sealing Shield
