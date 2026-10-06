@@ -113,9 +113,7 @@ def record_pipeline_run_metadata(
     resolved_selected_models = dict(selected_models) if selected_models else {}
     resolved_forecast_origin = forecast_origin
 
-    from src.config import DB_PATH as CONFIG_DB_PATH
-
-    target_db = Path(db_path) if db_path else Path(CONFIG_DB_PATH)
+    target_db = Path(db_path) if db_path else Path(get_runtime_paths()["db_path"])
     if (not resolved_selected_models or not resolved_forecast_origin) and target_db.exists():
         try:
             with get_db_connection(target_db) as conn:
@@ -225,15 +223,8 @@ def record_pipeline_run_metadata(
             # doğrudan SQL yerine State Machine üzerinden güvenle ilerlet:
             current_st = existing_row[0]
             if status and status != current_st:
-                try:
-                    update_pipeline_run_status(run_id, status, db_path=active_db)
-                except Exception:
-                    # Testlerdeki doğrudan geçişler veya terminal durumlar için esnek fallback
-                    cur.execute(
-                        "UPDATE pipeline_runs SET status = ? WHERE run_id = ?",
-                        (status, run_id),
-                    )
-                    conn.commit()
+                update_pipeline_run_status(run_id, status, db_path=active_db)
+
         else:
             cur.execute(
                 """
@@ -823,16 +814,17 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
         "inputs": inputs_lineage,
     }
 
-    # Manifest'i hem varsa staging reports dizinine hem de canonical reports dizinine eşzamanlı mühürle
-    dest_paths = [root_dir / "reports" / "run_manifest.json"]
-    for r_dir in reports_dirs:
-        dest_paths.append(r_dir / "run_manifest.json")
+    # Manifest yalnızca aktif runtime reports dizinine yazılır.
+    # Staging run sırasında canonical reports kesinlikle değiştirilmez.
+    dest_dirs = list(dict.fromkeys(reports_dirs))
+    if not dest_dirs:
+        dest_dirs = [Path(get_runtime_paths()["reports_dir"])]
 
-    for m_path in set(dest_paths):
+    for r_dir in dest_dirs:
+        m_path = r_dir / "run_manifest.json"
         m_path.parent.mkdir(parents=True, exist_ok=True)
         with open(m_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=4, ensure_ascii=False)
-
     return manifest
 
 
