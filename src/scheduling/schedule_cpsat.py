@@ -101,12 +101,25 @@ def run_cpsat_scheduling(
             print(f"[WARN] machine_state_snapshot kaydedilemedi: {e}")
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
-    if sku_plan is None:
+    if run_id is not None:
+        sku_plan = pd.read_sql(
+            "SELECT * FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
+            conn,
+            params=(str(run_id),),
+        )
+    elif sku_plan is None:
         sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     changeover_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
-    mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
+    if run_id is not None:
+        mrp_df = pd.read_sql(
+            "SELECT * FROM mrp_plan WHERE run_id = ? AND period_week = 1",
+            conn,
+            params=(str(run_id),),
+        )
+    else:
+        mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
 
     # -------------------------------------------------------------------------
     # OPERASYONEL POLİTİKA (Model A - Week-1 Finite Overtime Authorization):
