@@ -64,3 +64,57 @@ def test_dtd_messages_rejected():
         validate_xml(
             '<!DOCTYPE OperationsPerformance [<!ENTITY x "external">]><OperationsPerformance xmlns="http://www.mesa.org/xml/B2MML"/>'
         )
+
+
+def test_multiple_operations_share_one_lot_request_and_keep_unique_segments():
+    first = ProductionScheduleTask(
+        task_id="T1",
+        lot_id="LOT1",
+        product_id="P01",
+        machine_id="M01",
+        operation_seq=1,
+        start_min=480,
+        end_min=500,
+        duration_min=20,
+    )
+    second = first.model_copy(
+        update={
+            "task_id": "T2",
+            "machine_id": "M02",
+            "operation_seq": 2,
+            "start_min": 500,
+            "end_min": 550,
+            "duration_min": 50,
+        }
+    )
+    result = ScheduleResult(status="FEASIBLE", makespan_hours=10, total_cost_eur=10, tasks=[first, second])
+    xml = schedule_to_xml(result, origin=ORIGIN, schedule_id="MULTI-OP")
+    root = validate_xml(xml)
+    namespace = {"b": "http://www.mesa.org/xml/B2MML"}
+    assert len(root.xpath("b:OperationsRequest", namespaces=namespace)) == 1
+    assert len(root.xpath("b:OperationsRequest/b:SegmentRequirement", namespaces=namespace)) == 2
+    assert schedule_from_xml(xml, origin=ORIGIN) == result
+    with pytest.raises(ValueError, match="unique"):
+        schedule_to_xml(result.model_copy(update={"tasks": [first, first]}), origin=ORIGIN, schedule_id="DUP")
+
+
+def test_mes_import_rejects_conflicting_units_references_and_nonfinite_quantity():
+    actual = MESActual(
+        lot_id="L1",
+        machine_id="M01",
+        operation_seq=1,
+        actual_start_min=480,
+        actual_end_min=500,
+        produced_qty=10,
+        scrap_qty=1,
+    )
+    xml = mes_to_xml(actual, origin=ORIGIN)
+    for wrong in (
+        xml.replace("<OperationsRequestID>L1", "<OperationsRequestID>OTHER"),
+        xml.replace("<UnitOfMeasure>units", "<UnitOfMeasure>kg"),
+        xml.replace("<QuantityString>10.0", "<QuantityString>Infinity"),
+    ):
+        with pytest.raises(ValueError):
+            mes_from_xml(wrong, origin=ORIGIN)
+    with pytest.raises(ValueError, match="midnight"):
+        mes_to_xml(actual, origin=ORIGIN.replace(hour=12))

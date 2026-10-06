@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProductionOrder(BaseModel):
@@ -24,6 +24,8 @@ class ProductionOrder(BaseModel):
 
 class MESActual(BaseModel):
     """MES Gerçekleşen Üretim Kaydı Sözleşmesi."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
 
     lot_id: str = Field(..., min_length=1)
     machine_id: str = Field(..., min_length=1)
@@ -62,6 +64,8 @@ class MaterialAvailability(BaseModel):
 class ProductionScheduleTask(BaseModel):
     """Çizelge Görev Çıktı Sözleşmesi."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     task_id: str = Field(..., min_length=1)
     lot_id: str = Field(..., min_length=1)
     product_id: str = Field(..., min_length=1)
@@ -95,6 +99,8 @@ class ScenarioRequest(BaseModel):
 
 class ScheduleResult(BaseModel):
     """Çizelgeleme Motoru Çıktı Sözleşmesi."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
 
     status: Literal["OPTIMAL", "FEASIBLE", "INFEASIBLE", "MODEL_INVALID"]
     makespan_hours: float = Field(..., ge=0)

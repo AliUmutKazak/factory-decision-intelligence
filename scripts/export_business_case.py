@@ -1,6 +1,7 @@
 """Export an auditable benchmark, B2MML demo and parameterized ROI case."""
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime
@@ -38,6 +39,11 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     report["solver_time_limit_seconds"] = args.seconds
     report["factory_time_origin"] = args.origin
+    project_root = Path(__file__).resolve().parents[1]
+    report["xml_exporter_code_hashes"] = {
+        name: hashlib.sha256((project_root / name).read_bytes()).hexdigest()
+        for name in ("src/contracts/b2mml.py", "scripts/export_business_case.py")
+    }
     report["customer_pilot_executed"] = False
     if "EDD" in accepted:
         report["roi_projections_vs_edd"] = {

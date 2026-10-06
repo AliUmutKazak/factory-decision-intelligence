@@ -27,8 +27,13 @@ def _element(parent, name, value=None):
 
 
 def _origin(origin):
-    if origin.tzinfo is None or origin.utcoffset() is None or origin.weekday() != 0:
-        raise ValueError("Factory time origin must be a timezone-aware Monday.")
+    if (
+        origin.tzinfo is None
+        or origin.utcoffset() is None
+        or origin.weekday() != 0
+        or any((origin.hour, origin.minute, origin.second, origin.microsecond))
+    ):
+        raise ValueError("Factory time origin must be a timezone-aware Monday at midnight.")
     return origin
 
 
@@ -88,6 +93,8 @@ def _parameter(parent, kind, name, value, unit=None):
 def schedule_to_xml(result: ScheduleResult, *, origin: datetime, schedule_id: str):
     if not result.tasks or not schedule_id:
         raise ValueError("B2MML schedules require an ID and at least one task.")
+    if len({task.task_id for task in result.tasks}) != len(result.tasks):
+        raise ValueError("B2MML schedule task IDs must be unique.")
     root = etree.Element(f"{{{NS}}}OperationsSchedule", nsmap={None: NS})
     _element(root, "ID", schedule_id)
     _element(
@@ -103,9 +110,16 @@ def schedule_to_xml(result: ScheduleResult, *, origin: datetime, schedule_id: st
         ),
     )
     _element(root, "OperationsType", "Production")
+    requests = {}
+    products = {}
     for task in result.tasks:
-        request = _element(root, "OperationsRequest")
-        _element(request, "ID", task.lot_id)
+        if task.lot_id not in requests:
+            requests[task.lot_id] = _element(root, "OperationsRequest")
+            _element(requests[task.lot_id], "ID", task.lot_id)
+            products[task.lot_id] = task.product_id
+        elif products[task.lot_id] != task.product_id:
+            raise ValueError("One production lot cannot contain conflicting product definitions.")
+        request = requests[task.lot_id]
         segment = _element(request, "SegmentRequirement")
         _element(segment, "ID", task.task_id)
         _element(segment, "EarliestStartTime", _time(origin, task.start_min))
@@ -182,8 +196,18 @@ def mes_from_xml(xml, *, origin: datetime):
     segment = segments[0]
     if _text(segment, "b:MaterialActual/b:Quantity/b:UnitOfMeasure") != "units":
         raise ValueError("Factory MESActual expects quantities in units.")
+    if _text(segment, "b:SegmentData[b:ID='scrap_qty']/b:Value/b:UnitOfMeasure") != "units":
+        raise ValueError("Factory MESActual expects scrap quantities in units.")
+    lot_id = _text(segment, "b:MaterialActual/b:MaterialLotID")
+    if (
+        _text(segment, "b:OperationsRequestID") != lot_id
+        or _text(root, "b:OperationsResponse/b:OperationsRequestID") != lot_id
+    ):
+        raise ValueError("Conflicting B2MML lot/request references.")
+    if _text(segment, "b:MaterialActual/b:MaterialUse") != "Produced":
+        raise ValueError("MESActual requires produced material, not consumed material.")
     return MESActual(
-        lot_id=_text(segment, "b:MaterialActual/b:MaterialLotID"),
+        lot_id=lot_id,
         machine_id=_text(segment, "b:EquipmentActual/b:EquipmentID"),
         operation_seq=int(_text(segment, "b:ProcessSegmentID")),
         actual_start_min=_minutes(origin, _text(segment, "b:ActualStartTime")),
