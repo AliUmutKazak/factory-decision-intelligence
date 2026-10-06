@@ -100,7 +100,7 @@ def determine_system_status(tables):
     Sistem genel durumunu (READY, PIPELINE FAILED, SOLVER INFEASIBLE, DATA MISMATCH vb.)
     audit metadata ve veritabanı kısıtlarına göre değerlendirir.
     """
-    db_file = Path(DB_PATH)
+    db_file = Path(get_runtime_paths()["db_path"])
     if not db_file.exists():
         return "NO RUN", "error", "Veritabanı dosyası (factory.db) bulunamadı. Pipeline henüz çalıştırılmamış."
 
@@ -416,10 +416,13 @@ with tab_forecast:
             if "product_id" in forecast_df.columns and "model_used" in forecast_df.columns:
                 model_counts = forecast_df.groupby(["product_id", "model_used"]).size().reset_index(name="gun_sayisi")
                 st.dataframe(model_counts[["product_id", "model_used"]], use_container_width=True)
-            st.success("✓ **P02 & P03:** Klasik zaman serisi modeli olan **Holt-Winters** en düşük WAPE ile kazandı.")
-            st.success(
-                "✓ **P01, P04 & P05:** Çok adımlı özyinelemeli **LightGBM** doğrusal olmayan örüntüleri yakalayarak birinci oldu."
-            )
+            lineage_view = get_table("forecast_model_lineage", run_id=run_id_val)
+            if not lineage_view.empty and {"product_id", "selected_model"}.issubset(lineage_view.columns):
+                for model_name, group in lineage_view.groupby("selected_model"):
+                    sku_names = ", ".join(group["product_id"].astype(str).tolist())
+                    st.success(f"✓ **{sku_names}:** Rolling-origin WAPE karşılaştırmasında **{model_name}** seçildi.")
+            else:
+                st.info("Model lineage kaydı bulunamadı; model kazananı sabit metinle gösterilmiyor.")
 
         with col_f2:
             fig_fc = px.line(
@@ -772,7 +775,7 @@ with tab_scenarios:
     try:
         from src.scenarios.scenario_engine import ScenarioEngine
 
-        engine = ScenarioEngine(db_path=DB_PATH)
+        engine = ScenarioEngine(db_path=str(get_runtime_paths()["db_path"]))
         tradeoff_df = engine.run_all_scenarios()
 
         if not tradeoff_df.empty:
@@ -789,7 +792,7 @@ with tab_scenarios:
                 f"{best_cost_row['Total Cost (€)']:,.2f} €",
             )
             c3.metric(
-                "🔴 En Yüksek Riskli Senaryo",
+                "🔴 En Yüksek Modellenen Maliyet",
                 f"{worst_cost_row['Scenario']}",
                 f"{worst_cost_row['Total Cost (€)']:,.2f} €",
             )
@@ -833,7 +836,7 @@ with tab_mes:
         try:
             from src.scenarios.closed_loop import ClosedLoopEngine
 
-            cl_engine = ClosedLoopEngine(db_path=DB_PATH)
+            cl_engine = ClosedLoopEngine(db_path=str(get_runtime_paths()["db_path"]))
             decision = cl_engine.evaluate_variance_and_trigger(run_id_val)
 
             kpi1, kpi2, kpi3 = st.columns(3)
@@ -1049,7 +1052,7 @@ with tab_mes:
 
         st.markdown("---")
         st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
-        audit_history = get_table("reschedule_audit_log")
+        audit_history = get_table("reschedule_audit_log", run_id_val)
         if not audit_history.empty:
             st.dataframe(
                 audit_history[
