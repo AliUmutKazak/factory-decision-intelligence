@@ -108,11 +108,17 @@ def evaluate_schedule_service_level(
     makespan_min = float(df["end_min"].max()) if not df.empty else 0.0
     makespan_hours = round(makespan_min / 60.0, 2)
 
-    total_setup_min = float(df["setup_duration"].sum()) if "setup_duration" in df.columns else 0.0
+    setup_col = "setup_before_min" if "setup_before_min" in df.columns else "setup_duration"
+    total_setup_min = float(df[setup_col].sum()) if setup_col in df.columns else 0.0
     total_setup_hours = round(total_setup_min / 60.0, 2)
 
     # Operasyon süreleri ve kullanım (utilization)
-    run_time_col = "duration" if "duration" in df.columns else "run_duration"
+    if "duration_min" in df.columns:
+        run_time_col = "duration_min"
+    elif "duration" in df.columns:
+        run_time_col = "duration"
+    else:
+        run_time_col = "run_duration"
     total_run_min = float(df[run_time_col].sum()) if run_time_col in df.columns else 0.0
 
     num_machines = df["machine_id"].nunique() if "machine_id" in df.columns else 1
