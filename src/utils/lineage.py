@@ -6,6 +6,8 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
+
+from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -250,7 +252,7 @@ def record_pipeline_run_metadata(
 def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     """Denetim Madde 27: Koşumu her ortamda (fresh clone dahil) garantili olarak RUNNING durumunda başlatır."""
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
 
     # Hedef dizin yoksa oluştur (Fresh clone / CI ortamları için fail-safe)
     db_dir = os.path.dirname(os.path.abspath(active_db))
@@ -937,7 +939,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         root_dir / "reports" / "forecast_model_metadata.json",
     ]
 
-    processed_dir = Path(getattr(config, "PROCESSED_DATA_DIR", root_dir / "data" / "processed"))
+    processed_dir = Path(get_runtime_paths()["processed_dir"])
     if processed_dir.exists():
         for csv_file in processed_dir.glob("*.csv"):
             allowlist.append(csv_file)
