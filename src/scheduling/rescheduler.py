@@ -58,6 +58,15 @@ class DynamicRescheduler:
     def _persist_rescheduled_version(self, conn: sqlite3.Connection, new_df: pd.DataFrame, new_run_id: str, audit: RescheduleAuditEntry) -> None:
         self._create_new_run_record(conn,new_run_id,audit.previous_run_id)
         new_df.to_sql("production_schedule",conn,if_exists="append",index=False)
+        # Solver metadata is also versioned; never replace historical metadata.
+        meta_row = {
+            "run_id": new_run_id,
+            "status": "RESCHEDULED",
+            "reschedule_from_run_id": audit.previous_run_id,
+            "trigger_event_id": audit.trigger_event_id,
+            "nervousness_score": audit.nervousness_score,
+        }
+        pd.DataFrame([meta_row]).to_sql("reschedule_version_metadata", conn, if_exists="append", index=False)
         self._persist_audit_entry(conn,audit)
         conn.commit()
 
@@ -120,7 +129,10 @@ class DynamicRescheduler:
                     raise ValueError(f"[RESCHEDULE] Frozen constraint violated: {tid}")
             report=self._calculate_nervousness(baseline_sched,new_sched,len(frozen),len(baseline_sched)-len(frozen))
             audit=RescheduleAuditEntry(audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",trigger_event_id=trigger.event_id,previous_run_id=previous_run_id,new_run_id=new_run_id,trigger_timestamp_min=trigger.current_time_min,freeze_horizon_min=trigger.freeze_horizon_min,affected_machine_id=trigger.delay_machine_id,delay_duration_min=trigger.delay_duration_min,reason=trigger.reason,total_tasks=report.total_tasks,frozen_tasks_count=report.frozen_tasks_count,rescheduled_tasks_count=report.rescheduled_tasks_count,machine_swapped_count=report.machine_swapped_count,avg_start_delta_min=report.average_start_delta_min,nervousness_score=report.nervousness_score)
-            if persist_audit: self._persist_rescheduled_version(disk_conn,new_sched,new_run_id,audit)
+            if persist_audit:
+                self._persist_rescheduled_version(disk_conn,new_sched,new_run_id,audit)
+                from src.utils.lineage import promote_run_to_active
+                promote_run_to_active(new_run_id, db_path=self.disk_db_path)
             return baseline_sched,new_sched,meta,report,audit
         finally: disk_conn.close()
 
