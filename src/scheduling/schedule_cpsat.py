@@ -82,6 +82,7 @@ def run_cpsat_scheduling(
         reports_path.mkdir(parents=True, exist_ok=True)
     conn = get_db_connection(active_db_path)
     machine_initial_states = get_initial_machine_states(conn)
+    maintenance_windows = load_machine_maintenance_windows(conn)
 
     # Madde 30: Machine state run-scope snapshot mühürleme
     if run_id and machine_initial_states:
@@ -542,6 +543,17 @@ def run_cpsat_scheduling(
         # P0 DÜZELTMESİ: Hafta Bazlı Sert OT Bütçe Kısıtı (Solver-Enforced OT Budget)
         # ---------------------------------------------------------------------
         break_intervals = []
+        for mw in maintenance_windows:
+            if str(mw.machine_id) == str(mid):
+                if mw.start_min < horizon and mw.end_min > 0:
+                    start = max(0, int(mw.start_min))
+                    end = min(horizon, int(mw.end_min))
+                    if end > start:
+                        break_intervals.append(
+                            model.NewFixedSizeIntervalVar(
+                                start, end - start, f"maintenance_{mid}_{start}_{end}"
+                            )
+                        )
         if str(mid) not in machine_ot_hours:
             raise ValueError(f"Eksik makine takvim verisi (fail-fast): Tezgah {mid} icin OT limiti tanimlanmamis!")
         allowed_ot_min = int(machine_ot_hours[str(mid)] * 60)
