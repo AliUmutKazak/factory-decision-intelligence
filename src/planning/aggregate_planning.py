@@ -31,13 +31,16 @@ from src.config import (
     get_runtime_paths,
 )
 from src.scheduling.calendar_service import MachineCalendarService
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, persist_run_scoped_dataframe
 
 
-def load_data(db_path=None):
+def load_data(db_path=None, run_id=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
-    forecast_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
+    if run_id is not None:
+        forecast_df = pd.read_sql("SELECT * FROM forecast_demand WHERE run_id = ?", conn, params=(str(run_id),))
+    else:
+        forecast_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
     products_df = pd.read_sql("SELECT * FROM products", conn)
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
@@ -467,7 +470,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
     active_db_path = db_path or runtime["db_path"]
     processed_dir = runtime["processed_dir"]
 
-    forecast_df, products_df, routing_df, machines_df = load_data(active_db_path)
+    forecast_df, products_df, routing_df, machines_df = load_data(active_db_path, run_id=run_id)
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)
 
     capacity_cuts = {}
@@ -488,14 +491,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
         # 2. SKU Seviyesine Ayrıştır
         sku_plan_df, family_plan_df = disaggregate_to_sku(family_plan_df, sku_weekly)
 
-        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti (Madde 8 Düzeltmesi)
-        routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
-        cycle_map = {
-            (row["product_id"], row["machine_id"]): row["processing_time_min"] / 60.0
-            for _, row in routing_extended.iterrows()
-        }
-
-        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti (Madde 8 Düzeltmesi)
+        # 3. Operasyonel Tezgah Yükü ve Darboğaz Tespiti
         routing_extended = routing_df.merge(products_df[["product_id", "family_id"]], on="product_id")
         cycle_map = {
             (row["product_id"], row["machine_id"]): row["processing_time_min"] / 60.0
@@ -610,9 +606,10 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
     final_capacity_df.to_csv(output_machine_capacity_path, index=False)
 
     conn = get_db_connection(active_db_path)
-    final_family_plan.to_sql("aggregate_plan", conn, index=False, if_exists="replace")
-    final_sku_plan.to_sql("sku_production_plan", conn, index=False, if_exists="replace")
-    final_capacity_df.to_sql("machine_capacity_plan", conn, index=False, if_exists="replace")
+    persist_run_scoped_dataframe(conn, "aggregate_plan", final_family_plan, str(run_id))
+    persist_run_scoped_dataframe(conn, "sku_production_plan", final_sku_plan, str(run_id))
+    persist_run_scoped_dataframe(conn, "machine_capacity_plan", final_capacity_df, str(run_id))
+    conn.commit()
     conn.close()
 
     print(f"[OK] Aile Taktik Planı Kaydedildi: {output_aggregate_path}")
