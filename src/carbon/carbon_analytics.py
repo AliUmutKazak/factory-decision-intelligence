@@ -23,7 +23,6 @@ Gerçek Sistem Bağlantı Mimarisi:
 ===============================================================================
 """
 
-import os
 
 import pandas as pd
 
