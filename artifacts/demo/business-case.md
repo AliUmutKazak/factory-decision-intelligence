@@ -1,7 +1,7 @@
 # Measured factory demo business case
 
-Baseline: `RUN-20261006-9c3528`.
-Physical input fingerprint: `e5af4088c5651e120435b546d4ac5a24d178fef37e34d7560eccf6bcc08991b9`.
+Baseline: `RUN-20261006-38b141`.
+Physical input fingerprint: `e159d31bc3e4c852d16d7671c7871c7c34e1c376f6bc0c675e8144adfb1c0182`.
 
 All accepted schedules share the production calendar, maintenance, routes, setup, material availability, overtime and committed movement constraints.
 Dispatch baselines select machine order and use CP-SAT to place intervals; runtime includes a solver and is not a pure heuristic speed comparison.
