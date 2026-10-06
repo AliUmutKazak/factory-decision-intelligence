@@ -1,7 +1,7 @@
 {
-    "run_id": "RUN-20261006-e437bf",
-    "run_timestamp": "2026-10-06T20:41:01.080976",
-    "git_sha": "061a40d06080a901bcf01ed8471537fef28c4463",
+    "run_id": "RUN-20261006-b41377",
+    "run_timestamp": "2026-10-06T17:59:38.078247",
+    "git_sha": "75eb08d9256b98a54cbd19735c2fd479d8a0a432",
     "data_source": "data/processed/factory_orders.csv",
     "forecast_origin": "2017-12-31",
     "forecast_method": "Hybrid_Backtest_Selection",
@@ -12,7 +12,7 @@
         "P04": "Holt-Winters",
         "P05": "Naive"
     },
-    "config_hash": "51b0894b2abd67df",
+    "config_hash": "2ee298b9e6bb0683",
     "status": "COMPLETED",
     "orders_count": 1825,
     "environment": {
