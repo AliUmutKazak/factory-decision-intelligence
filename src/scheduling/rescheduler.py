@@ -117,7 +117,7 @@ class DynamicRescheduler:
                     mem_conn.commit()
                 from unittest.mock import patch
                 with patch("src.scheduling.schedule_cpsat.get_db_connection",return_value=NoCloseConnectionWrapper(mem_conn)):
-                    meta=run_cpsat_scheduling(run_id=new_run_id,frozen_task_positions=frozen)
+                    meta=run_cpsat_scheduling(run_id=new_run_id,frozen_task_positions=frozen,persist_outputs=False)
                 new_sched=pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?",mem_conn,params=(new_run_id,))
             finally: mem_conn.close()
             if new_sched.empty: raise ValueError("[RESCHEDULE] Solver yeni schedule üretmedi.")
