@@ -21,8 +21,9 @@ from src.config import (
 from src.contracts.schemas import ScenarioResultModel
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
 from src.integration.rescheduler import ClosedLoopRescheduler
+from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.service_level import evaluate_schedule_service_level
-from src.utils.db import get_db_connection
+from src.utils.db import get_active_run_id, get_db_connection
 
 
 class ScenarioDataUnavailableError(Exception):
@@ -105,15 +106,17 @@ class ScenarioEngine:
             "RAW MATERIAL DELAY": ScenarioShock(name="RAW MATERIAL DELAY", material_delay_days=3),
         }
 
-    def _read_table_safe(self, table_name: str, db_path: str) -> pd.DataFrame:
+    def _read_table_safe(self, table_name: str, db_path: str, run_id: str | None = None) -> pd.DataFrame:
+        conn = get_db_connection(db_path)
         try:
-            conn = get_db_connection(db_path)
-            try:
-                return pd.read_sql(f"SELECT * FROM {table_name}", conn)
-            finally:
-                conn.close()
-        except Exception:
-            return pd.DataFrame()
+            run_scoped = {"orders", "forecast_demand", "forecast_model_lineage", "aggregate_plan", "sku_production_plan", "machine_capacity_plan", "mrp_plan", "production_schedule", "energy_kpis", "energy_machine_kpis", "carbon_kpis", "carbon_machine_kpis", "carbon_price_scenarios"}
+            if run_id and table_name in run_scoped:
+                return pd.read_sql(f"SELECT * FROM {table_name} WHERE run_id = ?", conn, params=(str(run_id),))
+            return pd.read_sql(f"SELECT * FROM {table_name}", conn)
+        except Exception as exc:
+            raise ScenarioDataUnavailableError(f"DATA_UNAVAILABLE: {table_name} okunamadı: {exc}") from exc
+        finally:
+            conn.close()
 
     def _get_baseline_energy_carbon(
         self, sched_df: pd.DataFrame, energy_df: pd.DataFrame, carbon_df: pd.DataFrame
@@ -159,10 +162,12 @@ class ScenarioEngine:
         - 3 Kritik Operasyonel Şok (Demand, Capacity, Material): Gerçek kısıt çözümü / rerun.
         - Finansal Şoklar (Energy, CO2): Analitik duyarlılık (Sensitivity) analizi.
         """
-        sched_df = self._read_table_safe("production_schedule", self.db_path)
-        energy_df = self._read_table_safe("energy_kpis", self.db_path)
-        carbon_df = self._read_table_safe("carbon_kpis", self.db_path)
-        orders_df = self._read_table_safe("orders", self.db_path)
+        with get_db_connection(self.db_path) as conn:
+            run_id = get_active_run_id(conn)
+        sched_df = self._read_table_safe("production_schedule", self.db_path, run_id)
+        energy_df = self._read_table_safe("energy_kpis", self.db_path, run_id)
+        carbon_df = self._read_table_safe("carbon_kpis", self.db_path, run_id)
+        orders_df = self._read_table_safe("orders", self.db_path, run_id)
 
         # Hem çizelge hem enerji tablosu yoksa/boşsa veri yoktur: hata fırlat
         if sched_df.empty and (energy_df.empty or "makespan_hours" not in energy_df.columns):
@@ -186,39 +191,24 @@ class ScenarioEngine:
         if shock.failed_machines:
             failed_m = shock.failed_machines[0]
             try:
-                rescheduler = ClosedLoopRescheduler(db_path=self.db_path)
-                # CP-SAT re-optimization ile makine takvimini kapatıp yeniden çöz
-                sim_sched_solved = rescheduler._solve_cpsat_reschedule(
-                    df=sched_df.copy(),
-                    machine_id=failed_m,
-                    down_start_min=480.0,
-                    down_duration_min=480.0,
+                rescheduler = DynamicRescheduler(disk_db_path=self.db_path)
+                from src.contracts.schemas import RescheduleTriggerEvent
+                trigger = RescheduleTriggerEvent(
+                    event_id=f"SCENARIO-{shock.name.replace(' ', '-').upper()}",
+                    current_time_min=480,
+                    freeze_horizon_min=240,
+                    delay_machine_id=failed_m,
+                    delay_duration_min=480,
+                    reason=f"Scenario: {shock.name}",
                 )
-                if sim_sched_solved is not None and not sim_sched_solved.empty:
-                    sim_sched = sim_sched_solved
-                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-                else:
-                    # Solver fallback (ripple shift)
-                    resched_result = rescheduler.reschedule_on_machine_breakdown(
-                        machine_id=failed_m,
-                        down_start_min=480.0,
-                        down_duration_min=480.0,
-                        event_type="MAJOR_BREAKDOWN",
-                        commit=False,
-                    )
-                    sim_makespan = (
-                        resched_result["new_makespan_min"] / 60.0
-                        if resched_result["status"] == "RESCHEDULED"
-                        else base_makespan + 8.0
-                    )
-            except Exception:
-                if not sim_sched.empty and "machine_id" in sim_sched.columns:
-                    mask = sim_sched["machine_id"] == failed_m
-                    sim_sched.loc[mask, "start_min"] += 480.0
-                    sim_sched.loc[mask, "end_min"] += 480.0
-                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-                else:
-                    sim_makespan = base_makespan + 8.0
+                _, sim_sched, _, _, _ = rescheduler.execute_reschedule(
+                    trigger=trigger,
+                    new_run_id=None,
+                    persist_audit=False,
+                )
+                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
+            except Exception as exc:
+                raise ScenarioDataUnavailableError(f"SCENARIO_SOLVE_FAILED: {shock.name}: {exc}") from exc
 
             run_col = "duration_min" if "duration_min" in sim_sched.columns else "duration"
             sim_work_hours = (
