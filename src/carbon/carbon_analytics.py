@@ -31,8 +31,8 @@ from src.config import (
     DEFAULT_FORKLIFT_LITERS,
     DIESEL_EMISSION_FACTOR,
     GRID_EMISSION_FACTOR,
+    get_runtime_paths,
 )
-from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
 
