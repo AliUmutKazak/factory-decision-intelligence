@@ -130,8 +130,14 @@ class DynamicRescheduler:
         completed_tasks: set,
     ) -> dict[str, tuple[str, float, float]]:
         cutoff = trigger.current_time_min + trigger.freeze_horizon_min
+        execution_committed = baseline_sched.get(
+            "execution_status", pd.Series("SCHEDULED", index=baseline_sched.index)
+        ).isin({"IN_PROGRESS", "COMPLETED"})
         frozen = baseline_sched[
-            (baseline_sched["start_min"] < cutoff) | baseline_sched["task_id"].isin(completed_tasks)
+            (baseline_sched["start_min"] < cutoff)
+            | (baseline_sched["start_min"] <= trigger.current_time_min)
+            | baseline_sched["task_id"].astype(str).isin({str(task_id) for task_id in completed_tasks})
+            | execution_committed
         ]
         return {
             str(row["task_id"]): (
@@ -502,7 +508,11 @@ class DynamicRescheduler:
                 )
             else:
                 track_df = pd.DataFrame(columns=["task_id", "status"])
-            completed = set(track_df.loc[track_df["status"] == "COMPLETED", "task_id"]) if not track_df.empty else set()
+            completed = (
+                set(track_df.loc[track_df["status"].isin({"COMPLETED", "IN_PROGRESS"}), "task_id"])
+                if not track_df.empty
+                else set()
+            )
             frozen = self._build_frozen_positions(baseline_sched, trigger, completed)
 
             mem_conn = sqlite3.connect(":memory:")

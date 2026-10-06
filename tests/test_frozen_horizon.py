@@ -8,6 +8,25 @@ from src.integration.rescheduler import ClosedLoopRescheduler
 from src.utils.db import get_db_connection
 
 
+def test_execution_commitments_override_planned_start_and_zero_freeze_window():
+    from src.contracts.schemas import RescheduleTriggerEvent
+    from src.scheduling.rescheduler import DynamicRescheduler
+
+    baseline = pd.DataFrame(
+        [
+            {"task_id": 1, "machine_id": "M01", "start_min": 480, "end_min": 600, "execution_status": "SCHEDULED"},
+            {"task_id": 2, "machine_id": "M01", "start_min": 900, "end_min": 960, "execution_status": "IN_PROGRESS"},
+            {"task_id": 3, "machine_id": "M01", "start_min": 1000, "end_min": 1060, "execution_status": "SCHEDULED"},
+            {"task_id": 4, "machine_id": "M01", "start_min": 1200, "end_min": 1260, "execution_status": "SCHEDULED"},
+        ]
+    )
+    trigger = RescheduleTriggerEvent(event_id="ZERO-FREEZE", current_time_min=480, freeze_horizon_min=0)
+    engine = DynamicRescheduler.__new__(DynamicRescheduler)
+    frozen = engine._build_frozen_positions(baseline, trigger, {"3"})
+    assert set(frozen) == {"1", "2", "3"}
+    assert frozen["2"] == ("M01", 900.0, 960.0)
+
+
 def test_frozen_horizon_data_model_columns_exist():
     conn = get_db_connection()
     df = pd.read_sql("SELECT * FROM production_schedule LIMIT 10;", conn)
