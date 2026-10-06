@@ -9,6 +9,7 @@ from typing import Any
 import pandas as pd
 
 from src.config import ECONOMIC_CONFIG
+from src.scheduling.analytics_schema import schedule_job_summary
 
 # Müşteri sınıfı / Öncelik ceza çarpanları (Tier 1 = VIP / Stratejik Ortak)
 CUSTOMER_CLASS_WEIGHTS = {
@@ -52,15 +53,7 @@ def evaluate_schedule_service_level(
     df = schedule_df.copy()
 
     # Sipariş veya iş tamamlama zamanı (C_j: job'ın son operasyonunun bitişi)
-    group_col = "job_id" if "job_id" in df.columns else "product_id"
-    job_completion = df.groupby(group_col)["end_min"].max().reset_index()
-    job_completion.rename(columns={"end_min": "completion_min"}, inplace=True)
-
-    # Sipariş metadata entegrasyonu (varsa orders_df ile merge)
-    if orders_df is not None and not orders_df.empty:
-        merged = pd.merge(job_completion, orders_df, on=group_col, how="left")
-    else:
-        merged = job_completion.copy()
+    group_col, merged = schedule_job_summary(df, orders_df)
 
     # Varsayılan sütun atamaları (yoksa)
     if "due_date_min" not in merged.columns:
@@ -74,7 +67,7 @@ def evaluate_schedule_service_level(
         merged["customer_class"] = merged["customer_class"].fillna("STANDARD")
 
     if "priority" not in merged.columns:
-        merged["priority"] = 1
+        merged["priority"] = merged.get("priority_weight", 1)
     else:
         merged["priority"] = merged["priority"].fillna(1)
 

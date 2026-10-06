@@ -1,4 +1,3 @@
-import json
 import sys
 from pathlib import Path
 
@@ -52,7 +51,7 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
     """
     db_file = Path(get_runtime_paths()["db_path"])
     if not db_file.exists():
-        return pd.DataFrame()
+        raise QueryError("Runtime database is unavailable.")
 
     try:
         with get_db_connection(get_runtime_paths()["db_path"]) as conn:
@@ -60,7 +59,7 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
             cursor.execute(f"PRAGMA table_info({table_name})")
             rows = cursor.fetchall()
             if not rows:
-                return pd.DataFrame()
+                raise QueryError(f"Required table is missing: {table_name}")
 
             columns = [row[1] for row in rows]
             if run_id:
@@ -110,17 +109,12 @@ def determine_system_status(tables):
         return "NO RUN", "error", "Doğrulanmış ACTIVE pipeline koşumu bulunamadı."
 
     # 2. Solver Metadata Doğrulaması
-    solver_meta_path = get_runtime_paths()["reports_dir"] / "schedule_solver_metadata.json"
-    if solver_meta_path.exists():
-        try:
-            with open(solver_meta_path, encoding="utf-8") as f:
-                s_meta = json.load(f)
-        except Exception as e:
-            return "METADATA CORRUPTED", "error", f"Solver metadata dosyası bozuk: {e}"
-
-        s_status = str(s_meta.get("solver_status", "")).upper()
-        if s_status in ["INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]:
-            return "SOLVER INFEASIBLE", "error", f"CP-SAT Çizelgeleme çözücüsü başarısız: {s_status}."
+    solver_meta = tables.get("schedule_solver_metadata", pd.DataFrame())
+    if solver_meta.empty or set(solver_meta["run_id"]) != {active["run_id"]}:
+        return "DATA MISMATCH", "error", "ACTIVE run için solver metadata eksik veya uyumsuz."
+    s_status = str(solver_meta.iloc[-1].get("solver_status", solver_meta.iloc[-1].get("status", ""))).upper()
+    if s_status not in {"OPTIMAL", "FEASIBLE"}:
+        return "SOLVER INFEASIBLE", "error", f"CP-SAT başarısız: {s_status}."
 
     # 3. Tablo Doluluk Kontrolleri (Madde 20)
     core_upstream = ["forecast_demand", "sku_production_plan", "mrp_plan"]
@@ -173,7 +167,11 @@ st.title("🏭 Factory Decision Intelligence Platform")
 st.caption("Talep Tahmini • Hiyerarşik Taktik Planlama • Zaman Fazlı MRP • CP-SAT Çizelgeleme • Enerji & Karbon")
 
 # --- 1. Aktif Pipeline Run Tespiti (Zero Stale Data Contract) ---
-active_run = get_active_pipeline_run(allow_fallback=False)
+try:
+    active_run = get_active_pipeline_run(allow_fallback=False)
+except Exception as exc:
+    st.error(f"ACTIVE run okunamadı: {exc}")
+    st.stop()
 
 if not active_run:
     st.error("🚫 **NO ACTIVE RUN**: Doğrulanmış ve aktif (ACTIVE) durumda bir pipeline koşumu bulunamadı.")
@@ -192,18 +190,23 @@ data_src_val = active_run.get("data_source", "N/A")
 target_run_id = run_id_val if run_id_val != "N/A" else None
 
 # --- 2. Veri Setlerini Aktif Run ID'ye Göre Çek ---
-raw_tables = {
-    "pipeline_runs": get_table("pipeline_runs"),
-    "forecast_model_lineage": get_table("forecast_model_lineage", run_id=target_run_id),
-    "energy_kpis": get_table("energy_kpis", run_id=target_run_id),
-    "carbon_kpis": get_table("carbon_kpis", run_id=target_run_id),
-    "mrp_plan": get_table("mrp_plan", run_id=target_run_id),
-    "forecast_demand": get_table("forecast_demand", run_id=target_run_id),
-    "sku_production_plan": get_table("sku_production_plan", run_id=target_run_id),
-    "production_schedule": get_table("production_schedule", run_id=target_run_id),
-    "aggregate_plan": get_table("aggregate_plan", run_id=target_run_id),
-    "machine_capacity_plan": get_table("machine_capacity_plan", run_id=target_run_id),
-}
+try:
+    raw_tables = {
+        "pipeline_runs": get_table("pipeline_runs"),
+        "forecast_model_lineage": get_table("forecast_model_lineage", run_id=target_run_id),
+        "energy_kpis": get_table("energy_kpis", run_id=target_run_id),
+        "carbon_kpis": get_table("carbon_kpis", run_id=target_run_id),
+        "mrp_plan": get_table("mrp_plan", run_id=target_run_id),
+        "forecast_demand": get_table("forecast_demand", run_id=target_run_id),
+        "sku_production_plan": get_table("sku_production_plan", run_id=target_run_id),
+        "production_schedule": get_table("production_schedule", run_id=target_run_id),
+        "schedule_solver_metadata": get_table("schedule_solver_metadata", run_id=target_run_id),
+        "aggregate_plan": get_table("aggregate_plan", run_id=target_run_id),
+        "machine_capacity_plan": get_table("machine_capacity_plan", run_id=target_run_id),
+    }
+except QueryError as exc:
+    st.error(str(exc))
+    st.stop()
 
 # --- 3. Sistem Durumu Değerlendirmesi ---
 status_code, status_level, status_msg = determine_system_status(raw_tables)
@@ -637,8 +640,8 @@ with tab_schedule:
         st.divider()
         st.subheader("⚖️ Çizelgeleme Kural Kıyaslaması (Heuristic Benchmarking)")
         st.caption(
-            "Gelişmiş CP-SAT Tam Optimizasyon modelinin klasik fabrika kurallarına (FIFO, EDD, SPT, Greedy) "
-            "karşı sağladığı verimlilik ve gecikme kazanımları."
+            "FIFO, EDD, SPT ve Greedy örnekleri takvim, bakım ve rota öncüllüğü içermeyen basitleştirilmiş kurallardır. "
+            "CP-SAT ile aynı fizibilite modelini kullanmazlar; bu tablo optimum veya performans kazanımı kanıtı değildir."
         )
 
         try:
@@ -775,8 +778,15 @@ with tab_scenarios:
     try:
         from src.scenarios.scenario_engine import ScenarioEngine
 
-        engine = ScenarioEngine(db_path=str(get_runtime_paths()["db_path"]))
-        tradeoff_df = engine.run_all_scenarios()
+        cache_key = f"scenario_matrix:{run_id_val}"
+        if st.button("Senaryoları hesapla", key="compute_scenarios"):
+            with st.spinner("Aktif plan için senaryolar hesaplanıyor..."):
+                engine = ScenarioEngine(db_path=str(get_runtime_paths()["db_path"]))
+                result = engine.run_all_scenarios()
+                if engine.baseline_run_id != run_id_val:
+                    raise DashboardDataError("ACTIVE run değişti; sonuçları görmek için paneli yenileyin.")
+                st.session_state[cache_key] = result
+        tradeoff_df = st.session_state.get(cache_key, pd.DataFrame())
 
         if not tradeoff_df.empty:
             c1, c2, c3 = st.columns(3)
@@ -815,7 +825,7 @@ with tab_scenarios:
                 use_container_width=True,
             )
         else:
-            st.warning("Senaryo sonuçları boş döndü.")
+            st.info("Bu ACTIVE plan için senaryo karşılaştırmasını hesaplamak üzere butona basın.")
     except Exception as e:
         st.error(f"Senaryo motoru hatası: {e}")
 

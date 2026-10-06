@@ -11,14 +11,13 @@ import os
 import sqlite3
 import tempfile
 import uuid
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 
 from src.config import (
-    CARBON_PRICE_SCENARIOS_EUR,
     DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH,
     ECONOMIC_CONFIG,
     ObjectivePolicy,
@@ -99,6 +98,7 @@ class ScenarioEngine:
 
     def __init__(self, db_path: str | None = None):
         self.db_path = db_path or os.environ.get("FACTORY_DB_PATH", "data/factory.db")
+        self.baseline_run_id: str | None = None
         self.scenarios: dict[str, ScenarioShock] = {
             "BASELINE": ScenarioShock(name="BASELINE"),
             "+20% DEMAND": ScenarioShock(name="+20% DEMAND", demand_multiplier=1.20),
@@ -221,7 +221,26 @@ class ScenarioEngine:
             except Exception as exc:
                 raise ScenarioDataUnavailableError(f"SCENARIO_SOLVE_FAILED: {shock.name}: {exc}") from exc
 
+    @contextmanager
+    def _baseline_snapshot(self):
+        if not Path(self.db_path).is_file():
+            raise ScenarioDataUnavailableError("DATA_UNAVAILABLE: Runtime database missing.")
+        with tempfile.TemporaryDirectory(prefix="factory-baseline-") as temporary:
+            snapshot = Path(temporary) / "factory.db"
+            with closing(sqlite3.connect(self.db_path)) as source, closing(sqlite3.connect(snapshot)) as target:
+                source.backup(target)
+                try:
+                    self.baseline_run_id = get_active_run_id(target)
+                except RuntimeError as exc:
+                    raise ScenarioDataUnavailableError(f"DATA_UNAVAILABLE: {exc}") from exc
+            engine = ScenarioEngine(db_path=str(snapshot))
+            yield engine
+
     def evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
+        with self._baseline_snapshot() as engine:
+            return engine._evaluate_scenario(shock)
+
+    def _evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
         """Madde 23: Hibrit Senaryo Motoru.
 
         - 3 Kritik Operasyonel Şok (Demand, Capacity, Material): Gerçek kısıt çözümü / rerun.
@@ -277,13 +296,7 @@ class ScenarioEngine:
         # 3. FİNANSAL SENSITIVITY ANALİZİ (+25% Energy, +50 €/tCO2)
         # =====================================================================
         unit_electricity_price = DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH * shock.electricity_price_multiplier
-        if isinstance(CARBON_PRICE_SCENARIOS_EUR, list) and len(CARBON_PRICE_SCENARIOS_EUR) > 0:
-            base_carb_rate = float(CARBON_PRICE_SCENARIOS_EUR[len(CARBON_PRICE_SCENARIOS_EUR) // 2])
-        elif isinstance(CARBON_PRICE_SCENARIOS_EUR, dict):
-            base_carb_rate = float(CARBON_PRICE_SCENARIOS_EUR.get("mid", 85.0))
-        else:
-            base_carb_rate = float(CARBON_PRICE_SCENARIOS_EUR) if CARBON_PRICE_SCENARIOS_EUR else 85.0
-        total_carb_rate = base_carb_rate + shock.carbon_tax_delta_eur
+        total_carb_rate = ECONOMIC_CONFIG.carbon_price_per_ton + shock.carbon_tax_delta_eur
 
         params = CostParameters(
             energy_cost_per_kwh=unit_electricity_price,
@@ -304,24 +317,14 @@ class ScenarioEngine:
                 carbon_emissions_ton=sim_tco2,
             )
             inventory_cost = round(cost_breakdown.inventory_holding_cost, 2)
-            # Eğer TMC içindeki enerji maliyeti hesaplanmışsa onu al, yoksa doğrudan hesaplananı kullan
-            energy_cost = round(cost_breakdown.energy_cost, 2) or calc_energy_cost
-            carbon_cost = round(cost_breakdown.carbon_cost, 2) or calc_carbon_cost
+            energy_cost = round(cost_breakdown.energy_cost, 2)
+            carbon_cost = round(cost_breakdown.carbon_cost, 2)
             total_cost = round(cost_breakdown.total_manufacturing_cost, 2)
-            if total_cost == 0.0:
-                backlog_cost = (backlog / 50.0) * ECONOMIC_CONFIG.backlog_penalty_per_batch
-                total_cost = round(energy_cost + carbon_cost + inventory_cost + backlog_cost, 2)
         else:
             inventory_cost = 0.0
             energy_cost = calc_energy_cost
             carbon_cost = calc_carbon_cost
-            overtime_cost = (
-                max(0.0, sim_makespan - 168.0)
-                * ECONOMIC_CONFIG.labor_rate_per_hour
-                * ECONOMIC_CONFIG.overtime_multiplier
-            )
-            backlog_cost = (backlog / 50.0) * ECONOMIC_CONFIG.backlog_penalty_per_batch
-            total_cost = round(energy_cost + carbon_cost + inventory_cost + overtime_cost + backlog_cost, 2)
+            total_cost = round(energy_cost + carbon_cost, 2)
 
         return ScenarioResult(
             scenario=shock.name,
@@ -337,7 +340,9 @@ class ScenarioEngine:
 
     def run_all_scenarios(self) -> pd.DataFrame:
         """Tüm senaryoları çalıştırarak nihai Karşılaştırma Matrisini döner."""
-        results = [self.evaluate_scenario(shock) for shock in self.scenarios.values()]
+        # One SQLite snapshot pins the entire comparison to the same run and masters.
+        with self._baseline_snapshot() as engine:
+            results = [engine._evaluate_scenario(shock) for shock in self.scenarios.values()]
         df = pd.DataFrame([r.__dict__ for r in results])
         df.columns = [
             "Scenario",
@@ -350,4 +355,5 @@ class ScenarioEngine:
             "Carbon Cost (€)",
             "Total Cost (€)",
         ]
+        df["Baseline Run"] = self.baseline_run_id
         return df

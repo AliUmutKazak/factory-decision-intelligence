@@ -1,5 +1,5 @@
 # 🏭 Factory Decision Intelligence System
-### Enterprise Decision Support, Hierarchical Optimization (LP & CP-SAT), Green Manufacturing & Dynamic Rescheduling Platform
+### Decision Support POC, Hierarchical Optimization (LP & CP-SAT), Green Manufacturing & Dynamic Rescheduling Platform
 ### Endüstriyel Karar Destek, Hiyerarşik Optimizasyon (LP & CP-SAT), Yeşil İmalat ve Dinamik Yeniden Çizelgeleme Platformu
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
@@ -7,7 +7,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![OR-Tools](https://img.shields.io/badge/Google%20OR--Tools-CP--SAT-EA4335?style=flat&logo=google&logoColor=white)](https://developers.google.com/optimization)
 [![PuLP](https://img.shields.io/badge/PuLP-LP%20Optimization-4B8BBE?style=flat)](https://coin-or.github.io/pulp/)
-[![Tests](https://img.shields.io/badge/Pytest-161%2F161%20Passed-brightgreen?style=flat&logo=pytest&logoColor=white)]()
+[![CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg?event=pull_request)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
 [![Code Quality](https://img.shields.io/badge/Linter-Ruff%20Clean-black?style=flat)](https://beta.ruff.rs/docs/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -17,10 +17,10 @@
 ## 🌐 Executive Summary / Yönetici Özeti
 
 ### [TR] Sistem Özeti
-**Factory Decision Intelligence System**, ayrık imalat (discrete manufacturing) tesisleri için operasyonel araştırmalar (Operations Research), malzeme gereksinim planlaması (MRP-I), yeşil imalat (green manufacturing) ve gerçek zamanlı dinamik çizelgelemeyi bir araya getiren kurumsal seviyede bir karar destek motorudur. Taktiksel düzeydeki çok dönemli kapasite ve emisyon kararlarını, operasyonel düzeyde sıra bağımlı hazırlık sürelerine (SDST) sahip sonlu kapasiteli tezgah çizelgelerine bağlar. Atölye zeminindeki beklenmeyen aksaklıklarda (makine arızaları, acil siparişler) dondurulmuş ufuk (freeze horizon) ve çizelge gerginliği (schedule nervousness) metrikleriyle kararlı yeniden çizelgeleme yürütür.
+**Factory Decision Intelligence System**, ayrık imalat (discrete manufacturing) tesisleri için operasyonel araştırmalar (Operations Research), malzeme gereksinim planlaması (MRP-I), yeşil imalat (green manufacturing) ve gerçek zamanlı dinamik çizelgelemeyi bir araya getiren ileri düzey bir karar destek prototipidir. Taktiksel düzeydeki çok dönemli kapasite ve emisyon kararlarını, operasyonel düzeyde sıra bağımlı hazırlık sürelerine (SDST) sahip sonlu kapasiteli tezgah çizelgelerine bağlar. Atölye zeminindeki beklenmeyen aksaklıklarda (makine arızaları, acil siparişler) dondurulmuş ufuk (freeze horizon) ve çizelge gerginliği (schedule nervousness) metrikleriyle kararlı yeniden çizelgeleme yürütür.
 
 ### [EN] System Overview
-The **Factory Decision Intelligence System** is an enterprise-grade decision intelligence engine uniting Operations Research (OR), multi-level Material Requirements Planning (MRP-I), green manufacturing constraints, and dynamic shop-floor rescheduling for discrete manufacturing plants. It bridges aggregate tactical decisions (capacity, energy costs, carbon emission caps) with operational finite-capacity machine scheduling featuring Sequence-Dependent Setup Times (SDST). During stochastic events (breakdowns, hot orders), it executes controlled dynamic rescheduling governed by a freeze horizon and quantitative schedule nervousness metrics.
+The **Factory Decision Intelligence System** is an advanced decision intelligence prototype uniting Operations Research (OR), multi-level Material Requirements Planning (MRP-I), green manufacturing constraints, and dynamic shop-floor rescheduling for discrete manufacturing plants. It bridges aggregate tactical decisions (capacity, energy costs, carbon emission caps) with operational finite-capacity machine scheduling featuring Sequence-Dependent Setup Times (SDST). During stochastic events (breakdowns, hot orders), it executes controlled dynamic rescheduling governed by a freeze horizon and quantitative schedule nervousness metrics.
 
 ---
 
@@ -53,7 +53,7 @@ graph TD
     end
 
     subgraph Katman 2: Taktiksel Planlama & Yeşil İmalat / Tactical LP Layer
-        B --> C[Linear Programming - PuLP / HiGHS]
+        B --> C[Linear Programming - PuLP / CBC]
         C --> D[Haftalık Lot Büyüklükleri & Güvenlik Stoğu]
         C --> E[Fazla Mesai, Enerji Tüketimi & Karbon Emisyon Kotası]
     end
@@ -184,6 +184,10 @@ Mevcut zamandan ($t_{now}$) itibaren belirlenen dondurma periyodu ($H_{freeze}$)
 $$S_i = S_i^{orijinal}, \quad Makine_i = Makine_i^{orijinal} \quad \forall i \text{ where } S_i \le t_{now} + H_{freeze}$$
 Bu operasyonların sırası ve makine atamaları yeniden çizelgelemede **değiştirilemez**.
 
+Duruş, etkilenen tezgâhtaki dondurulmuş görevlerden sonra uygulanır; başlamış operasyonu kesip devam ettirme modellenmez. Ayrıntılar: [Run isolation and rescheduling](docs/run-isolation-and-rescheduling.md).
+
+`OPERATIONAL_BALANCED` politikası makespan, setup ve tardiness sürelerini dengeler. Eski `COST_OPTIMIZED` adı kaldırılmıştır: CP-SAT parasal toplam üretim maliyetini optimize ettiği iddiasında bulunmaz. Ekonomik senaryo raporları `EconomicConfig` EUR parametreleriyle ayrı hesaplanır.
+
 ### 2. Çizelge Gerginliği Metrikleri (Schedule Nervousness Metrics)
 Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için iki metrik ölçülür:
 * **Başlangıç Zamanı Sapması (Start Time Displacement):**
@@ -205,22 +209,22 @@ Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için 
 ### SOP-02: Makine Arızası Müdahale Prosedürü (Breakdown Response)
 1. **Arıza Girişi:** Arızalanan makine ID'si, arıza anı ($t_{breakdown}$) ve tahmini tamir süresi ($T_{repair}$) girilir.
 2. **Dondurma Uygulama:** $t_{breakdown} + H_{freeze}$ penceresindeki işler kilitlenir.
-3. **What-If Simülasyonu:** `/api/v1/what-if/breakdown` çağrılarak termin gecikmeleri simüle edilir.
-4. **Onay & Reschedule:** Kabul edilebilir senaryo seçilerek `/api/v1/reschedule` ile yeni çizelge yürürlüğe alınır.
+3. **What-If Simülasyonu:** `/api/v1/schedule/what-if/breakdown` çağrılarak termin gecikmeleri simüle edilir.
+4. **Onay & Reschedule:** Kabul edilebilir senaryo seçilerek `/api/v1/schedule/reschedule` ile yeni çizelge yürürlüğe alınır.
 
 ### SOP-03: Acil Sipariş Enjeksiyon Prosedürü (Hot-Order Injection)
 1. **Öncelik Tanımlama:** Acil sipariş yüksek öncelik bayrağı ve teslim tarihi ile sisteme verilir.
-2. **Çatışma Analizi:** `/api/v1/what-if/hot-order` çağrısı ile mevcut müşteri siparişlerinde oluşacak gecikmeler listelenir.
+2. **Çatışma Analizi:** `/api/v1/schedule/what-if/hot-order` çağrısı ile mevcut müşteri siparişlerinde oluşacak gecikmeler listelenir.
 3. **Kapasite Tahsisi:** Mümkünse mesai artışı, değilse düşük öncelikli işlerin ötelenmesiyle acil sipariş hatta enjekte edilir.
 
 ---
 
 ## 🛡️ Kriptografik İzlenebilirlik (Lineage & Audit Trail)
 
-Sistemdeki tüm simülasyon ve yeniden çizelgeleme kararları değiştirilemez denetim kütüğüne (Audit Trail) kaydedilir:
+Yayınlanan yeniden çizelgeleme kararları audit tablosuna ve karar kütüğüne kaydedilir; bundle dosyalarının SHA-256 özetleri değişiklikleri tespit eder. Sandbox what-if işlemleri runtime verisini değiştirmez:
 * **Olay Kaydı:** Tetikleyici olay tipi (`BREAKDOWN`, `HOT_ORDER`, `PERIODIC`).
 * **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak mühürlenir.
-* **Denetim Tablosu:** SQLite `audit_log` tablosunda saklanır ve `/api/v1/audit-log` üzerinden denetlenebilir.
+* **Denetim Tablosu:** SQLite `reschedule_audit_log` tablosunda saklanır ve `/api/v1/schedule/audit-log` üzerinden denetlenebilir.
 
 ---
 
@@ -233,8 +237,8 @@ Sistemdeki tüm simülasyon ve yeniden çizelgeleme kararları değiştirilemez 
 | **Veri Şeması & Doğrulama** | Pydantic | v2.x | Tip güvenliği ve veri sözleşmeleri (Contracts) |
 | **Karar Kokpiti & UI** | Streamlit, Plotly Express | 1.32+ | İnteraktif Gantt şeması, senaryo kıyası ve yönetici kokpiti |
 | **Veri Tabanı & Analitik** | SQLite3, Pandas, NumPy | Python Builtin / 2.x | Veri ambarı, staging hatları ve denetim logları |
-| **Test & Kalite Güvencesi**| Pytest, Ruff | 161 Tests / Clean | %100 geçen birim, regresyon ve entegrasyon testleri |
-| **Konteynerizasyon** | Docker, Docker Compose | Multi-Stage | Tek komutla orkestrasyon ve mikroservis dağıtımı |
+| **Test & Kalite Güvencesi**| Pytest, Ruff, GitHub Actions | CI quality gates | Birim, regresyon, entegrasyon ve Docker başlangıç testleri |
+| **Konteynerizasyon** | Docker, Docker Compose | Python 3.11-slim | Pipeline hazırlığı, ACTIVE doğrulaması ve servis başlangıcı |
 
 ---
 
@@ -244,12 +248,13 @@ FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnterakt
 
 | Metot | Uç Nokta (Endpoint) | Parametre / Gövde (Payload) | Açıklama |
 |---|---|---|---|
-| `GET` | `/health` | - | Servis canlılık ve veritabanı bağlantı kontrolü |
+| `GET` | `/health` | - | Servis canlılığı |
+| `GET` | `/ready` | - | ACTIVE sürüm ve solver metadata kontrolü; run_id döndürür |
 | `GET` | `/api/v1/schedule/current` | - | SQLite üzerindeki aktif operasyonel çizelgeyi döndürür |
-| `POST` | `/api/v1/what-if/breakdown` | `{"machine_id": "M1", "start_time": 120, "duration": 60}` | Makine duruşunu simüle eder; gecikme ve sapma analizi sunar |
-| `POST` | `/api/v1/what-if/hot-order` | `{"order_id": "HOT_01", "due_date": 300, "tasks": [...]}` | Acil siparişin mevcut çizelge üzerindeki etkisini hesaplar |
-| `POST` | `/api/v1/reschedule` | `{"trigger_type": "...", "freeze_horizon": 60}` | Dondurulmuş ufuk kurallarıyla yeni çizelgeyi üretir ve kaydeder |
-| `GET` | `/api/v1/audit-log` | `?limit=50` | SHA-256 imzalı geçmiş simülasyon ve plan denetim loglarını listeler |
+| `POST` | `/api/v1/schedule/what-if/breakdown` | `{"machine_id": "M01", "start_min": 480, "duration_min": 60}` | Makine duruşunu simüle eder; gecikme ve sapma analizi sunar |
+| `POST` | `/api/v1/schedule/what-if/hot-order` | `{"order_id": "HOT_01", "product_id": "P01", "quantity": 25, "due_date_min": 2880, "priority_weight": 10}` | Acil siparişin mevcut çizelge üzerindeki etkisini hesaplar |
+| `POST` | `/api/v1/schedule/reschedule` | `{"trigger": {"event_id": "EVT-01", "current_time_min": 480, "freeze_horizon_min": 60, "delay_machine_id": "M01", "delay_duration_min": 60}}` | Dondurulmuş ufuk kurallarıyla yeni çizelgeyi üretir ve kaydeder |
+| `GET` | `/api/v1/schedule/audit-log` | `?limit=50` | SHA-256 imzalı geçmiş simülasyon ve plan denetim loglarını listeler |
 
 ---
 
@@ -269,7 +274,7 @@ Streamlit karar paneli (`http://localhost:8501`), karar vericilere interaktif ye
 
 ```bash
 # 1. Depoyu klonlayın
-git clone [https://github.com/AliUmutKazak/factory-decision-intelligence.git](https://github.com/AliUmutKazak/factory-decision-intelligence.git)
+git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
 cd factory-decision-intelligence
 
 # 2. Sanal ortamı oluşturun ve aktifleştirin
@@ -283,12 +288,14 @@ source factory-env/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Kalite Güvencesi ve Testler (161 Test)
+### 2. Pipeline, doğrulama ve testler
 
-Projedeki 161 birim, entegrasyon ve regresyon testini koşturmak için:
+Servislerden ve entegrasyon testlerinden önce doğrulanmış bir ACTIVE plan oluşturun:
 
 ```bash
-pytest tests/ -v
+python main.py
+python scripts/verify_active_run.py
+python -m pytest tests/ -v
 ```
 
 ### 3. FastAPI Servisini Başlatma
@@ -311,16 +318,19 @@ streamlit run dashboard/app.py
 
 ## 🐳 Docker ile Dağıtım
 
-Docker ve Docker Compose sayesinde tüm mimari izole konteynerlar olarak tek komutla ayağa kaldırılabilir:
+Docker Compose ilk başlangıçta pipeline çalıştırır, bundle ve ACTIVE run doğrulamasından sonra API ve dashboard servislerini açar. Sonraki başlangıçlarda doğrulanmış mevcut ACTIVE sürümü kullanır:
 
 ```bash
 # Servisleri derleyin ve başlatın
-docker compose up --build
+docker compose up --build -d --wait --wait-timeout 240 api dashboard
 ```
 
 * **FastAPI Backend:** `http://localhost:8000/docs`
 * **Streamlit Dashboard:** `http://localhost:8501`
+* **Hazır olma kontrolü:** `http://localhost:8000/ready`
 * **Durdurmak için:** `docker compose down`
+
+`data/`, `reports/` ve `artifacts/runs/` kalıcı ve servisler arasında paylaşılan dizinlerdir. Mevcut ACTIVE bundle doğrulanamazsa başlangıç durur. Bilinçli yeni plan üretimi için `docker compose run --rm pipeline python scripts/bootstrap_runtime.py --refresh` çalıştırın. Temiz Docker başlangıcı ve yeniden başlatma CI içinde sınanır. Bu dağıtım tek sunuculu demo/POC içindir; üretim SaaS hazır olduğu iddia edilmez.
 
 ---
 
@@ -335,15 +345,15 @@ factory-decision-intelligence/
 │   ├── api/                    # FastAPI REST servis mimarisi
 │   │   └── server.py           # Endpoint tanımları ve HTTP işleyicileri
 │   ├── contracts/              # Pydantic veri sözleşmeleri ve şemaları
-│   ├── planning/               # Kademe 1: Taktiksel LP Planlama (PuLP / HiGHS)
+│   ├── planning/               # Kademe 1: Taktiksel LP Planlama (PuLP / CBC)
 │   ├── mrp/                    # Kademe 2: MRP-I, BOM patlatma ve lead-time dengeleme
 │   ├── scheduling/             # Kademe 3 & 5: CP-SAT Çizelgeleme ve What-If motoru
 │   │   ├── schedule_cpsat.py   # OR-Tools sonlu kapasite çizelgeleyicisi
 │   │   ├── what_if.py          # Arıza ve acil sipariş simülatörü
 │   │   └── rescheduler.py      # Freeze Horizon & Dinamik Rescheduler
 │   └── config.py               # Konfigürasyon, yollar ve ortam değişkenleri
-├── tests/                      # 161 adet birim, entegrasyon ve regresyon testi
-├── Dockerfile                  # Python 3.11-slim üretim Docker imaj reçetesi
+├── tests/                      # Birim, entegrasyon ve regresyon testleri
+├── Dockerfile                  # Python 3.11-slim Docker imaj reçetesi
 ├── docker-compose.yml          # FastAPI ve Streamlit mikroservis orkestrasyonu
 ├── .dockerignore               # Docker imaj filtreleme kuralları
 ├── requirements.txt            # Python bağımlılık listesi

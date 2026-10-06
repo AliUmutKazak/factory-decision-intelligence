@@ -96,6 +96,8 @@ def run_cpsat_scheduling(
     if persist_outputs:
         processed_path.mkdir(parents=True, exist_ok=True)
         reports_path.mkdir(parents=True, exist_ok=True)
+
+    policy = SchedulingObjectivePolicy(policy)
     conn = connection if connection is not None else get_db_connection(active_db_path)
     if run_id and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
         existing_run = conn.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (str(run_id),)).fetchone()
@@ -853,15 +855,20 @@ def run_cpsat_scheduling(
 
         if stage1_status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             optimal_tardiness = int(solver.Value(total_weighted_tardiness))
-            print(f"[LEXICOGRAPHIC] Aşama 1 tamamlandı. Minimum Ağırlıklı Gecikme: {optimal_tardiness} dk")
+            print(f"[LEXICOGRAPHIC] Aşama 1: {solver.StatusName(stage1_status)}, Gecikme: {optimal_tardiness} dk")
             # Optimal gecikme seviyesi kısıt olarak kilitlenir
             model.Add(total_weighted_tardiness <= optimal_tardiness)
+        else:
+            conn.close()
+            raise RuntimeError(f"Lexicographic service stage failed: {solver.StatusName(stage1_status)}")
 
         # Aşama 2: Operasyonel Verimlilik (Makespan + Setup Minimizasyonu)
         print("[LEXICOGRAPHIC] Aşama 2: Termin kısıtı altında Makespan ve Setup minimize ediliyor...")
         stage2_obj = int(weight_makespan) * makespan + int(weight_setup) * total_setup_duration
         model.Minimize(stage2_obj)
         status = solver.Solve(model)
+        if status == cp_model.OPTIMAL and stage1_status != cp_model.OPTIMAL:
+            status = cp_model.FEASIBLE
     else:
         # Standart / Normalize edilmiş ağırlıklı amaç fonksiyonu
         objective_expr = (
@@ -911,7 +918,7 @@ def run_cpsat_scheduling(
     best_makespan = int(solver.Value(makespan))
     total_setup_val = int(solver.Value(total_setup_duration)) if all_setup_terms else 0
     obj_val = float(solver.ObjectiveValue())
-    best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
+    best_bound = float(solver.BestObjectiveBound())
     gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
     status_audit_tag = "OPTIMAL_PROVEN" if proven_optimal else "FEASIBLE_SUBOPTIMAL"
 
@@ -1115,7 +1122,7 @@ def run_cpsat_scheduling(
     best_bound = float(solver.BestObjectiveBound()) if status in (cp_model.OPTIMAL, cp_model.FEASIBLE) else None
 
     obj_val = float(solver.ObjectiveValue())
-    best_bound = float(solver.BestObjectiveBound()) if solver.BestObjectiveBound() > 0 else 0.0
+    best_bound = float(solver.BestObjectiveBound())
 
     # Gap hesabı: (|Objective - Bound| / max(1.0, |Objective|)) * 100
     if obj_val is not None and best_bound is not None:
@@ -1133,7 +1140,7 @@ def run_cpsat_scheduling(
         proven_optimal=bool(status == cp_model.OPTIMAL),
         wall_time_seconds=float(round(solver.WallTime(), 4)),
         objective_value=float(round(obj_val, 4)),
-        best_objective_bound=float(round(best_bound, 4)) if (best_bound is not None and best_bound > 0) else None,
+        best_objective_bound=float(round(best_bound, 4)) if best_bound is not None else None,
         random_seed=int(CPSAT_RANDOM_SEED),
         num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
         time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
@@ -1147,6 +1154,10 @@ def run_cpsat_scheduling(
         "run_id": effective_run_id,
         "solver_name": "Google OR-Tools CP-SAT",
         "solver_status": status_name,
+        "objective_policy": str(policy),
+        "objective_units": "weighted_minutes",
+        "primary_stage_status": solver.StatusName(stage1_status) if hierarchical and tardiness_terms else None,
+        "gap_scope": "EFFICIENCY_STAGE" if hierarchical and tardiness_terms else "COMPOSITE_OBJECTIVE",
         "is_optimal": bool(status == cp_model.OPTIMAL),
         "objective_value_min": obj_val,
         "best_bound_min": best_bound,
@@ -1158,7 +1169,7 @@ def run_cpsat_scheduling(
         "random_seed": int(CPSAT_RANDOM_SEED),
         "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 0.0)),
         "tasks_scheduled": len(sched_df),
-        "total_scheduled_units": int(sched_df["production_units"].sum())
+        "total_scheduled_units": int(sched_df.loc[sched_df["operation_seq"] == 1, "production_units"].sum())
         if "production_units" in sched_df.columns
         else 0,
         "week_1_horizon_min": 7 * 24 * 60,
@@ -1167,7 +1178,9 @@ def run_cpsat_scheduling(
         "execution_policy": "CROSS_WEEK_SPILLOVER_ALLOWED",
         "ot_policy": "MODEL_A_WEEK1_ONLY",
         "ot_policy_description": "Overtime authorized strictly for Week-1; cross-week spillover runs under regular shifts only.",
-        "objective_type": "MINIMIZE_MAKESPAN_AND_SETUP",
+        "objective_type": "LEXICOGRAPHIC_SERVICE_THEN_EFFICIENCY"
+        if hierarchical
+        else "WEIGHTED_MAKESPAN_SETUP_TARDINESS",
         "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
         "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
@@ -1184,18 +1197,10 @@ def run_cpsat_scheduling(
     solver_meta_dict["is_optimal"] = int(contract_metadata.proven_optimal)
     solver_meta_dict["objective_value_min"] = float(contract_metadata.objective_value or 0.0)
     solver_meta_dict["best_bound_min"] = (
-        float(contract_metadata.best_objective_bound)
-        if contract_metadata.best_objective_bound is not None
-        else float(contract_metadata.objective_value or 0.0)
+        float(contract_metadata.best_objective_bound) if contract_metadata.best_objective_bound is not None else None
     )
-    if contract_metadata.objective_value and contract_metadata.best_objective_bound:
-        gap = (
-            abs(contract_metadata.objective_value - contract_metadata.best_objective_bound)
-            / max(abs(contract_metadata.objective_value), 1e-6)
-        ) * 100.0
-    else:
-        gap = 0.0
-    solver_meta_dict["optimality_gap_pct"] = round(gap, 4)
+    gap = contract_metadata.optimality_gap_pct
+    solver_meta_dict["optimality_gap_pct"] = round(gap, 4) if gap is not None else None
     solver_meta_dict["solve_time_seconds"] = float(contract_metadata.wall_time_seconds)
 
     solver_meta_df = pd.DataFrame([solver_meta_dict])

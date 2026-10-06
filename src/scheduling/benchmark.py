@@ -156,7 +156,7 @@ class SchedulingBenchmarkSuite:
                 late_orders = 1 if tardiness_hr > 0 else 0
                 results.append(
                     BenchmarkResult(
-                        method="CP-SAT (Exact)",
+                        method="CP-SAT (Reported)",
                         makespan=makespan_hr,
                         late_orders=late_orders,
                         total_tardiness=tardiness_hr,
@@ -167,7 +167,7 @@ class SchedulingBenchmarkSuite:
             elif isinstance(cpsat_result, dict):
                 results.append(
                     BenchmarkResult(
-                        method="CP-SAT (Exact)",
+                        method="CP-SAT (Reported)",
                         makespan=float(cpsat_result.get("makespan", 0.0)),
                         late_orders=int(cpsat_result.get("late_orders", 0)),
                         total_tardiness=float(cpsat_result.get("total_tardiness", 0.0)),

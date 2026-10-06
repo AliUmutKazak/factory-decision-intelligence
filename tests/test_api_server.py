@@ -14,6 +14,21 @@ def test_health_check():
     assert data["status"] == "HEALTHY"
 
 
+def test_readiness_returns_the_same_active_version_as_schedule():
+    ready = client.get("/ready")
+    assert ready.status_code == 200
+    schedule = client.get("/api/v1/schedule/current?limit=5").json()
+    assert schedule
+    assert {task["run_id"] for task in schedule} == {ready.json()["run_id"]}
+
+
+def test_readiness_rejects_missing_runtime_without_creating_database(tmp_path, monkeypatch):
+    target = tmp_path / "absent.db"
+    monkeypatch.setenv("FACTORY_DB_PATH", str(target))
+    assert client.get("/ready").status_code == 503
+    assert not target.exists()
+
+
 def test_get_current_schedule():
     response = client.get("/api/v1/schedule/current?limit=5")
     assert response.status_code == 200

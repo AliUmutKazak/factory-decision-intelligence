@@ -552,28 +552,27 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
-    cur = conn.cursor()
-
-    # 1. Kesin Üretim Kuralı: Sadece ACTIVE durumu aranır
-    cur.execute("""
-        SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
-        FROM pipeline_runs
-        WHERE status = 'ACTIVE'
-        ORDER BY timestamp DESC LIMIT 1
-    """)
-    row = cur.fetchone()
-
-    # 2. Uyumluluk Modu (Yalnızca parametre ile açıkça talep edilirse):
-    if not row and allow_fallback:
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
+            return None
+        cur = conn.cursor()
         cur.execute("""
             SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
-            FROM pipeline_runs
-            WHERE status IN ('COMPLETED', 'SUCCESS')
-            ORDER BY timestamp DESC LIMIT 1
+            FROM pipeline_runs WHERE status = 'ACTIVE' LIMIT 2
         """)
-        row = cur.fetchone()
-
-    conn.close()
+        rows = cur.fetchall()
+        if len(rows) > 1:
+            raise RuntimeError("[RUN GOVERNANCE] Multiple ACTIVE runs; refusing to select a version.")
+        row = rows[0] if rows else None
+        if not row and allow_fallback:
+            cur.execute("""
+                SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
+                FROM pipeline_runs WHERE status IN ('COMPLETED', 'SUCCESS')
+                ORDER BY timestamp DESC LIMIT 1
+            """)
+            row = cur.fetchone()
+    finally:
+        conn.close()
     if row:
         return {
             "run_id": row[0],

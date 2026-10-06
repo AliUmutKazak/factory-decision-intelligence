@@ -249,6 +249,12 @@ class ScheduleSolverMetadata(BaseModel):
     total_setup_min: int | None = Field(default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)")
     total_tardiness_min: int | None = Field(default=None, ge=0, description="Toplam teslim gecikmesi (dakika)")
 
+    @property
+    def optimality_gap_pct(self) -> float | None:
+        if self.best_objective_bound is None:
+            return None
+        return abs(self.objective_value - self.best_objective_bound) / max(1.0, abs(self.objective_value)) * 100.0
+
 
 class ScenarioShockModel(BaseModel):
     """Senaryo şok ve parametre manipülasyon sözleşmesi."""

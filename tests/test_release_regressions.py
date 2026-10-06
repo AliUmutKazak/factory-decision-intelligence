@@ -15,6 +15,17 @@ from src.utils.lineage import apply_run_retention_policy, init_pipeline_runs_tab
 from src.utils.run_bundle import RunBundleError, export_run_database, seal_run_bundle, verify_run_bundle
 
 
+def test_ambiguous_active_runs_fail_closed():
+    from src.utils.db import get_active_run_id
+    from src.utils.lineage import get_active_pipeline_run
+
+    with sqlite3.connect(":memory:") as conn:
+        conn.execute("CREATE TABLE pipeline_runs(run_id TEXT, status TEXT)")
+        conn.executemany("INSERT INTO pipeline_runs VALUES (?, 'ACTIVE')", [("A",), ("B",)])
+        with pytest.raises(RuntimeError, match="Multiple ACTIVE"):
+            get_active_run_id(conn)
+
+
 def test_runtime_paths_do_not_leak_into_another_thread(tmp_path):
     canonical = get_runtime_paths()["db_path"]
     with ThreadPoolExecutor(max_workers=1) as executor:

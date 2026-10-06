@@ -1,6 +1,7 @@
 """Factory Decision Intelligence REST API."""
 
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -47,6 +48,22 @@ def require_active_run_id(conn: sqlite3.Connection) -> str:
 @app.get("/health", tags=["Health & Monitoring"])
 def health_check() -> dict[str, str]:
     return {"status": "HEALTHY", "service": "factory-decision-intelligence"}
+
+
+@app.get("/ready", tags=["Health & Monitoring"])
+def readiness_check() -> dict[str, str]:
+    if not Path(get_runtime_paths()["db_path"]).is_file():
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable.")
+    conn = get_db()
+    try:
+        active = get_active_run_id(conn)
+        if not conn.execute("SELECT 1 FROM schedule_solver_metadata WHERE run_id = ?", (active,)).fetchone():
+            raise RuntimeError("ACTIVE solver metadata is unavailable.")
+        return {"status": "READY", "run_id": active}
+    except (RuntimeError, sqlite3.Error) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    finally:
+        conn.close()
 
 
 @app.get("/api/v1/schedule/current", tags=["Schedule Query"])

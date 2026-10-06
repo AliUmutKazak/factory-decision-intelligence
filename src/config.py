@@ -181,7 +181,7 @@ class SchedulingObjectivePolicy(StrEnum):
     BALANCED = "BALANCED"
     SERVICE_LEVEL_FIRST = "SERVICE_LEVEL_FIRST"
     THROUGHPUT_MAX = "THROUGHPUT_MAX"
-    COST_OPTIMIZED = "COST_OPTIMIZED"
+    OPERATIONAL_BALANCED = "OPERATIONAL_BALANCED"
 
 
 @dataclass(frozen=True)
@@ -211,8 +211,8 @@ OBJECTIVE_POLICIES: dict[SchedulingObjectivePolicy, ObjectiveWeights] = {
         setup_weight=0,
         tardiness_weight=0,
     ),
-    # 4. Ekonomik Etki / Maliyet Odaklı (Sıra bağımlı ayar ve gecikme cezası dengeli)
-    SchedulingObjectivePolicy.COST_OPTIMIZED: ObjectiveWeights(
+    # 4. Operational tradeoff; these minute weights do not optimize monetary TMC.
+    SchedulingObjectivePolicy.OPERATIONAL_BALANCED: ObjectiveWeights(
         makespan_weight=30,
         setup_weight=5,
         tardiness_weight=50,

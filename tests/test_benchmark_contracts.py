@@ -65,6 +65,6 @@ def test_benchmark_suite_accepts_cpsat_contract():
 
     # 4 Sezgisel (FIFO, EDD, SPT, Greedy) + 1 CP-SAT = 5 Satır
     assert len(df_comp) == 5
-    assert "CP-SAT (Exact)" in df_comp["Method"].values
-    cpsat_row = df_comp[df_comp["Method"] == "CP-SAT (Exact)"].iloc[0]
+    assert "CP-SAT (Reported)" in df_comp["Method"].values
+    cpsat_row = df_comp[df_comp["Method"] == "CP-SAT (Reported)"].iloc[0]
     assert cpsat_row["Makespan (hr)"] == 5.0

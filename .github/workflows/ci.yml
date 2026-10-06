@@ -67,3 +67,39 @@ jobs:
     - name: "Quality Gate 5: Industrial Scenario Matrix & OR Physics Tests"
       run: |
         pytest -v --durations=10
+
+  docker-smoke:
+    name: Clean Docker startup and persistent ACTIVE run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build and prepare a fresh runtime
+      run: docker compose up --build -d --wait --wait-timeout 240 api dashboard
+    - name: Verify services and ACTIVE lineage
+      run: |
+        curl --fail http://localhost:8501/_stcore/health
+        curl --fail http://localhost:8000/ready > /tmp/ready-before.json
+        docker compose exec -T api python scripts/verify_active_run.py
+        python - <<'PY'
+        import json, urllib.request
+        ready = json.load(open('/tmp/ready-before.json'))
+        tasks = json.load(urllib.request.urlopen('http://localhost:8000/api/v1/schedule/current'))
+        assert tasks and {task['run_id'] for task in tasks} == {ready['run_id']}
+        PY
+    - name: Restart and retain the same verified ACTIVE version
+      run: |
+        docker compose down
+        docker compose up -d --wait --wait-timeout 240 api dashboard
+        curl --fail http://localhost:8000/ready > /tmp/ready-after.json
+        python - <<'PY'
+        import json
+        assert json.load(open('/tmp/ready-before.json'))['run_id'] == json.load(open('/tmp/ready-after.json'))['run_id']
+        PY
+        docker compose exec -T api python scripts/verify_active_run.py
+    - name: Container logs
+      if: always()
+      run: docker compose logs --no-color
+    - name: Stop containers
+      if: always()
+      run: docker compose down

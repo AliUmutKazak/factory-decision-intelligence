@@ -21,3 +21,19 @@ Machine downtime and material release delays are solver constraints. Demand/capa
 The solver enforces exact processing/setup overlap against the W1 overtime budget. W2+ overtime is prohibited. Transfer lots are capped to fit a regular shift, including throughput shocks. Initial setup ends at the first operation start, keeping solver constraints and exported accounting consistent.
 
 OR-Tools is pinned to 9.14.6206 and single-worker search. Native crashes were observed with the parallel portfolio in both 9.15 and 9.14 during this workload. Validation covers solver feasibility rather than assuming an optimum from a time-limited solve. CI verifies the ACTIVE bundle hashes, database lineage and physics, followed by the full test suite.
+
+## Economic reporting and objective names
+
+`OPERATIONAL_BALANCED` replaces the misleading `COST_OPTIMIZED` name. The solver balances makespan, setup and weighted tardiness in minutes; it does not minimize monetary total manufacturing cost. Unsupported policy names fail explicitly. Monetary scenario reports use EconomicConfig's EUR rates, including its carbon baseline, separately from solver objectives.
+
+A scenario matrix pins one SQLite snapshot for all shocks and reports its baseline run ID. Dashboard scenario computation runs on request and keeps results under that version. Dashboard solver status comes from the ACTIVE database rows rather than a mutable JSON cache.
+
+Analytics retain lot identity, due dates and priorities. Historical demand is not a dispatch-order mapping and cannot multiply lot costs or service KPIs. Quantity is counted once across routing operations. Processing and setup base costs already include worked minutes; overtime adds their respective premiums. Without explicit OT accounting, actual interval/calendar overlap is used, never elapsed makespan. Missing processing duration and ambiguous order metadata fail explicitly.
+
+Zero lower bounds remain valid proof data. A feasible service-first stage cannot become a proven lexicographic optimum just because the efficiency stage is optimal. Solver failures preserve the previous published version.
+
+## Container startup
+
+Compose runs a one-shot bootstrap before API/dashboard startup. A fresh runtime executes the pipeline and verifies the ACTIVE bundle. An existing runtime is verified and reused; invalid bundles block startup. Data, reports and sealed run bundles are shared persistent mounts. `/health` indicates liveness; `/ready` requires one ACTIVE version with solver metadata and returns its ID. CI builds a clean image, checks service readiness and bundle lineage, then restarts the stack and checks that the same ACTIVE version survives. This is a single-host demonstration/POC deployment, not a production multi-tenant service.
+
+Heuristic benchmark rules omit routing precedence, maintenance and calendars; the dashboard labels them as simplified illustrations rather than equivalent feasibility or performance proofs. CP-SAT results are labelled reported rather than exact.

@@ -43,12 +43,12 @@ def get_active_run_id(conn: sqlite3.Connection) -> str:
     """Return the sole ACTIVE pipeline run; fail fast when none exists."""
     if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
         raise RuntimeError("[RUN GOVERNANCE] ACTIVE run bulunamadı: pipeline_runs tablosu yok.")
-    row = conn.execute(
-        "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
-    ).fetchone()
-    if not row or not row[0]:
+    rows = conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' LIMIT 2").fetchall()
+    if not rows or not rows[0][0]:
         raise RuntimeError("[RUN GOVERNANCE] ACTIVE run bulunamadı.")
-    return str(row[0])
+    if len(rows) != 1:
+        raise RuntimeError("[RUN GOVERNANCE] Multiple ACTIVE runs; refusing to select a version.")
+    return str(rows[0][0])
 
 
 def clone_run_inputs(conn, source_run_id: str, target_run_id: str, tables=None) -> None:
