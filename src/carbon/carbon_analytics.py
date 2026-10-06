@@ -33,19 +33,30 @@ from src.config import (
     GRID_EMISSION_FACTOR,
     get_runtime_paths,
 )
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
 
 
 
 def compute_carbon_analytics(run_id=None, db_path=None):
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
+    if not run_id:
+        with get_db_connection(active_db_path) as run_conn:
+            run_id = get_active_run_id(run_conn)
     processed_dir = runtime["processed_dir"]
     output_carbon_path = processed_dir / "carbon_analytics.csv"
     output_machine_carbon_path = processed_dir / "carbon_machine_kpis.csv"
     conn = get_db_connection(active_db_path)
-    energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn).iloc[0]
-    machine_kpis_df = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
+    energy_kpi_df = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(str(run_id),)
+    )
+    machine_kpis_df = pd.read_sql(
+        "SELECT * FROM energy_machine_kpis WHERE run_id = ?", conn, params=(str(run_id),)
+    )
+    if energy_kpi_df.empty:
+        conn.close()
+        raise RuntimeError(f"[CARBON] Energy KPI bulunamadı for run_id={run_id}.")
+    energy_kpi = energy_kpi_df.iloc[0]
     conn.close()
 
     total_kwh = float(energy_kpi["grand_total_kwh"])
@@ -163,16 +174,12 @@ def compute_carbon_analytics(run_id=None, db_path=None):
             run_id TEXT
         );
     """)
-    cursor.execute("DELETE FROM carbon_kpis;")
-    cursor.execute("DELETE FROM carbon_machine_kpis;")
-    cursor.execute("DELETE FROM carbon_price_scenarios;")
-    conn.commit()
-
-    carbon_kpis_df.to_sql("carbon_kpis", conn, index=False, if_exists="append")
+    persist_run_scoped_dataframe(conn, "carbon_kpis", carbon_kpis_df, str(run_id))
     if "data_source" in machine_kpis_df.columns:
         machine_kpis_df = machine_kpis_df.drop(columns=["data_source"])
-    machine_kpis_df.to_sql("carbon_machine_kpis", conn, index=False, if_exists="append")
-    scen_df.to_sql("carbon_price_scenarios", conn, index=False, if_exists="append")
+    persist_run_scoped_dataframe(conn, "carbon_machine_kpis", machine_kpis_df, str(run_id))
+    persist_run_scoped_dataframe(conn, "carbon_price_scenarios", scen_df, str(run_id))
+    conn.commit()
     conn.close()
 
     print(f"[OK] Karbon KPI'ları Kaydedildi: {output_carbon_path}")
