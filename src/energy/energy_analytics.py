@@ -25,13 +25,18 @@ import pandas as pd
 
 from src.config import get_runtime_paths
 from src.scheduling.calendar_service import MachineCalendarService
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, get_active_run_id, persist_run_scoped_dataframe
 
 
-def load_data(db_path=None):
+def load_data(db_path=None, run_id=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
-    schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    if run_id is not None:
+        schedule_df = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(str(run_id),)
+        )
+    else:
+        schedule_df = pd.read_sql("SELECT * FROM production_schedule", conn)
     machines_df = pd.read_sql("SELECT * FROM machines", conn)
     routing_df = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
     conn.close()
@@ -67,8 +72,12 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
     processed_dir = runtime["processed_dir"]
     output_energy_kpi_path = processed_dir / "energy_kpis.csv"
     output_profile_path = processed_dir / "energy_profile_15min.csv"
+    if not run_id:
+        with get_db_connection(active_db_path) as run_conn:
+            run_id = get_active_run_id(run_conn)
+
     if schedule_df is None or machines_df is None:
-        loaded_sched, loaded_mach = load_data(active_db_path)
+        loaded_sched, loaded_mach = load_data(active_db_path, run_id=run_id)
         if schedule_df is None:
             schedule_df = loaded_sched
         if machines_df is None:
@@ -107,9 +116,7 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
         m_kpi_df = pd.DataFrame(machine_kpis)
         profile_df = pd.DataFrame(columns=["time_min", "time_hour", "interval_min", "total_load_kw"])
 
-        if not run_id:
-            run_id = "RUN-DEFAULT"
-        kpi_df["run_id"] = run_id
+         kpi_df["run_id"] = run_id
         m_kpi_df["run_id"] = run_id
         profile_df["run_id"] = run_id
 
@@ -118,24 +125,10 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
         profile_df.to_csv(output_profile_path, index=False)
 
         conn = get_db_connection(active_db_path)
-        cur = conn.cursor()
-        if run_id:
-            # İlgili run_id varsa mükerrer kaydı önlemek için temizle
-            try:
-                cur.execute("DELETE FROM energy_kpis WHERE run_id = ?", (run_id,))
-                cur.execute("DELETE FROM energy_profile_15min WHERE run_id = ?", (run_id,))
-                cur.execute("DELETE FROM energy_machine_kpis WHERE run_id = ?", (run_id,))
-                conn.commit()
-            except Exception:
-                pass
-            kpi_df.to_sql("energy_kpis", conn, if_exists="append", index=False)
-            profile_df.to_sql("energy_profile_15min", conn, if_exists="append", index=False)
-            m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="append", index=False)
-        else:
-            # Standalone çalıştırmada replace yerine temizleyip ekle
-            kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
-            profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
-            m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
+        persist_run_scoped_dataframe(conn, "energy_kpis", kpi_df, str(run_id))
+        persist_run_scoped_dataframe(conn, "energy_profile_15min", profile_df, str(run_id))
+        persist_run_scoped_dataframe(conn, "energy_machine_kpis", m_kpi_df, str(run_id))
+        conn.commit()
         conn.close()
 
         return kpi_df, m_kpi_df, profile_df
@@ -359,9 +352,10 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
 
     # Normal calisma SQLite veritabani kayitlari
     conn = get_db_connection(active_db_path)
-    kpi_df.to_sql("energy_kpis", conn, if_exists="replace", index=False)
-    profile_df.to_sql("energy_profile_15min", conn, if_exists="replace", index=False)
-    m_kpi_df.to_sql("energy_machine_kpis", conn, if_exists="replace", index=False)
+    persist_run_scoped_dataframe(conn, "energy_kpis", kpi_df, str(run_id))
+    persist_run_scoped_dataframe(conn, "energy_profile_15min", profile_df, str(run_id))
+    persist_run_scoped_dataframe(conn, "energy_machine_kpis", m_kpi_df, str(run_id))
+    conn.commit()
     conn.close()
 
     print(f"[OK] Enerji KPI'lari Kaydedildi: {output_energy_kpi_path}")
