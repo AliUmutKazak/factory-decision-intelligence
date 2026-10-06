@@ -11,7 +11,6 @@ from src.contracts.schemas import (
     RescheduleAuditEntry,
     RescheduleTriggerEvent,
     ScheduleNervousnessReport,
-    ScheduleSolverMetadata,
 )
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.scheduling.what_if import NoCloseConnectionWrapper
@@ -55,7 +54,7 @@ class DynamicRescheduler:
             (new_run_id,f"RESCHEDULE:{previous_run_id}",row[1],row[2],row[3],row[4]),
         )
 
-    def _persist_rescheduled_version(self, conn: sqlite3.Connection, new_df: pd.DataFrame, new_run_id: str, audit: RescheduleAuditEntry) -> None:
+    def _persist_rescheduled_version(self, conn: sqlite3.Connection, new_df: pd.DataFrame, new_run_id: str, audit: RescheduleAuditEntry, meta) -> None:
         self._create_new_run_record(conn,new_run_id,audit.previous_run_id)
         new_df.to_sql("production_schedule",conn,if_exists="append",index=False)
         # Solver metadata is versioned with the new run. Reuse only columns
@@ -115,9 +114,11 @@ class DynamicRescheduler:
         try:
             previous_run_id = self._get_active_run_id(disk_conn)
             baseline_sched = pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min",disk_conn,params=(previous_run_id,))
-            if baseline_sched.empty: raise ValueError(f"[RESCHEDULE] ACTIVE schedule bulunamadı: {previous_run_id}")
+            if baseline_sched.empty:
+                raise ValueError(f"[RESCHEDULE] ACTIVE schedule bulunamadı: {previous_run_id}")
             new_run_id = new_run_id or f"RESCHED-{uuid.uuid4().hex[:10].upper()}"
-            if new_run_id == previous_run_id: raise ValueError("[RESCHEDULE] new_run_id ACTIVE run ile aynı olamaz.")
+            if new_run_id == previous_run_id:
+                raise ValueError("[RESCHEDULE] new_run_id ACTIVE run ile aynı olamaz.")
             track_df = pd.read_sql("SELECT task_id,status FROM mes_order_tracking WHERE run_id = ?",disk_conn,params=(previous_run_id,))
             completed = set(track_df.loc[track_df["status"]=="COMPLETED","task_id"]) if not track_df.empty else set()
             frozen = self._build_frozen_positions(baseline_sched,trigger,completed)
@@ -131,22 +132,30 @@ class DynamicRescheduler:
                 with patch("src.scheduling.schedule_cpsat.get_db_connection",return_value=NoCloseConnectionWrapper(mem_conn)):
                     meta=run_cpsat_scheduling(run_id=new_run_id,frozen_task_positions=frozen,persist_outputs=False)
                 new_sched=pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?",mem_conn,params=(new_run_id,))
-            finally: mem_conn.close()
-            if new_sched.empty: raise ValueError("[RESCHEDULE] Solver yeni schedule üretmedi.")
+            finally:
+                mem_conn.close()
+            if new_sched.empty:
+                raise ValueError("[RESCHEDULE] Solver yeni schedule üretmedi.")
             for tid,(machine,start,end) in frozen.items():
                 row=new_sched[new_sched["task_id"].astype(str)==tid]
-                if row.empty: raise ValueError(f"[RESCHEDULE] Frozen task missing: {tid}")
+                if row.empty:
+                    raise ValueError(f"[RESCHEDULE] Frozen task missing: {tid}")
                 nr=row.iloc[0]
-                if str(nr["machine_id"])!=machine or abs(float(nr["start_min"])-start)>1e-6 or abs(float(nr["end_min"])-end)>1e-6:
+                if (
+                    str(nr["machine_id"]) != machine
+                    or abs(float(nr["start_min"]) - start) > 1e-6
+                    or abs(float(nr["end_min"]) - end) > 1e-6
+                ):
                     raise ValueError(f"[RESCHEDULE] Frozen constraint violated: {tid}")
             report=self._calculate_nervousness(baseline_sched,new_sched,len(frozen),len(baseline_sched)-len(frozen))
             audit=RescheduleAuditEntry(audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",trigger_event_id=trigger.event_id,previous_run_id=previous_run_id,new_run_id=new_run_id,trigger_timestamp_min=trigger.current_time_min,freeze_horizon_min=trigger.freeze_horizon_min,affected_machine_id=trigger.delay_machine_id,delay_duration_min=trigger.delay_duration_min,reason=trigger.reason,total_tasks=report.total_tasks,frozen_tasks_count=report.frozen_tasks_count,rescheduled_tasks_count=report.rescheduled_tasks_count,machine_swapped_count=report.machine_swapped_count,avg_start_delta_min=report.average_start_delta_min,nervousness_score=report.nervousness_score)
             if persist_audit:
-                self._persist_rescheduled_version(disk_conn,new_sched,new_run_id,audit)
+                self._persist_rescheduled_version(disk_conn,new_sched,new_run_id,audit,meta)
                 from src.utils.lineage import promote_run_to_active
                 promote_run_to_active(new_run_id, db_path=self.disk_db_path)
             return baseline_sched,new_sched,meta,report,audit
-        finally: disk_conn.close()
+        finally:
+            disk_conn.close()
 
     def _persist_audit_entry(self, conn: sqlite3.Connection, audit: RescheduleAuditEntry) -> None:
         """Persists the audit lineage record into SQLite."""
