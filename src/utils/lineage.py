@@ -361,10 +361,18 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
 
         # 1. SAME RUN: validate current run only; historical rows are allowed.
         tables_to_check = [
-            "production_schedule", "energy_kpis", "energy_machine_kpis",
-            "carbon_kpis", "carbon_machine_kpis", "carbon_price_scenarios",
-            "forecast_demand", "forecast_model_lineage",
-            "sku_production_plan", "aggregate_plan", "machine_capacity_plan", "mrp_plan",
+            "production_schedule",
+            "energy_kpis",
+            "energy_machine_kpis",
+            "carbon_kpis",
+            "carbon_machine_kpis",
+            "carbon_price_scenarios",
+            "forecast_demand",
+            "forecast_model_lineage",
+            "sku_production_plan",
+            "aggregate_plan",
+            "machine_capacity_plan",
+            "mrp_plan",
         ]
         for tbl in tables_to_check:
             cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = ?", (tbl,))
@@ -377,6 +385,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE run_id = ?", (run_id,))
             if cur.fetchone()[0] == 0:
                 raise ValueError(f"[VALIDATION GATE FAIL] {tbl} için {run_id} verisi yok.")
+
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
         sched_df = pd.read_sql("SELECT lot_id, product_id, production_units FROM production_schedule WHERE run_id = ?", conn, params=(run_id,))
         sku_plan_df = pd.read_sql(
@@ -399,9 +408,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                     )
 
         # 3. PHYSICS: Aynı Tezgahta Sıfır Zaman Çakışması & OT Bütçesi
-        sched_full = pd.read_sql(
-            "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(run_id,)
-        )
+        sched_full = pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(run_id,))
         if not sched_full.empty:
             for m_id, m_df in sched_full.groupby("machine_id"):
                 m_sorted = m_df.sort_values(by="start_min").reset_index(drop=True)
@@ -472,12 +479,8 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
         cur.execute("PRAGMA table_info(energy_machine_kpis)")
         em_cols = [r[1] for r in cur.fetchall()]
         if e_cols and em_cols:
-            energy_kpi = pd.read_sql(
-                "SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(run_id,)
-            )
-            machine_kpi = pd.read_sql(
-                "SELECT * FROM energy_machine_kpis WHERE run_id = ?", conn, params=(run_id,)
-            )
+            energy_kpi = pd.read_sql("SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(run_id,))
+            machine_kpi = pd.read_sql("SELECT * FROM energy_machine_kpis WHERE run_id = ?", conn, params=(run_id,))
             if not energy_kpi.empty and not machine_kpi.empty:
                 # energy_kpis tablosunda tesis toplam kWh: grand_total_kwh
                 e_col_name = (
