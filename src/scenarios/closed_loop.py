@@ -5,11 +5,13 @@ ve eşik aşımında yeniden çizelgeleme (Dynamic Replanning) kararını tetikl
 """
 
 import os
+from contextlib import closing
 from dataclasses import dataclass
 
 import pandas as pd
 
 from src.utils.db import get_db_connection
+from src.utils.runtime_lock import run_mutation_lock
 
 
 @dataclass
@@ -37,14 +39,14 @@ class ClosedLoopEngine:
         """
         MES üzerinden gelen fiili üretim ve duruş kayıtlarını veritabanına yazar.
         """
-        conn = get_db_connection(self.db_path)
-        if run_id and "run_id" not in actuals_df.columns:
-            actuals_df = actuals_df.copy()
-            actuals_df["run_id"] = run_id
-
-        actuals_df.to_sql("mes_production_actuals", conn, if_exists="append", index=False)
-        conn.commit()
-        conn.close()
+        # Serialize actuals with pipeline publication; open the DB after the lock
+        # so an atomic replacement cannot strand feedback in the old inode.
+        with run_mutation_lock(self.db_path), closing(get_db_connection(self.db_path)) as conn:
+            if run_id and "run_id" not in actuals_df.columns:
+                actuals_df = actuals_df.copy()
+                actuals_df["run_id"] = run_id
+            actuals_df.to_sql("mes_production_actuals", conn, if_exists="append", index=False)
+            conn.commit()
         return len(actuals_df)
 
     def evaluate_variance_and_trigger(self, run_id: str) -> ReplanningTriggerDecision:

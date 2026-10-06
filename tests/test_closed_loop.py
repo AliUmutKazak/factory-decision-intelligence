@@ -5,6 +5,33 @@ import pytest
 
 from src.data.build_database_and_eda import initialize_database
 from src.scenarios.closed_loop import ClosedLoopEngine
+
+
+def test_actuals_wait_for_the_pipeline_publication_lock(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    from src.utils.runtime_lock import run_mutation_lock
+
+    db = tmp_path / "factory.db"
+    engine = ClosedLoopEngine(str(db))
+    started, written = Event(), Event()
+
+    def ingest():
+        started.set()
+        engine.ingest_mes_actuals(pd.DataFrame([{"actual_units": 10}]), run_id="R")
+        written.set()
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        with run_mutation_lock(db):
+            future = executor.submit(ingest)
+            assert started.wait(timeout=5)
+            assert not written.wait(timeout=0.1)
+        future.result(timeout=5)
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT run_id, actual_units FROM mes_production_actuals").fetchall() == [("R", 10)]
+
+
 from src.utils.lineage import start_pipeline_run
 
 
