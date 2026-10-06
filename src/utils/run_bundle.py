@@ -30,6 +30,7 @@ def export_run_database(source_db, target_db, run_id: str) -> None:
                 target.execute("DELETE FROM reschedule_audit_log WHERE new_run_id != ?", (run_id,))
         target.execute("DELETE FROM pipeline_runs WHERE run_id != ?", (run_id,))
         target.commit()
+        target.execute("VACUUM")
 
 
 def sha256_file(path: Path) -> str:

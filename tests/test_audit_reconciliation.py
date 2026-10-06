@@ -69,7 +69,9 @@ def test_2_cpsat_calendar_bounds(isolated_db):
 
         # Kesin takvim: Başlangıç ile bitiş arasındaki HİÇBİR gün Pazar (gün indeksi 6) olamaz
         start_day_idx = s_min // 1440
-        end_day_idx = e_min // 1440
+        # Intervals are [start, end): midnight at Sunday is the boundary,
+        # not a minute of Sunday production.
+        end_day_idx = (e_min - 1) // 1440
         for d in range(start_day_idx, end_day_idx + 1):
             assert (d % 7) != 6, f"Pazar gunune sarkan gorev tespit edildi! Gun: {d}, Gorev: {r['task_id']}"
 

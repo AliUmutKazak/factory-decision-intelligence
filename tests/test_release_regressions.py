@@ -115,6 +115,10 @@ def test_bundle_verifier_rejects_tampered_and_unlisted_payloads(tmp_path):
     (tmp_path / "factory.db").write_bytes(b"changed")
     with pytest.raises(RunBundleError, match="hash mismatch"):
         verify_run_bundle(tmp_path, "SEALED")
+    (tmp_path / "production_schedule.csv").write_text("task_id,start_min\n1,480\n")
+    seal_run_bundle(tmp_path, "SEALED")
+    with pytest.raises(RunBundleError, match="no run_id"):
+        verify_run_bundle(tmp_path, "SEALED")
 
 
 def test_writer_lock_supports_nested_rescheduler_calls(tmp_path):
