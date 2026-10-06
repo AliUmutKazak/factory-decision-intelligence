@@ -465,6 +465,26 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
     """)
     conn.commit()
 
+    # Planned maintenance windows (optional master schedule exceptions).
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS machine_maintenance (
+            maintenance_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            machine_id TEXT NOT NULL,
+            start_min INTEGER NOT NULL,
+            end_min INTEGER NOT NULL,
+            maintenance_type TEXT NOT NULL DEFAULT 'PREVENTIVE',
+            description TEXT DEFAULT '',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            FOREIGN KEY (machine_id) REFERENCES machines(machine_id),
+            CHECK (end_min > start_min)
+        )
+    """)
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_machine_maintenance_active "
+        "ON machine_maintenance(machine_id, start_min) WHERE is_active = 1"
+    )
+    conn.commit()
+
     # P1-1: ERP Mapping Table (External System Reconciliation)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS erp_mapping (
