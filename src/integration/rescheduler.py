@@ -66,6 +66,27 @@ class ClosedLoopRescheduler:
                 }
             raise
 
+        if commit:
+            import sqlite3
+            conn = sqlite3.connect(self._engine.disk_db_path)
+            try:
+                conn.execute(
+                    """INSERT INTO mes_execution_events
+                       (run_id, machine_id, event_type, event_timestamp_min, actual_duration_min, delay_reason)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        audit.previous_run_id,
+                        machine_id,
+                        event_type,
+                        down_start_min,
+                        down_duration_min,
+                        reason,
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
         old_makespan = float(base_df["end_min"].max()) if not base_df.empty else 0.0
         new_makespan = float(new_df["end_min"].max()) if not new_df.empty else old_makespan
         return {
