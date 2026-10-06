@@ -20,7 +20,6 @@ Bu yapılar CP-SAT kısıt yayılımı (constraint propagation) ve SAT tabanlı
 """
 
 import json
-import os
 from pathlib import Path
 
 import pandas as pd
