@@ -14,7 +14,10 @@ def _load_schedule_data():
         return None
     try:
         conn = get_db_connection(db_path)
-        df = pd.read_sql("SELECT * FROM production_schedule", conn)
+        df = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+            conn,
+        )
         conn.close()
         if not df.empty:
             return df
@@ -43,8 +46,13 @@ def test_schedule_makespan_energy_consistency():
     if not cur.fetchone():
         compute_energy_analytics()
 
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
-    energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    energy_kpi = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
     conn.close()
 
     assert not sched_df.empty, "production_schedule tablosu boş olamaz."
@@ -82,7 +90,10 @@ def test_machine_capacity_consistency():
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
     assert db_path.exists(), "factory.db not found"
     conn = get_db_connection(db_path)
-    cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
+    cap_df = pd.read_sql(
+        "SELECT * FROM machine_capacity_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
     w1_cap = cap_df[cap_df["period_week"] == 1]
     assert not w1_cap.empty, "machine_capacity_plan tablosu icinde 1. hafta verisi bulunamadi"
@@ -124,8 +135,14 @@ def test_carbon_energy_balance():
     if not cur.fetchone():
         compute_energy_analytics()
 
-    m_kpis = pd.read_sql("SELECT machine_id, total_kwh FROM energy_machine_kpis", conn)
-    f_kpis = pd.read_sql("SELECT grand_total_kwh FROM energy_kpis", conn)
+    m_kpis = pd.read_sql(
+        "SELECT machine_id, total_kwh FROM energy_machine_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    f_kpis = pd.read_sql(
+        "SELECT grand_total_kwh FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not m_kpis.empty, "energy_machine_kpis tablosu bos olamaz."
@@ -152,7 +169,10 @@ def test_transfer_batching_precedence_and_flow():
 
     db_path = Path(__file__).resolve().parent.parent / "data" / "factory.db"
     conn = get_db_connection(db_path)
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not sched_df.empty, "production_schedule boş olamaz."
@@ -325,6 +345,8 @@ def test_pipeline_transaction_boundary_and_active_run_promotion(tmp_path, monkey
     # 3. İkinci bir koşum COMPLETED olsa bile promote_run_to_active çağrılmadıkça ACTIVE OLAMAZ (P1 Güvencesi)
     run_2 = "RUN-TEST-BOUND-002"
     start_pipeline_run(run_2, db_path=temp_db)
+    record_pipeline_run_metadata(run_id=run_2, status="STAGING", db_path=temp_db)
+    record_pipeline_run_metadata(run_id=run_2, status="VALIDATE", db_path=temp_db)
     record_pipeline_run_metadata(run_id=run_2, status="COMPLETED", orders_count=500, db_path=temp_db)
     assert get_active_pipeline_run(db_path=temp_db) is None, "COMPLETED kosum promote edilmedikce ACTIVE sayilamaz!"
 
@@ -347,7 +369,10 @@ def test_lp_cpsat_overtime_reconciliation():
     from src.config import DB_PATH
 
     conn = get_db_connection(DB_PATH)
-    sched_df = pd.read_sql_query("SELECT * FROM production_schedule", conn)
+    sched_df = pd.read_sql_query(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not sched_df.empty, "production_schedule tablosu boş!"

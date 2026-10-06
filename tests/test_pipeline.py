@@ -58,8 +58,14 @@ def test_mathematical_reconciliation_family_sku_schedule(db_conn):
     Family Batches -> SKU Planned Units -> Scheduled Units arasında
     Largest Remainder yöntemiyle sıfır kayıp / tam korunum sağlandığını test eder.
     """
-    sku_df = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", db_conn)
-    sched_df = pd.read_sql("SELECT * FROM production_schedule WHERE operation_seq = 1", db_conn)
+    sku_df = pd.read_sql(
+        "SELECT * FROM sku_production_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') AND period_week = 1",
+        db_conn,
+    )
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') AND operation_seq = 1",
+        db_conn,
+    )
 
     total_sku_units = sku_df["planned_units"].sum()
     # Gerçek üretilen parça adedi 'production_units' kolonundadır
@@ -74,7 +80,9 @@ def test_mathematical_reconciliation_family_sku_schedule(db_conn):
 
 def test_energy_physical_consistency(db_conn):
     """Fiziksel Enerji Kuralı: Peak Güç (kW) >= Ortalama Güç (kW) olmalıdır."""
-    kpi_df = pd.read_sql("SELECT * FROM energy_kpis", db_conn)
+    kpi_df = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", db_conn
+    )
     assert not kpi_df.empty, "energy_kpis tablosu boş!"
 
     avg_kw = kpi_df["avg_load_kw"].iloc[0]
@@ -85,7 +93,10 @@ def test_energy_physical_consistency(db_conn):
 
 def test_machine_no_overlap(db_conn):
     """Aynı makinede iki operasyonun zaman diliminin çakışmadığını doğrular."""
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", db_conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        db_conn,
+    )
 
     for m, group in sched_df.groupby("machine_id"):
         sorted_ops = group.sort_values("start_min").to_dict("records")
@@ -100,7 +111,9 @@ def test_machine_no_overlap(db_conn):
 
 def test_carbon_accounting_balance(db_conn):
     """Scope 1 + Scope 2 = Total GHG emisyon dengesini kontrol eder."""
-    carbon_df = pd.read_sql("SELECT * FROM carbon_kpis", db_conn)
+    carbon_df = pd.read_sql(
+        "SELECT * FROM carbon_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", db_conn
+    )
     assert not carbon_df.empty
 
     s1 = carbon_df["scope_1_tco2e"].iloc[0]

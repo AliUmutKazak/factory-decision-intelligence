@@ -7,10 +7,23 @@ delegating all schedule decisions to the authoritative engine.
 """
 
 import uuid
+from contextlib import closing
+from functools import wraps
 from typing import Any
 
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.rescheduler import DynamicRescheduler
+from src.utils.db import get_active_run_id
+from src.utils.runtime_lock import run_mutation_lock
+
+
+def _serialized(method):
+    @wraps(method)
+    def execute(self, *args, **kwargs):
+        with run_mutation_lock(self._engine.disk_db_path):
+            return method(self, *args, **kwargs)
+
+    return execute
 
 
 class ClosedLoopRescheduler:
@@ -20,7 +33,16 @@ class ClosedLoopRescheduler:
         self.db_path = db_path
         self.run_id = run_id
         self._engine = DynamicRescheduler(disk_db_path=db_path)
+        if self.run_id is None:
+            import sqlite3
 
+            with closing(sqlite3.connect(self._engine.disk_db_path)) as conn:
+                try:
+                    self.run_id = get_active_run_id(conn)
+                except RuntimeError:
+                    pass
+
+    @_serialized
     def reschedule_on_machine_breakdown(
         self,
         machine_id: str,
@@ -46,6 +68,19 @@ class ClosedLoopRescheduler:
             delay_duration_min=int(round(down_duration_min)),
             reason=f"[{event_type}] {reason}",
         )
+        # The observed MES event is durable even when no ACTIVE schedule is
+        # available or a subsequent solve fails. Sandbox calls never write it.
+        if commit and self.run_id:
+            import sqlite3
+
+            with closing(sqlite3.connect(self._engine.disk_db_path)) as conn:
+                conn.execute(
+                    "INSERT INTO mes_execution_events "
+                    "(run_id, machine_id, event_type, event_timestamp_min, actual_duration_min, delay_reason) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (self.run_id, machine_id, event_type, down_start_min, down_duration_min, reason),
+                )
+                conn.commit()
         try:
             base_df, new_df, meta, report, audit = self._engine.execute_reschedule(
                 trigger=trigger,
@@ -66,30 +101,10 @@ class ClosedLoopRescheduler:
                 }
             raise
 
-        if commit:
-            import sqlite3
-
-            conn = sqlite3.connect(self._engine.disk_db_path)
-            try:
-                conn.execute(
-                    """INSERT INTO mes_execution_events
-                       (run_id, machine_id, event_type, event_timestamp_min, actual_duration_min, delay_reason)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
-                    (
-                        audit.previous_run_id,
-                        machine_id,
-                        event_type,
-                        down_start_min,
-                        down_duration_min,
-                        reason,
-                    ),
-                )
-                conn.commit()
-            finally:
-                conn.close()
-
         old_makespan = float(base_df["end_min"].max()) if not base_df.empty else 0.0
         new_makespan = float(new_df["end_min"].max()) if not new_df.empty else old_makespan
+        if commit:
+            self.run_id = audit.new_run_id
         return {
             "status": "RESCHEDULED",
             "affected_tasks_count": int(report.rescheduled_tasks_count),

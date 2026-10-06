@@ -36,24 +36,19 @@ def test_multi_tiered_state_transitions_on_breakdown():
     down_start = 600.0
     down_dur = 90.0
 
-    result = rescheduler.reschedule_on_machine_breakdown(
-        machine_id="M01",
-        down_start_min=down_start,
-        down_duration_min=down_dur,
-        reason="Madde 20 Horizon Audit",
-        commit=False,
-    )
-    assert result["status"] == "RESCHEDULED"
+    from src.contracts.schemas import RescheduleTriggerEvent
 
-    # CP-SAT çözümü üzerinden durumları denetle
-    df_resched = rescheduler._solve_cpsat_reschedule(
-        df=df_init.copy(),
-        machine_id="M01",
-        down_start_min=down_start,
-        down_duration_min=down_dur,
+    base, df_resched, meta, report, audit = rescheduler._engine.execute_reschedule(
+        RescheduleTriggerEvent(
+            event_id="FREEZE-AUDIT",
+            current_time_min=int(down_start),
+            freeze_horizon_min=240,
+            delay_machine_id="M01",
+            delay_duration_min=int(down_dur),
+        ),
+        persist_audit=False,
     )
-    if df_resched is None:
-        df_resched = df_init.copy()
+    assert len(df_resched) == len(df_init) > 0
 
     # 1. COMPLETED -> Immutable (Arıza öncesinde biten işlerin zamanları değişmez)
     completed_tasks = df_init[df_init["end_min"] <= down_start]

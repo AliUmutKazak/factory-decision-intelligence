@@ -84,7 +84,7 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
     )
     count_before = cur.fetchone()[0]
 
-    rescheduler.reschedule_on_machine_breakdown(
+    result = rescheduler.reschedule_on_machine_breakdown(
         machine_id="M02",
         down_start_min=720.0,
         down_duration_min=60.0,
@@ -109,11 +109,12 @@ def test_reschedule_event_persisted_to_db(tmp_path, monkeypatch):
     sched_row = cur.fetchone()
     conn.close()
 
+    assert result["status"] == "NO_ACTIVE_RUN"
     assert count_after == count_before + 1, "Arıza olayı mes_execution_events tablosuna kaydedilmedi."
     assert sched_row is not None, "production_schedule tablosunda kayıt bulunamadı."
 
 
-def test_two_tier_hybrid_rescheduling_modes():
+def test_minor_and_major_delays_use_authoritative_solver():
     """Kısa süreli arızalarda (<= 60 dk) FAST_LOCAL_REPAIR,
 
     büyük duruşlarda (> 60 dk) CPSAT_REOPTIMIZATION modunun tetiklendiğini doğrular.
@@ -130,7 +131,7 @@ def test_two_tier_hybrid_rescheduling_modes():
     )
     assert result_minor["status"] in ("RESCHEDULED", "NO_IMPACT")
     if result_minor["status"] == "RESCHEDULED":
-        assert result_minor["reschedule_mode"] == "FAST_LOCAL_REPAIR"
+        assert result_minor["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
         assert result_minor["is_major_disruption"] is False
 
     # 2. Majör arıza (180 dk / 3 saat) -> Solver Tier Re-optimization

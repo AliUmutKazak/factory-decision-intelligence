@@ -7,11 +7,14 @@ malzeme gereksinim planlaması, enerji ve karbon muhasebesi zincirini çalışt�
 
 import os
 import shutil
+import sqlite3
 import sys
 import time
+from contextlib import closing
 from pathlib import Path
 
 from src.carbon.carbon_analytics import compute_carbon_analytics
+from src.config import runtime_path_context
 from src.data.build_database_and_eda import initialize_database
 from src.data.preprocessing import run_preprocessing
 from src.energy.energy_analytics import compute_energy_analytics
@@ -30,11 +33,29 @@ from src.utils.lineage import (
     update_pipeline_run_status,
     validate_pipeline_run,
 )
-from src.utils.run_bundle import seal_run_bundle
+from src.utils.run_bundle import export_run_database, seal_run_bundle
+from src.utils.runtime_lock import run_mutation_lock
 
 
 def run_end_to_end_pipeline():
+    base = Path.cwd() if (Path.cwd() / "data").exists() else Path(__file__).resolve().parent
+    canonical = Path(os.environ.get("FACTORY_CANONICAL_DB", base / "data" / "factory.db"))
     run_id = generate_run_id()
+    staging = base / "runs" / run_id
+    with (
+        run_mutation_lock(canonical),
+        runtime_path_context(
+            base_dir=base,
+            data_dir=base / "data",
+            db_path=staging / f"factory_staging_{run_id}.db",
+            processed_dir=staging / "data" / "processed",
+            reports_dir=staging / "reports",
+        ),
+    ):
+        return _run_end_to_end_pipeline(run_id)
+
+
+def _run_end_to_end_pipeline(run_id):
     print("\n" + "#" * 85)
     print(f"      FABRİKA KARAR DESTEK PLATFORMU: PIPELINE BAŞLATILDI (Run ID: {run_id})")
     print("#" * 85 + "\n")
@@ -52,12 +73,8 @@ def run_end_to_end_pipeline():
 
     # Mevcut kanonik DB varsa metadata ve baz tablolar için staging'e başlangıç kopyası al
     if canonical_db.exists():
-        shutil.copy2(canonical_db, staging_db)
-
-    # Pipeline boyunca tüm modüllerin izole staging ortamına yazmasını sağla
-    os.environ["FACTORY_DB_PATH"] = str(staging_db)
-    os.environ["FACTORY_PROCESSED_DIR"] = str(staging_processed)
-    os.environ["FACTORY_REPORTS_DIR"] = str(staging_reports)
+        with closing(sqlite3.connect(canonical_db)) as source, closing(sqlite3.connect(staging_db)) as target:
+            source.backup(target)
 
     # Staging üzerinde koşumu başlat ve RUNNING durumuna al
     start_pipeline_run(run_id=run_id, db_path=str(staging_db))
@@ -97,7 +114,7 @@ def run_end_to_end_pipeline():
         # Validation Gate dosya kontrolü yapmadan önce güncel run_id'yi metadata dosyasına yaz
         record_pipeline_run_metadata(run_id=run_id, status="VALIDATE", db_path=str(staging_db))
 
-        validate_pipeline_run(run_id=run_id, db_path=str(staging_db))
+        validate_pipeline_run(run_id=run_id, db_path=str(staging_db), reports_dir=str(staging_reports))
         print("[AUDIT] Doğrulama başarılı: Matematiksel ve operasyonel veri bütünlüğü onaylandı.")
 
         # VALIDATE -> COMPLETED geçişi State Machine üzerinden yürütülür
@@ -131,87 +148,52 @@ def run_end_to_end_pipeline():
 
         # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
         manifest = generate_run_manifest(
-            run_id=run_id, db_path=str(staging_db), input_source_path="data/processed/factory_orders.csv"
+            run_id=run_id, db_path=str(staging_db), input_source_path=str(staging_processed / "factory_orders.csv")
         )
         print(
             f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)"
         )
 
-        # Environment değişkenlerini kaldır
-        os.environ.pop("FACTORY_DB_PATH", None)
-        os.environ.pop("FACTORY_PROCESSED_DIR", None)
-        os.environ.pop("FACTORY_REPORTS_DIR", None)
+        # Seal and verify the complete private bundle BEFORE the authoritative
+        # canonical pointer can change. No canonical DB or cache is touched here.
+        run_artifacts_dir = base_dir / "artifacts" / "runs" / run_id
+        run_artifacts_dir.mkdir(parents=True, exist_ok=False)
+        export_run_database(staging_db, run_artifacts_dir / "factory.db", run_id)
+        shutil.copytree(staging_processed, run_artifacts_dir / "data" / "processed")
+        shutil.copytree(staging_reports, run_artifacts_dir / "reports")
+        seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")
 
-        # Açık kalmış bağlantıları serbest bırak
-        import gc
+        # ACTIVE and ARCHIVED are switched inside the private staging database.
+        # Publishing a complete DB through same-filesystem os.replace is the
+        # single commit point; a failed seal/promotion leaves the old DB intact.
+        promote_run_to_active(run_id=run_id, db_path=str(staging_db))
+        canonical_db.parent.mkdir(parents=True, exist_ok=True)
+        pending_db = canonical_db.with_name(f".{canonical_db.name}.{run_id}.tmp")
+        try:
+            with closing(sqlite3.connect(staging_db)) as source, closing(sqlite3.connect(pending_db)) as target:
+                source.backup(target)
+            os.replace(pending_db, canonical_db)
+        finally:
+            pending_db.unlink(missing_ok=True)
 
-        gc.collect()
-        time.sleep(0.5)
-
-        # 1. Fiziksel Atomic Replacement: Staging DB & Artifacts -> Canonical Store
-        max_retries = 5
-        promoted = False
-        for attempt in range(max_retries):
-            try:
-                shutil.copy2(staging_db, canonical_db)
-
-                # Başarılı koşan koşumun artifact'lerini kanonik dizinlere terfi ettir (promote)
-                canonical_processed = base_dir / "data" / "processed"
-                canonical_reports = base_dir / "reports"
-                canonical_processed.mkdir(parents=True, exist_ok=True)
-                canonical_reports.mkdir(parents=True, exist_ok=True)
-
-                if staging_processed.exists():
-                    for item in staging_processed.glob("*.*"):
-                        shutil.copy2(item, canonical_processed / item.name)
-
-                if staging_reports.exists():
-                    for item in staging_reports.glob("*.*"):
-                        shutil.copy2(item, canonical_reports / item.name)
-
-                # Immutable run bundle: source is staging only. Canonical caches
-                # are never mixed into the historical run snapshot.
-                run_artifacts_dir = base_dir / "artifacts" / "runs" / run_id
-                run_artifacts_dir.mkdir(parents=True, exist_ok=True)
-
-                if staging_db.exists():
-                    shutil.copy2(staging_db, run_artifacts_dir / "factory.db")
-
-                bundle_processed = run_artifacts_dir / "data" / "processed"
-                bundle_reports = run_artifacts_dir / "reports"
-                shutil.copytree(staging_processed, bundle_processed, dirs_exist_ok=True)
-                shutil.copytree(staging_reports, bundle_reports, dirs_exist_ok=True)
-
-                seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")
-                print(f"[AUDIT] Run bundle mühürlendi: {run_artifacts_dir}")
-
-                promoted = True
-                break
-            except PermissionError:
-                gc.collect()
-                time.sleep(1.0)
-
-        if not promoted:
-            temp_target = canonical_db.with_suffix(f".tmp_{run_id}")
-            shutil.copy2(staging_db, temp_target)
-            if canonical_db.exists():
-                try:
-                    canonical_db.unlink()
-                except PermissionError:
-                    pass
-            temp_target.replace(canonical_db)
-
-        # Retention canonical DB ve immutable run bundle üzerinde, ACTIVE
-        # promotion'dan önce tamamlanır. Hata olursa eski ACTIVE değişmeden kalır.
-        apply_run_retention_policy(
-            keep_last_n=20,
-            db_path=str(canonical_db),
-            artifacts_dir=str(base_dir / "artifacts" / "runs"),
-        )
-
-        # Final critical state transition. Schedule/data mutation does not occur
-        # after this point; ACTIVE is the authoritative production pointer.
-        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
+        # Compatibility caches are derived from the sealed run. Cache/retention
+        # failures after publication cannot turn a committed ACTIVE run into a
+        # reported pipeline failure or erase the prior version.
+        try:
+            for source_dir, target_dir in (
+                (staging_processed, base_dir / "data" / "processed"),
+                (staging_reports, base_dir / "reports"),
+            ):
+                target_dir.mkdir(parents=True, exist_ok=True)
+                for item in source_dir.glob("*.*"):
+                    shutil.copy2(item, target_dir / item.name)
+            apply_run_retention_policy(
+                keep_last_n=20,
+                db_path=str(canonical_db),
+                artifacts_dir=str(base_dir / "artifacts" / "runs"),
+            )
+        except Exception as cache_error:
+            print(f"[CACHE] ACTIVE run committed; cache/retention refresh failed: {cache_error}")
 
         # Staging dosyasını temizle (Başarısız olsa dahi pipeline'ı etkilemez)
         if staging_db.exists():
@@ -229,9 +211,6 @@ def run_end_to_end_pipeline():
 
     except Exception as exc:
         print(f"\n[CRITICAL PIPELINE FAILURE] Aşama hatası: {str(exc)}", file=sys.stderr)
-        os.environ.pop("FACTORY_DB_PATH", None)
-        os.environ.pop("FACTORY_PROCESSED_DIR", None)
-        os.environ.pop("FACTORY_REPORTS_DIR", None)
 
         # Hata anında staging DB ve izole staging klasörü temizlenir, kanonik DB/dosyalara dokunulmaz!
         if staging_dir.exists():

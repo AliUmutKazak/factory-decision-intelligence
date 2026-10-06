@@ -42,15 +42,24 @@ from src.contracts.schemas import (
     SolverStatus,
 )
 from src.scheduling.maintenance import load_machine_maintenance_windows
-from src.utils.db import get_db_connection, persist_run_scoped_dataframe
+from src.utils.db import get_db_connection, migrate_schedule_commitments, persist_run_scoped_dataframe
 
 
-def get_initial_machine_states(conn) -> dict:
+def get_initial_machine_states(conn, run_id=None) -> dict:
     """
     Denetim Madde 21: Tezgâh başlangıç durumunu öncelikle SQLite 'machine_state'
     (MES runtime snapshot) tablosundan okur. Tablo yoksa config.INITIAL_MACHINE_STATE'e düşer.
     """
     states = {}
+    if run_id:
+        try:
+            rows = conn.execute(
+                "SELECT machine_id, last_product_id FROM machine_state_snapshot WHERE run_id = ?", (str(run_id),)
+            ).fetchall()
+            if rows:
+                return {str(machine): str(product) for machine, product in rows}
+        except Exception:
+            pass
     try:
         df_state = pd.read_sql("SELECT machine_id, last_product_id FROM machine_state", conn)
         for _, r in df_state.iterrows():
@@ -72,18 +81,30 @@ def run_cpsat_scheduling(
     reports_dir=None,
     frozen_task_positions=None,
     persist_outputs: bool = True,
+    maintenance_overrides=None,
+    earliest_start_min: int = 0,
+    db_path=None,
+    connection=None,
+    material_delay_min: int = 0,
+    reference_schedule=None,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
-    active_db_path = runtime["db_path"]
+    active_db_path = db_path or runtime["db_path"]
     processed_path = Path(processed_dir) if processed_dir is not None else Path(runtime["processed_dir"])
     reports_path = Path(reports_dir) if reports_dir is not None else Path(runtime["reports_dir"])
     if persist_outputs:
         processed_path.mkdir(parents=True, exist_ok=True)
         reports_path.mkdir(parents=True, exist_ok=True)
-    conn = get_db_connection(active_db_path)
-    machine_initial_states = get_initial_machine_states(conn)
+    conn = connection if connection is not None else get_db_connection(active_db_path)
+    if run_id and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
+        existing_run = conn.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (str(run_id),)).fetchone()
+        if existing_run and existing_run[0] in {"ACTIVE", "ARCHIVED"}:
+            conn.close()
+            raise ValueError(f"[RUN GOVERNANCE] Immutable run cannot be overwritten: {run_id}")
+    machine_initial_states = get_initial_machine_states(conn, run_id)
     maintenance_windows = load_machine_maintenance_windows(conn)
+    maintenance_windows.extend(maintenance_overrides or [])
 
     # Madde 30: Machine state run-scope snapshot mühürleme
     if run_id and machine_initial_states:
@@ -98,12 +119,12 @@ def run_cpsat_scheduling(
                 }
                 for m_id, p_id in machine_initial_states.items()
             ]
-            pd.DataFrame(snapshot_records).to_sql("machine_state_snapshot", conn, if_exists="append", index=False)
+            persist_run_scoped_dataframe(conn, "machine_state_snapshot", pd.DataFrame(snapshot_records), str(run_id))
         except Exception as e:
             print(f"[WARN] machine_state_snapshot kaydedilemedi: {e}")
 
     # 1. 1. Hafta SKU Planından Partileri Yükle
-    if run_id is not None:
+    if sku_plan is None and run_id is not None:
         sku_plan = pd.read_sql(
             "SELECT * FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
             conn,
@@ -111,6 +132,9 @@ def run_cpsat_scheduling(
         )
     elif sku_plan is None:
         sku_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
+    if sku_plan.empty:
+        conn.close()
+        raise ValueError(f"[SCHEDULE INPUT] No SKU input for run {run_id}; clone inputs explicitly.")
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     changeover_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
@@ -133,7 +157,10 @@ def run_cpsat_scheduling(
     machine_ot_hours = {}
     try:
         cap_df = pd.read_sql(
-            "SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1", conn
+            "SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan WHERE period_week = 1"
+            + (" AND run_id = ?" if run_id is not None else ""),
+            conn,
+            params=(str(run_id),) if run_id is not None else None,
         )
         for _, r in cap_df.iterrows():
             m_id = str(r["machine_id"])
@@ -267,6 +294,17 @@ def run_cpsat_scheduling(
             sku_release_times[pid] = 0
             sku_material_datetimes[pid] = horizon_start_dt.strftime("%Y-%m-%d %H:%M:%S")
 
+    for pid in sku_release_times:
+        sku_release_times[pid] += material_delay_min
+        sku_material_datetimes[pid] = (horizon_start_dt + pd.Timedelta(minutes=sku_release_times[pid])).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+    reference_ids = {}
+    if reference_schedule is not None:
+        reference_ids = {
+            (str(row.lot_id), int(row.operation_seq)): row.task_id for row in reference_schedule.itertuples()
+        }
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
     tasks = []
@@ -275,8 +313,11 @@ def run_cpsat_scheduling(
     enable_streaming = cfg.ENABLE_LOT_STREAMING
     max_sub_batches = cfg.MAX_SUB_LOT_BATCHES
 
-    for _, row in sku_plan.iterrows():
+    for _, row in sku_plan.sort_values(["product_id"]).iterrows():
         pid = row["product_id"]
+        lot_prefix = str(row["lot_id"]) if pd.notna(row.get("lot_id")) else f"LOT_{pid}"
+        due_date_min = int(row["due_date_min"]) if pd.notna(row.get("due_date_min")) else 7 * 24 * 60
+        priority_weight = int(row["priority_weight"]) if pd.notna(row.get("priority_weight")) else 1
         total_batches = int(row["planned_batches"])
         total_units = int(row["planned_units"])
 
@@ -284,12 +325,26 @@ def run_cpsat_scheduling(
         if total_batches <= 0 or total_units <= 0:
             continue
 
+        lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
+        if lot_routings.empty:
+            conn.close()
+            raise ValueError(f"[SCHEDULE INPUT] Routing missing for {pid}.")
+        # Every non-preemptive sublot must fit a regular shift even in W2+,
+        # where overtime is prohibited. Throughput shocks can otherwise make
+        # the static 40-batch transfer size mathematically infeasible.
+        regular_limits = [
+            max(1, int(machine_daily_hours[str(op.machine_id)] * 60 // op.processing_time_min))
+            for op in lot_routings.itertuples()
+            if op.processing_time_min > 0
+        ]
+        sub_batch_limit = min([max_sub_batches, *regular_limits])
+
         # Alt lot (sub-lot) paketlerini belirle
         sub_batches_list = []
-        if enable_streaming and total_batches > max_sub_batches:
+        if enable_streaming and total_batches > sub_batch_limit:
             rem = total_batches
             while rem > 0:
-                alloc = min(rem, max_sub_batches)
+                alloc = min(rem, sub_batch_limit)
                 sub_batches_list.append(alloc)
                 rem -= alloc
         else:
@@ -298,7 +353,7 @@ def run_cpsat_scheduling(
         lot_routings = routing_df[routing_df["product_id"] == pid].sort_values("operation_seq")
 
         for sub_idx, sub_b_qty in enumerate(sub_batches_list, start=1):
-            sub_lot_id = f"LOT_{pid}_L{sub_idx}" if len(sub_batches_list) > 1 else f"LOT_{pid}"
+            sub_lot_id = f"{lot_prefix}_L{sub_idx}" if len(sub_batches_list) > 1 else lot_prefix
             sub_units = sub_b_qty * batch_size
 
             for _, op in lot_routings.iterrows():
@@ -309,9 +364,9 @@ def run_cpsat_scheduling(
 
                 tasks.append(
                     {
-                        "task_id": task_counter,
+                        "task_id": reference_ids.get((sub_lot_id, seq), task_counter),
                         "lot_id": sub_lot_id,
-                        "parent_lot_id": f"LOT_{pid}",
+                        "parent_lot_id": lot_prefix,
                         "sub_lot_index": sub_idx,
                         "product_id": pid,
                         "batch_count": sub_b_qty,
@@ -320,6 +375,8 @@ def run_cpsat_scheduling(
                         "operation_seq": seq,
                         "machine_id": mid,
                         "duration": duration,
+                        "due_date_min": due_date_min,
+                        "priority_weight": priority_weight,
                     }
                 )
                 task_counter += 1
@@ -357,7 +414,30 @@ def run_cpsat_scheduling(
         conn.commit()
         if persist_outputs:
             empty_df.to_csv(processed_path / "production_schedule.csv", index=False)
-        return empty_df
+        empty_meta = ScheduleSolverMetadata(
+            run_id=str(run_id or "DEFAULT_RUN"),
+            status=SolverStatus.OPTIMAL,
+            proven_optimal=True,
+            wall_time_seconds=0.0,
+            objective_value=0.0,
+            best_objective_bound=0.0,
+            random_seed=int(CPSAT_RANDOM_SEED),
+            num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
+            time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+            makespan_min=0,
+            total_setup_min=0,
+            total_tardiness_min=0,
+        )
+        persist_run_scoped_dataframe(
+            conn, "schedule_solver_metadata", pd.DataFrame([empty_meta.model_dump()]), str(run_id)
+        )
+        conn.commit()
+        conn.close()
+        if persist_outputs:
+            (reports_path / "schedule_solver_metadata.json").write_text(
+                json.dumps(empty_meta.model_dump(mode="json"), indent=2), encoding="utf-8"
+            )
+        return empty_meta
     tasks_df = pd.DataFrame(tasks)
 
     # -------------------------------------------------------------------------
@@ -417,6 +497,8 @@ def run_cpsat_scheduling(
             "production_units": t["production_units"],
             "sub_lot_index": t.get("sub_lot_index", 0),
             "duration": t["duration"],
+            "due_date_min": t["due_date_min"],
+            "priority_weight": t["priority_weight"],
         }
 
         if mid not in machine_to_tasks:
@@ -429,11 +511,12 @@ def run_cpsat_scheduling(
     if frozen_task_positions:
         missing_frozen = []
         for frozen_tid, frozen_spec in frozen_task_positions.items():
-            if frozen_tid not in all_tasks:
+            task_key = next((key for key in all_tasks if str(key) == str(frozen_tid)), None)
+            if task_key is None:
                 missing_frozen.append(str(frozen_tid))
                 continue
             frozen_machine, frozen_start, frozen_end = frozen_spec
-            task_info = all_tasks[frozen_tid]
+            task_info = all_tasks[task_key]
             if str(task_info["machine_id"]) != str(frozen_machine):
                 raise ValueError(
                     f"[FREEZE CONSTRAINT FAIL] Task {frozen_tid} machine mismatch: "
@@ -445,6 +528,11 @@ def run_cpsat_scheduling(
             raise ValueError(
                 f"[FREEZE CONSTRAINT FAIL] Frozen task(s) missing from regenerated model: {missing_frozen[:20]}"
             )
+
+    frozen_ids = {str(key) for key in (frozen_task_positions or {})}
+    for tid, info in all_tasks.items():
+        if str(tid) not in frozen_ids:
+            model.Add(info["start"] >= int(earliest_start_min))
 
     # 1. Rota Öncelik Kısıtı (Precedence: Op 1 -> Op 2 -> Op 3)
     for lid, group in tasks_df.groupby("lot_id"):
@@ -473,8 +561,8 @@ def run_cpsat_scheduling(
             if r_j > 0:
                 model.Add(t_info["start"] >= r_j)
 
-        # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri (AddCircuit + OptionalInterval)
-        all_setup_terms = []
+    # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri
+    all_setup_terms = []
     for mid, tids in machine_to_tasks.items():
         n_m = len(tids)
         if n_m == 0:
@@ -483,6 +571,7 @@ def run_cpsat_scheduling(
         dummy = n_m
         circuit_arcs = []
         machine_setup_intervals = []
+        setup_duration_by_task = {tid: [] for tid in tids}
 
         # 1) Dummy -> Task (Günün ilk işi): Tezgâh başlangıç durumuna (Initial State) göre setup
         p_init = machine_initial_states.get(mid, None)
@@ -492,12 +581,13 @@ def run_cpsat_scheduling(
 
             p_first = all_tasks[tid]["product_id"]
             s_init = int(setup_dict.get((mid, p_init, p_first), 0)) if p_init else 0
+            setup_duration_by_task[tid].append(lit * s_init)
             if s_init > 0:
                 s_start = model.NewIntVar(0, horizon, f"init_setup_start_{mid}_{tid}")
                 s_end = model.NewIntVar(0, horizon, f"init_setup_end_{mid}_{tid}")
                 s_interval = model.NewOptionalIntervalVar(s_start, s_init, s_end, lit, f"init_setup_int_{mid}_{tid}")
                 machine_setup_intervals.append(s_interval)
-                model.Add(s_end <= all_tasks[tid]["start"]).OnlyEnforceIf(lit)
+                model.Add(s_end == all_tasks[tid]["start"]).OnlyEnforceIf(lit)
                 all_setup_terms.append(lit * s_init)
 
         # 2) Task -> Dummy (Günün son işi)
@@ -519,6 +609,7 @@ def run_cpsat_scheduling(
                 circuit_arcs.append((i, j, lit))
 
                 s12 = int(setup_dict.get((mid, p1, p2), 0))
+                setup_duration_by_task[t2].append(lit * s12)
                 if s12 > 0:
                     # Fiziksel Setup İntervali: Model içinde optimize edilen bağımsız zaman aralığı
                     s_start = model.NewIntVar(0, horizon, f"setup_start_{mid}_{t1}_{t2}")
@@ -556,7 +647,29 @@ def run_cpsat_scheduling(
         if str(mid) not in machine_ot_hours:
             raise ValueError(f"Eksik makine takvim verisi (fail-fast): Tezgah {mid} icin OT limiti tanimlanmamis!")
         allowed_ot_min = int(machine_ot_hours[str(mid)] * 60)
+        night_length = int(round((24.0 - machine_daily_hours[str(mid)]) * 60))
         total_days = (horizon // 1440) + 2
+
+        # Charge ACTUAL processing+setup minutes to the tactical OT budget,
+        # rather than rounding authorization to whole opened night windows.
+        if allowed_ot_min > 0 and night_length > 0:
+            usage_terms = []
+            for tid in tids:
+                setup_start = model.NewIntVar(0, horizon, f"selected_setup_start_{mid}_{tid}")
+                model.Add(setup_start == all_tasks[tid]["start"] - sum(setup_duration_by_task[tid]))
+                for kind, start_expr, end_expr in (
+                    ("run", all_tasks[tid]["start"], all_tasks[tid]["end"]),
+                    ("setup", setup_start, all_tasks[tid]["start"]),
+                ):
+                    for day in range(6):
+                        left = model.NewIntVar(0, horizon, f"ot_left_{mid}_{tid}_{kind}_{day}")
+                        right = model.NewIntVar(0, horizon, f"ot_right_{mid}_{tid}_{kind}_{day}")
+                        overlap = model.NewIntVar(0, night_length, f"ot_usage_{mid}_{tid}_{kind}_{day}")
+                        model.AddMaxEquality(left, [start_expr, day * 1440])
+                        model.AddMinEquality(right, [end_expr, day * 1440 + night_length])
+                        model.AddMaxEquality(overlap, [0, right - left])
+                        usage_terms.append(overlap)
+            model.Add(sum(usage_terms) <= allowed_ot_min)
 
         # Hafta bazlı gece OT kullanımını biriktirmek için sözlük: {hafta_indeksi: [ot_kullanildi_boolean_değişkenleri]}
         week_ot_active_vars = {}
@@ -578,7 +691,7 @@ def run_cpsat_scheduling(
                 # Pazartesi - Cumartesi: Gece penceresi (00:00 - 08:00) = 480 dakika
                 night_start = day * 1440
                 if night_start < horizon:
-                    night_end = min(night_start + 8 * 60, horizon)
+                    night_end = min(night_start + night_length, horizon)
                     night_dur = night_end - night_start
                     if night_dur > 0:
                         if allowed_ot_min <= 0:
@@ -609,7 +722,7 @@ def run_cpsat_scheduling(
         for w_idx, act_vars in week_ot_active_vars.items():
             if w_idx == 0:
                 # 1. Hafta (W1): Taktik LP'den onaylanan bütçe tavanı kadar gece penceresi açılabilir
-                max_allowed_blocks = (allowed_ot_min + 479) // 480 if allowed_ot_min > 0 else 0
+                max_allowed_blocks = (allowed_ot_min + night_length - 1) // night_length if night_length > 0 else 0
                 model.Add(sum(act_vars) <= max_allowed_blocks)
             else:
                 # 2. Hafta ve sonrası (Spillover): Model A politikası gereği W2+ gece fazla mesaisi açılamaz
@@ -832,6 +945,8 @@ def run_cpsat_scheduling(
                     "batch_size_units": all_tasks[tid]["batch_size_units"],
                     "production_units": all_tasks[tid]["production_units"],
                     "duration_min": all_tasks[tid]["duration"],
+                    "due_date_min": all_tasks[tid]["due_date_min"],
+                    "priority_weight": all_tasks[tid]["priority_weight"],
                     "start_min": s_val,
                     "end_min": e_val,
                     "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
@@ -1094,26 +1209,26 @@ def run_cpsat_scheduling(
     if persist_outputs:
         with open(reports_path / "schedule_solver_metadata.json", "w", encoding="utf-8") as f:
             json.dump(raw_metadata_dict, f, indent=2, ensure_ascii=False)
+    # -------------------------------------------------------------------------
+    # Faz 3 - Madde 6: Schedule Output Contract & Database Sealing Shield
+    # -------------------------------------------------------------------------
+    for _, row in sched_df.iterrows():
+        ScheduleOutputTask(
+            run_id=effective_run_id,
+            task_id=str(row["task_id"]),
+            product_id=str(row["product_id"]),
+            machine_id=str(row["machine_id"]),
+            start_min=int(row["start_min"]),
+            end_min=int(row["end_min"]),
+            duration_min=int(row["duration_min"]),
+            due_date_min=int(row.get("due_date_min", row.get("due_date", 0))),
+            tardiness_min=int(row.get("tardiness_min", 0)),
+        )
 
-        # -------------------------------------------------------------------------
-        # Faz 3 - Madde 6: Schedule Output Contract & Database Sealing Shield
-        # -------------------------------------------------------------------------
-        for _, row in sched_df.iterrows():
-            ScheduleOutputTask(
-                run_id=effective_run_id,
-                task_id=str(row["task_id"]),
-                product_id=str(row["product_id"]),
-                machine_id=str(row["machine_id"]),
-                start_min=int(row["start_min"]),
-                end_min=int(row["end_min"]),
-                duration_min=int(row["duration_min"]),
-                due_date_min=int(row.get("due_date_min", row.get("due_date", 0))),
-                tardiness_min=int(row.get("tardiness_min", 0)),
-            )
-
-        persist_run_scoped_dataframe(conn, "production_schedule", sched_df, effective_run_id)
-        persist_run_scoped_dataframe(conn, "schedule_solver_metadata", solver_meta_df, effective_run_id)
-        conn.commit()
+    migrate_schedule_commitments(conn)
+    persist_run_scoped_dataframe(conn, "production_schedule", sched_df, effective_run_id)
+    persist_run_scoped_dataframe(conn, "schedule_solver_metadata", solver_meta_df, effective_run_id)
+    conn.commit()
     print("✓ production_schedule ve schedule_solver_metadata güncellendi.")
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)

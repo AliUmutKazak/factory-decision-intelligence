@@ -21,8 +21,10 @@ from src.contracts.schemas import (
     ScheduleNervousnessReport,
 )
 from src.energy.energy_analytics import compute_energy_analytics
+from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.scheduling.what_if import NoCloseConnectionWrapper
+from src.utils.runtime_lock import run_mutation_lock
 
 
 class DynamicRescheduler:
@@ -158,7 +160,7 @@ class DynamicRescheduler:
             INSERT INTO pipeline_runs
             (run_id, timestamp, trigger_source, orders_count, git_sha,
              config_hash, data_source, status)
-            VALUES (?, datetime('now'), ?, ?, ?, ?, ?, 'COMPLETED')
+            VALUES (?, datetime('now'), ?, ?, ?, ?, ?, 'RUNNING')
             """,
             (
                 new_run_id,
@@ -201,6 +203,14 @@ class DynamicRescheduler:
         pd.DataFrame([row]).to_sql("schedule_solver_metadata", conn, if_exists="append", index=False)
 
     def _persist_audit_entry(self, conn: sqlite3.Connection, audit: RescheduleAuditEntry) -> None:
+        conn.execute("""CREATE TABLE IF NOT EXISTS reschedule_audit_log (
+            audit_id TEXT PRIMARY KEY, trigger_event_id TEXT NOT NULL,
+            previous_run_id TEXT NOT NULL, new_run_id TEXT NOT NULL,
+            trigger_timestamp_min REAL, freeze_horizon_min REAL,
+            affected_machine_id TEXT, delay_duration_min REAL, reason TEXT,
+            total_tasks INTEGER, frozen_tasks_count INTEGER, rescheduled_tasks_count INTEGER,
+            machine_swapped_count INTEGER, avg_start_delta_min REAL, nervousness_score REAL
+        )""")
         conn.execute(
             """
             INSERT OR REPLACE INTO reschedule_audit_log (
@@ -241,6 +251,9 @@ class DynamicRescheduler:
         self._create_new_run_record(conn, new_run_id, audit.previous_run_id)
         self._clone_run_scoped_inputs(conn, audit.previous_run_id, new_run_id)
 
+        from src.utils.db import migrate_schedule_commitments
+
+        migrate_schedule_commitments(conn)
         conn.execute("DELETE FROM production_schedule WHERE run_id = ?", (new_run_id,))
         new_df.to_sql("production_schedule", conn, if_exists="append", index=False)
         self._persist_solver_metadata(conn, new_run_id, meta)
@@ -251,12 +264,9 @@ class DynamicRescheduler:
         runtime = get_runtime_paths()
         configured_db = Path(runtime["db_path"]).resolve()
         actual_db = Path(self.disk_db_path).resolve()
-        if actual_db == configured_db:
-            processed = Path(runtime["processed_dir"])
-            reports = Path(runtime["reports_dir"])
-        else:
-            processed = actual_db.parent / "processed"
-            reports = actual_db.parent / "reports"
+        staging = actual_db.parent / "reschedule_runs" / run_id
+        processed = staging / "data" / "processed"
+        reports = staging / "reports"
         bundle = Path(runtime["base_dir"]) / "artifacts" / "runs" / run_id
         return processed, reports, bundle
 
@@ -382,7 +392,7 @@ class DynamicRescheduler:
     ) -> Path:
         _, _, bundle_dir = self._artifact_dirs(run_id)
         if bundle_dir.exists():
-            shutil.rmtree(bundle_dir)
+            raise ValueError(f"Immutable bundle already exists: {bundle_dir}")
         bundle_processed = bundle_dir / "data" / "processed"
         bundle_reports = bundle_dir / "reports"
         bundle_processed.mkdir(parents=True, exist_ok=True)
@@ -393,13 +403,9 @@ class DynamicRescheduler:
         for path in reports_dir.glob("*.*"):
             shutil.copy2(path, bundle_reports / path.name)
 
-        source = sqlite3.connect(self.disk_db_path)
-        target = sqlite3.connect(bundle_dir / "factory.db")
-        try:
-            source.backup(target)
-        finally:
-            target.close()
-            source.close()
+        from src.utils.run_bundle import export_run_database
+
+        export_run_database(self.disk_db_path, bundle_dir / "factory.db", run_id)
 
         files = {}
         for path in sorted(bundle_dir.rglob("*")):
@@ -454,7 +460,17 @@ class DynamicRescheduler:
         new_run_id: str | None = None,
         persist_audit: bool = True,
     ):
+        with run_mutation_lock(self.disk_db_path):
+            return self._execute_reschedule(trigger, new_run_id, persist_audit)
+
+    def _execute_reschedule(
+        self,
+        trigger: RescheduleTriggerEvent,
+        new_run_id: str | None = None,
+        persist_audit: bool = True,
+    ):
         disk_conn = sqlite3.connect(self.disk_db_path)
+        created_version = False
         try:
             previous_run_id = self._get_active_run_id(disk_conn)
             baseline_sched = pd.read_sql(
@@ -468,6 +484,8 @@ class DynamicRescheduler:
             new_run_id = new_run_id or f"RESCHED-{uuid.uuid4().hex[:10].upper()}"
             if new_run_id == previous_run_id:
                 raise ValueError("[RESCHEDULE] new_run_id ACTIVE run ile aynı olamaz.")
+            if disk_conn.execute("SELECT 1 FROM pipeline_runs WHERE run_id = ?", (new_run_id,)).fetchone():
+                raise ValueError(f"[RESCHEDULE] Run ID already exists: {new_run_id}")
 
             if self._table_exists(disk_conn, "mes_order_tracking"):
                 track_df = pd.read_sql(
@@ -484,29 +502,34 @@ class DynamicRescheduler:
             disk_conn.backup(mem_conn)
             try:
                 self._clone_run_scoped_inputs(mem_conn, previous_run_id, new_run_id)
+                outage_windows = []
                 if trigger.delay_machine_id and trigger.delay_duration_min > 0:
-                    mem_conn.execute(
-                        "UPDATE machine_calendar "
-                        "SET available_hours = MAX(0.0, available_hours - ?) "
-                        "WHERE machine_id = ?",
-                        (
-                            trigger.delay_duration_min / 60.0,
+                    # Committed tasks retain their exact positions. The delay
+                    # applies to the mutable queue after those commitments.
+                    committed_end = max(
+                        (end for machine, _, end in frozen.values() if machine == trigger.delay_machine_id),
+                        default=trigger.current_time_min,
+                    )
+                    outage_start = max(trigger.current_time_min, int(committed_end))
+                    outage_windows = [
+                        MaintenanceWindow(
                             trigger.delay_machine_id,
-                        ),
-                    )
-                    mem_conn.commit()
+                            outage_start,
+                            outage_start + trigger.delay_duration_min,
+                            "RESCHEDULE_DELAY",
+                            trigger.reason,
+                        )
+                    ]
 
-                from unittest.mock import patch
-
-                with patch(
-                    "src.scheduling.schedule_cpsat.get_db_connection",
-                    return_value=NoCloseConnectionWrapper(mem_conn),
-                ):
-                    meta = run_cpsat_scheduling(
-                        run_id=new_run_id,
-                        frozen_task_positions=frozen,
-                        persist_outputs=False,
-                    )
+                meta = run_cpsat_scheduling(
+                    run_id=new_run_id,
+                    connection=NoCloseConnectionWrapper(mem_conn),
+                    frozen_task_positions=frozen,
+                    persist_outputs=False,
+                    maintenance_overrides=outage_windows,
+                    earliest_start_min=trigger.current_time_min,
+                    reference_schedule=baseline_sched,
+                )
                 new_sched = pd.read_sql(
                     "SELECT * FROM production_schedule WHERE run_id = ?",
                     mem_conn,
@@ -555,6 +578,7 @@ class DynamicRescheduler:
             )
 
             if persist_audit:
+                created_version = True
                 self._persist_rescheduled_version(disk_conn, new_sched, new_run_id, audit, meta)
                 disk_conn.commit()
                 disk_conn.close()
@@ -562,17 +586,27 @@ class DynamicRescheduler:
 
                 # Schedule-dependent analytics are recomputed for the new run;
                 # they are never inherited from the previous ACTIVE version.
-                compute_energy_analytics(run_id=new_run_id, db_path=self.disk_db_path)
-                compute_carbon_analytics(run_id=new_run_id, db_path=self.disk_db_path)
+                processed_dir, reports_dir, _ = self._artifact_dirs(new_run_id)
+                compute_energy_analytics(
+                    run_id=new_run_id, db_path=self.disk_db_path, processed_dir=processed_dir, reports_dir=reports_dir
+                )
+                compute_carbon_analytics(
+                    run_id=new_run_id, db_path=self.disk_db_path, processed_dir=processed_dir, reports_dir=reports_dir
+                )
                 processed_dir, reports_dir = self._write_run_artifacts(new_run_id, meta, audit)
 
-                from src.utils.lineage import promote_run_to_active, validate_pipeline_run
+                from src.utils.lineage import promote_run_to_active, update_pipeline_run_status, validate_pipeline_run
+
+                update_pipeline_run_status(new_run_id, "STAGING", db_path=self.disk_db_path)
+                update_pipeline_run_status(new_run_id, "VALIDATE", db_path=self.disk_db_path)
 
                 validate_pipeline_run(
                     new_run_id,
                     db_path=self.disk_db_path,
                     reports_dir=str(reports_dir),
                 )
+                update_pipeline_run_status(new_run_id, "COMPLETED", db_path=self.disk_db_path)
+                processed_dir, reports_dir = self._write_run_artifacts(new_run_id, meta, audit)
                 self._record_decision(new_run_id, trigger, report, audit, meta)
                 self._seal_run_bundle(
                     new_run_id,
@@ -584,6 +618,17 @@ class DynamicRescheduler:
                 promote_run_to_active(new_run_id, db_path=self.disk_db_path)
 
             return baseline_sched, new_sched, meta, report, audit
+        except Exception:
+            if created_version:
+                from src.utils.lineage import update_pipeline_run_status
+
+                with sqlite3.connect(self.disk_db_path) as failure_conn:
+                    row = failure_conn.execute(
+                        "SELECT status FROM pipeline_runs WHERE run_id = ?", (new_run_id,)
+                    ).fetchone()
+                if row and row[0] in {"RUNNING", "STAGING", "VALIDATE", "COMPLETED"}:
+                    update_pipeline_run_status(new_run_id, "FAILED", db_path=self.disk_db_path)
+            raise
         finally:
             if disk_conn is not None:
                 disk_conn.close()

@@ -1,4 +1,6 @@
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -8,6 +10,17 @@ from src.contracts.schemas import EconomicConfigModel
 # Dizin Hiyerarşisi
 SRC_DIR = Path(__file__).resolve().parent
 BASE_DIR = SRC_DIR.parent
+_runtime_overrides = ContextVar("factory_runtime_paths", default={})
+
+
+@contextmanager
+def runtime_path_context(**paths):
+    """Per-thread/task runtime paths without changing process-wide environment."""
+    token = _runtime_overrides.set({**_runtime_overrides.get(), **paths})
+    try:
+        yield
+    finally:
+        _runtime_overrides.reset(token)
 
 
 def get_runtime_paths():
@@ -27,13 +40,15 @@ def get_runtime_paths():
     custom_db = os.getenv("FACTORY_DB_PATH")
     db_path = Path(custom_db) if custom_db else data_dir / "factory.db"
 
-    return {
+    resolved = {
         "base_dir": BASE_DIR,
         "data_dir": data_dir,
         "processed_dir": processed_dir,
         "reports_dir": reports_dir,
         "db_path": db_path,
     }
+    resolved.update({key: Path(value) for key, value in _runtime_overrides.get().items()})
+    return resolved
 
 
 # Geriye dönük uyumluluk ve dinamik Staging İzolasyonu:

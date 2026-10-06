@@ -8,7 +8,12 @@ Girdi şoklarını izole staging/sandbox ortamında simüle eder:
 """
 
 import os
+import sqlite3
+import tempfile
+import uuid
+from contextlib import closing
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 
@@ -20,9 +25,8 @@ from src.config import (
 )
 from src.contracts.schemas import ScenarioResultModel
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
-from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.service_level import evaluate_schedule_service_level
-from src.utils.db import get_active_run_id, get_db_connection
+from src.utils.db import clone_run_inputs, get_active_run_id, get_db_connection
 
 
 class ScenarioDataUnavailableError(Exception):
@@ -146,28 +150,76 @@ class ScenarioEngine:
                 "DATA_UNAVAILABLE: Makespan türetilebilecek geçerli operasyonel veri yok."
             )
 
-        if (
-            not energy_df.empty
-            and "grand_total_kwh" in energy_df.columns
-            and float(energy_df["grand_total_kwh"].iloc[0]) > 0
-        ):
-            base_kwh = float(energy_df["grand_total_kwh"].iloc[0])
-        else:
-            run_col = "duration_min" if "duration_min" in sched_df.columns else "duration"
-            if not sched_df.empty and run_col in sched_df.columns:
-                total_duration_hours = float(sched_df[run_col].sum()) / 60.0
-                base_kwh = total_duration_hours * 45.0
-            else:
-                raise ScenarioDataUnavailableError(
-                    "DATA_UNAVAILABLE: Enerji tüketimi hesaplanabilecek operasyonel veri yok."
-                )
-
-        if not carbon_df.empty and "total_tco2e" in carbon_df.columns and float(carbon_df["total_tco2e"].iloc[0]) > 0:
-            base_tco2 = float(carbon_df["total_tco2e"].iloc[0])
-        else:
-            base_tco2 = round(base_kwh * 0.00044, 2)
+        if energy_df.empty or "grand_total_kwh" not in energy_df.columns:
+            raise ScenarioDataUnavailableError("DATA_UNAVAILABLE: Energy KPI missing.")
+        if carbon_df.empty or "total_tco2e" not in carbon_df.columns:
+            raise ScenarioDataUnavailableError("DATA_UNAVAILABLE: Carbon KPI missing.")
+        base_kwh = float(energy_df["grand_total_kwh"].iloc[0])
+        base_tco2 = float(carbon_df["total_tco2e"].iloc[0])
 
         return base_makespan, base_kwh, base_tco2
+
+    def _solve_operational_shock(self, shock: ScenarioShock, source_run_id: str):
+        """Run LP -> MRP -> CP-SAT -> energy/carbon on a private SQLite backup."""
+        from src.carbon.carbon_analytics import compute_carbon_analytics
+        from src.config import SchedulingObjectivePolicy
+        from src.energy.energy_analytics import compute_energy_analytics
+        from src.inventory.bom_mrp import run_mrp_engine
+        from src.planning.aggregate_planning import run_planning_pipeline
+        from src.scheduling.maintenance import MaintenanceWindow
+        from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+
+        if shock.demand_multiplier < 0 or shock.capacity_multiplier <= 0:
+            raise ValueError("Demand must be non-negative and capacity positive.")
+        with tempfile.TemporaryDirectory(prefix="factory-scenario-") as temporary:
+            root = Path(temporary)
+            db = root / "factory.db"
+            processed = root / "processed"
+            reports = root / "reports"
+            with closing(sqlite3.connect(self.db_path)) as source, closing(sqlite3.connect(db)) as target:
+                source.backup(target)
+            scenario_id = f"SCENARIO-{uuid.uuid4().hex[:12]}"
+            with sqlite3.connect(db) as conn:
+                clone_run_inputs(conn, source_run_id, scenario_id)
+                if shock.demand_multiplier != 1.0:
+                    conn.execute(
+                        "UPDATE forecast_demand SET forecast_demand = forecast_demand * ? WHERE run_id = ?",
+                        (shock.demand_multiplier, scenario_id),
+                    )
+                if shock.capacity_multiplier != 1.0:
+                    # Capacity loss is modeled as lower throughput, including
+                    # both the tactical resource load and operational durations.
+                    conn.execute(
+                        "UPDATE routing SET processing_time_min = processing_time_min / ?", (shock.capacity_multiplier,)
+                    )
+                conn.commit()
+            try:
+                run_planning_pipeline(run_id=scenario_id, db_path=db, processed_dir=processed)
+                run_mrp_engine(run_id=scenario_id, db_path=db, processed_dir=processed)
+                windows = [
+                    MaintenanceWindow(machine, 480, 960, "BREAKDOWN", shock.name) for machine in shock.failed_machines
+                ]
+                run_cpsat_scheduling(
+                    run_id=scenario_id,
+                    db_path=db,
+                    processed_dir=processed,
+                    reports_dir=reports,
+                    policy=SchedulingObjectivePolicy(shock.objective_policy),
+                    maintenance_overrides=windows,
+                    material_delay_min=shock.material_delay_days * 1440,
+                )
+                compute_energy_analytics(run_id=scenario_id, db_path=db, processed_dir=processed)
+                compute_carbon_analytics(run_id=scenario_id, db_path=db, processed_dir=processed)
+                with sqlite3.connect(db) as conn:
+                    schedule = pd.read_sql(
+                        "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(scenario_id,)
+                    )
+                    energy = pd.read_sql("SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(scenario_id,))
+                    carbon = pd.read_sql("SELECT * FROM carbon_kpis WHERE run_id = ?", conn, params=(scenario_id,))
+                    orders = pd.read_sql("SELECT * FROM orders WHERE run_id = ?", conn, params=(scenario_id,))
+                return schedule, float(energy["grand_total_kwh"].iloc[0]), float(carbon["total_tco2e"].iloc[0]), orders
+            except Exception as exc:
+                raise ScenarioDataUnavailableError(f"SCENARIO_SOLVE_FAILED: {shock.name}: {exc}") from exc
 
     def evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
         """Madde 23: Hibrit Senaryo Motoru.
@@ -175,8 +227,11 @@ class ScenarioEngine:
         - 3 Kritik Operasyonel Şok (Demand, Capacity, Material): Gerçek kısıt çözümü / rerun.
         - Finansal Şoklar (Energy, CO2): Analitik duyarlılık (Sensitivity) analizi.
         """
-        with get_db_connection(self.db_path) as conn:
-            run_id = get_active_run_id(conn)
+        try:
+            with get_db_connection(self.db_path) as conn:
+                run_id = get_active_run_id(conn)
+        except RuntimeError as exc:
+            raise ScenarioDataUnavailableError(f"DATA_UNAVAILABLE: {exc}") from exc
         sched_df = self._read_table_safe("production_schedule", self.db_path, run_id)
         energy_df = self._read_table_safe("energy_kpis", self.db_path, run_id)
         carbon_df = self._read_table_safe("carbon_kpis", self.db_path, run_id)
@@ -196,136 +251,27 @@ class ScenarioEngine:
         sim_kwh = base_kwh
         sim_tco2 = base_tco2
 
-        # =====================================================================
-        # 1. OPERASYONEL RERUN / KISIT ÇÖZÜMLERİ (MADDE 23: 3 KRİTİK ŞOK)
-        # =====================================================================
-
-        # [Şok 1: Capacity Shock - M01 Unavailable]
-        if shock.failed_machines:
-            failed_m = shock.failed_machines[0]
-            try:
-                rescheduler = DynamicRescheduler(disk_db_path=self.db_path)
-                from src.contracts.schemas import RescheduleTriggerEvent
-
-                trigger = RescheduleTriggerEvent(
-                    event_id=f"SCENARIO-{shock.name.replace(' ', '-').upper()}",
-                    current_time_min=480,
-                    freeze_horizon_min=240,
-                    delay_machine_id=failed_m,
-                    delay_duration_min=480,
-                    reason=f"Scenario: {shock.name}",
-                )
-                _, sim_sched, _, _, _ = rescheduler.execute_reschedule(
-                    trigger=trigger,
-                    new_run_id=None,
-                    persist_audit=False,
-                )
-                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            except Exception as exc:
-                raise ScenarioDataUnavailableError(f"SCENARIO_SOLVE_FAILED: {shock.name}: {exc}") from exc
-
-            run_col = "duration_min" if "duration_min" in sim_sched.columns else "duration"
-            sim_work_hours = (
-                float(sim_sched[run_col].sum()) / 60.0
-                if not sim_sched.empty and run_col in sim_sched.columns
-                else base_makespan * 3.5
-            )
-            sim_kwh = max(base_kwh, sim_work_hours * 45.0 + (480.0 / 60.0 * 10.0))
-            sim_tco2 = round(sim_kwh * 0.00044, 2)
-
-        # [Şok 2: Material Disruption - Raw Material Delay]
-        elif shock.material_delay_days > 0:
-            delay_min = shock.material_delay_days * 8.0 * 60.0
-            if not sim_sched.empty and "start_min" in sim_sched.columns:
-                # MRP malzeme erişilebilirlik tarihini (release date) ötele
-                first_ops = (
-                    sim_sched["operation_seq"] == 1
-                    if "operation_seq" in sim_sched.columns
-                    else sim_sched.index < max(1, len(sim_sched) // 3)
-                )
-                sim_sched.loc[first_ops, "start_min"] += delay_min
-                sim_sched.loc[first_ops, "end_min"] += delay_min
-
-                # Rotalama (precedence) ve makine kısıtlarını sağa kaydırarak yeniden çöz
-                changed = True
-                while changed:
-                    changed = False
-                    for _, group in sim_sched.groupby("lot_id"):
-                        sorted_ops = group.sort_values("operation_seq").index.tolist()
-                        for i in range(len(sorted_ops) - 1):
-                            curr_idx, next_idx = sorted_ops[i], sorted_ops[i + 1]
-                            if sim_sched.at[next_idx, "start_min"] < sim_sched.at[curr_idx, "end_min"]:
-                                dur = sim_sched.at[next_idx, "end_min"] - sim_sched.at[next_idx, "start_min"]
-                                sim_sched.at[next_idx, "start_min"] = sim_sched.at[curr_idx, "end_min"]
-                                sim_sched.at[next_idx, "end_min"] = sim_sched.at[next_idx, "start_min"] + dur
-                                changed = True
-
-                    for _, group in sim_sched.groupby("machine_id"):
-                        sorted_mach = group.sort_values("start_min").index.tolist()
-                        for i in range(len(sorted_mach) - 1):
-                            curr_idx, next_idx = (
-                                sorted_mach[i],
-                                sorted_mach[i + 1],
-                            )
-                            if sim_sched.at[next_idx, "start_min"] < sim_sched.at[curr_idx, "end_min"]:
-                                dur = sim_sched.at[next_idx, "end_min"] - sim_sched.at[next_idx, "start_min"]
-                                sim_sched.at[next_idx, "start_min"] = sim_sched.at[curr_idx, "end_min"]
-                                sim_sched.at[next_idx, "end_min"] = sim_sched.at[next_idx, "start_min"] + dur
-                                changed = True
-
-                sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            else:
-                raise ScenarioDataUnavailableError(
-                    "SCENARIO_SOLVE_FAILED: Material delay requires a baseline schedule."
-                )
-
-        # [Şok 3: Demand Shock - +20% Demand]
-        elif shock.demand_multiplier != 1.0:
-            sim_kwh = base_kwh * shock.demand_multiplier
-            sim_tco2 = round(base_tco2 * shock.demand_multiplier, 2)
-            if not sim_sched.empty:
-                run_col = "duration_min" if "duration_min" in sim_sched.columns else "duration"
-                sim_sched[run_col] = sim_sched[run_col] * shock.demand_multiplier
-                if "end_min" in sim_sched.columns:
-                    sim_sched["end_min"] = sim_sched["start_min"] + sim_sched[run_col]
-                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            else:
-                raise ScenarioDataUnavailableError("SCENARIO_SOLVE_FAILED: Demand shock requires a baseline schedule.")
-
-        # Kapasite düşüşü (-10% Capacity)
-        elif shock.capacity_multiplier != 1.0:
-            scale = 1.0 / max(shock.capacity_multiplier, 0.1)
-            if not sim_sched.empty:
-                run_col = "duration_min" if "duration_min" in sim_sched.columns else "duration"
-                sim_sched[run_col] = sim_sched[run_col] * scale
-                if "end_min" in sim_sched.columns:
-                    sim_sched["end_min"] = sim_sched["start_min"] + sim_sched[run_col]
-                    sim_makespan = float(sim_sched["end_min"].max()) / 60.0
-            else:
-                raise ScenarioDataUnavailableError(
-                    "SCENARIO_SOLVE_FAILED: Capacity shock requires a baseline schedule."
-                )
+        operational_shock = (
+            shock.failed_machines
+            or shock.material_delay_days > 0
+            or shock.demand_multiplier != 1.0
+            or shock.capacity_multiplier != 1.0
+        )
+        if operational_shock:
+            sim_sched, sim_kwh, sim_tco2, orders_df = self._solve_operational_shock(shock, run_id)
+            sim_makespan = float(sim_sched["end_min"].max()) / 60.0 if not sim_sched.empty else 0.0
 
         # =====================================================================
         # 2. SERVİS SEVİYESİ VE GECİKME (OTIF %)
         # =====================================================================
         target_due_min = 168.0 * 60.0
-        if shock.demand_multiplier > 1.0:
-            service_kpis = evaluate_schedule_service_level(
-                schedule_df=sim_sched,
-                orders_df=orders_df,
-                default_due_date_min=target_due_min * 0.80,
-            )
-            on_time_pct = min(85.0, round(service_kpis.get("on_time_delivery_pct", 85.0), 1))
-            backlog = max(15, int(service_kpis.get("late_quantity", 15)))
-        else:
-            service_kpis = evaluate_schedule_service_level(
-                schedule_df=sim_sched,
-                orders_df=orders_df,
-                default_due_date_min=target_due_min,
-            )
-            on_time_pct = round(service_kpis.get("on_time_delivery_pct", 100.0), 1)
-            backlog = int(service_kpis.get("late_quantity", 0))
+        service_kpis = evaluate_schedule_service_level(
+            schedule_df=sim_sched,
+            orders_df=orders_df,
+            default_due_date_min=target_due_min,
+        )
+        on_time_pct = round(service_kpis["on_time_delivery_pct"], 1)
+        backlog = int(service_kpis["late_quantity"])
 
         # =====================================================================
         # 3. FİNANSAL SENSITIVITY ANALİZİ (+25% Energy, +50 €/tCO2)
@@ -343,9 +289,6 @@ class ScenarioEngine:
             energy_cost_per_kwh=unit_electricity_price,
             carbon_cost_per_ton=total_carb_rate,
         )
-
-        calc_energy_cost = round(sim_kwh * unit_electricity_price, 2)
-        calc_carbon_cost = round(sim_tco2 * total_carb_rate, 2)
 
         # 4. Ekonomik Karar Motoru (TMC)
         # Doğrudan deterministik enerji ve karbon maliyet hesapları
@@ -369,13 +312,7 @@ class ScenarioEngine:
                 backlog_cost = (backlog / 50.0) * ECONOMIC_CONFIG.backlog_penalty_per_batch
                 total_cost = round(energy_cost + carbon_cost + inventory_cost + backlog_cost, 2)
         else:
-            baseline_batches = 12 * shock.demand_multiplier
-            inventory_cost = round(
-                baseline_batches
-                * ECONOMIC_CONFIG.holding_cost_per_batch
-                * (1.2 if shock.material_delay_days > 0 else 1.0),
-                2,
-            )
+            inventory_cost = 0.0
             energy_cost = calc_energy_cost
             carbon_cost = calc_carbon_cost
             overtime_cost = (

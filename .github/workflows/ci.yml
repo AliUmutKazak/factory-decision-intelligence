@@ -62,11 +62,7 @@ jobs:
 
     - name: "Quality Gate 4: Artifact & Report Manifest Validation"
       run: |
-        python -c "
-        from pathlib import Path
-        assert Path('data/factory.db').exists(), 'data/factory.db database missing!'
-        print('Artifact manifest validation PASSED.')
-        "
+        python scripts/verify_active_run.py
 
     - name: "Quality Gate 5: Industrial Scenario Matrix & OR Physics Tests"
       run: |

@@ -15,6 +15,8 @@ Mimari Standart:
 ================================================================================
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pulp
@@ -459,7 +461,7 @@ def validate_and_repair_disaggregation(sku_plan_df, family_plan_df, machine_capa
     return repaired_df, updated_family_df, any_repair
 
 
-def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
+def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None, processed_dir=None):
     """
     Hiyerarşik Üretim Planlama Motoru (Endüstriyel Kapalı Devre Re-Optimization)
     Alt seviye SKU fizibilitesi sağlanana kadar üst seviye Taktik LP'yi
@@ -468,7 +470,7 @@ def run_planning_pipeline(run_id=None, max_feedback_iters=3, db_path=None):
 
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
-    processed_dir = runtime["processed_dir"]
+    processed_dir = Path(processed_dir) if processed_dir is not None else runtime["processed_dir"]
 
     forecast_df, products_df, routing_df, machines_df = load_data(active_db_path, run_id=run_id)
     sku_weekly, family_weekly = build_weekly_forecast_bridge(forecast_df, products_df)

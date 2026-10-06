@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -39,7 +41,7 @@ def calculate_gross_requirements(sku_plan, bom):
     return gross_req
 
 
-def run_mrp_engine(run_id=None, db_path=None):
+def run_mrp_engine(run_id=None, db_path=None, processed_dir=None):
     sku_plan, bom, materials = load_data(db_path=db_path, run_id=run_id)
     gross_df = calculate_gross_requirements(sku_plan, bom)
 
@@ -149,7 +151,7 @@ def run_mrp_engine(run_id=None, db_path=None):
 
     # SQLite ve CSV'ye Aktar
     runtime = get_runtime_paths()
-    processed_dir = runtime["processed_dir"]
+    processed_dir = Path(processed_dir) if processed_dir is not None else runtime["processed_dir"]
     output_mrp_path = processed_dir / "mrp_plan.csv"
     active_db_path = db_path or runtime["db_path"]
 

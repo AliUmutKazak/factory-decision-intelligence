@@ -20,6 +20,8 @@ gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji 
 ===============================================================================
 """
 
+from pathlib import Path
+
 import pandas as pd
 
 from src.config import get_runtime_paths
@@ -63,10 +65,12 @@ def load_machine_specs(db_path=None) -> dict:
     return specs
 
 
-def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db_path=None):
+def compute_energy_analytics(
+    schedule_df=None, machines_df=None, run_id=None, db_path=None, processed_dir=None, reports_dir=None
+):
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
-    processed_dir = runtime["processed_dir"]
+    processed_dir = Path(processed_dir) if processed_dir is not None else runtime["processed_dir"]
     output_energy_kpi_path = processed_dir / "energy_kpis.csv"
     output_profile_path = processed_dir / "energy_profile_15min.csv"
     if not run_id:
