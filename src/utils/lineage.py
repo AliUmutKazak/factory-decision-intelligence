@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from src import config
 from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
@@ -108,7 +107,6 @@ def record_pipeline_run_metadata(
     except Exception:
         pulp_ver = "not_installed"
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     if not run_id:
         run_id = generate_run_id()
 
@@ -299,7 +297,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
     İllegal geçişlerde ValueError fırlatır, aynı duruma geçişlerde idempotent davranır.
     """
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return
     conn = get_db_connection(active_db)
@@ -343,19 +341,22 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
 
     import pandas as pd
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     root_dir = Path(__file__).resolve().parent.parent.parent
 
     # Runtime path is authoritative; validation must never read canonical reports
     # while an isolated staging environment is active.
+    runtime_paths = get_runtime_paths()
     if reports_dir:
         resolved_reports_dir = Path(reports_dir)
-    elif os.environ.get("FACTORY_REPORTS_DIR"):
-        resolved_reports_dir = Path(os.environ["FACTORY_REPORTS_DIR"])
-    elif db_path:
+    elif (
+        db_path
+        and not os.environ.get("FACTORY_REPORTS_DIR")
+        and Path(runtime_paths["reports_dir"]) == Path(runtime_paths["base_dir"]) / "reports"
+    ):
         resolved_reports_dir = Path(db_path).parent / "reports"
     else:
-        resolved_reports_dir = Path(get_runtime_paths()["reports_dir"])
+        resolved_reports_dir = Path(runtime_paths["reports_dir"])
 
     conn = get_db_connection(active_db)
     try:
@@ -551,7 +552,7 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     uyumluluk için açıkça istendiğinde COMPLETED/SUCCESS durumuna bakar.
     """
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
@@ -899,7 +900,7 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     2. run_id koşumunu COMPLETED -> ACTIVE durumuna taşır.
     """
 
-    target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    target_db = db_path or str(get_runtime_paths()["db_path"])
 
     conn = get_db_connection(target_db)
     try:
@@ -954,7 +955,6 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     6. atomic swap
     """
     import json
-    import os
     import shutil
     import tempfile
     from pathlib import Path
@@ -991,7 +991,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         raise ValueError(f"Git SHA mismatch: DB '{db_git_sha}' != Metadata '{meta_git_sha}'")
 
     # 4. Explicit Artifact Allowlist
-    active_db = Path(os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db"))
+    active_db = Path(get_runtime_paths()["db_path"])
     allowlist = [
         active_db,
         metadata_file,
@@ -1044,7 +1044,7 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     """
     import sqlite3
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     manifest = generate_run_manifest(run_id, db_path=active_db, input_source_path=input_source_path)
     inputs_lineage = manifest.get("inputs", {})
 

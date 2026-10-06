@@ -42,7 +42,7 @@ The supplied review does not turn its explicitly deferred roadmap into finished 
 
 ## Verification record
 
-The previous hardening head `aa4e95c5e0e83853841f7a61796f1df7c3c01048` passed the complete GitHub Actions matrix: 184 tests and the clean-start/restart Docker job ([run 37537786461](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/37537786461)). That result applies to that head, not automatically to subsequent edits. The follow-up review closes additional benchmark, economic-configuration, read-only audit and readiness defects; its current checks are reported in the PR rather than represented by a static pass-count badge.
+The previous hardening head `aa4e95c5e0e83853841f7a61796f1df7c3c01048` passed the complete GitHub Actions matrix: 184 tests and the clean-start/restart Docker job ([run 37537786461](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/37537786461)). That result applies to that head, not automatically to subsequent edits. The follow-up review closes additional benchmark, economic-configuration, read-only audit and readiness defects, plus context-vs-environment precedence in scenario/closed-loop constructors, ERP mapping and lineage helpers. Its current checks are reported in the PR rather than represented by a static pass-count badge.
 
 The deployment remains a single-host demo/POC. Disruption downtime is queued after frozen commitments; operation interruption/resumption is not implemented. The production path uses CP-SAT rather than a separate Tier-1 heuristic repair. Heuristic benchmark rules use a simplified constraint model and do not establish an equivalent-feasibility performance claim.
 

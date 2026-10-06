@@ -1,6 +1,7 @@
 """Failures found while closing run isolation and rescheduling regressions."""
 
 import json
+import shutil
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -36,7 +37,11 @@ def test_runtime_paths_do_not_leak_into_another_thread(tmp_path):
 
 
 def test_staging_context_takes_precedence_over_environment_database(tmp_path, monkeypatch):
+    from src.data.preprocessing import get_erp_product_mapping
+    from src.scenarios.closed_loop import ClosedLoopEngine
+    from src.scenarios.scenario_engine import ScenarioEngine
     from src.utils.db import get_db_connection
+    from src.utils.lineage import update_pipeline_run_status
 
     external = tmp_path / "environment.db"
     staging = tmp_path / "staging.db"
@@ -44,10 +49,38 @@ def test_staging_context_takes_precedence_over_environment_database(tmp_path, mo
     with runtime_path_context(db_path=staging):
         with get_db_connection(cfg.DB_PATH) as conn:
             conn.execute("CREATE TABLE staged(value INTEGER)")
+            conn.execute(
+                "CREATE TABLE erp_product_mapping(source_product_code TEXT, internal_product_id TEXT, "
+                "is_in_scope INTEGER, source_system TEXT, status TEXT)"
+            )
+            conn.execute("INSERT INTO erp_product_mapping VALUES ('777', 'STAGED_SKU', 1, 'KAGGLE', 'active')")
         start_pipeline_run("STAGED", db_path=None)
+        update_pipeline_run_status("STAGED", "STAGING")
+        assert ScenarioEngine().db_path == str(staging)
+        assert ClosedLoopEngine().db_path == str(staging)
+        assert get_erp_product_mapping()[0][777] == "STAGED_SKU"
+        assert ScenarioEngine(str(external)).db_path == str(external)
     assert not external.exists()
     with sqlite3.connect(staging) as conn:
-        assert conn.execute("SELECT run_id FROM pipeline_runs").fetchone()[0] == "STAGED"
+        assert conn.execute("SELECT run_id, status FROM pipeline_runs").fetchone() == ("STAGED", "STAGING")
+
+
+def test_validation_uses_context_reports_before_environment_reports(tmp_path, monkeypatch):
+    from src.utils.db import get_active_run_id
+    from src.utils.lineage import validate_pipeline_run
+
+    paths = get_runtime_paths()
+    staging = tmp_path / "staging.db"
+    reports = tmp_path / "staging-reports"
+    shutil.copy2(paths["db_path"], staging)
+    shutil.copytree(paths["reports_dir"], reports)
+    with sqlite3.connect(staging) as conn:
+        active = get_active_run_id(conn)
+    wrong_reports = tmp_path / "environment-reports"
+    monkeypatch.setenv("FACTORY_REPORTS_DIR", str(wrong_reports))
+    with runtime_path_context(db_path=staging, reports_dir=reports):
+        assert validate_pipeline_run(active)
+    assert not wrong_reports.exists()
 
 
 def test_reference_source_survives_run_retention(tmp_path, monkeypatch):

@@ -40,9 +40,8 @@ def get_erp_product_mapping(source_system: str = "KAGGLE", db_path: str | None =
     - in_scope_ids: sadece üretim kapsamındaki dahili SKU kümesi {'P01'..'P05'}
     döner.
     """
-    from src import config
 
-    target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    target_db = db_path or get_runtime_paths()["db_path"]
 
     mapping = {}
     in_scope_ids = set()

@@ -7,7 +7,6 @@ Girdi şoklarını izole staging/sandbox ortamında simüle eder:
   çizelgeleme ve operasyonel veriler üzerinden deterministik metrikler üretir.
 """
 
-import os
 import sqlite3
 import tempfile
 import uuid
@@ -21,6 +20,7 @@ from src.config import (
     DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH,
     ECONOMIC_CONFIG,
     ObjectivePolicy,
+    get_runtime_paths,
 )
 from src.contracts.schemas import ScenarioResultModel
 from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
@@ -97,7 +97,7 @@ class ScenarioEngine:
     """
 
     def __init__(self, db_path: str | None = None):
-        self.db_path = db_path or os.environ.get("FACTORY_DB_PATH", "data/factory.db")
+        self.db_path = str(db_path or get_runtime_paths()["db_path"])
         self.baseline_run_id: str | None = None
         self.scenarios: dict[str, ScenarioShock] = {
             "BASELINE": ScenarioShock(name="BASELINE"),

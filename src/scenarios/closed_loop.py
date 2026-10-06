@@ -4,12 +4,12 @@ Saha fiili üretim verilerini (Actuals) izler, plan sapmalarını (slippage) öl
 ve eşik aşımında yeniden çizelgeleme (Dynamic Replanning) kararını tetikler.
 """
 
-import os
 from contextlib import closing
 from dataclasses import dataclass
 
 import pandas as pd
 
+from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 from src.utils.runtime_lock import run_mutation_lock
 
@@ -31,7 +31,7 @@ class ClosedLoopEngine:
     """
 
     def __init__(self, db_path: str | None = None, slippage_threshold_pct: float = 10.0, max_delay_hours: float = 4.0):
-        self.db_path = db_path or os.environ.get("FACTORY_DB_PATH", "data/factory.db")
+        self.db_path = str(db_path or get_runtime_paths()["db_path"])
         self.slippage_threshold_pct = slippage_threshold_pct
         self.max_delay_hours = max_delay_hours
 
