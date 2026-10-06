@@ -290,12 +290,63 @@ def fix_validation_and_retention() -> None:
     replace_between("src/utils/lineage.py", retention_start, retention_end, retention)
 
 
+def fix_main_bundle() -> None:
+    ensure_before(
+        "main.py",
+        "from src.utils.lineage import (",
+        "from src.utils.run_bundle import seal_run_bundle\n",
+    )
+    replace_once(
+        "main.py",
+        '                bundle_manifest = bundle_reports / "run_manifest.json"\n'
+        '                if bundle_manifest.exists():\n'
+        '                    shutil.copy2(bundle_manifest, run_artifacts_dir / "manifest.json")\n'
+        '                print(f"[AUDIT] P0-3 Run Isolation tamamlandı: {run_artifacts_dir}")',
+        '                seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")\n'
+        '                print(f"[AUDIT] Run bundle mühürlendi: {run_artifacts_dir}")',
+    )
+    replace_once(
+        "main.py",
+        '                cur.execute("SELECT COUNT(*) FROM orders")\n'
+        '                row = cur.fetchone()',
+        '                cur.execute("SELECT COUNT(*) FROM orders WHERE run_id = ?", (run_id,))\n'
+        '                row = cur.fetchone()',
+    )
+    old = '''        # 2. P0.4: Mutlak En Son Atomik İşlem -> CANONICAL DB Üzerinde ACTIVE Promosyonu
+        # Kanonik DB tamamen diske oturduktan sonra tek bir atomik UPDATE ile ACTIVE yapılır.
+        # Bu adımın arkasından hata verebilecek HİÇBİR I/O veya operasyon çalıştırılmaz.
+        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
+
+        # Retention only after successful promotion; staging must never mutate
+        # canonical historical artifacts.
+        apply_run_retention_policy(
+            keep_last_n=20,
+            db_path=str(canonical_db),
+            artifacts_dir=str(base_dir / "artifacts" / "runs"),
+        )
+'''
+    new = '''        # Retention canonical DB ve immutable run bundle üzerinde, ACTIVE
+        # promotion'dan önce tamamlanır. Hata olursa eski ACTIVE değişmeden kalır.
+        apply_run_retention_policy(
+            keep_last_n=20,
+            db_path=str(canonical_db),
+            artifacts_dir=str(base_dir / "artifacts" / "runs"),
+        )
+
+        # Final critical state transition. Schedule/data mutation does not occur
+        # after this point; ACTIVE is the authoritative production pointer.
+        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
+'''
+    replace_once("main.py", old, new)
+
+
 def main() -> None:
     fix_energy()
     fix_service_level()
     fix_scheduler_imports()
     fix_orders_history()
     fix_validation_and_retention()
+    fix_main_bundle()
 
 
 if __name__ == "__main__":
