@@ -144,8 +144,6 @@ class ClosedLoopRescheduler:
             "downtime_deviation_min": round(downtime_deviation, 2),
             "planned_scrap_rate": planned_scrap_rate,
             "actual_scrap_rate": actual_scrap_rate,
-            "planned_scrap_rate": planned_scrap_rate,
-            "actual_scrap_rate": actual_scrap_rate,
             "scrap_deviation": round(scrap_deviation, 4),
             "total_time_deviation_min": round(total_time_deviation, 2),
             "replan_required": replan_required,
