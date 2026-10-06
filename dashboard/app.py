@@ -11,11 +11,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.config import (
-    DB_PATH,
-    PLANNING_HORIZON_WEEKS,
-    WEEKLY_HOURS_PER_MACHINE,
-)
+from src.config import PLANNING_HORIZON_WEEKS, WEEKLY_HOURS_PER_MACHINE, get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
@@ -54,12 +50,12 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
     Veritabanından tabloyu çeker.
     Hata (QueryError) ile boş sonuç ayrımını garanti eder.
     """
-    db_file = Path(DB_PATH)
+    db_file = Path(get_runtime_paths()["db_path"])
     if not db_file.exists():
         return pd.DataFrame()
 
     try:
-        with get_db_connection(DB_PATH) as conn:
+        with get_db_connection(get_runtime_paths()["db_path"]) as conn:
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table_name})")
             rows = cursor.fetchall()
@@ -67,11 +63,12 @@ def get_table(table_name: str, run_id: str = None) -> pd.DataFrame:
                 return pd.DataFrame()
 
             columns = [row[1] for row in rows]
-            if run_id and "run_id" in columns:
+            if run_id:
+                if "run_id" not in columns:
+                    raise QueryError(f"{table_name} run_id kolonu olmadan dashboard'a verilemez.")
                 query = f"SELECT * FROM {table_name} WHERE run_id = ?"
                 return pd.read_sql(query, conn, params=[run_id])
-            else:
-                return pd.read_sql(f"SELECT * FROM {table_name}", conn)
+            return pd.read_sql(f"SELECT * FROM {table_name}", conn)
     except Exception as exc:
         raise QueryError(f"Veritabanı sorgu hatası [{table_name}]: {exc}") from exc
 
@@ -89,7 +86,11 @@ def filter_by_active_run(df: pd.DataFrame, active_id: str) -> pd.DataFrame:
     Eğer aktif run_id'ye ait kayıt yoksa eski veriye (fallback) düşülmez,
     böylece sessiz veri uyuşmazlığı (DATA MISMATCH) engellenir.
     """
-    if not df.empty and "run_id" in df.columns and active_id and active_id != "N/A":
+    if active_id and active_id != "N/A":
+        if df.empty:
+            return df
+        if "run_id" not in df.columns:
+            raise DashboardDataError("DATA MISMATCH: runtime tablosunda run_id kolonu yok.")
         return df[df["run_id"] == active_id]
     return df
 
@@ -103,34 +104,13 @@ def determine_system_status(tables):
     if not db_file.exists():
         return "NO RUN", "error", "Veritabanı dosyası (factory.db) bulunamadı. Pipeline henüz çalıştırılmamış."
 
-    # 1. Pipeline Run & Lineage Metadata Doğrulaması
-    metadata_path = Path("reports/run_metadata.json")
-    if metadata_path.exists():
-        try:
-            with open(metadata_path, encoding="utf-8") as f:
-                run_meta = json.load(f)
-        except Exception as e:
-            return "METADATA CORRUPTED", "error", f"reports/run_metadata.json okunamadı veya bozuk: {e}"
-
-        status_val = str(run_meta.get("status", "")).upper()
-        # Madde 27: Backend ACTIVE kontratı ile Dashboard semantik uyumu
-        if status_val != "ACTIVE":
-            return (
-                "PIPELINE FAILED",
-                "error",
-                f"Aktif pipeline koşumu doğrulanmadı (Status: {status_val}, Run: {run_meta.get('run_id')}). Yalnızca ACTIVE statülü koşumlar yayına alınır.",
-            )
-
-        # Çözücü durumları geçerli mi?
-        opt_metrics = run_meta.get("optimization_metrics", {})
-        agg_status = str(opt_metrics.get("aggregate_lp_status", "")).upper()
-        cpsat_status = str(opt_metrics.get("cpsat_solver_status", "")).upper()
-
-        if "INFEASIBLE" in agg_status or "INFEASIBLE" in cpsat_status:
-            return "SOLVER INFEASIBLE", "error", f"Optimizasyon çözücü hatası: LP={agg_status}, CP-SAT={cpsat_status}."
+    # 1. Pipeline Run & Lineage: pipeline_runs is authoritative.
+    active = get_active_pipeline_run(allow_fallback=False)
+    if not active:
+        return "NO RUN", "error", "Doğrulanmış ACTIVE pipeline koşumu bulunamadı."
 
     # 2. Solver Metadata Doğrulaması
-    solver_meta_path = Path("reports/schedule_solver_metadata.json")
+    solver_meta_path = get_runtime_paths()["reports_dir"] / "schedule_solver_metadata.json"
     if solver_meta_path.exists():
         try:
             with open(solver_meta_path, encoding="utf-8") as f:
