@@ -171,38 +171,22 @@ def run_end_to_end_pipeline():
                     for item in staging_reports.glob("*.*"):
                         shutil.copy2(item, canonical_reports / item.name)
 
-                # ---------------------------------------------------------
-                # P0-3: Production Artifact Isolation (Run-Scoped Archive)
-                # ---------------------------------------------------------
+                # Immutable run bundle: source is staging only. Canonical caches
+                # are never mixed into the historical run snapshot.
                 run_artifacts_dir = base_dir / "artifacts" / "runs" / run_id
                 run_artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-                # 1. Staging DB kopyasını run klasörüne factory.db olarak mühürle
                 if staging_db.exists():
                     shutil.copy2(staging_db, run_artifacts_dir / "factory.db")
-                elif canonical_db.exists():
-                    shutil.copy2(canonical_db, run_artifacts_dir / "factory.db")
 
-                # 2. Processed CSV çıktılarını topla (hem canonical hem staging birleştirilir)
-                for src_dir in (canonical_processed, staging_processed):
-                    if src_dir.exists():
-                        for item in src_dir.glob("*.csv"):
-                            shutil.copy2(item, run_artifacts_dir / item.name)
+                bundle_processed = run_artifacts_dir / "data" / "processed"
+                bundle_reports = run_artifacts_dir / "reports"
+                shutil.copytree(staging_processed, bundle_processed, dirs_exist_ok=True)
+                shutil.copytree(staging_reports, bundle_reports, dirs_exist_ok=True)
 
-                # 3. Reports ve manifest çıktılarını topla (hem canonical hem staging)
-                for rep_dir in (canonical_reports, staging_reports):
-                    if rep_dir.exists():
-                        for item in rep_dir.glob("*.*"):
-                            shutil.copy2(item, run_artifacts_dir / item.name)
-                            if item.name == "run_manifest.json":
-                                shutil.copy2(item, run_artifacts_dir / "manifest.json")
-
-                # run_manifest.json canonical reports içindeyse doğrudan garantiye al
-                manifest_file = canonical_reports / "run_manifest.json"
-                if manifest_file.exists():
-                    shutil.copy2(manifest_file, run_artifacts_dir / "run_manifest.json")
-                    shutil.copy2(manifest_file, run_artifacts_dir / "manifest.json")
-
+                bundle_manifest = bundle_reports / "run_manifest.json"
+                if bundle_manifest.exists():
+                    shutil.copy2(bundle_manifest, run_artifacts_dir / "manifest.json")
                 print(f"[AUDIT] P0-3 Run Isolation tamamlandı: {run_artifacts_dir}")
 
                 promoted = True
@@ -253,20 +237,28 @@ def run_end_to_end_pipeline():
             except Exception:
                 pass
 
+        # Record failure on canonical control DB without touching active run data.
         try:
-            if canonical_db.exists():
-                from src.utils.db import get_db_connection
+            from src.utils.db import get_db_connection
 
-                with get_db_connection(str(canonical_db)) as conn:
-                    init_pipeline_runs_table(conn)
-                    cur = conn.cursor()
+            with get_db_connection(str(canonical_db)) as conn:
+                init_pipeline_runs_table(conn)
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT status FROM pipeline_runs WHERE run_id = ?",
+                    (run_id,),
+                )
+                existing = cur.fetchone()
+                if existing is None:
                     cur.execute(
-                        "INSERT OR REPLACE INTO pipeline_runs (run_id, timestamp, status) VALUES (?, datetime('now'), 'FAILED')",
+                        "INSERT INTO pipeline_runs (run_id, timestamp, trigger_source, status) "
+                        "VALUES (?, datetime('now'), 'pipeline_execution', 'INITIALIZED')",
                         (run_id,),
                     )
-            record_pipeline_run_metadata(run_id=run_id, status="FAILED")
-        except Exception:
-            pass
+                    conn.commit()
+                update_pipeline_run_status(run_id, "FAILED", db_path=str(canonical_db))
+        except Exception as failure_audit_exc:
+            print(f"[WARN] Failure audit kaydı yazılamadı: {failure_audit_exc}", file=sys.stderr)
 
         raise exc
 
