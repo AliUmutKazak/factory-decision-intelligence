@@ -58,15 +58,27 @@ class DynamicRescheduler:
     def _persist_rescheduled_version(self, conn: sqlite3.Connection, new_df: pd.DataFrame, new_run_id: str, audit: RescheduleAuditEntry) -> None:
         self._create_new_run_record(conn,new_run_id,audit.previous_run_id)
         new_df.to_sql("production_schedule",conn,if_exists="append",index=False)
-        # Solver metadata is also versioned; never replace historical metadata.
-        meta_row = {
+        # Solver metadata is versioned with the new run. Reuse only columns
+        # already present in the canonical solver metadata table.
+        meta_payload = audit.model_dump() if hasattr(audit, "model_dump") else {}
+        meta_payload.update({
             "run_id": new_run_id,
-            "status": "RESCHEDULED",
-            "reschedule_from_run_id": audit.previous_run_id,
-            "trigger_event_id": audit.trigger_event_id,
-            "nervousness_score": audit.nervousness_score,
-        }
-        pd.DataFrame([meta_row]).to_sql("reschedule_version_metadata", conn, if_exists="append", index=False)
+            "status": getattr(meta, "status", "FEASIBLE"),
+            "solver_status": getattr(meta, "status", "FEASIBLE"),
+            "makespan_min": getattr(meta, "makespan_min", None),
+            "objective_value": getattr(meta, "objective_value", None),
+            "best_objective_bound": getattr(meta, "best_objective_bound", None),
+            "total_setup_min": getattr(meta, "total_setup_min", None),
+            "total_tardiness_min": getattr(meta, "total_tardiness_min", None),
+            "wall_time_seconds": getattr(meta, "wall_time_seconds", None),
+        })
+        solver_cols = [r[1] for r in conn.execute("PRAGMA table_info(schedule_solver_metadata)").fetchall()]
+        if solver_cols:
+            row = {k: v for k, v in meta_payload.items() if k in solver_cols}
+            if "run_id" in solver_cols:
+                row["run_id"] = new_run_id
+            if row:
+                pd.DataFrame([row]).to_sql("schedule_solver_metadata", conn, if_exists="append", index=False)
         self._persist_audit_entry(conn,audit)
         conn.commit()
 
