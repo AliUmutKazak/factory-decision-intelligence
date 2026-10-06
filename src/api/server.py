@@ -1,4 +1,4 @@
-"""Factory Decision Intelligence - REST API Servis Katmanı (Faz 6)."""
+"""Factory Decision Intelligence REST API."""
 
 import sqlite3
 from typing import Any
@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Query, status
 from pydantic import BaseModel
 
 from src.config import get_runtime_paths
+from src.contracts.decision_ledger import DecisionLedger
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
@@ -15,6 +16,7 @@ from src.contracts.schemas import (
 )
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
+from src.utils.db import get_active_run_id, get_db_connection
 
 
 class DynamicRescheduleRequest(BaseModel):
@@ -24,15 +26,25 @@ class DynamicRescheduleRequest(BaseModel):
 
 app = FastAPI(
     title="Factory Decision Intelligence API",
-    description="Taktik LP, CP-SAT Operasyonel Çizelgeleme, What-If ve Dinamik Rescheduling Servisi",
+    description=(
+        "Taktik LP, CP-SAT operasyonel çizelgeleme, what-if ve "
+        "dinamik rescheduling servis katmanı"
+    ),
     version="1.0.0",
 )
 
 
-def get_db():
-    conn = sqlite3.connect(get_runtime_paths()["db_path"])
+def get_db() -> sqlite3.Connection:
+    conn = get_db_connection(get_runtime_paths()["db_path"])
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def require_active_run_id(conn: sqlite3.Connection) -> str:
+    try:
+        return get_active_run_id(conn)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail="ACTIVE run bulunamadı.") from exc
 
 
 @app.get("/health", tags=["Health & Monitoring"])
@@ -46,15 +58,10 @@ def get_current_schedule(
 ) -> list[dict[str, Any]]:
     conn = get_db()
     try:
-        active = pd.read_sql(
-            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1",
-            conn,
-        )
-        if active.empty:
-            raise HTTPException(status_code=409, detail="ACTIVE run bulunamadı.")
-        active_run_id = str(active.iloc[0]["run_id"])
+        active_run_id = require_active_run_id(conn)
         df = pd.read_sql(
-            "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC LIMIT ?",
+            "SELECT * FROM production_schedule WHERE run_id = ? "
+            "ORDER BY start_min ASC LIMIT ?",
             conn,
             params=(active_run_id, limit),
         )
@@ -67,22 +74,17 @@ def get_current_schedule(
 def get_solver_metadata() -> dict[str, Any]:
     conn = get_db()
     try:
-        active = pd.read_sql(
-            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1",
-            conn,
-        )
-        if active.empty:
-            raise HTTPException(status_code=409, detail="ACTIVE run bulunamadı.")
-        active_run_id = str(active.iloc[0]["run_id"])
+        active_run_id = require_active_run_id(conn)
         df = pd.read_sql(
-            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? ORDER BY id DESC LIMIT 1",
+            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? "
+            "ORDER BY rowid DESC LIMIT 1",
             conn,
             params=(active_run_id,),
         )
         if df.empty:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Henüz çözücü meta verisi kaydedilmemiş.",
+                detail="ACTIVE run için solver metadata bulunamadı.",
             )
         return df.iloc[0].to_dict()
     finally:
@@ -93,18 +95,18 @@ def get_solver_metadata() -> dict[str, Any]:
 def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()
-        b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
+        _, scenario_meta, report, scenario_df = engine.simulate_breakdown(event)
         return {
             "status": "SUCCESS",
             "scenario_type": "MACHINE_BREAKDOWN",
             "comparison_report": report.model_dump(),
-            "solver_status": s_meta.status,
-            "tasks_count": len(sc_df),
+            "solver_status": scenario_meta.status,
+            "tasks_count": len(scenario_df),
         }
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"What-If arıza simülasyonu başarısız: {str(exc)}",
+            detail=f"What-If arıza simülasyonu başarısız: {exc}",
         ) from exc
 
 
@@ -112,18 +114,18 @@ def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
 def simulate_hot_order(injection: HotOrderInjection) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()
-        b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
+        _, scenario_meta, report, scenario_df = engine.simulate_hot_order(injection)
         return {
             "status": "SUCCESS",
             "scenario_type": "HOT_ORDER_INJECTION",
             "comparison_report": report.model_dump(),
-            "solver_status": s_meta.status,
-            "tasks_count": len(sc_df),
+            "solver_status": scenario_meta.status,
+            "tasks_count": len(scenario_df),
         }
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"What-If acil sipariş simülasyonu başarısız: {str(exc)}",
+            detail=f"What-If acil sipariş simülasyonu başarısız: {exc}",
         ) from exc
 
 
@@ -133,7 +135,7 @@ def execute_dynamic_reschedule(
 ) -> dict[str, Any]:
     try:
         rescheduler = DynamicRescheduler()
-        base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
+        _, _, new_meta, nervousness, audit = rescheduler.execute_reschedule(
             trigger=request.trigger,
             new_run_id=request.new_run_id,
         )
@@ -142,14 +144,16 @@ def execute_dynamic_reschedule(
             "audit_id": audit.audit_id,
             "previous_run_id": audit.previous_run_id,
             "new_run_id": audit.new_run_id,
-            "nervousness_report": n_rep.model_dump(),
-            "solver_status": n_meta.status,
-            "new_makespan_min": n_meta.makespan_min,
+            "nervousness_report": nervousness.model_dump(),
+            "solver_status": new_meta.status,
+            "new_makespan_min": new_meta.makespan_min,
         }
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Dinamik yeniden çizelgeleme başarısız: {str(exc)}",
+            detail=f"Dinamik yeniden çizelgeleme başarısız: {exc}",
         ) from exc
 
 
@@ -159,11 +163,26 @@ def get_reschedule_audit_log(
 ) -> list[dict[str, Any]]:
     conn = get_db()
     try:
+        active_run_id = require_active_run_id(conn)
         df = pd.read_sql(
-            "SELECT * FROM reschedule_audit_log ORDER BY created_at DESC LIMIT ?",
+            "SELECT * FROM reschedule_audit_log "
+            "WHERE new_run_id = ? OR previous_run_id = ? "
+            "ORDER BY created_at DESC LIMIT ?",
             conn,
-            params=(limit,),
+            params=(active_run_id, active_run_id, limit),
         )
         return df.to_dict(orient="records")
     finally:
         conn.close()
+
+
+@app.get("/api/v1/decisions", tags=["Audit & Lineage"])
+def get_active_run_decisions() -> list[dict[str, Any]]:
+    conn = get_db()
+    try:
+        active_run_id = require_active_run_id(conn)
+    finally:
+        conn.close()
+
+    ledger = DecisionLedger(get_runtime_paths()["db_path"])
+    return [entry.to_dict() for entry in ledger.get_by_run_id(active_run_id)]
