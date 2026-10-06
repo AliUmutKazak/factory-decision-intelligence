@@ -190,3 +190,12 @@ def migrate_schedule_commitments(conn) -> None:
         for column in ("due_date_min", "priority_weight"):
             if column not in columns:
                 conn.execute(f"ALTER TABLE production_schedule ADD COLUMN {column} INTEGER")
+
+
+def migrate_solver_objective_contract(conn):
+    """Keep historic unknown policy/units NULL while recording all new solves."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(schedule_solver_metadata)")}
+    if columns:
+        for column in ("objective_units", "objective_policy"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE schedule_solver_metadata ADD COLUMN {column} TEXT")

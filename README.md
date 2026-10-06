@@ -183,11 +183,13 @@ Atölye zemininde belirsizlikler gerçekleştiğinde uygulanan dinamik politikal
 Mevcut zamandan ($t_{now}$) itibaren belirlenen dondurma periyodu ($H_{freeze}$) içindeki operasyonlar sahada hazırlığı tamamlanmış veya işlem görmekte kabul edilir:
 $$S_i = S_i^{orijinal}, \quad Makine_i = Makine_i^{orijinal} \quad \forall i \text{ where } S_i < t_{now} + H_{freeze} \text{ or } S_i \le t_{now}$$
 Bu operasyonların sırası ve makine atamaları yeniden çizelgelemede **değiştirilemez**.
-MES'te başlamış veya tamamlanmış operasyonlar, planlanan başlangıçları ileride olsa bile dondurulur. Ufuk sınırına tam eşit gelecekteki görevler serbesttir; ayrı bir FLEXIBLE hareket kısıtı uygulanmaz.
+MES'te başlamış veya tamamlanmış operasyonlar, planlanan başlangıçları ileride olsa bile dondurulur. Dondurulmuş ufuktan sonraki `flexible_horizon_min` içindeki görevler FLEXIBLE durumundadır; aynı makinede kalır ve başlangıçları önceki değerden en fazla `max_flexible_shift_min` kadar hareket edebilir. Bu sınırları aşan sonuç kabul edilmez.
 
 Duruş, etkilenen tezgâhtaki dondurulmuş görevlerden sonra uygulanır; başlamış operasyonu kesip devam ettirme modellenmez. Ayrıntılar: [Run isolation and rescheduling](docs/run-isolation-and-rescheduling.md).
 
-`OPERATIONAL_BALANCED` politikası makespan, setup ve tardiness sürelerini dengeler. Eski `COST_OPTIMIZED` adı kaldırılmıştır: CP-SAT parasal toplam üretim maliyetini optimize ettiği iddiasında bulunmaz. Ekonomik senaryo raporları `EconomicConfig` EUR parametreleriyle ayrı hesaplanır.
+`OPERATIONAL_BALANCED` süreleri dengeler. `COST_OPTIMIZED` artık gerçek parasal TMC hedefidir: işçilik, setup, OT primleri, WIP holding, ağırlıklı gecikme, enerji, karbon, malzeme ve W1 expedite maliyetlerini `EconomicConfig` oranlarıyla minimize eder. Sonuç ve bound para birimindedir; mikro para birimi yuvarlaması kaydedilir. FEASIBLE sonuç optimum veya diğer politikadan daha düşük maliyet garantisi değildir.
+
+Orkestratör önce mevcut makine sırasını koruyan yerel onarım adayı üretir ve ortak üretim CP-SAT modeliyle bütün zamanları doğrular. Kabul edilirse `VALIDATED_LOCAL_REPAIR`, reddedilirse gerekçesiyle `CPSAT_REOPTIMIZATION` audit’e kaydedilir. Yerel doğrulama küresel optimum olarak işaretlenmez. Gerçek freeze/FLEXIBLE/duruş kısıtları yeni sürümde yeniden oynatılabilir biçimde saklanır.
 
 ### 2. Çizelge Gerginliği Metrikleri (Schedule Nervousness Metrics)
 Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için iki metrik ölçülür:
@@ -260,9 +262,9 @@ FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnterakt
 
 Karar geçmişi SQLite'ta kalıcıdır; yeniden çizelgeleme kararları sürüm kimliğiyle sorgulanır. Bu, tek sunuculu POC denetim kaydıdır; harici bir enterprise audit platformu iddiası taşımaz.
 
-ISA-95 adaptörleri semantik olarak hizalanmış kanonik sözleşmeler ve B2MML odaklı XML çıktıları sağlar. B2MML XSD doğrulaması, vendor birlikte çalışabilirliği ve çift yönlü XML import desteği henüz uygulanmamıştır.
+ISA-95 adaptörleri kanonik sözleşmeler ile MESA B2MML 0701 resmî XSD’lerine karşı doğrulanan çizelge/MES XML export ve import sağlar. Desteklenen fabrika profili, timezone-aware Pazartesi başlangıç zamanı ve kaynak şema hash’leri açıkça tanımlıdır. Belirli vendor endpoint’iyle gerçek birlikte çalışabilirlik müşteri kabul testi gerektirir; yapılmış olarak gösterilmez.
 
-Benchmark tablosu gerçek çizelgenin geç lot sayısını, toplam ve ağırlıklı gecikmesini ayrı hesaplar. Yalnızca solver özeti varsa bilinmeyen geç lot sayısı boş bırakılır. FIFO/EDD/SPT/Greedy örnekleri takvim, bakım, rota ve freeze kısıtlarını paylaşmadığından bu tablo CP-SAT için yüzdesel performans kazanımı kanıtı olarak kullanılmaz.
+Dashboard benchmark’ı kullanıcı düğmesiyle başlatılır. FIFO/EDD/SPT/Greedy makine sırasını seçer; her çizelge aynı üretim CP-SAT modeli, veri snapshot’ı, takvim, bakım, rota, setup, malzeme, OT ve freeze/FLEXIBLE kısıtları altında yerleştirilir. Gerçek lot gecikmeleri, maliyetler, süreler ve ölçülen EDD farkı raporlanır. Saf sezgisel runtime karşılaştırması veya müşteri ROI kanıtı değildir. [Ölçülmüş demo](artifacts/demo/business-case.md) ve [demo/müşteri pilot rehberi](docs/demo-and-customer-pilot.md) yeniden üretme adımlarını içerir.
 
 ---
 

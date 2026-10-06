@@ -640,6 +640,7 @@ def apply_run_retention_policy(
             "mrp_plan",
             "production_schedule",
             "schedule_solver_metadata",
+            "schedule_model_context",
             "energy_kpis",
             "energy_profile_15min",
             "energy_machine_kpis",

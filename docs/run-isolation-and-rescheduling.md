@@ -24,7 +24,7 @@ OR-Tools is pinned to 9.14.6206 and single-worker search. Native crashes were ob
 
 ## Economic reporting and objective names
 
-`OPERATIONAL_BALANCED` replaces the misleading `COST_OPTIMIZED` name. The solver balances makespan, setup and weighted tardiness in minutes; it does not minimize monetary total manufacturing cost. Unsupported policy names fail explicitly. Monetary scenario reports use EconomicConfig's EUR rates, including its carbon baseline, separately from solver objectives.
+`OPERATIONAL_BALANCED` balances makespan, setup and weighted tardiness in minutes. `COST_OPTIMIZED` minimizes actual monetary TMC using EconomicConfig rates; it includes fixed material/process costs and variable setup, overtime premiums, holding, tardiness, energy and carbon. Monetary objective/bound units and micro-currency rounding are explicit. Policy-only scenario changes trigger a real solve, with scenario energy/carbon rates passed to the monetary objective. Shared independent TMC reporting includes materials and W1 expedites.
 
 A scenario matrix pins one SQLite snapshot for all shocks and reports its baseline run ID. Dashboard scenario computation runs on request and keeps results under that version. Dashboard solver status comes from the ACTIVE database rows rather than a mutable JSON cache.
 
@@ -36,4 +36,6 @@ Zero lower bounds remain valid proof data. A feasible service-first stage cannot
 
 Compose runs a one-shot bootstrap before API/dashboard startup. A fresh runtime executes the pipeline and verifies the ACTIVE bundle. An existing runtime is verified and reused; invalid bundles block startup. Data, reports and sealed run bundles are shared persistent mounts. `/health` indicates liveness; `/ready` requires one ACTIVE version with solver metadata and returns its ID. CI builds a clean image, checks service readiness and bundle lineage, then restarts the stack and checks that the same ACTIVE version survives. This is a single-host demonstration/POC deployment, not a production multi-tenant service.
 
-Heuristic benchmark rules omit routing precedence, maintenance and calendars; the dashboard labels them as simplified illustrations rather than equivalent feasibility or performance proofs. CP-SAT results are labelled reported rather than exact.
+The explicit production benchmark pins one immutable snapshot. Dispatch rules select machine sequences and the shared CP-SAT physical model places them under routing, calendar, maintenance, materials, setup, overtime and commitment constraints. Scope-specific optimality and measured runtime are reported; a dispatch OPTIMAL is restricted to its selected sequence. Unknown cases and zero denominators do not invent improvements.
+
+The orchestrator first tries regular-shift local repair, preserving machine order. Every candidate position is certified by the exact production model; rejected candidates fall back to full CP-SAT with an audit reason. The local certificate is FEASIBLE without a global bound. FLEXIBLE tasks retain their machine and hard start-displacement bounds. The final version stores real freeze/FLEXIBLE/maintenance context rather than the all-fixed candidate used for validation.

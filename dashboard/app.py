@@ -17,7 +17,7 @@ from src.contracts.schemas import (
     RescheduleTriggerEvent,
 )
 from src.integration.mes_service import MESIntegrationService
-from src.scheduling.benchmark import BenchmarkTask, SchedulingBenchmarkSuite
+from src.scheduling.production_benchmark import production_benchmark
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
 from src.utils.db import get_db_connection
@@ -544,8 +544,8 @@ with tab_schedule:
         setup_val = f"{float(meta_row.get('total_setup_min', 0)):.0f} dk"
         tard_val = f"{float(meta_row.get('total_tardiness_min', 0)):.0f} dk"
     elif not sched_df.empty:
-        status_display = "🟢 OPTIMAL (CP-SAT)"
-        wall_time = "< 2.0 sn"
+        status_display = "⚪ UNKNOWN (metadata yok)"
+        wall_time = "N/A"
         makespan_val = f"{float(sched_df['end_min'].max()) / 60.0:.1f} sa"
         setup_val = f"{float(sched_df.get('setup_before_min', pd.Series([0])).sum()):.0f} dk"
         tard_val = f"{float(sched_df.get('tardiness_min', pd.Series([0])).sum()):.0f} dk"
@@ -647,60 +647,40 @@ with tab_schedule:
         # Faz 4 - Klasik Sezgiseller (Heuristics) vs. CP-SAT Benchmark
         # ---------------------------------------------------------
         st.divider()
-        st.subheader("⚖️ Çizelgeleme Kural Kıyaslaması (Heuristic Benchmarking)")
+        st.subheader("⚖️ Ortak Üretim Kısıtlarıyla Benchmark")
         st.caption(
-            "FIFO, EDD, SPT ve Greedy örnekleri takvim, bakım ve rota öncüllüğü içermeyen basitleştirilmiş kurallardır. "
-            "CP-SAT ile aynı fizibilite modelini kullanmazlar; bu tablo optimum veya performans kazanımı kanıtı değildir."
+            "FIFO/EDD/SPT/Greedy makine sırasını seçer; tüm çizelgeleri ortak CP-SAT modeli yerleştirir. "
+            "Takvim, bakım, rota, malzeme, setup, OT ve sabit görevler aynı kalır. "
+            "Sonuçlar model maliyetleridir; müşteri tasarrufu veya saf sezgisel hız testi değildir."
         )
-
-        try:
-            bench_tasks = []
-            for _, r in sched_df.iterrows():
-                bench_tasks.append(
-                    BenchmarkTask(
-                        task_id=str(r["task_id"]),
-                        product_id=str(r.get("product_id", "")),
-                        machine_id=str(r.get("machine_id", "")),
-                        processing_time=float(r.get("duration_min", 0)) / 60.0,
-                        release_date=float(r.get("release_time_min", 0)) / 60.0,
-                        due_date=float(r["due_date_min"]) / 60.0,
-                        order_id=str(r["lot_id"]),
-                        priority_weight=float(r["priority_weight"]),
-                    )
-                )
-
-            if bench_tasks:
-                suite = SchedulingBenchmarkSuite(bench_tasks)
-                cpsat_dict = suite.reported_schedule_metrics(sched_df)
-                bench_df = suite.run_cpsat_comparison(cpsat_result=cpsat_dict)
-                st.dataframe(bench_df, use_container_width=True)
-
-                col_g1, col_g2 = st.columns(2)
-                with col_g1:
-                    fig_make = px.bar(
-                        bench_df,
-                        x="Method",
-                        y="Makespan (hr)",
-                        color="Method",
-                        text_auto=".1f",
-                        title="⏱️ Toplam Üretim Süresi (Makespan - Saat)",
-                    )
-                    fig_make.update_layout(showlegend=False)
-                    st.plotly_chart(fig_make, use_container_width=True)
-
-                with col_g2:
-                    fig_tard = px.bar(
-                        bench_df,
-                        x="Method",
-                        y="Total Tardiness (hr)",
-                        color="Method",
-                        text_auto=".1f",
-                        title="🚨 Toplam Sipariş Gecikmesi (Tardiness - Saat)",
-                    )
-                    fig_tard.update_layout(showlegend=False)
-                    st.plotly_chart(fig_tard, use_container_width=True)
-        except Exception as e:
-            st.info(f"Benchmark karşılaştırması hesaplanırken bilgi: {e}")
+        benchmark_key = f"production_benchmark:{target_run_id}"
+        if st.button("Ortak kısıtlarla benchmark çalıştır", key="run_production_benchmark"):
+            try:
+                with st.spinner("Altı politika aynı veri snapshot'ında çözülüyor..."):
+                    measured = production_benchmark(str(get_runtime_paths()["db_path"]))
+                if measured["baseline_run_id"] != target_run_id:
+                    st.warning("ACTIVE sürümü değişti; güncel sürümü görüntüleyip benchmark'ı tekrar çalıştırın.")
+                else:
+                    st.session_state[benchmark_key] = measured
+            except Exception as exc:
+                st.error(f"Benchmark üretilemedi: {exc}")
+        if benchmark_key in st.session_state:
+            measured = st.session_state[benchmark_key]
+            rows = [
+                {
+                    key: value
+                    for key, value in case.items()
+                    if key not in {"schedule", "cost_breakdown", "solver_metadata"}
+                }
+                for case in measured["cases"]
+            ]
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+            gain = measured["weighted_tardiness_improvement_vs_edd_pct"]
+            if gain is not None:
+                st.metric("EDD'ye göre ağırlıklı gecikme değişimi", f"{gain:.2f}%")
+            else:
+                st.info("EDD gecikmesi sıfır veya kabul edilmiş sonuç yok; yüzdesel değişim tanımsız.")
+            st.caption(f"Baseline: {measured['baseline_run_id']} · Girdi SHA-256: {measured['input_hash']}")
 
 # =============================================================
 # TAB 5: ENERJİ & KARBON

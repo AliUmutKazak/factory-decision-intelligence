@@ -84,6 +84,8 @@ def compute_energy_analytics(
         if machines_df is None:
             machines_df = loaded_mach
     machine_specs = load_machine_specs(active_db_path)
+    with get_db_connection(active_db_path) as calendar_conn:
+        daily_hours = MachineCalendarService.load_daily_hours(calendar_conn)
     if schedule_df.empty or len(schedule_df) == 0:
         # Madde 12: 0 Uretim durumunda fiziksel sifir enerji dengesi
         facility_kpis = {
@@ -137,7 +139,9 @@ def compute_energy_analytics(
     makespan_min = int(schedule_df["end_min"].max())
     makespan_hours = makespan_min / 60.0
     # 3. Madde: batch_qty veri sözleşmesi - Doğrudan canonical production_units kullanımı
-    total_units_produced = int(schedule_df[schedule_df["operation_seq"] == 1]["production_units"].sum())
+    total_units_produced = int(
+        schedule_df.sort_values("operation_seq").groupby("lot_id")["production_units"].first().sum()
+    )
 
     # 1. İşlem Enerjisi (Processing Energy): İki Bileşenli Termodinamik Model
     # NOT (Fiziksel Doğrulama & Çift Sayım Önleme):
@@ -187,36 +191,39 @@ def compute_energy_analytics(
         t_end = t + actual_interval
         total_slice_load_kw = 0.0
 
-        current_week, day_of_week, day_cursor = MachineCalendarService.get_week_and_day(t)
-        is_calendar_regular = MachineCalendarService.is_regular_calendar_shift(t)
-        is_ot_window = MachineCalendarService.is_overtime_window(t)
-
         for m_id, specs in machine_specs.items():
             m_sched = schedule_df[schedule_df["machine_id"] == m_id]
 
             # 1. İşlemde mi? (Interval overlap kontrolü: [start_min, end_min) kesişimi)
             active_proc = m_sched[(m_sched["start_min"] < t_end) & (m_sched["end_min"] > t)]
 
-            slice_load_kw = 0.0
-            if len(active_proc) > 0:
-                # Makine işlemde: İki bileşenli termodinamik model uyarınca (base + variable proses gücü)
-                job = active_proc.iloc[0]
-                slice_load_kw = float(job.get("proc_power_kw", specs["base_kw"]))
-                m_proc_min[m_id] += actual_interval
-                m_proc_kwh[m_id] += slice_load_kw * (actual_interval / 60.0)
-            else:
-                # Boşta (Idle) mı, kapalı mı?
-                # Regular mesaide idle; OT penceresinde ise ancak o haftada makinenin OT yetkisi varsa idle, yoksa OFF
-                has_ot_auth = weekly_machine_ot_hours.get((current_week, m_id), 0.0) > 0
-                is_active_window = is_calendar_regular or (is_ot_window and has_ot_auth)
-
-                if is_active_window:
-                    slice_load_kw = specs["idle_kw"]
-                    m_idle_min[m_id] += actual_interval
-                    m_idle_kwh[m_id] += slice_load_kw * (actual_interval / 60.0)
-                else:
-                    slice_load_kw = 0.0
-
+            processing_min = 0.0
+            slice_kwh = 0.0
+            for job in active_proc.itertuples():
+                overlap = max(0.0, min(t_end, job.end_min) - max(t, job.start_min))
+                processing_min += overlap
+                energy = overlap / 60 * job.proc_power_kw
+                slice_kwh += energy
+                m_proc_min[m_id] += overlap
+                m_proc_kwh[m_id] += energy
+            setup_min = 0.0
+            for job in m_sched.to_dict("records"):
+                setup_start = job.get("setup_start_min", job["start_min"] - job.get("setup_before_min", 0))
+                setup_end = job.get("setup_end_min", job["start_min"])
+                setup_min += max(0.0, min(t_end, setup_end) - max(t, setup_start))
+            setup_energy = setup_min / 60 * specs["setup_kw"]
+            slice_kwh += setup_energy
+            m_setup_min[m_id] += setup_min
+            m_setup_kwh[m_id] += setup_energy
+            opened = MachineCalendarService.open_minutes(
+                t, t_end, daily_hours[m_id], weekly_machine_ot_hours.get((1, m_id), 0) > 0
+            )
+            idle_min = max(0.0, opened - processing_min - setup_min)
+            idle_energy = idle_min / 60 * specs["idle_kw"]
+            slice_kwh += idle_energy
+            m_idle_min[m_id] += idle_min
+            m_idle_kwh[m_id] += idle_energy
+            slice_load_kw = slice_kwh / (actual_interval / 60)
             total_slice_load_kw += slice_load_kw
 
         profile_records.append(
@@ -224,7 +231,7 @@ def compute_energy_analytics(
                 "time_min": t,
                 "time_hour": round(t / 60.0, 2),
                 "interval_min": actual_interval,
-                "total_load_kw": round(total_slice_load_kw, 2),
+                "total_load_kw": total_slice_load_kw,
             }
         )
 
@@ -269,11 +276,6 @@ def compute_energy_analytics(
     grand_total_kwh = round(total_proc_kwh + total_setup_kwh + total_idle_kwh, 4)
 
     # Denetim Madde 26 & test_6 Mutabakatı: 15-dk profil integrali == grand_total_kwh == sum(machines_total_kwh)
-    current_prof_integral = sum(r["total_load_kw"] * (r["interval_min"] / 60.0) for r in profile_records)
-    integral_diff = grand_total_kwh - current_prof_integral
-    if abs(integral_diff) > 0 and len(profile_records) > 0:
-        delta_kw = integral_diff / (profile_records[0]["interval_min"] / 60.0)
-        profile_records[0]["total_load_kw"] = round(profile_records[0]["total_load_kw"] + delta_kw, 2)
     avg_load_kw = round(grand_total_kwh / makespan_hours, 2) if makespan_hours > 0 else 0.0
     profile_df = pd.DataFrame(profile_records)
     raw_peak_kw = profile_df["total_load_kw"].max()

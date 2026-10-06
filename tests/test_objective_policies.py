@@ -6,9 +6,9 @@ from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.utils.db import clone_run_inputs, get_db_connection
 
 
-def test_misleading_cost_policy_is_rejected_before_any_solve():
-    with pytest.raises(ValueError, match="COST_OPTIMIZED"):
-        run_cpsat_scheduling(policy="COST_OPTIMIZED", persist_outputs=False)
+def test_unknown_policy_is_rejected_before_any_solve():
+    with pytest.raises(ValueError, match="UNKNOWN_COST_POLICY"):
+        run_cpsat_scheduling(policy="UNKNOWN_COST_POLICY", persist_outputs=False)
 
 
 def test_objective_policies_configuration():
@@ -17,6 +17,7 @@ def test_objective_policies_configuration():
     assert SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST in OBJECTIVE_POLICIES
     assert SchedulingObjectivePolicy.THROUGHPUT_MAX in OBJECTIVE_POLICIES
     assert SchedulingObjectivePolicy.OPERATIONAL_BALANCED in OBJECTIVE_POLICIES
+    assert SchedulingObjectivePolicy.COST_OPTIMIZED in OBJECTIVE_POLICIES
 
     # Servis seviyesi politikasında gecikme ağırlığı Makespan'e baskın olmalıdır
     service_weights = OBJECTIVE_POLICIES[SchedulingObjectivePolicy.SERVICE_LEVEL_FIRST]

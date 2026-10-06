@@ -182,6 +182,7 @@ class SchedulingObjectivePolicy(StrEnum):
     SERVICE_LEVEL_FIRST = "SERVICE_LEVEL_FIRST"
     THROUGHPUT_MAX = "THROUGHPUT_MAX"
     OPERATIONAL_BALANCED = "OPERATIONAL_BALANCED"
+    COST_OPTIMIZED = "COST_OPTIMIZED"
 
 
 @dataclass(frozen=True)
@@ -217,6 +218,8 @@ OBJECTIVE_POLICIES: dict[SchedulingObjectivePolicy, ObjectiveWeights] = {
         setup_weight=5,
         tardiness_weight=50,
     ),
+    # Monetary rates come from EconomicConfig, not these operational weights.
+    SchedulingObjectivePolicy.COST_OPTIMIZED: ObjectiveWeights(0, 0, 0),
 }
 
 # Geriye dönük uyumluluk için varsayılan ağırlıklar:

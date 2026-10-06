@@ -22,6 +22,33 @@ class MachineCalendarService:
     WORKING_DAYS_PER_WEEK = 6  # Pzt - Cmt
 
     @classmethod
+    def load_daily_hours(cls, conn):
+        """Identical per-machine shift boundaries for scheduling and analytics."""
+        hours = {
+            str(machine): float(value)
+            for machine, value in conn.execute("SELECT machine_id, max_daily_hours FROM machines")
+        }
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'").fetchone():
+            for machine, value in conn.execute(
+                "SELECT machine_id, AVG(available_hours) FROM machine_calendar WHERE is_available = 1 GROUP BY machine_id"
+            ):
+                hours[str(machine)] = float(value)
+        if any(not 0 < value <= 24 for value in hours.values()):
+            raise ValueError("Machine shift duration must be within (0, 24] hours.")
+        return hours
+
+    @classmethod
+    def open_minutes(cls, start, end, daily_hours, allow_week1_overtime):
+        total = 0.0
+        night = int(round((24 - daily_hours) * 60))
+        for day in range(int(start // 1440), int(end // 1440) + 1):
+            if day % 7 == 6:
+                continue
+            left = day * 1440 if day < 6 and allow_week1_overtime else day * 1440 + night
+            total += max(0.0, min(end, (day + 1) * 1440) - max(start, left))
+        return total
+
+    @classmethod
     def get_week_and_day(cls, time_min: float) -> tuple[int, int, float]:
         """
         Verilen mutlak dakika için (week_index, day_of_week, day_cursor_min) döner.

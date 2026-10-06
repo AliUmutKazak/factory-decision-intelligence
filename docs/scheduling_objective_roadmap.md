@@ -1,19 +1,13 @@
-# Cizelgeleme Amac Fonksiyonu ve Operasyonel Yol Haritasi (Audit Madde 16)
+# Scheduling objectives and current scope
 
-## 1. Mevcut Mimari Durum (Faz 1)
-- **Amac Fonksiyonu:** Salt Makespan Minimizasyonu (min C_max).
-- **Yurutme Politikasi:** CROSS_WEEK_SPILLOVER_ALLOWED (cross_week_execution_allowed = 1).
-- **Kapsam:** Siparislerin en erken surede tamamlanmasi hedeflenir; haftalik ufkun asilmasina izin verilir.
+The production model supports `BALANCED`, `SERVICE_LEVEL_FIRST`, `THROUGHPUT_MAX`, `OPERATIONAL_BALANCED` and `COST_OPTIMIZED`. These share machine no-overlap, ordered routes/transfer lots, sequence-dependent physical setup, material release, maintenance, Mon–Sat calendar, W1 overtime authorization and W2+ spillover without night overtime.
 
-## 2. Operasyonel Bosluk ve Fabrika Ihtiyaci
-Gercek uretim ortaminda salt makespan minimizasyonu su operasyonel dinamikleri dikkate almaz:
-1. **Musteri Termin Tarihi (Due Date):** Siparisin erken bitmesinden ziyade terminine yetismesi esastir.
-2. **Gecikme (Tardiness / Lateness):** Ceza maliyetleri minimize edilmelidir.
-3. **Fazla Mesai (Overtime Cost):** Gece vardiyasi ve hafta sonu fazla mesai primleri agirliklandirilmalidir.
-4. **Siraya Bagli Ayar Sureleri (Sequence-Dependent Setup Times):** Tezgah ayar/kalip degisim sureleri minimize edilmelidir.
-5. **Oncelik ve Malzeme Hazirligi (Priority & Material Availability):** Kritik musteri siparisleri ve hammadde varis pencereleri gozetilmelidir.
+The first four use explicit policy weights on makespan, setup and weighted tardiness in minutes. `COST_OPTIMIZED` minimizes monetary manufacturing cost using EconomicConfig rates: base processing/setup labor, separate overtime premiums, quantity-once WIP holding, weighted tardiness, process/setup/idle energy and Scope 1/2 carbon, materials and W1 MRP expedite fees. Processing/material costs are fixed for a fixed workload but remain included. Variable schedule terms can change its selected sequence. Monetary value and lower bound use currency units; coefficients are rounded to micro currency units, with an analytic decomposition retained.
 
-## 3. Hedef Cok Amacli Fonksiyon (Faz 2 Modelleme)
-Sonraki buyuk modelleme fazinda CP-SAT cozucusu icin agirlikli cok amacli hedef fonksiyonu kurgulanacaktir:
+Hierarchical solving first minimizes weighted tardiness and locks the accepted stage-one value, then optimizes the selected efficiency or monetary objective. A FEASIBLE stage one cannot become a proven global lexicographic optimum because stage two is optimal. A zero lower bound remains valid. Time-limited FEASIBLE results do not guarantee a lower cost than another policy.
 
-min [ alpha * C_max + beta * Sum(w_i * Tardiness_i) + gamma * Sum(Cost_OT_m) + delta * Sum(Setup_Time_jk) ]
+FROZEN means hard machine/start/end commitments, including MES in-progress/completed states. FLEXIBLE means hard machine identity and bounded displacement around the original start; other operations remain free subject to the event time and physical constraints. Conservative local repair preserves machine order and regular shifts, then certifies all candidate positions with the same production model. A local certificate is reported as FEASIBLE without a global optimality bound. Rejected candidates record a reason and use full CP-SAT.
+
+The equivalent-constraint benchmark snapshots all inputs and replayable disruption/movement context. FIFO/EDD/SPT/Greedy choose machine sequences; CP-SAT places them. A dispatch optimum applies to that fixed sequence. Its runtime therefore measures dispatch plus production solver placement, not a pure heuristic implementation. Actual schedules and cost components support auditable measured comparisons; unknown cases and zero denominators remain undefined.
+
+The deployment remains a single-host factory POC. Customer pilot and vendor endpoint acceptance require customer data/access. No large architectural rewrite or predictive maintenance/agents/ERP replacement is part of this closure.

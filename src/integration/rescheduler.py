@@ -56,9 +56,9 @@ class ClosedLoopRescheduler:
         """Delegate to the authoritative ACTIVE -> new run rescheduler.
 
         commit=False is a sandbox call and does not persist the new version.
-        force_heuristic is retained for API compatibility; the authoritative
-        engine intentionally uses the solver path so freeze semantics stay
-        mathematically enforceable.
+        force_heuristic is retained for API compatibility. The authoritative
+        engine certifies local repair through the production model and falls
+        back to full CP-SAT without relaxing frozen commitments.
         """
         trigger = RescheduleTriggerEvent(
             event_id=f"EVT-{uuid.uuid4().hex[:10].upper()}",
@@ -87,7 +87,7 @@ class ClosedLoopRescheduler:
                 new_run_id=None,
                 persist_audit=commit,
             )
-        except ValueError as exc:
+        except (ValueError, RuntimeError) as exc:
             if "ACTIVE run" in str(exc) or "ACTIVE schedule" in str(exc):
                 return {
                     "status": "NO_ACTIVE_RUN",
@@ -111,7 +111,8 @@ class ClosedLoopRescheduler:
             "old_makespan_min": old_makespan,
             "new_makespan_min": new_makespan,
             "delta_makespan_min": new_makespan - old_makespan,
-            "reschedule_mode": "CPSAT_REOPTIMIZATION",
+            "reschedule_mode": audit.decision_tier,
+            "repair_rejection_reason": audit.repair_rejection_reason,
             "is_major_disruption": down_duration_min > 60.0,
             "previous_run_id": audit.previous_run_id,
             "new_run_id": audit.new_run_id,

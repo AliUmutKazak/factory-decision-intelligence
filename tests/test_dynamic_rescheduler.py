@@ -97,3 +97,46 @@ def test_scan_pending_mes_events():
         assert isinstance(triggers, list)
     finally:
         conn.close()
+
+
+def test_local_repair_is_certified_and_persists_real_model_context():
+    from src.scheduling.model_context import load_model_context
+
+    engine = DynamicRescheduler()
+    trigger = RescheduleTriggerEvent(event_id="LOCAL-CERTIFY", current_time_min=0, freeze_horizon_min=100000)
+    base, schedule, metadata, _, audit = engine.execute_reschedule(trigger, new_run_id="LOCAL-CERTIFIED")
+    assert audit.decision_tier == "VALIDATED_LOCAL_REPAIR"
+    assert metadata.proven_optimal is False
+    assert metadata.best_objective_bound is None
+    assert schedule.set_index("task_id").start_min.to_dict() == base.set_index("task_id").start_min.to_dict()
+    with sqlite3.connect(engine.disk_db_path) as conn:
+        context = load_model_context(conn, "LOCAL-CERTIFIED")
+        assert len(context["frozen_positions"]) == len(schedule)
+        tier = conn.execute(
+            "SELECT decision_tier FROM reschedule_audit_log WHERE new_run_id='LOCAL-CERTIFIED'"
+        ).fetchone()[0]
+        assert tier == audit.decision_tier
+
+
+def test_rejected_local_candidate_falls_back_to_authoritative_solver(monkeypatch):
+    import src.scheduling.rescheduler as module
+
+    def reject_candidate(*args, **kwargs):
+        raise ValueError("candidate exceeds movement budget")
+
+    original = module.run_cpsat_scheduling
+
+    def bounded_solve(**kwargs):
+        return original(**kwargs, time_limit_seconds=3)
+
+    monkeypatch.setattr(module, "local_repair_candidate", reject_candidate)
+    monkeypatch.setattr(module, "run_cpsat_scheduling", bounded_solve)
+    engine = DynamicRescheduler()
+    _, schedule, _, _, audit = engine.execute_reschedule(
+        RescheduleTriggerEvent(event_id="LOCAL-FALLBACK", current_time_min=0, freeze_horizon_min=100000),
+        new_run_id="LOCAL-FALLBACK",
+        persist_audit=False,
+    )
+    assert not schedule.empty
+    assert audit.decision_tier == "CPSAT_REOPTIMIZATION"
+    assert "movement budget" in audit.repair_rejection_reason

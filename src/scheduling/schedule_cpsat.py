@@ -42,7 +42,12 @@ from src.contracts.schemas import (
     SolverStatus,
 )
 from src.scheduling.maintenance import load_machine_maintenance_windows
-from src.utils.db import get_db_connection, migrate_schedule_commitments, persist_run_scoped_dataframe
+from src.utils.db import (
+    get_db_connection,
+    migrate_schedule_commitments,
+    migrate_solver_objective_contract,
+    persist_run_scoped_dataframe,
+)
 
 
 def get_initial_machine_states(conn, run_id=None) -> dict:
@@ -87,6 +92,11 @@ def run_cpsat_scheduling(
     connection=None,
     material_delay_min: int = 0,
     reference_schedule=None,
+    task_override=None,
+    dispatch_rule: str | None = None,
+    flexible_task_windows=None,
+    time_limit_seconds: float | None = None,
+    economic_config=None,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
@@ -98,6 +108,11 @@ def run_cpsat_scheduling(
         reports_path.mkdir(parents=True, exist_ok=True)
 
     policy = SchedulingObjectivePolicy(policy)
+    limit = float(CPSAT_TIME_LIMIT_SECONDS if time_limit_seconds is None else time_limit_seconds)
+    if limit <= 0:
+        raise ValueError("Scheduling time limit must be positive.")
+    if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
+        raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
     conn = connection if connection is not None else get_db_connection(active_db_path)
     if run_id and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
         existing_run = conn.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (str(run_id),)).fetchone()
@@ -105,6 +120,7 @@ def run_cpsat_scheduling(
             conn.close()
             raise ValueError(f"[RUN GOVERNANCE] Immutable run cannot be overwritten: {run_id}")
     machine_initial_states = get_initial_machine_states(conn, run_id)
+    migrate_solver_objective_contract(conn)
     maintenance_windows = load_machine_maintenance_windows(conn)
     maintenance_windows.extend(maintenance_overrides or [])
 
@@ -173,24 +189,9 @@ def run_cpsat_scheduling(
         weekly_machine_ot_budget_min = {}
         machine_ot_hours = {}
 
-    # Denetim Madde 31: machine_calendar öncelikli, yoksa machines.max_daily_hours SSOT
-    machine_daily_hours = {}
-    try:
-        cal_df = pd.read_sql(
-            "SELECT machine_id, AVG(available_hours) as avg_hours FROM machine_calendar WHERE is_available = 1 GROUP BY machine_id",
-            conn,
-        )
-        for _, r in cal_df.iterrows():
-            machine_daily_hours[str(r["machine_id"])] = float(r["avg_hours"])
-    except Exception:
-        pass
+    from src.scheduling.calendar_service import MachineCalendarService
 
-    # Eksik kalan veya takvimde olmayan makineler için machines tablosuna fallback
-    m_df = pd.read_sql("SELECT machine_id, max_daily_hours FROM machines", conn)
-    for _, r in m_df.iterrows():
-        mid = str(r["machine_id"])
-        if mid not in machine_daily_hours:
-            machine_daily_hours[mid] = float(r["max_daily_hours"])
+    machine_daily_hours = MachineCalendarService.load_daily_hours(conn)
 
     # Changeover matrisi dinamik okuma
     setup_dict = {}
@@ -303,9 +304,13 @@ def run_cpsat_scheduling(
         )
 
     reference_ids = {}
+    reference_hints = {}
     if reference_schedule is not None:
         reference_ids = {
             (str(row.lot_id), int(row.operation_seq)): row.task_id for row in reference_schedule.itertuples()
+        }
+        reference_hints = {
+            str(row.task_id): (int(row.start_min), int(row.end_min)) for row in reference_schedule.itertuples()
         }
     # Operasyonları Planlanan Partilere (planned_batches) Göre Oluştur
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
@@ -382,6 +387,37 @@ def run_cpsat_scheduling(
                     }
                 )
                 task_counter += 1
+    if task_override is not None:
+        required = {
+            "task_id",
+            "lot_id",
+            "product_id",
+            "machine_id",
+            "operation_seq",
+            "duration_min",
+            "due_date_min",
+            "priority_weight",
+            "production_units",
+            "batch_count",
+            "batch_size_units",
+        }
+        if not required <= set(task_override):
+            raise ValueError(f"Task override missing fields: {sorted(required - set(task_override))}")
+        if (
+            task_override.task_id.astype(str).duplicated().any()
+            or task_override.duplicated(["lot_id", "operation_seq"]).any()
+        ):
+            raise ValueError("Task override contains duplicate operation identities.")
+        tasks = task_override.to_dict("records")
+        route_keys = set(zip(routing_df.product_id, routing_df.operation_seq, routing_df.machine_id))
+        for task in tasks:
+            if (task["product_id"], task["operation_seq"], task["machine_id"]) not in route_keys:
+                raise ValueError(f"Task override does not match a routing operation: {task['task_id']}")
+            if float(task["duration_min"]) != int(task["duration_min"]):
+                raise ValueError("Task override requires integer-minute processing durations.")
+            task["duration"] = int(task["duration_min"])
+            task.setdefault("parent_lot_id", task["lot_id"])
+            task.setdefault("sub_lot_index", 0)
     if not tasks:
         canonical_schedule_cols = [
             "task_id",
@@ -422,6 +458,10 @@ def run_cpsat_scheduling(
             proven_optimal=True,
             wall_time_seconds=0.0,
             objective_value=0.0,
+            objective_units=str((economic_config or cfg.ECONOMIC_CONFIG).currency)
+            if policy == SchedulingObjectivePolicy.COST_OPTIMIZED
+            else "weighted_minutes",
+            objective_policy=str(policy),
             best_objective_bound=0.0,
             random_seed=int(CPSAT_RANDOM_SEED),
             num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
@@ -461,7 +501,7 @@ def run_cpsat_scheduling(
     # CP-SAT'a girmeden önce tüm girdi yükünü Pydantic sözleşmesiyle mühürle
     ScheduleInputPayload(
         tasks=input_task_contracts,
-        time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+        time_limit_seconds=limit,
         random_seed=int(CPSAT_RANDOM_SEED),
     )
 
@@ -501,6 +541,7 @@ def run_cpsat_scheduling(
             "duration": t["duration"],
             "due_date_min": t["due_date_min"],
             "priority_weight": t["priority_weight"],
+            "release_time_min": max(sku_release_times.get(t["product_id"], 0), int(t.get("release_time_min", 0))),
         }
 
         if mid not in machine_to_tasks:
@@ -532,6 +573,15 @@ def run_cpsat_scheduling(
             )
 
     frozen_ids = {str(key) for key in (frozen_task_positions or {})}
+    if flexible_task_windows:
+        for task_id, (machine, lower, upper) in flexible_task_windows.items():
+            key = next((key for key in all_tasks if str(key) == str(task_id)), None)
+            if key is None or str(all_tasks[key]["machine_id"]) != str(machine):
+                raise ValueError(f"Flexible task identity/machine mismatch: {task_id}")
+            if lower > upper:
+                raise ValueError(f"Invalid flexible bounds: {task_id}")
+            model.Add(all_tasks[key]["start"] >= int(lower))
+            model.Add(all_tasks[key]["start"] <= int(upper))
     for tid, info in all_tasks.items():
         if str(tid) not in frozen_ids:
             model.Add(info["start"] >= int(earliest_start_min))
@@ -556,30 +606,47 @@ def run_cpsat_scheduling(
                     model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["start"])
                 prev_tid = curr_tid
     # 2. Closed-Loop MRP Serbest Bırakma Kısıtı (r_j = max_{m in BOM} t_availability,m)
+    first_operations = tasks_df.groupby("lot_id")["operation_seq"].min().to_dict()
     for tid, t_info in all_tasks.items():
-        if t_info["operation_seq"] == 1:
-            pid = t_info["product_id"]
-            r_j = sku_release_times.get(pid, 0)
+        if t_info["operation_seq"] == first_operations[t_info["lot_id"]]:
+            r_j = t_info["release_time_min"]
             if r_j > 0:
                 model.Add(t_info["start"] >= r_j)
 
     # 3. Tezgâh Çakışma Önleme & Kesin Zamanlı Setup İntervalleri
     all_setup_terms = []
+    machine_setup_terms = {}
+    processing_ot_terms = []
+    setup_ot_terms = []
     for mid, tids in machine_to_tasks.items():
         n_m = len(tids)
         if n_m == 0:
             continue
 
         dummy = n_m
+        hinted_order = sorted(tids, key=lambda tid: reference_hints.get(str(tid), (horizon, horizon))[0])
+        hinted_arcs = {(dummy, tids.index(hinted_order[0])), (tids.index(hinted_order[-1]), dummy)}
+        hinted_arcs.update((tids.index(left), tids.index(right)) for left, right in zip(hinted_order, hinted_order[1:]))
+        hint_sequence = not dispatch_rule and all(str(tid) in reference_hints for tid in tids)
         circuit_arcs = []
         machine_setup_intervals = []
         setup_duration_by_task = {tid: [] for tid in tids}
+        machine_setup_terms[mid] = []
+        if dispatch_rule:
+            from src.scheduling.dispatch import dispatch_rank
+
+            ranks = dispatch_rank(tasks_df, dispatch_rule)
+            ordered = sorted(tids, key=lambda tid: ranks[str(tid)])
+            for previous, following in zip(ordered, ordered[1:]):
+                model.Add(all_tasks[following]["start"] >= all_tasks[previous]["end"])
 
         # 1) Dummy -> Task (Günün ilk işi): Tezgâh başlangıç durumuna (Initial State) göre setup
         p_init = machine_initial_states.get(mid, None)
         for i, tid in enumerate(tids):
             lit = model.NewBoolVar(f"first_{mid}_{tid}")
             circuit_arcs.append((dummy, i, lit))
+            if hint_sequence:
+                model.AddHint(lit, int((dummy, i) in hinted_arcs))
 
             p_first = all_tasks[tid]["product_id"]
             s_init = int(setup_dict.get((mid, p_init, p_first), 0)) if p_init else 0
@@ -589,13 +656,19 @@ def run_cpsat_scheduling(
                 s_end = model.NewIntVar(0, horizon, f"init_setup_end_{mid}_{tid}")
                 s_interval = model.NewOptionalIntervalVar(s_start, s_init, s_end, lit, f"init_setup_int_{mid}_{tid}")
                 machine_setup_intervals.append(s_interval)
+                if hint_sequence:
+                    model.AddHint(s_start, max(0, reference_hints[str(tid)][0] - s_init))
+                    model.AddHint(s_end, reference_hints[str(tid)][0])
                 model.Add(s_end == all_tasks[tid]["start"]).OnlyEnforceIf(lit)
                 all_setup_terms.append(lit * s_init)
+                machine_setup_terms[mid].append(lit * s_init)
 
         # 2) Task -> Dummy (Günün son işi)
         for i, tid in enumerate(tids):
             lit = model.NewBoolVar(f"arc_end_{mid}_{tid}")
             circuit_arcs.append((i, dummy, lit))
+            if hint_sequence:
+                model.AddHint(lit, int((i, dummy) in hinted_arcs))
 
         # 3) Task i -> Task j (Doğrudan komşu işler ve fiziksel hazırlık intervalleri)
         for i in range(n_m):
@@ -609,6 +682,8 @@ def run_cpsat_scheduling(
 
                 lit = model.NewBoolVar(f"arc_{mid}_{t1}_{t2}")
                 circuit_arcs.append((i, j, lit))
+                if hint_sequence:
+                    model.AddHint(lit, int((i, j) in hinted_arcs))
 
                 s12 = int(setup_dict.get((mid, p1, p2), 0))
                 setup_duration_by_task[t2].append(lit * s12)
@@ -618,7 +693,11 @@ def run_cpsat_scheduling(
                     s_end = model.NewIntVar(0, horizon, f"setup_end_{mid}_{t1}_{t2}")
                     s_interval = model.NewOptionalIntervalVar(s_start, s12, s_end, lit, f"setup_int_{mid}_{t1}_{t2}")
                     all_setup_terms.append(lit * s12)
+                    machine_setup_terms[mid].append(lit * s12)
                     machine_setup_intervals.append(s_interval)
+                    if hint_sequence and (i, j) in hinted_arcs:
+                        model.AddHint(s_start, max(0, reference_hints[str(t2)][0] - s12))
+                        model.AddHint(s_end, reference_hints[str(t2)][0])
 
                     # Hazırlık öncül iş bitmeden başlayamaz
                     model.Add(s_start >= all_tasks[t1]["end"]).OnlyEnforceIf(lit)
@@ -636,6 +715,11 @@ def run_cpsat_scheduling(
         # ---------------------------------------------------------------------
         # P0 DÜZELTMESİ: Hafta Bazlı Sert OT Bütçe Kısıtı (Solver-Enforced OT Budget)
         # ---------------------------------------------------------------------
+        if task_override is not None and frozen_task_positions and "setup_before_min" in task_override:
+            frozen_setups = {str(row.task_id): int(row.setup_before_min) for row in task_override.itertuples()}
+            for tid in tids:
+                if str(tid) in frozen_ids:
+                    model.Add(sum(setup_duration_by_task[tid]) == frozen_setups[str(tid)])
         break_intervals = []
         for mw in maintenance_windows:
             if str(mw.machine_id) == str(mid):
@@ -671,6 +755,7 @@ def run_cpsat_scheduling(
                         model.AddMinEquality(right, [end_expr, day * 1440 + night_length])
                         model.AddMaxEquality(overlap, [0, right - left])
                         usage_terms.append(overlap)
+                        (processing_ot_terms if kind == "run" else setup_ot_terms).append(overlap)
             model.Add(sum(usage_terms) <= allowed_ot_min)
 
         # Hafta bazlı gece OT kullanımını biriktirmek için sözlük: {hafta_indeksi: [ot_kullanildi_boolean_değişkenleri]}
@@ -779,6 +864,29 @@ def run_cpsat_scheduling(
         tardiness_terms.append(priority_weight * tardiness_var)
 
     total_weighted_tardiness = sum(tardiness_terms) if tardiness_terms else 0
+    monetary = None
+    if policy == SchedulingObjectivePolicy.COST_OPTIMIZED:
+        from src.scheduling.monetary_objective import build_monetary_objective
+
+        monetary = build_monetary_objective(
+            model,
+            all_tasks,
+            tasks_df,
+            pd.read_sql("SELECT * FROM machines", conn),
+            routing_df,
+            bom_df,
+            pd.read_sql("SELECT * FROM materials", conn),
+            mrp_df,
+            makespan,
+            horizon,
+            machine_setup_terms,
+            processing_ot_terms,
+            setup_ot_terms,
+            machine_daily_hours,
+            machine_ot_hours,
+            tardiness_terms,
+            economic_config or cfg.ECONOMIC_CONFIG,
+        )
 
     # Seçilen işletme politikasına göre katsayıları yükle (Business Objective Layer)
     weights = OBJECTIVE_POLICIES.get(policy, OBJECTIVE_POLICIES[SchedulingObjectivePolicy.BALANCED])
@@ -824,6 +932,8 @@ def run_cpsat_scheduling(
             # Başlangıç zamanı: Tezgâhın boşalma anı, malzeme geliş tarihi ve önceki operasyon bitişinin maksimumu
             h_start = max(sim_machine_available.get(m_id, 0), rel, pred_end)
             h_end = h_start + dur
+            if str(t_id) in reference_hints:
+                h_start, h_end = reference_hints[str(t_id)]
 
             sim_machine_available[m_id] = h_end
             sim_task_end[t_id] = h_end
@@ -840,7 +950,7 @@ def run_cpsat_scheduling(
     except Exception as e:
         print(f"[WARM-START] Sezgisel başlangıç ipucu üretilirken atlandı: {e}")
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = float(CPSAT_TIME_LIMIT_SECONDS)
+    solver.parameters.max_time_in_seconds = limit
     solver.parameters.num_search_workers = int(CPSAT_NUM_SEARCH_WORKERS)
     solver.parameters.random_seed = int(CPSAT_RANDOM_SEED)
 
@@ -864,7 +974,11 @@ def run_cpsat_scheduling(
 
         # Aşama 2: Operasyonel Verimlilik (Makespan + Setup Minimizasyonu)
         print("[LEXICOGRAPHIC] Aşama 2: Termin kısıtı altında Makespan ve Setup minimize ediliyor...")
-        stage2_obj = int(weight_makespan) * makespan + int(weight_setup) * total_setup_duration
+        stage2_obj = (
+            monetary.expression
+            if monetary
+            else int(weight_makespan) * makespan + int(weight_setup) * total_setup_duration
+        )
         model.Minimize(stage2_obj)
         status = solver.Solve(model)
         if status == cp_model.OPTIMAL and stage1_status != cp_model.OPTIMAL:
@@ -876,7 +990,7 @@ def run_cpsat_scheduling(
             + int(weight_setup) * total_setup_duration
             + int(weight_tardiness) * total_weighted_tardiness
         )
-        model.Minimize(objective_expr)
+        model.Minimize(monetary.expression if monetary else objective_expr)
         status = solver.Solve(model)
 
     status_name = solver.StatusName(status)
@@ -919,6 +1033,9 @@ def run_cpsat_scheduling(
     total_setup_val = int(solver.Value(total_setup_duration)) if all_setup_terms else 0
     obj_val = float(solver.ObjectiveValue())
     best_bound = float(solver.BestObjectiveBound())
+    if monetary:
+        obj_val /= monetary.scale
+        best_bound /= monetary.scale
     gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
     status_audit_tag = "OPTIMAL_PROVEN" if proven_optimal else "FEASIBLE_SUBOPTIMAL"
 
@@ -956,7 +1073,7 @@ def run_cpsat_scheduling(
                     "priority_weight": all_tasks[tid]["priority_weight"],
                     "start_min": s_val,
                     "end_min": e_val,
-                    "release_time_min": sku_release_times.get(all_tasks[tid]["product_id"], 0),
+                    "release_time_min": all_tasks[tid]["release_time_min"],
                     "material_availability_datetime": sku_material_datetimes.get(
                         all_tasks[tid]["product_id"], horizon_start_dt.strftime("%Y-%m-%d %H:%M:%S")
                     ),
@@ -1123,6 +1240,9 @@ def run_cpsat_scheduling(
 
     obj_val = float(solver.ObjectiveValue())
     best_bound = float(solver.BestObjectiveBound())
+    if monetary:
+        obj_val /= monetary.scale
+        best_bound /= monetary.scale
 
     # Gap hesabı: (|Objective - Bound| / max(1.0, |Objective|)) * 100
     if obj_val is not None and best_bound is not None:
@@ -1140,10 +1260,12 @@ def run_cpsat_scheduling(
         proven_optimal=bool(status == cp_model.OPTIMAL),
         wall_time_seconds=float(round(solver.WallTime(), 4)),
         objective_value=float(round(obj_val, 4)),
+        objective_units=str((economic_config or cfg.ECONOMIC_CONFIG).currency) if monetary else "weighted_minutes",
+        objective_policy=str(policy),
         best_objective_bound=float(round(best_bound, 4)) if best_bound is not None else None,
         random_seed=int(CPSAT_RANDOM_SEED),
         num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
-        time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
+        time_limit_seconds=limit,
         makespan_min=int(solver.Value(makespan)),
         total_setup_min=int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
         total_tardiness_min=int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0,
@@ -1155,12 +1277,18 @@ def run_cpsat_scheduling(
         "solver_name": "Google OR-Tools CP-SAT",
         "solver_status": status_name,
         "objective_policy": str(policy),
-        "objective_units": "weighted_minutes",
+        "objective_units": str((economic_config or cfg.ECONOMIC_CONFIG).currency) if monetary else "weighted_minutes",
         "primary_stage_status": solver.StatusName(stage1_status) if hierarchical and tardiness_terms else None,
-        "gap_scope": "EFFICIENCY_STAGE" if hierarchical and tardiness_terms else "COMPOSITE_OBJECTIVE",
+        "gap_scope": "DISPATCH_SEQUENCE"
+        if dispatch_rule
+        else "EFFICIENCY_STAGE"
+        if hierarchical and tardiness_terms
+        else "MONETARY_TMC"
+        if monetary
+        else "COMPOSITE_OBJECTIVE",
         "is_optimal": bool(status == cp_model.OPTIMAL),
-        "objective_value_min": obj_val,
-        "best_bound_min": best_bound,
+        "objective_value_min": None if monetary else obj_val,
+        "best_bound_min": None if monetary else best_bound,
         "optimality_gap_pct": round(optimality_gap, 4) if optimality_gap is not None else None,
         "solve_time_seconds": round(float(solver.WallTime()), 4),
         "configured_num_search_workers": int(CPSAT_NUM_SEARCH_WORKERS),
@@ -1180,6 +1308,8 @@ def run_cpsat_scheduling(
         "ot_policy_description": "Overtime authorized strictly for Week-1; cross-week spillover runs under regular shifts only.",
         "objective_type": "LEXICOGRAPHIC_SERVICE_THEN_EFFICIENCY"
         if hierarchical
+        else "MONETARY_TMC"
+        if monetary
         else "WEIGHTED_MAKESPAN_SETUP_TARDINESS",
         "operational_objectives_backlog": "MAKESPAN_AND_SEQUENCE_DEPENDENT_SETUP",
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
@@ -1187,7 +1317,7 @@ def run_cpsat_scheduling(
         "mrp_qc_hold_enforced": 1,
         "objective_makespan_min": int(solver.Value(makespan)),
         "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
-        "total_objective_value": float(solver.ObjectiveValue()),
+        "total_objective_value": obj_val,
     }
 
     solver_meta_dict = contract_metadata.model_dump()
@@ -1195,15 +1325,29 @@ def run_cpsat_scheduling(
     solver_meta_dict["solver_name"] = "OR-Tools CP-SAT"
     solver_meta_dict["solver_status"] = str(contract_metadata.status)
     solver_meta_dict["is_optimal"] = int(contract_metadata.proven_optimal)
-    solver_meta_dict["objective_value_min"] = float(contract_metadata.objective_value or 0.0)
+    solver_meta_dict["objective_value_min"] = None if monetary else float(contract_metadata.objective_value or 0.0)
     solver_meta_dict["best_bound_min"] = (
-        float(contract_metadata.best_objective_bound) if contract_metadata.best_objective_bound is not None else None
+        float(contract_metadata.best_objective_bound)
+        if not monetary and contract_metadata.best_objective_bound is not None
+        else None
     )
     gap = contract_metadata.optimality_gap_pct
     solver_meta_dict["optimality_gap_pct"] = round(gap, 4) if gap is not None else None
     solver_meta_dict["solve_time_seconds"] = float(contract_metadata.wall_time_seconds)
 
     solver_meta_df = pd.DataFrame([solver_meta_dict])
+    if monetary:
+        economic_payload = {
+            "scale": monetary.scale,
+            "rates": (economic_config or cfg.ECONOMIC_CONFIG).model_dump(mode="json"),
+            "cost_components": monetary.breakdown(solver),
+            "coefficient_rounding_max_currency_per_charged_unit": 0.5 / monetary.scale,
+        }
+        raw_metadata_dict["economic_objective"] = economic_payload
+        solver_meta_df["economic_objective_json"] = json.dumps(economic_payload)
+        existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(schedule_solver_metadata)")}
+        if existing_columns and "economic_objective_json" not in existing_columns:
+            conn.execute("ALTER TABLE schedule_solver_metadata ADD COLUMN economic_objective_json TEXT")
     sched_df["run_id"] = effective_run_id
     sched_df["schedule_state"] = "FREE"
     sched_df["execution_status"] = "SCHEDULED"
@@ -1233,6 +1377,11 @@ def run_cpsat_scheduling(
         )
 
     migrate_schedule_commitments(conn)
+    from src.scheduling.model_context import save_model_context
+
+    save_model_context(
+        conn, effective_run_id, earliest_start_min, frozen_task_positions, flexible_task_windows, maintenance_overrides
+    )
     persist_run_scoped_dataframe(conn, "production_schedule", sched_df, effective_run_id)
     persist_run_scoped_dataframe(conn, "schedule_solver_metadata", solver_meta_df, effective_run_id)
     conn.commit()

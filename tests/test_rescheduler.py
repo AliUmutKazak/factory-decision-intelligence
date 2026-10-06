@@ -130,7 +130,7 @@ def test_minor_and_major_delays_use_authoritative_solver():
     )
     assert result_minor["status"] in ("RESCHEDULED", "NO_IMPACT")
     if result_minor["status"] == "RESCHEDULED":
-        assert result_minor["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
+        assert result_minor["reschedule_mode"] in {"VALIDATED_LOCAL_REPAIR", "CPSAT_REOPTIMIZATION"}
         assert result_minor["is_major_disruption"] is False
 
     # 2. Majör arıza (180 dk / 3 saat) -> Solver Tier Re-optimization
@@ -143,7 +143,7 @@ def test_minor_and_major_delays_use_authoritative_solver():
     )
     assert result_major["status"] in ("RESCHEDULED", "NO_IMPACT")
     if result_major["status"] == "RESCHEDULED":
-        assert result_major["reschedule_mode"] == "CPSAT_REOPTIMIZATION"
+        assert result_major["reschedule_mode"] in {"VALIDATED_LOCAL_REPAIR", "CPSAT_REOPTIMIZATION"}
         assert result_major["is_major_disruption"] is True
 
 

@@ -17,13 +17,12 @@ from pathlib import Path
 import pandas as pd
 
 from src.config import (
-    DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH,
     ECONOMIC_CONFIG,
     ObjectivePolicy,
     get_runtime_paths,
 )
 from src.contracts.schemas import ScenarioResultModel
-from src.economics.cost_to_serve import CostParameters, EconomicDecisionEngine
+from src.economics.schedule_cost import evaluate_schedule_cost
 from src.scheduling.service_level import evaluate_schedule_service_level
 from src.utils.db import clone_run_inputs, get_active_run_id, get_db_connection
 
@@ -205,6 +204,7 @@ class ScenarioEngine:
                     processed_dir=processed,
                     reports_dir=reports,
                     policy=SchedulingObjectivePolicy(shock.objective_policy),
+                    economic_config=self._economic_rates(shock),
                     maintenance_overrides=windows,
                     material_delay_min=shock.material_delay_days * 1440,
                 )
@@ -217,7 +217,14 @@ class ScenarioEngine:
                     energy = pd.read_sql("SELECT * FROM energy_kpis WHERE run_id = ?", conn, params=(scenario_id,))
                     carbon = pd.read_sql("SELECT * FROM carbon_kpis WHERE run_id = ?", conn, params=(scenario_id,))
                     orders = pd.read_sql("SELECT * FROM orders WHERE run_id = ?", conn, params=(scenario_id,))
-                return schedule, float(energy["grand_total_kwh"].iloc[0]), float(carbon["total_tco2e"].iloc[0]), orders
+                    costs = evaluate_schedule_cost(conn, schedule, scenario_id, self._economic_rates(shock))
+                return (
+                    schedule,
+                    float(energy["grand_total_kwh"].iloc[0]),
+                    float(carbon["total_tco2e"].iloc[0]),
+                    orders,
+                    costs,
+                )
             except Exception as exc:
                 raise ScenarioDataUnavailableError(f"SCENARIO_SOLVE_FAILED: {shock.name}: {exc}") from exc
 
@@ -239,6 +246,15 @@ class ScenarioEngine:
     def evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
         with self._baseline_snapshot() as engine:
             return engine._evaluate_scenario(shock)
+
+    @staticmethod
+    def _economic_rates(shock):
+        values = ECONOMIC_CONFIG.model_dump()
+        values.update(
+            energy_price_per_kwh=ECONOMIC_CONFIG.energy_price_per_kwh * shock.electricity_price_multiplier,
+            carbon_price_per_ton=ECONOMIC_CONFIG.carbon_price_per_ton + shock.carbon_tax_delta_eur,
+        )
+        return type(ECONOMIC_CONFIG)(**values)
 
     def _evaluate_scenario(self, shock: ScenarioShock) -> ScenarioResult:
         """Madde 23: Hibrit Senaryo Motoru.
@@ -275,10 +291,14 @@ class ScenarioEngine:
             or shock.material_delay_days > 0
             or shock.demand_multiplier != 1.0
             or shock.capacity_multiplier != 1.0
+            or shock.objective_policy != ObjectivePolicy.BALANCED
         )
         if operational_shock:
-            sim_sched, sim_kwh, sim_tco2, orders_df = self._solve_operational_shock(shock, run_id)
+            sim_sched, sim_kwh, sim_tco2, orders_df, costs = self._solve_operational_shock(shock, run_id)
             sim_makespan = float(sim_sched["end_min"].max()) / 60.0 if not sim_sched.empty else 0.0
+        else:
+            with get_db_connection(self.db_path) as conn:
+                costs = evaluate_schedule_cost(conn, sim_sched, run_id, self._economic_rates(shock))
 
         # =====================================================================
         # 2. SERVİS SEVİYESİ VE GECİKME (OTIF %)
@@ -295,36 +315,10 @@ class ScenarioEngine:
         # =====================================================================
         # 3. FİNANSAL SENSITIVITY ANALİZİ (+25% Energy, +50 €/tCO2)
         # =====================================================================
-        unit_electricity_price = DEFAULT_ELECTRICITY_PRICE_EUR_PER_KWH * shock.electricity_price_multiplier
-        total_carb_rate = ECONOMIC_CONFIG.carbon_price_per_ton + shock.carbon_tax_delta_eur
-
-        params = CostParameters(
-            energy_cost_per_kwh=unit_electricity_price,
-            carbon_cost_per_ton=total_carb_rate,
-        )
-
-        # 4. Ekonomik Karar Motoru (TMC)
-        # Doğrudan deterministik enerji ve karbon maliyet hesapları
-        calc_energy_cost = round(sim_kwh * unit_electricity_price, 2)
-        calc_carbon_cost = round(sim_tco2 * total_carb_rate, 2)
-
-        if not sim_sched.empty:
-            econ_engine = EconomicDecisionEngine(params=params)
-            cost_breakdown = econ_engine.compute_total_manufacturing_cost(
-                schedule_df=sim_sched,
-                orders_df=orders_df,
-                energy_kwh_total=sim_kwh,
-                carbon_emissions_ton=sim_tco2,
-            )
-            inventory_cost = round(cost_breakdown.inventory_holding_cost, 2)
-            energy_cost = round(cost_breakdown.energy_cost, 2)
-            carbon_cost = round(cost_breakdown.carbon_cost, 2)
-            total_cost = round(cost_breakdown.total_manufacturing_cost, 2)
-        else:
-            inventory_cost = 0.0
-            energy_cost = calc_energy_cost
-            carbon_cost = calc_carbon_cost
-            total_cost = round(energy_cost + carbon_cost, 2)
+        inventory_cost = costs.get("inventory_holding_cost", 0.0)
+        energy_cost = costs.get("energy_cost", 0.0)
+        carbon_cost = costs.get("carbon_cost", 0.0)
+        total_cost = costs["total_manufacturing_cost"]
 
         return ScenarioResult(
             scenario=shock.name,

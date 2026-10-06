@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import uuid
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -19,11 +20,16 @@ from src.contracts.schemas import (
     RescheduleAuditEntry,
     RescheduleTriggerEvent,
     ScheduleNervousnessReport,
+    SolverStatus,
 )
 from src.energy.energy_analytics import compute_energy_analytics
-from src.scheduling.maintenance import MaintenanceWindow
-from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.scheduling.calendar_service import MachineCalendarService
+from src.scheduling.dispatch import local_repair_candidate
+from src.scheduling.maintenance import MaintenanceWindow, load_machine_maintenance_windows
+from src.scheduling.model_context import load_model_context, save_model_context
+from src.scheduling.schedule_cpsat import get_initial_machine_states, run_cpsat_scheduling
 from src.scheduling.what_if import NoCloseConnectionWrapper
+from src.utils.db import get_active_run_id, migrate_solver_objective_contract
 from src.utils.runtime_lock import run_mutation_lock
 
 
@@ -68,12 +74,7 @@ class DynamicRescheduler:
         self.disk_db_path = str(disk_db_path or get_runtime_paths()["db_path"])
 
     def _get_active_run_id(self, conn: sqlite3.Connection) -> str:
-        row = conn.execute(
-            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
-        ).fetchone()
-        if not row or not row[0]:
-            raise ValueError("[RESCHEDULE] ACTIVE run bulunamadı; silent fallback yasaktır.")
-        return str(row[0])
+        return get_active_run_id(conn)
 
     @staticmethod
     def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
@@ -138,6 +139,7 @@ class DynamicRescheduler:
             | (baseline_sched["start_min"] <= trigger.current_time_min)
             | baseline_sched["task_id"].astype(str).isin({str(task_id) for task_id in completed_tasks})
             | execution_committed
+            | baseline_sched.get("schedule_state", pd.Series("FREE", index=baseline_sched.index)).eq("FROZEN")
         ]
         return {
             str(row["task_id"]): (
@@ -161,6 +163,8 @@ class DynamicRescheduler:
         if not row:
             raise ValueError(f"[RESCHEDULE] Baseline run bulunamadı: {previous_run_id}")
 
+        from src.utils.lineage import CONFIG_PATH, compute_file_hash, get_git_sha
+
         conn.execute(
             """
             INSERT INTO pipeline_runs
@@ -172,8 +176,8 @@ class DynamicRescheduler:
                 new_run_id,
                 f"RESCHEDULE:{previous_run_id}",
                 row[0],
-                row[1],
-                row[2],
+                get_git_sha(),
+                compute_file_hash(CONFIG_PATH),
                 row[3],
             ),
         )
@@ -197,6 +201,7 @@ class DynamicRescheduler:
     ) -> None:
         if not self._table_exists(conn, "schedule_solver_metadata"):
             return
+        migrate_solver_objective_contract(conn)
         solver_cols = [row[1] for row in conn.execute("PRAGMA table_info(schedule_solver_metadata)").fetchall()]
         payload = self._metadata_dict(meta, new_run_id)
         row = {key: value for key, value in payload.items() if key in solver_cols}
@@ -220,6 +225,9 @@ class DynamicRescheduler:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(reschedule_audit_log)")}
         if "created_at" not in columns:
             conn.execute("ALTER TABLE reschedule_audit_log ADD COLUMN created_at TEXT")
+        for column in ("decision_tier", "repair_rejection_reason"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE reschedule_audit_log ADD COLUMN {column} TEXT")
         conn.execute(
             """
             INSERT INTO reschedule_audit_log (
@@ -227,8 +235,8 @@ class DynamicRescheduler:
                 trigger_timestamp_min, freeze_horizon_min, affected_machine_id,
                 delay_duration_min, reason, total_tasks, frozen_tasks_count,
                 rescheduled_tasks_count, machine_swapped_count, avg_start_delta_min,
-                nervousness_score, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                nervousness_score, decision_tier, repair_rejection_reason, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
             (
                 audit.audit_id,
@@ -246,6 +254,8 @@ class DynamicRescheduler:
                 audit.machine_swapped_count,
                 audit.avg_start_delta_min,
                 audit.nervousness_score,
+                audit.decision_tier,
+                audit.repair_rejection_reason,
             ),
         )
 
@@ -372,6 +382,9 @@ class DynamicRescheduler:
                     "machine_id": trigger.delay_machine_id,
                     "delay_duration_min": trigger.delay_duration_min,
                     "freeze_horizon_min": trigger.freeze_horizon_min,
+                    "flexible_horizon_min": trigger.flexible_horizon_min,
+                    "max_flexible_shift_min": trigger.max_flexible_shift_min,
+                    "decision_tier": audit.decision_tier,
                 },
                 triggered_reason=trigger.reason,
                 selected_action=f"Promote immutable reschedule version {new_run_id}",
@@ -379,6 +392,7 @@ class DynamicRescheduler:
                     "ACTIVE schedule was not mutated in place",
                     "Frozen tasks were enforced as solver-level hard constraints",
                     "CP-SAT returned an accepted feasible schedule",
+                    f"Validated decision path: {audit.decision_tier}",
                 ],
                 rejected_alternatives=[
                     "Overwrite the ACTIVE schedule in place",
@@ -514,12 +528,23 @@ class DynamicRescheduler:
                 else set()
             )
             frozen = self._build_frozen_positions(baseline_sched, trigger, completed)
+            cutoff = trigger.current_time_min + trigger.freeze_horizon_min
+            flexible = {
+                str(row.task_id): (
+                    str(row.machine_id),
+                    max(trigger.current_time_min, int(row.start_min) - trigger.max_flexible_shift_min),
+                    int(row.start_min) + trigger.max_flexible_shift_min,
+                )
+                for row in baseline_sched.itertuples()
+                if str(row.task_id) not in frozen and row.start_min < cutoff + trigger.flexible_horizon_min
+            }
+            baseline_context = load_model_context(disk_conn, previous_run_id)
 
             mem_conn = sqlite3.connect(":memory:")
             disk_conn.backup(mem_conn)
             try:
                 self._clone_run_scoped_inputs(mem_conn, previous_run_id, new_run_id)
-                outage_windows = []
+                outage_windows = [MaintenanceWindow(**window) for window in baseline_context["maintenance_overrides"]]
                 if trigger.delay_machine_id and trigger.delay_duration_min > 0:
                     # Committed tasks retain their exact positions. The delay
                     # applies to the mutable queue after those commitments.
@@ -528,7 +553,7 @@ class DynamicRescheduler:
                         default=trigger.current_time_min,
                     )
                     outage_start = max(trigger.current_time_min, int(committed_end))
-                    outage_windows = [
+                    outage_windows += [
                         MaintenanceWindow(
                             trigger.delay_machine_id,
                             outage_start,
@@ -538,15 +563,55 @@ class DynamicRescheduler:
                         )
                     ]
 
-                meta = run_cpsat_scheduling(
+                meta = None
+                tier = "CPSAT_REOPTIMIZATION"
+                repair_rejection = None
+                solve_args = dict(
                     run_id=new_run_id,
                     connection=NoCloseConnectionWrapper(mem_conn),
-                    frozen_task_positions=frozen,
                     persist_outputs=False,
                     maintenance_overrides=outage_windows,
                     earliest_start_min=trigger.current_time_min,
                     reference_schedule=baseline_sched,
+                    task_override=baseline_sched,
+                    flexible_task_windows=flexible,
                 )
+                if trigger.allow_local_repair:
+                    repair_started = perf_counter()
+                    try:
+                        setup_rows = pd.read_sql("SELECT * FROM changeover_matrix", mem_conn)
+                        machines = set(baseline_sched.machine_id.astype(str))
+                        setup_matrix = {}
+                        for row in setup_rows.to_dict("records"):
+                            applicable = [row["machine_id"]] if row.get("machine_id") in machines else machines
+                            for machine in applicable:
+                                key = (machine, row["from_product"], row["to_product"])
+                                if row.get("machine_id") in machines or key not in setup_matrix:
+                                    setup_matrix[key] = int(round(row["setup_time_min"]))
+                        candidate = local_repair_candidate(
+                            baseline_sched,
+                            trigger.current_time_min,
+                            frozen,
+                            flexible,
+                            MachineCalendarService.load_daily_hours(mem_conn),
+                            setup_matrix,
+                            get_initial_machine_states(mem_conn, new_run_id),
+                            load_machine_maintenance_windows(mem_conn) + outage_windows,
+                        )
+                        meta = run_cpsat_scheduling(**solve_args, frozen_task_positions=candidate, time_limit_seconds=3)
+                        meta = meta.model_copy(
+                            update={
+                                "status": SolverStatus.FEASIBLE,
+                                "proven_optimal": False,
+                                "best_objective_bound": None,
+                                "wall_time_seconds": perf_counter() - repair_started,
+                            }
+                        )
+                        tier = "VALIDATED_LOCAL_REPAIR"
+                    except (ValueError, RuntimeError, TimeoutError) as exc:
+                        repair_rejection = str(exc)
+                if meta is None:
+                    meta = run_cpsat_scheduling(**solve_args, frozen_task_positions=frozen)
                 new_sched = pd.read_sql(
                     "SELECT * FROM production_schedule WHERE run_id = ?",
                     mem_conn,
@@ -561,6 +626,7 @@ class DynamicRescheduler:
             frozen_mask = new_sched["task_id"].astype(str).isin(frozen)
             new_sched.loc[frozen_mask, "schedule_state"] = "FROZEN"
             new_sched.loc[frozen_mask, "freeze_until_min"] = trigger.current_time_min + trigger.freeze_horizon_min
+            new_sched.loc[new_sched.task_id.astype(str).isin(flexible), "schedule_state"] = "FLEXIBLE"
             if not track_df.empty:
                 execution_states = {str(row.task_id): row.status for row in track_df.itertuples()}
                 for index, task in new_sched.iterrows():
@@ -602,11 +668,14 @@ class DynamicRescheduler:
                 machine_swapped_count=report.machine_swapped_count,
                 avg_start_delta_min=report.average_start_delta_min,
                 nervousness_score=report.nervousness_score,
+                decision_tier=tier,
+                repair_rejection_reason=repair_rejection,
             )
 
             if persist_audit:
                 created_version = True
                 self._persist_rescheduled_version(disk_conn, new_sched, new_run_id, audit, meta)
+                save_model_context(disk_conn, new_run_id, trigger.current_time_min, frozen, flexible, outage_windows)
                 disk_conn.commit()
                 disk_conn.close()
                 disk_conn = None
