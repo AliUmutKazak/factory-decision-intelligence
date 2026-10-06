@@ -1,8 +1,13 @@
 """API Servis Uç Noktaları Entegrasyon Testleri."""
 
+import hashlib
+import os
+import sqlite3
+
 from fastapi.testclient import TestClient
 
 from src.api.server import app
+from src.contracts.decision_ledger import DecisionLedger, DecisionLedgerEntry
 
 client = TestClient(app)
 
@@ -27,6 +32,59 @@ def test_readiness_rejects_missing_runtime_without_creating_database(tmp_path, m
     monkeypatch.setenv("FACTORY_DB_PATH", str(target))
     assert client.get("/ready").status_code == 503
     assert not target.exists()
+
+
+def test_readiness_rejects_corrupt_database(tmp_path, monkeypatch):
+    target = tmp_path / "corrupt.db"
+    target.write_bytes(b"not a sqlite database")
+    monkeypatch.setenv("FACTORY_DB_PATH", str(target))
+    assert client.get("/ready").status_code == 503
+
+
+def test_decisions_query_does_not_create_a_table(tmp_path, monkeypatch):
+    target = tmp_path / "without-ledger.db"
+    with sqlite3.connect(target) as conn:
+        conn.execute("CREATE TABLE pipeline_runs (run_id TEXT, status TEXT)")
+        conn.execute("INSERT INTO pipeline_runs VALUES ('A', 'ACTIVE')")
+    monkeypatch.setenv("FACTORY_DB_PATH", str(target))
+    before = hashlib.sha256(target.read_bytes()).hexdigest()
+    assert client.get("/api/v1/decisions").json() == []
+    assert hashlib.sha256(target.read_bytes()).hexdigest() == before
+
+
+def test_decisions_remain_on_one_snapshot_during_atomic_publication(tmp_path, monkeypatch):
+    import src.api.server as server
+
+    target = tmp_path / "canonical.db"
+    replacement = tmp_path / "replacement.db"
+    for path, run_id in ((target, "OLD"), (replacement, "NEW")):
+        with sqlite3.connect(path) as conn:
+            conn.execute("CREATE TABLE pipeline_runs (run_id TEXT, status TEXT)")
+            conn.execute("INSERT INTO pipeline_runs VALUES (?, 'ACTIVE')", (run_id,))
+        DecisionLedger(path).record(
+            DecisionLedgerEntry(
+                decision_id=f"D-{run_id}",
+                run_id=run_id,
+                decision_type="RESCHEDULE",
+                input_state={},
+                triggered_reason="test",
+                selected_action="version",
+            )
+        )
+    monkeypatch.setenv("FACTORY_DB_PATH", str(target))
+    resolve = server.require_active_run_id
+
+    def promote_after_resolving(conn):
+        active = resolve(conn)
+        os.replace(replacement, target)
+        return active
+
+    monkeypatch.setattr(server, "require_active_run_id", promote_after_resolving)
+    response = client.get("/api/v1/decisions")
+    assert response.status_code == 200
+    assert [row["decision_id"] for row in response.json()] == ["D-OLD"]
+    with sqlite3.connect(target) as conn:
+        assert conn.execute("SELECT run_id FROM pipeline_runs").fetchone()[0] == "NEW"
 
 
 def test_get_current_schedule():

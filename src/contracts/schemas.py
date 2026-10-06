@@ -247,7 +247,9 @@ class ScheduleSolverMetadata(BaseModel):
     # Faz 3 - Madde 4: Çok Amaçlı Fonksiyon Ayrıştırması (Multi-Objective Decomposition)
     makespan_min: int | None = Field(default=None, ge=0, description="Toplam tamamlanma süresi (dakika)")
     total_setup_min: int | None = Field(default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)")
-    total_tardiness_min: int | None = Field(default=None, ge=0, description="Toplam teslim gecikmesi (dakika)")
+    total_tardiness_min: int | None = Field(
+        default=None, ge=0, description="Öncelik ağırlıklı toplam teslim gecikmesi (dakika)"
+    )
 
     @property
     def optimality_gap_pct(self) -> float | None:

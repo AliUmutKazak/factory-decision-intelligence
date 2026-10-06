@@ -8,7 +8,7 @@ Bu modül:
 2. Semantik Hizalama (ISA-95 Alignment): ANSI/ISA-95 Part 2 & Part 3 nesneleri
 3. Adaptör Katmanı (Optional Adapters):
    - JSON API Payload Adapter
-   - B2MML / XML Serialization Adapter
+   - B2MML-oriented XML Serialization Adapter
    - Vendor-Specific ERP / MES Normalizer
 """
 
@@ -23,7 +23,11 @@ from src.contracts.schemas import (
 
 
 class ISA95Adapter:
-    """Enterprise Canonical Model ile ISA-95 / B2MML arasında çift yönlü adaptör."""
+    """ISA-95 semantically aligned exports with B2MML-oriented XML adapters.
+
+    XML payloads are project-specific exports, without B2MML XSD validation or
+    verified vendor interoperability. Import/round-trip support is not provided.
+    """
 
     @staticmethod
     def order_to_isa95_dict(order: ProductionOrder) -> dict[str, Any]:
@@ -45,7 +49,7 @@ class ISA95Adapter:
 
     @staticmethod
     def mes_actual_to_b2mml_xml(mes: MESActual) -> str:
-        """MES Actual üretim kaydını ISA-95 ProductionPerformance B2MML uyumlu XML çıktısına dönüştürür."""
+        """MES Actual kaydını B2MML odaklı, XSD doğrulanmamış XML'e dönüştürür."""
         root = ET.Element("ProductionPerformance")
         root.set("xmlns", "http://www.mesa.org/xml/B2MML-V0600")
 
@@ -65,7 +69,7 @@ class ISA95Adapter:
 
     @staticmethod
     def schedule_result_to_b2mml_xml(result: ScheduleResult) -> str:
-        """ScheduleResult çıktısını ISA-95 ProductionSchedule B2MML uyumlu XML çıktısına dönüştürür."""
+        """ScheduleResult çıktısını B2MML odaklı, XSD doğrulanmamış XML'e dönüştürür."""
         root = ET.Element("ProductionSchedule")
         root.set("xmlns", "http://www.mesa.org/xml/B2MML-V0600")
 

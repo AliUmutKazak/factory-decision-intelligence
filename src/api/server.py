@@ -54,8 +54,9 @@ def health_check() -> dict[str, str]:
 def readiness_check() -> dict[str, str]:
     if not Path(get_runtime_paths()["db_path"]).is_file():
         raise HTTPException(status_code=503, detail="Runtime database is unavailable.")
-    conn = get_db()
+    conn = None
     try:
+        conn = get_db()
         active = get_active_run_id(conn)
         if not conn.execute("SELECT 1 FROM schedule_solver_metadata WHERE run_id = ?", (active,)).fetchone():
             raise RuntimeError("ACTIVE solver metadata is unavailable.")
@@ -63,7 +64,8 @@ def readiness_check() -> dict[str, str]:
     except (RuntimeError, sqlite3.Error) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 @app.get("/api/v1/schedule/current", tags=["Schedule Query"])
@@ -193,8 +195,6 @@ def get_active_run_decisions() -> list[dict[str, Any]]:
     conn = get_db()
     try:
         active_run_id = require_active_run_id(conn)
+        return [entry.to_dict() for entry in DecisionLedger.read_by_run_id(conn, active_run_id)]
     finally:
         conn.close()
-
-    ledger = DecisionLedger(get_runtime_paths()["db_path"])
-    return [entry.to_dict() for entry in ledger.get_by_run_id(active_run_id)]

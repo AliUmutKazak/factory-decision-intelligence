@@ -181,8 +181,9 @@ Atölye zemininde belirsizlikler gerçekleştiğinde uygulanan dinamik politikal
 
 ### 1. Dondurulmuş Ufuk Politikası (Freeze Horizon Policy)
 Mevcut zamandan ($t_{now}$) itibaren belirlenen dondurma periyodu ($H_{freeze}$) içindeki operasyonlar sahada hazırlığı tamamlanmış veya işlem görmekte kabul edilir:
-$$S_i = S_i^{orijinal}, \quad Makine_i = Makine_i^{orijinal} \quad \forall i \text{ where } S_i \le t_{now} + H_{freeze}$$
+$$S_i = S_i^{orijinal}, \quad Makine_i = Makine_i^{orijinal} \quad \forall i \text{ where } S_i < t_{now} + H_{freeze} \text{ or } S_i \le t_{now}$$
 Bu operasyonların sırası ve makine atamaları yeniden çizelgelemede **değiştirilemez**.
+MES'te başlamış veya tamamlanmış operasyonlar, planlanan başlangıçları ileride olsa bile dondurulur. Ufuk sınırına tam eşit gelecekteki görevler serbesttir; ayrı bir FLEXIBLE hareket kısıtı uygulanmaz.
 
 Duruş, etkilenen tezgâhtaki dondurulmuş görevlerden sonra uygulanır; başlamış operasyonu kesip devam ettirme modellenmez. Ayrıntılar: [Run isolation and rescheduling](docs/run-isolation-and-rescheduling.md).
 
@@ -254,7 +255,14 @@ FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnterakt
 | `POST` | `/api/v1/schedule/what-if/breakdown` | `{"machine_id": "M01", "start_min": 480, "duration_min": 60}` | Makine duruşunu simüle eder; gecikme ve sapma analizi sunar |
 | `POST` | `/api/v1/schedule/what-if/hot-order` | `{"order_id": "HOT_01", "product_id": "P01", "quantity": 25, "due_date_min": 2880, "priority_weight": 10}` | Acil siparişin mevcut çizelge üzerindeki etkisini hesaplar |
 | `POST` | `/api/v1/schedule/reschedule` | `{"trigger": {"event_id": "EVT-01", "current_time_min": 480, "freeze_horizon_min": 60, "delay_machine_id": "M01", "delay_duration_min": 60}}` | Dondurulmuş ufuk kurallarıyla yeni çizelgeyi üretir ve kaydeder |
-| `GET` | `/api/v1/schedule/audit-log` | `?limit=50` | SHA-256 imzalı geçmiş simülasyon ve plan denetim loglarını listeler |
+| `GET` | `/api/v1/schedule/audit-log` | `?limit=50` | ACTIVE sürüme bağlı kalıcı yeniden çizelgeleme denetim kayıtlarını listeler |
+| `GET` | `/api/v1/decisions` | - | ACTIVE sürümün SQLite'a kaydedilmiş karar gerekçelerini salt okunur olarak döndürür |
+
+Karar geçmişi SQLite'ta kalıcıdır; yeniden çizelgeleme kararları sürüm kimliğiyle sorgulanır. Bu, tek sunuculu POC denetim kaydıdır; harici bir enterprise audit platformu iddiası taşımaz.
+
+ISA-95 adaptörleri semantik olarak hizalanmış kanonik sözleşmeler ve B2MML odaklı XML çıktıları sağlar. B2MML XSD doğrulaması, vendor birlikte çalışabilirliği ve çift yönlü XML import desteği henüz uygulanmamıştır.
+
+Benchmark tablosu gerçek çizelgenin geç lot sayısını, toplam ve ağırlıklı gecikmesini ayrı hesaplar. Yalnızca solver özeti varsa bilinmeyen geç lot sayısı boş bırakılır. FIFO/EDD/SPT/Greedy örnekleri takvim, bakım, rota ve freeze kısıtlarını paylaşmadığından bu tablo CP-SAT için yüzdesel performans kazanımı kanıtı olarak kullanılmaz.
 
 ---
 

@@ -10,7 +10,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from src.config import PLANNING_HORIZON_WEEKS, WEEKLY_HOURS_PER_MACHINE, get_runtime_paths
+from src.config import ECONOMIC_CONFIG, PLANNING_HORIZON_WEEKS, WEEKLY_HOURS_PER_MACHINE, get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
@@ -409,7 +409,8 @@ with tab_summary:
         )
         st.info(
             f"**Sürdürülebilirlik:** Tesis tepe yükü **{float(e_kpi.get('peak_load_kw', 0.0)):.1f} kW** olarak fiziksel kuralı doğruladı; "
-            f"Dahili Karbon Senaryosu (80 €/tCO₂e) kapsamında karbon maruziyeti **€{float(c_kpi.get('total_tco2e', 0.0)) * 80:,.2f}** seviyesindedir."
+            f"Dahili Karbon Senaryosu ({ECONOMIC_CONFIG.carbon_price_per_ton:g} €/tCO₂e) kapsamında karbon maruziyeti "
+            f"**€{float(c_kpi.get('total_tco2e', 0.0)) * ECONOMIC_CONFIG.carbon_price_per_ton:,.2f}** seviyesindedir."
         )
 
 # =============================================================
@@ -657,34 +658,20 @@ with tab_schedule:
             for _, r in sched_df.iterrows():
                 bench_tasks.append(
                     BenchmarkTask(
-                        task_id=str(r.get(hover_col, r.get("task_id", f"T_{_}"))),
+                        task_id=str(r["task_id"]),
                         product_id=str(r.get("product_id", "")),
                         machine_id=str(r.get("machine_id", "")),
                         processing_time=float(r.get("duration_min", 0)) / 60.0,
                         release_date=float(r.get("release_time_min", 0)) / 60.0,
-                        due_date=float(r.get("due_date_min", r.get("due_date", 2400))) / 60.0,
+                        due_date=float(r["due_date_min"]) / 60.0,
+                        order_id=str(r["lot_id"]),
+                        priority_weight=float(r["priority_weight"]),
                     )
                 )
 
             if bench_tasks:
                 suite = SchedulingBenchmarkSuite(bench_tasks)
-                cpsat_dict = {}
-                if not solver_meta_df.empty:
-                    meta_r = solver_meta_df.iloc[-1]
-                    cpsat_dict = {
-                        "makespan": float(meta_r.get("makespan_min", sched_df["end_min"].max())) / 60.0,
-                        "late_orders": 1 if float(meta_r.get("total_tardiness_min", 0)) > 0 else 0,
-                        "total_tardiness": float(meta_r.get("total_tardiness_min", 0)) / 60.0,
-                        "total_setup_time": float(meta_r.get("total_setup_min", 0)) / 60.0,
-                    }
-                else:
-                    cpsat_dict = {
-                        "makespan": float(sched_df["end_min"].max()) / 60.0,
-                        "late_orders": 0,
-                        "total_tardiness": 0.0,
-                        "total_setup_time": float(sched_df.get("setup_before_min", pd.Series([0])).sum()) / 60.0,
-                    }
-
+                cpsat_dict = suite.reported_schedule_metrics(sched_df)
                 bench_df = suite.run_cpsat_comparison(cpsat_result=cpsat_dict)
                 st.dataframe(bench_df, use_container_width=True)
 
@@ -761,7 +748,7 @@ with tab_sustainability:
                 "Dahili Karbon Fiyat Senaryosu / Internal Carbon Price Scenario (€/tCO₂e):",
                 min_value=0,
                 max_value=200,
-                value=80,
+                value=int(ECONOMIC_CONFIG.carbon_price_per_ton),
                 step=10,
                 help="Bu simülasyon bir emisyon piyasası takası değil, Exposure = Carbon × InternalCarbonPrice formülüne dayalı içsel gölge fiyatlandırma (Shadow Pricing) senaryosudur.",
             )
