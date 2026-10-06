@@ -30,9 +30,7 @@ def run_cmd(cmd_list: list[str]) -> str:
         check=False,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"Komut başarısız: {' '.join(cmd_list)}\n{result.stderr}"
-        )
+        raise RuntimeError(f"Komut başarısız: {' '.join(cmd_list)}\n{result.stderr}")
     return result.stdout
 
 
@@ -113,9 +111,7 @@ def verify_csv_lineage(staging: Path, run_id: str) -> None:
             raise RuntimeError(f"Reference artifact run_id kolonsuz: {filename}")
         actual = {str(value) for value in df["run_id"].dropna().unique()}
         if actual != {run_id}:
-            raise RuntimeError(
-                f"Reference lineage mismatch: {filename}: {actual} != {{{run_id}}}"
-            )
+            raise RuntimeError(f"Reference lineage mismatch: {filename}: {actual} != {{{run_id}}}")
 
 
 def build_manifest(staging: Path, run: dict[str, str], bundle: Path) -> dict:
@@ -134,9 +130,7 @@ def build_manifest(staging: Path, run: dict[str, str], bundle: Path) -> dict:
         "config_hash": run["config_hash"],
         "data_source": run["data_source"],
         "source_bundle": str(bundle.relative_to(BASE_DIR)).replace("\\", "/"),
-        "source_bundle_manifest_sha256": (
-            sha256(source_manifest) if source_manifest.exists() else None
-        ),
+        "source_bundle_manifest_sha256": (sha256(source_manifest) if source_manifest.exists() else None),
         "created_at": datetime.now(UTC).isoformat(),
         "files": files,
     }
@@ -147,17 +141,13 @@ def assert_versioned_snapshot_immutable(versioned_dir: Path, manifest: dict) -> 
         return
     existing_manifest = versioned_dir / "manifest.json"
     if not existing_manifest.exists():
-        raise RuntimeError(
-            f"Mevcut versioned reference manifest eksik: {versioned_dir}"
-        )
+        raise RuntimeError(f"Mevcut versioned reference manifest eksik: {versioned_dir}")
     existing = json.loads(existing_manifest.read_text(encoding="utf-8"))
     if existing.get("run_id") != manifest["run_id"]:
         raise RuntimeError("Versioned reference run_id uyuşmazlığı.")
     existing_files = existing.get("files", {})
     if existing_files != manifest.get("files", {}):
-        raise RuntimeError(
-            "Immutable reference ihlali: aynı run_id için farklı payload üretildi."
-        )
+        raise RuntimeError("Immutable reference ihlali: aynı run_id için farklı payload üretildi.")
 
 
 def freeze_reference_atomic(run_pipeline: bool = True) -> None:
@@ -182,9 +172,7 @@ def freeze_reference_atomic(run_pipeline: bool = True) -> None:
     copy_bundle_to_reference_staging(bundle, staging)
     verify_csv_lineage(staging, run_id)
     manifest = build_manifest(staging, run, bundle)
-    (staging / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    (staging / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
 
     assert_versioned_snapshot_immutable(versioned, manifest)
     if not versioned.exists():
@@ -204,10 +192,7 @@ def freeze_reference_atomic(run_pipeline: bool = True) -> None:
             backup.rename(reference)
         raise
 
-    print(
-        f"[REFERENCE SEALED] run={run_id} git={run['git_sha'][:12]} "
-        f"files={len(manifest['files'])}"
-    )
+    print(f"[REFERENCE SEALED] run={run_id} git={run['git_sha'][:12]} files={len(manifest['files'])}")
 
 
 if __name__ == "__main__":

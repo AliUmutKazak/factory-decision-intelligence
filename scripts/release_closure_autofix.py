@@ -55,7 +55,7 @@ def fix_energy() -> None:
         '         kpi_df["run_id"] = run_id',
         '        kpi_df["run_id"] = run_id',
     )
-    old = '''    weekly_machine_ot_hours = {}
+    old = """    weekly_machine_ot_hours = {}
     try:
         conn = get_db_connection(active_db_path)
         cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
@@ -64,8 +64,8 @@ def fix_energy() -> None:
             weekly_machine_ot_hours[(int(r["period_week"]), str(r["machine_id"]))] = float(r["overtime_hours"])
     except Exception:
         pass
-'''
-    new = '''    weekly_machine_ot_hours = {}
+"""
+    new = """    weekly_machine_ot_hours = {}
     with get_db_connection(active_db_path) as conn:
         cap_df = pd.read_sql(
             "SELECT period_week, machine_id, overtime_hours "
@@ -81,7 +81,7 @@ def fix_energy() -> None:
         weekly_machine_ot_hours[(int(row["period_week"]), str(row["machine_id"]))] = float(
             row["overtime_hours"]
         )
-'''
+"""
     replace_once("src/energy/energy_analytics.py", old, new)
 
 
@@ -112,11 +112,11 @@ def fix_orders_history() -> None:
     replace_once(
         "src/data/build_database_and_eda.py",
         '    cursor.execute("DELETE FROM orders;")\n    conn.commit()',
-        '''    if run_id:
+        """    if run_id:
         cursor.execute("DELETE FROM orders WHERE run_id = ?", (str(run_id),))
     else:
         cursor.execute("DELETE FROM orders")
-    conn.commit()''',
+    conn.commit()""",
     )
 
 
@@ -129,7 +129,7 @@ def fix_validation_and_retention() -> None:
 
     ot_start = "            # -----------------------------------------------------------------\n            # MADDE 18: Machine x Week Bazlı Operasyonel Overtime Validation"
     ot_end = "        # 3.1. ENERJİ MUTABAKATI"
-    ot_block = '''            # MADDE 18: DB-backed machine x week overtime validation.
+    ot_block = """            # MADDE 18: DB-backed machine x week overtime validation.
             cap_df = pd.read_sql(
                 "SELECT machine_id, overtime_hours FROM machine_capacity_plan "
                 "WHERE run_id = ? AND period_week = 1",
@@ -167,7 +167,7 @@ def fix_validation_and_retention() -> None:
                                 f"{machine_id}, W{week_index}={actual_ot:.1f} dk"
                             )
 
-'''
+"""
     replace_between("src/utils/lineage.py", ot_start, ot_end, ot_block)
 
     retention_start = "def apply_run_retention_policy("

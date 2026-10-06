@@ -154,14 +154,16 @@ def compute_energy_analytics(schedule_df=None, machines_df=None, run_id=None, db
     # ---------------------------------------------------------------------
     # Taktik LP'den makine OT saatlerini oku (Hafta bazlı)
     weekly_machine_ot_hours = {}
-    try:
-        conn = get_db_connection(active_db_path)
-        cap_df = pd.read_sql("SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan", conn)
-        conn.close()
-        for _, r in cap_df.iterrows():
-            weekly_machine_ot_hours[(int(r["period_week"]), str(r["machine_id"]))] = float(r["overtime_hours"])
-    except Exception:
-        pass
+    with get_db_connection(active_db_path) as conn:
+        cap_df = pd.read_sql(
+            "SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan WHERE run_id = ?",
+            conn,
+            params=(str(run_id),),
+        )
+    if cap_df.empty:
+        raise RuntimeError(f"[ENERGY] machine_capacity_plan bulunamadı for run_id={run_id}.")
+    for _, row in cap_df.iterrows():
+        weekly_machine_ot_hours[(int(row["period_week"]), str(row["machine_id"]))] = float(row["overtime_hours"])
 
     step_min = 15
     time_points = list(range(0, makespan_min, step_min))

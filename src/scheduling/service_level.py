@@ -8,6 +8,8 @@ from typing import Any
 
 import pandas as pd
 
+from src.config import ECONOMIC_CONFIG
+
 # Müşteri sınıfı / Öncelik ceza çarpanları (Tier 1 = VIP / Stratejik Ortak)
 CUSTOMER_CLASS_WEIGHTS = {
     "TIER_1": 3.0,
@@ -16,8 +18,8 @@ CUSTOMER_CLASS_WEIGHTS = {
     "STANDARD": 1.0,
 }
 
-# Varsayılan dakika başı gecikme maliyeti (TL/dk veya $/dk)
-DEFAULT_TARDINESS_COST_PER_MIN = 2.50
+# Economic SSOT: configured currency per tardy minute.
+DEFAULT_TARDINESS_COST_PER_MIN = ECONOMIC_CONFIG.tardiness_cost_per_hour / 60.0
 
 
 def evaluate_schedule_service_level(

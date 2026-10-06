@@ -26,10 +26,7 @@ class DynamicRescheduleRequest(BaseModel):
 
 app = FastAPI(
     title="Factory Decision Intelligence API",
-    description=(
-        "Taktik LP, CP-SAT operasyonel çizelgeleme, what-if ve "
-        "dinamik rescheduling servis katmanı"
-    ),
+    description=("Taktik LP, CP-SAT operasyonel çizelgeleme, what-if ve dinamik rescheduling servis katmanı"),
     version="1.0.0",
 )
 
@@ -60,8 +57,7 @@ def get_current_schedule(
     try:
         active_run_id = require_active_run_id(conn)
         df = pd.read_sql(
-            "SELECT * FROM production_schedule WHERE run_id = ? "
-            "ORDER BY start_min ASC LIMIT ?",
+            "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY start_min ASC LIMIT ?",
             conn,
             params=(active_run_id, limit),
         )
@@ -76,8 +72,7 @@ def get_solver_metadata() -> dict[str, Any]:
     try:
         active_run_id = require_active_run_id(conn)
         df = pd.read_sql(
-            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? "
-            "ORDER BY rowid DESC LIMIT 1",
+            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? ORDER BY rowid DESC LIMIT 1",
             conn,
             params=(active_run_id,),
         )

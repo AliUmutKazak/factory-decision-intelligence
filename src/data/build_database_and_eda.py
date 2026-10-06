@@ -234,7 +234,10 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
     if "run_id" not in order_cols:
         cursor.execute("ALTER TABLE orders ADD COLUMN run_id TEXT")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_run ON orders(run_id)")
-    cursor.execute("DELETE FROM orders;")
+    if run_id:
+        cursor.execute("DELETE FROM orders WHERE run_id = ?", (str(run_id),))
+    else:
+        cursor.execute("DELETE FROM orders")
     conn.commit()
 
     # -------------------------------------------------------------

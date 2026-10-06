@@ -67,8 +67,7 @@ class DynamicRescheduler:
 
     def _get_active_run_id(self, conn: sqlite3.Connection) -> str:
         row = conn.execute(
-            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' "
-            "ORDER BY timestamp DESC LIMIT 1"
+            "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
         ).fetchone()
         if not row or not row[0]:
             raise ValueError("[RESCHEDULE] ACTIVE run bulunamadı; silent fallback yasaktır.")
@@ -100,22 +99,15 @@ class DynamicRescheduler:
 
         # Integer surrogate primary keys must be regenerated. Business keys are
         # retained; run_id changes provide version identity where applicable.
-        columns = [
-            row[1]
-            for row in info
-            if not (row[5] == 1 and str(row[2]).upper().startswith("INTEGER"))
-        ]
+        columns = [row[1] for row in info if not (row[5] == 1 and str(row[2]).upper().startswith("INTEGER"))]
         if "run_id" not in columns:
             return
 
         conn.execute(f"DELETE FROM {table_name} WHERE run_id = ?", (target_run_id,))
         insert_cols = ", ".join(f'"{col}"' for col in columns)
-        select_expr = ", ".join(
-            "?" if col == "run_id" else f'"{col}"' for col in columns
-        )
+        select_expr = ", ".join("?" if col == "run_id" else f'"{col}"' for col in columns)
         conn.execute(
-            f"INSERT INTO {table_name} ({insert_cols}) "
-            f"SELECT {select_expr} FROM {table_name} WHERE run_id = ?",
+            f"INSERT INTO {table_name} ({insert_cols}) SELECT {select_expr} FROM {table_name} WHERE run_id = ?",
             (target_run_id, source_run_id),
         )
 
@@ -126,9 +118,7 @@ class DynamicRescheduler:
         target_run_id: str,
     ) -> None:
         for table_name in self.RUN_SCOPED_INPUT_TABLES:
-            self._clone_run_scoped_table(
-                conn, table_name, source_run_id, target_run_id
-            )
+            self._clone_run_scoped_table(conn, table_name, source_run_id, target_run_id)
         conn.commit()
 
     def _build_frozen_positions(
@@ -139,8 +129,7 @@ class DynamicRescheduler:
     ) -> dict[str, tuple[str, float, float]]:
         cutoff = trigger.current_time_min + trigger.freeze_horizon_min
         frozen = baseline_sched[
-            (baseline_sched["start_min"] < cutoff)
-            | baseline_sched["task_id"].isin(completed_tasks)
+            (baseline_sched["start_min"] < cutoff) | baseline_sched["task_id"].isin(completed_tasks)
         ]
         return {
             str(row["task_id"]): (
@@ -158,8 +147,7 @@ class DynamicRescheduler:
         previous_run_id: str,
     ) -> None:
         row = conn.execute(
-            "SELECT orders_count, git_sha, config_hash, data_source "
-            "FROM pipeline_runs WHERE run_id = ?",
+            "SELECT orders_count, git_sha, config_hash, data_source FROM pipeline_runs WHERE run_id = ?",
             (previous_run_id,),
         ).fetchone()
         if not row:
@@ -201,12 +189,7 @@ class DynamicRescheduler:
     ) -> None:
         if not self._table_exists(conn, "schedule_solver_metadata"):
             return
-        solver_cols = [
-            row[1]
-            for row in conn.execute(
-                "PRAGMA table_info(schedule_solver_metadata)"
-            ).fetchall()
-        ]
+        solver_cols = [row[1] for row in conn.execute("PRAGMA table_info(schedule_solver_metadata)").fetchall()]
         payload = self._metadata_dict(meta, new_run_id)
         row = {key: value for key, value in payload.items() if key in solver_cols}
         if not row:
@@ -215,13 +198,9 @@ class DynamicRescheduler:
             "DELETE FROM schedule_solver_metadata WHERE run_id = ?",
             (new_run_id,),
         )
-        pd.DataFrame([row]).to_sql(
-            "schedule_solver_metadata", conn, if_exists="append", index=False
-        )
+        pd.DataFrame([row]).to_sql("schedule_solver_metadata", conn, if_exists="append", index=False)
 
-    def _persist_audit_entry(
-        self, conn: sqlite3.Connection, audit: RescheduleAuditEntry
-    ) -> None:
+    def _persist_audit_entry(self, conn: sqlite3.Connection, audit: RescheduleAuditEntry) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO reschedule_audit_log (
@@ -262,9 +241,7 @@ class DynamicRescheduler:
         self._create_new_run_record(conn, new_run_id, audit.previous_run_id)
         self._clone_run_scoped_inputs(conn, audit.previous_run_id, new_run_id)
 
-        conn.execute(
-            "DELETE FROM production_schedule WHERE run_id = ?", (new_run_id,)
-        )
+        conn.execute("DELETE FROM production_schedule WHERE run_id = ?", (new_run_id,))
         new_df.to_sql("production_schedule", conn, if_exists="append", index=False)
         self._persist_solver_metadata(conn, new_run_id, meta)
         self._persist_audit_entry(conn, audit)
@@ -292,12 +269,7 @@ class DynamicRescheduler:
             for table_name, filename in self.ARTIFACT_TABLES.items():
                 if not self._table_exists(conn, table_name):
                     continue
-                cols = {
-                    row[1]
-                    for row in conn.execute(
-                        f"PRAGMA table_info({table_name})"
-                    ).fetchall()
-                }
+                cols = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()}
                 if "run_id" not in cols:
                     continue
                 df = pd.read_sql(
@@ -327,9 +299,7 @@ class DynamicRescheduler:
                     if col in schedule_df.columns
                 ]
                 if accounting_cols:
-                    schedule_df[accounting_cols].to_csv(
-                        processed_dir / "task_weekly_accounting.csv", index=False
-                    )
+                    schedule_df[accounting_cols].to_csv(processed_dir / "task_weekly_accounting.csv", index=False)
 
             run_row = conn.execute(
                 "SELECT timestamp, trigger_source, orders_count, git_sha, config_hash, "
@@ -446,9 +416,7 @@ class DynamicRescheduler:
             "run_type": "DYNAMIC_RESCHEDULE",
             "files": files,
         }
-        (bundle_dir / "manifest.json").write_text(
-            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        (bundle_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
         return bundle_dir
 
     def scan_pending_mes_events(
@@ -465,9 +433,7 @@ class DynamicRescheduler:
                    OR event_type LIKE '%STOP%')
             ORDER BY event_timestamp_min DESC
         """
-        events_df = pd.read_sql(
-            query, mem_conn, params=(active_run_id, current_time_min)
-        )
+        events_df = pd.read_sql(query, mem_conn, params=(active_run_id, current_time_min))
         triggers = []
         for _, row in events_df.iterrows():
             triggers.append(
@@ -477,10 +443,7 @@ class DynamicRescheduler:
                     freeze_horizon_min=60,
                     delay_machine_id=row["machine_id"],
                     delay_duration_min=int(row["actual_duration_min"] or 0),
-                    reason=(
-                        f"{row['event_type']}: "
-                        f"{row['delay_reason'] or 'Unspecified deviation'}"
-                    ),
+                    reason=(f"{row['event_type']}: {row['delay_reason'] or 'Unspecified deviation'}"),
                 )
             )
         return triggers
@@ -500,9 +463,7 @@ class DynamicRescheduler:
                 params=(previous_run_id,),
             )
             if baseline_sched.empty:
-                raise ValueError(
-                    f"[RESCHEDULE] ACTIVE schedule bulunamadı: {previous_run_id}"
-                )
+                raise ValueError(f"[RESCHEDULE] ACTIVE schedule bulunamadı: {previous_run_id}")
 
             new_run_id = new_run_id or f"RESCHED-{uuid.uuid4().hex[:10].upper()}"
             if new_run_id == previous_run_id:
@@ -516,21 +477,13 @@ class DynamicRescheduler:
                 )
             else:
                 track_df = pd.DataFrame(columns=["task_id", "status"])
-            completed = (
-                set(track_df.loc[track_df["status"] == "COMPLETED", "task_id"])
-                if not track_df.empty
-                else set()
-            )
-            frozen = self._build_frozen_positions(
-                baseline_sched, trigger, completed
-            )
+            completed = set(track_df.loc[track_df["status"] == "COMPLETED", "task_id"]) if not track_df.empty else set()
+            frozen = self._build_frozen_positions(baseline_sched, trigger, completed)
 
             mem_conn = sqlite3.connect(":memory:")
             disk_conn.backup(mem_conn)
             try:
-                self._clone_run_scoped_inputs(
-                    mem_conn, previous_run_id, new_run_id
-                )
+                self._clone_run_scoped_inputs(mem_conn, previous_run_id, new_run_id)
                 if trigger.delay_machine_id and trigger.delay_duration_min > 0:
                     mem_conn.execute(
                         "UPDATE machine_calendar "
@@ -575,9 +528,7 @@ class DynamicRescheduler:
                     or abs(float(current["start_min"]) - start) > 1e-6
                     or abs(float(current["end_min"]) - end) > 1e-6
                 ):
-                    raise ValueError(
-                        f"[RESCHEDULE] Frozen constraint violated: {task_id}"
-                    )
+                    raise ValueError(f"[RESCHEDULE] Frozen constraint violated: {task_id}")
 
             report = self._calculate_nervousness(
                 baseline_sched,
@@ -604,24 +555,16 @@ class DynamicRescheduler:
             )
 
             if persist_audit:
-                self._persist_rescheduled_version(
-                    disk_conn, new_sched, new_run_id, audit, meta
-                )
+                self._persist_rescheduled_version(disk_conn, new_sched, new_run_id, audit, meta)
                 disk_conn.commit()
                 disk_conn.close()
                 disk_conn = None
 
                 # Schedule-dependent analytics are recomputed for the new run;
                 # they are never inherited from the previous ACTIVE version.
-                compute_energy_analytics(
-                    run_id=new_run_id, db_path=self.disk_db_path
-                )
-                compute_carbon_analytics(
-                    run_id=new_run_id, db_path=self.disk_db_path
-                )
-                processed_dir, reports_dir = self._write_run_artifacts(
-                    new_run_id, meta, audit
-                )
+                compute_energy_analytics(run_id=new_run_id, db_path=self.disk_db_path)
+                compute_carbon_analytics(run_id=new_run_id, db_path=self.disk_db_path)
+                processed_dir, reports_dir = self._write_run_artifacts(new_run_id, meta, audit)
 
                 from src.utils.lineage import promote_run_to_active, validate_pipeline_run
 
@@ -630,9 +573,7 @@ class DynamicRescheduler:
                     db_path=self.disk_db_path,
                     reports_dir=str(reports_dir),
                 )
-                self._record_decision(
-                    new_run_id, trigger, report, audit, meta
-                )
+                self._record_decision(new_run_id, trigger, report, audit, meta)
                 self._seal_run_bundle(
                     new_run_id,
                     previous_run_id,
@@ -677,17 +618,13 @@ class DynamicRescheduler:
             current = new_indexed.loc[task_id]
             if baseline["machine_id"] != current["machine_id"]:
                 machine_swaps += 1
-            start_deltas.append(
-                abs(float(current["start_min"]) - float(baseline["start_min"]))
-            )
+            start_deltas.append(abs(float(current["start_min"]) - float(baseline["start_min"])))
 
         avg_delta = float(np.mean(start_deltas)) if start_deltas else 0.0
         max_delta = float(np.max(start_deltas)) if start_deltas else 0.0
         swap_ratio = machine_swaps / total_tasks
         time_disruption_ratio = min(1.0, avg_delta / 10080.0)
-        nervousness_score = round(
-            0.5 * swap_ratio + 0.5 * time_disruption_ratio, 4
-        )
+        nervousness_score = round(0.5 * swap_ratio + 0.5 * time_disruption_ratio, 4)
 
         return ScheduleNervousnessReport(
             total_tasks=total_tasks,

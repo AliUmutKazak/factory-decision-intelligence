@@ -422,58 +422,38 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                             f"Görev {m_sorted.loc[i + 1, 'lot_id']} başlangıç: {next_start}"
                         )
 
-            # -----------------------------------------------------------------
-            # MADDE 18: Machine x Week Bazlı Operasyonel Overtime Validation
-            # -----------------------------------------------------------------
-            # Global eşik (total_ot > 60000) yerine tezgâh ve hafta bazlı katı kural
-            weekly_acc_path = (
-                Path(os.environ.get("FACTORY_PROCESSED_DIR", str(get_runtime_paths()["processed_dir"])))
-                / "task_weekly_accounting.csv"
+            # MADDE 18: DB-backed machine x week overtime validation.
+            cap_df = pd.read_sql(
+                "SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE run_id = ? AND period_week = 1",
+                conn,
+                params=(run_id,),
             )
-            allowed_w1_ot_min_by_machine = {"M01": 48 * 60}  # M01 W1 tavanı: 48h = 2880 dk
-
-            if weekly_acc_path.exists():
-                try:
-                    w_df = pd.read_csv(weekly_acc_path)
-                    if not w_df.empty and "machine_id" in w_df.columns and "week_index" in w_df.columns:
-                        ot_metric_col = next(
-                            (c for c in ["overtime_minutes", "ot_minutes", "overtime_min"] if c in w_df.columns), None
+            allowed_w1_ot_min = {
+                str(row["machine_id"]): float(row["overtime_hours"]) * 60.0 for _, row in cap_df.iterrows()
+            }
+            ot_col = "overtime_minutes" if "overtime_minutes" in sched_full.columns else None
+            if ot_col:
+                week_col = "schedule_week" if "schedule_week" in sched_full.columns else None
+                if week_col:
+                    for (machine_id, week_index), group in sched_full.groupby(["machine_id", week_col]):
+                        processing_ot = float(group[ot_col].sum())
+                        setup_ot = (
+                            float(group["setup_overtime_minutes"].sum())
+                            if "setup_overtime_minutes" in group.columns
+                            else 0.0
                         )
-                        if ot_metric_col:
-                            for (m_id, w_idx), grp in w_df.groupby(["machine_id", "week_index"]):
-                                grp_ot = grp[ot_metric_col].sum()
-                                if w_idx == 0:
-                                    max_allowed = allowed_w1_ot_min_by_machine.get(str(m_id), 0)
-                                    if grp_ot > max_allowed:
-                                        raise ValueError(
-                                            f"[VALIDATION GATE FAIL] Tezgâh Hafta-1 OT Aşıldı! "
-                                            f"Tezgâh: {m_id}, Fiili OT: {grp_ot} dk, İzin Verilen: {max_allowed} dk"
-                                        )
-                                else:
-                                    # Hafta 2 ve sonrası (Spillover): Model A politikası gereği OT = 0 olmalıdır
-                                    if grp_ot > 0:
-                                        raise ValueError(
-                                            f"[VALIDATION GATE FAIL] Spillover Döneminde (Hafta {w_idx + 1}) Yetkisiz OT! "
-                                            f"Tezgâh: {m_id}, Fiili OT: {grp_ot} dk (Maksimum: 0 dk)"
-                                        )
-                except Exception as e:
-                    if "[VALIDATION GATE FAIL]" in str(e):
-                        raise
-            else:
-                # Yedek kontrol (fallback): production_schedule üzerindeki tezgâh toplamları
-                ot_col = (
-                    "overtime_minutes"
-                    if "overtime_minutes" in sched_full.columns
-                    else ("overtime_min" if "overtime_min" in sched_full.columns else None)
-                )
-                if ot_col:
-                    for m_id, grp in sched_full.groupby("machine_id"):
-                        m_ot = grp[ot_col].sum()
-                        max_allowed = allowed_w1_ot_min_by_machine.get(str(m_id), 0)
-                        if m_ot > max_allowed:
+                        actual_ot = processing_ot + setup_ot
+                        if int(week_index) == 1:
+                            budget = allowed_w1_ot_min.get(str(machine_id), 0.0)
+                            if actual_ot > budget + 1e-6:
+                                raise ValueError(
+                                    f"[VALIDATION GATE FAIL] W1 OT aşıldı: {machine_id} "
+                                    f"{actual_ot:.1f} dk > {budget:.1f} dk"
+                                )
+                        elif actual_ot > 1e-6:
                             raise ValueError(
-                                f"[VALIDATION GATE FAIL] Tezgâh Toplam OT Sınırı Aşıldı! "
-                                f"Tezgâh: {m_id}, Fiili OT: {m_ot} dk, İzin Verilen: {max_allowed} dk"
+                                f"[VALIDATION GATE FAIL] Spillover OT yasak: "
+                                f"{machine_id}, W{week_index}={actual_ot:.1f} dk"
                             )
 
         # 3.1. ENERJİ MUTABAKATI: Tesis Toplamı == Tezgah Toplamları
@@ -598,61 +578,100 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     return None
 
 
-def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artifacts_dir: str = None) -> int:
-    """
-    Denetim Kapı 5 & Madde 23: Historical Run & Artifact Retention Policy.
-    - Üretim veritabanında denetim kütüğünün sınırsız büyümesini engeller.
-    - En güncel 'keep_last_n' adet koşumu korur, eski veya yetim kayıtları temizler.
-    - Veritabanından silinen veya yetim kalan fiziksel snapshot dizinlerini (artifacts/reference_runs/<RUN_ID>)
-      diskten temizleyerek veritabanı ile disk yaşam döngüsünü senkronize eder.
-    Silinen veritabanı satır sayısını döner.
-    """
-    import os
+def apply_run_retention_policy(
+    keep_last_n: int = 20,
+    db_path: str = None,
+    artifacts_dir: str = None,
+) -> int:
+    """Delete old run versions transactionally while always preserving ACTIVE."""
     import shutil
-    from pathlib import Path
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    if keep_last_n < 1:
+        raise ValueError("keep_last_n en az 1 olmalıdır.")
+
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return 0
 
     conn = get_db_connection(active_db)
     init_pipeline_runs_table(conn)
     cur = conn.cursor()
+    active_ids = {row[0] for row in cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchall()}
+    keep_non_active = max(0, keep_last_n - len(active_ids))
+    old_runs = [
+        row[0]
+        for row in cur.execute(
+            "SELECT run_id FROM pipeline_runs WHERE status != 'ACTIVE' ORDER BY timestamp DESC LIMIT -1 OFFSET ?",
+            (keep_non_active,),
+        ).fetchall()
+    ]
 
-    # Saklanacak en yeni N kaydın dışındaki eski run_id'leri bul
-    cur.execute(
-        """
-        SELECT run_id FROM pipeline_runs
-        ORDER BY timestamp DESC
-        LIMIT -1 OFFSET ?
-    """,
-        (keep_last_n,),
-    )
-    old_runs = [row[0] for row in cur.fetchall()]
-
-    deleted_count = 0
     if old_runs:
         placeholders = ",".join("?" for _ in old_runs)
-        cur.execute(f"DELETE FROM pipeline_runs WHERE run_id IN ({placeholders})", old_runs)
-        deleted_count = cur.rowcount
-        conn.commit()
+        run_scoped_tables = [
+            "orders",
+            "forecast_demand",
+            "forecast_model_lineage",
+            "aggregate_plan",
+            "sku_production_plan",
+            "machine_capacity_plan",
+            "mrp_plan",
+            "production_schedule",
+            "schedule_solver_metadata",
+            "energy_kpis",
+            "energy_profile_15min",
+            "energy_machine_kpis",
+            "carbon_kpis",
+            "carbon_machine_kpis",
+            "carbon_price_scenarios",
+            "machine_state_snapshot",
+            "mes_order_tracking",
+            "mes_execution_events",
+            "input_source_lineage",
+            "decision_ledger",
+        ]
+        try:
+            conn.execute("BEGIN")
+            for table_name in run_scoped_tables:
+                exists = cur.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?",
+                    (table_name,),
+                ).fetchone()
+                if not exists:
+                    continue
+                columns = {row[1] for row in cur.execute(f"PRAGMA table_info({table_name})").fetchall()}
+                if "run_id" in columns:
+                    cur.execute(
+                        f"DELETE FROM {table_name} WHERE run_id IN ({placeholders})",
+                        old_runs,
+                    )
+            if cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='reschedule_audit_log'").fetchone():
+                cur.execute(
+                    f"DELETE FROM reschedule_audit_log "
+                    f"WHERE new_run_id IN ({placeholders}) "
+                    f"OR previous_run_id IN ({placeholders})",
+                    old_runs + old_runs,
+                )
+            cur.execute(
+                f"DELETE FROM pipeline_runs WHERE run_id IN ({placeholders})",
+                old_runs,
+            )
+            deleted_count = cur.rowcount
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            conn.close()
+            raise
+    else:
+        deleted_count = 0
 
-    # Fiziksel Disk Artifact Senkronizasyonu (Madde 23)
-    target_artifacts_dir = Path(artifacts_dir) if artifacts_dir else Path("artifacts/reference_runs")
-    if target_artifacts_dir.exists() and target_artifacts_dir.is_dir():
-        # 1. Silinen eski koşuların disk snapshot'larını temizle
-        for old_id in old_runs:
-            old_run_dir = target_artifacts_dir / old_id
-            if old_run_dir.exists() and old_run_dir.is_dir():
-                shutil.rmtree(old_run_dir, ignore_errors=True)
-
-        # 2. Yetim (orphan) snapshot temizliği: DB'de geçerli olan run_id'leri al
-        cur.execute("SELECT run_id FROM pipeline_runs")
-        valid_runs = set(row[0] for row in cur.fetchall())
-
-        for item in target_artifacts_dir.iterdir():
-            if item.is_dir() and item.name not in valid_runs:
-                shutil.rmtree(item, ignore_errors=True)
+    target_artifacts = (
+        Path(artifacts_dir) if artifacts_dir else Path(get_runtime_paths()["base_dir"]) / "artifacts" / "runs"
+    )
+    for old_run_id in old_runs:
+        old_dir = target_artifacts / old_run_id
+        if old_dir.exists() and old_dir.is_dir():
+            shutil.rmtree(old_dir)
 
     conn.close()
     return deleted_count

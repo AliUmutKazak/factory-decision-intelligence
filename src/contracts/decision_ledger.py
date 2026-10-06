@@ -79,10 +79,7 @@ class DecisionLedger:
                 )
                 """
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_decision_ledger_run "
-                "ON decision_ledger(run_id, timestamp)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_decision_ledger_run ON decision_ledger(run_id, timestamp)")
             conn.commit()
 
     @staticmethod
@@ -171,9 +168,7 @@ class DecisionLedger:
             with get_db_connection(self.db_path) as conn:
                 run_ids = [
                     row[0]
-                    for row in conn.execute(
-                        "SELECT DISTINCT run_id FROM decision_ledger ORDER BY run_id"
-                    ).fetchall()
+                    for row in conn.execute("SELECT DISTINCT run_id FROM decision_ledger ORDER BY run_id").fetchall()
                 ]
             entries = [entry for run_id in run_ids for entry in self.get_by_run_id(run_id)]
         return json.dumps([e.to_dict() for e in entries], indent=2, ensure_ascii=False)
