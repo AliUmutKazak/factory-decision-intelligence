@@ -216,7 +216,7 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
         from src.data.preprocessing import run_preprocessing
 
         run_preprocessing()
-        orders_df = pd.read_csv(PROCESSED_ORDERS_PATH)
+        orders_df = pd.read_csv(processed_orders_path)
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS orders (
