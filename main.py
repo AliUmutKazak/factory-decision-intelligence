@@ -128,9 +128,6 @@ def run_end_to_end_pipeline():
             db_path=str(staging_db),
         )
 
-        # Retention Policy (Staging üzerinde temizlenir)
-        apply_run_retention_policy(keep_last_n=20, db_path=str(staging_db))
-
         # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
         manifest = generate_run_manifest(
             run_id=run_id, db_path=str(staging_db), input_source_path="data/processed/factory_orders.csv"
@@ -209,6 +206,14 @@ def run_end_to_end_pipeline():
         # Kanonik DB tamamen diske oturduktan sonra tek bir atomik UPDATE ile ACTIVE yapılır.
         # Bu adımın arkasından hata verebilecek HİÇBİR I/O veya operasyon çalıştırılmaz.
         promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
+
+        # Retention only after successful promotion; staging must never mutate
+        # canonical historical artifacts.
+        apply_run_retention_policy(
+            keep_last_n=20,
+            db_path=str(canonical_db),
+            artifacts_dir=str(base_dir / "artifacts" / "runs"),
+        )
 
         # Staging dosyasını temizle (Başarısız olsa dahi pipeline'ı etkilemez)
         if staging_db.exists():
