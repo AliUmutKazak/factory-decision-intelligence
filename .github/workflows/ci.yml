@@ -1,5 +1,6 @@
 name: Industrial Quality Gate & Verification Matrix
 
+# Release-closure verification run: validate the current main branch end to end.
 on:
   push:
     branches: [ "main", "master" ]
