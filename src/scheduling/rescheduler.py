@@ -191,6 +191,15 @@ class DynamicRescheduler:
         else:
             payload = {}
         payload["run_id"] = run_id
+        weighted_minutes = payload.get("objective_units", "weighted_minutes") == "weighted_minutes"
+        payload.update(
+            solver_name="OR-Tools CP-SAT",
+            solver_status=payload.get("status"),
+            is_optimal=int(bool(payload.get("proven_optimal", False))),
+            objective_value_min=payload.get("objective_value") if weighted_minutes else None,
+            best_bound_min=payload.get("best_objective_bound") if weighted_minutes else None,
+            solve_time_seconds=payload.get("wall_time_seconds"),
+        )
         return payload
 
     def _persist_solver_metadata(

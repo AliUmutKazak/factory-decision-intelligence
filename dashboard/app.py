@@ -120,7 +120,11 @@ def determine_system_status(tables):
     solver_meta = tables.get("schedule_solver_metadata", pd.DataFrame())
     if solver_meta.empty or set(solver_meta["run_id"]) != {active["run_id"]}:
         return "DATA MISMATCH", "error", "ACTIVE run için solver metadata eksik veya uyumsuz."
-    s_status = str(solver_meta.iloc[-1].get("solver_status", solver_meta.iloc[-1].get("status", ""))).upper()
+    metadata = solver_meta.iloc[-1]
+    value = metadata.get("status")
+    if pd.isna(value) or not value:
+        value = metadata.get("solver_status", "")
+    s_status = str(value).upper()
     if s_status not in {"OPTIMAL", "FEASIBLE"}:
         return "SOLVER INFEASIBLE", "error", f"CP-SAT başarısız: {s_status}."
 

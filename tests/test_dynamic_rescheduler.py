@@ -116,6 +116,18 @@ def test_local_repair_is_certified_and_persists_real_model_context():
             "SELECT decision_tier FROM reschedule_audit_log WHERE new_run_id='LOCAL-CERTIFIED'"
         ).fetchone()[0]
         assert tier == audit.decision_tier
+        row = conn.execute(
+            "SELECT status, solver_status, is_optimal, best_bound_min, solve_time_seconds FROM schedule_solver_metadata WHERE run_id='LOCAL-CERTIFIED'"
+        ).fetchone()
+        assert row[0] == row[1] == "FEASIBLE"
+        assert row[2] == 0 and row[3] is None and row[4] is not None
+    from pathlib import Path
+
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"), default_timeout=30).run()
+    assert not app.exception
+    assert not app.error
 
 
 def test_rejected_local_candidate_falls_back_to_authoritative_solver(monkeypatch):
