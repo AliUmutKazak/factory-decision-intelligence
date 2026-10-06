@@ -664,8 +664,6 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     import hashlib
     import sys
     from pathlib import Path
-
-    from src import config
     from src.config import get_runtime_paths
 
     root_dir = Path(__file__).resolve().parent.parent.parent
