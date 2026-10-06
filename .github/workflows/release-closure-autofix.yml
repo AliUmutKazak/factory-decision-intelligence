@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/release-closure-autofix.yml'
+      - 'scripts/release_closure_autofix.py'
 
 permissions:
   contents: write
