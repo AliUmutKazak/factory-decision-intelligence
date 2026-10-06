@@ -226,9 +226,14 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
             year INTEGER,
             month INTEGER,
             day_of_week INTEGER,
-            is_weekend INTEGER
+            is_weekend INTEGER,
+            run_id TEXT
         );
     """)
+    order_cols = [c[1] for c in cursor.execute("PRAGMA table_info(orders)").fetchall()]
+    if "run_id" not in order_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN run_id TEXT")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_orders_run ON orders(run_id)")
     cursor.execute("DELETE FROM orders;")
     conn.commit()
 
@@ -250,9 +255,20 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
         );
         """)
 
+    # Run-scoped execution tracking: aynı task_id farklı run sürümlerinde tekrar kullanılabilir.
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mes_order_tracking'")
+    tracking_exists = cursor.fetchone() is not None
+    if tracking_exists:
+        tracking_cols = [c[1] for c in cursor.execute("PRAGMA table_info(mes_order_tracking)").fetchall()]
+        tracking_pk = [c[1] for c in cursor.execute("PRAGMA table_info(mes_order_tracking)").fetchall() if c[5] == 1]
+        if "run_id" not in tracking_cols or tracking_pk == ["task_id"]:
+            cursor.execute("ALTER TABLE mes_order_tracking RENAME TO mes_order_tracking_legacy")
+            tracking_exists = False
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS mes_order_tracking (
-            task_id INTEGER PRIMARY KEY,
+            tracking_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
             run_id TEXT NOT NULL,
             lot_id TEXT NOT NULL,
             product_id TEXT NOT NULL,
@@ -264,11 +280,29 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
             status TEXT DEFAULT 'SCHEDULED',
             variance_min REAL DEFAULT 0.0,
             last_updated TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(run_id, task_id),
             FOREIGN KEY (machine_id) REFERENCES machines(machine_id)
         );
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_mes_tracking_run_task ON mes_order_tracking(run_id, task_id)")
+    legacy_exists = cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='mes_order_tracking_legacy'"
+    ).fetchone()
+    if legacy_exists:
+        cursor.execute("""
+            INSERT OR IGNORE INTO mes_order_tracking
+            (task_id, run_id, lot_id, product_id, machine_id, scheduled_start_min,
+             scheduled_end_min, actual_start_min, actual_end_min, status, variance_min, last_updated)
+            SELECT task_id, run_id, lot_id, product_id, machine_id, scheduled_start_min,
+                   scheduled_end_min, actual_start_min, actual_end_min, status, variance_min, last_updated
+            FROM mes_order_tracking_legacy
+            WHERE run_id IS NOT NULL
         """)
+        cursor.execute("DROP TABLE mes_order_tracking_legacy")
     conn.commit()
 
+    orders_df = orders_df.copy()
+    orders_df["run_id"] = run_id
     orders_df.to_sql("orders", conn, index=False, if_exists="append")
 
     # 2. Tek ve Standart Run ID Kaydı (INITIALIZED)
