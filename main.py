@@ -30,6 +30,7 @@ from src.utils.lineage import (
     update_pipeline_run_status,
     validate_pipeline_run,
 )
+from src.utils.run_bundle import seal_run_bundle
 
 
 def run_end_to_end_pipeline():
@@ -113,7 +114,7 @@ def run_end_to_end_pipeline():
 
             with get_db_connection(str(staging_db)) as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT COUNT(*) FROM orders")
+                cur.execute("SELECT COUNT(*) FROM orders WHERE run_id = ?", (run_id,))
                 row = cur.fetchone()
                 if row:
                     actual_orders_count = row[0]
@@ -181,10 +182,8 @@ def run_end_to_end_pipeline():
                 shutil.copytree(staging_processed, bundle_processed, dirs_exist_ok=True)
                 shutil.copytree(staging_reports, bundle_reports, dirs_exist_ok=True)
 
-                bundle_manifest = bundle_reports / "run_manifest.json"
-                if bundle_manifest.exists():
-                    shutil.copy2(bundle_manifest, run_artifacts_dir / "manifest.json")
-                print(f"[AUDIT] P0-3 Run Isolation tamamlandı: {run_artifacts_dir}")
+                seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")
+                print(f"[AUDIT] Run bundle mühürlendi: {run_artifacts_dir}")
 
                 promoted = True
                 break
@@ -202,18 +201,17 @@ def run_end_to_end_pipeline():
                     pass
             temp_target.replace(canonical_db)
 
-        # 2. P0.4: Mutlak En Son Atomik İşlem -> CANONICAL DB Üzerinde ACTIVE Promosyonu
-        # Kanonik DB tamamen diske oturduktan sonra tek bir atomik UPDATE ile ACTIVE yapılır.
-        # Bu adımın arkasından hata verebilecek HİÇBİR I/O veya operasyon çalıştırılmaz.
-        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
-
-        # Retention only after successful promotion; staging must never mutate
-        # canonical historical artifacts.
+        # Retention canonical DB ve immutable run bundle üzerinde, ACTIVE
+        # promotion'dan önce tamamlanır. Hata olursa eski ACTIVE değişmeden kalır.
         apply_run_retention_policy(
             keep_last_n=20,
             db_path=str(canonical_db),
             artifacts_dir=str(base_dir / "artifacts" / "runs"),
         )
+
+        # Final critical state transition. Schedule/data mutation does not occur
+        # after this point; ACTIVE is the authoritative production pointer.
+        promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
 
         # Staging dosyasını temizle (Başarısız olsa dahi pipeline'ı etkilemez)
         if staging_db.exists():

@@ -49,9 +49,7 @@ def seal_run_bundle(
         metadata = json.loads(run_meta.read_text(encoding="utf-8"))
         meta_run_id = metadata.get("run_id")
         if meta_run_id and str(meta_run_id) != str(run_id):
-            raise RunBundleError(
-                f"Bundle metadata run_id mismatch: {meta_run_id} != {run_id}"
-            )
+            raise RunBundleError(f"Bundle metadata run_id mismatch: {meta_run_id} != {run_id}")
 
     manifest = {
         "run_id": run_id,
@@ -64,9 +62,7 @@ def seal_run_bundle(
     }
     target = bundle / "manifest.json"
     temporary = bundle / "manifest.json.tmp"
-    temporary.write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    temporary.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
     temporary.replace(target)
     return manifest
 
@@ -79,9 +75,7 @@ def verify_run_bundle(bundle_dir: str | Path, expected_run_id: str) -> dict:
         raise RunBundleError(f"Bundle manifest missing: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if str(manifest.get("run_id")) != str(expected_run_id):
-        raise RunBundleError(
-            f"Bundle run_id mismatch: {manifest.get('run_id')} != {expected_run_id}"
-        )
+        raise RunBundleError(f"Bundle run_id mismatch: {manifest.get('run_id')} != {expected_run_id}")
 
     files = manifest.get("files")
     if not isinstance(files, dict) or not files:
@@ -92,7 +86,5 @@ def verify_run_bundle(bundle_dir: str | Path, expected_run_id: str) -> dict:
             raise RunBundleError(f"Bundle payload missing: {relative}")
         actual_hash = sha256_file(path)
         if actual_hash != expected.get("sha256"):
-            raise RunBundleError(
-                f"Bundle hash mismatch: {relative}: {actual_hash} != {expected.get('sha256')}"
-            )
+            raise RunBundleError(f"Bundle hash mismatch: {relative}: {actual_hash} != {expected.get('sha256')}")
     return manifest

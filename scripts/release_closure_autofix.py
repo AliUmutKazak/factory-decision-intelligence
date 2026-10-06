@@ -299,7 +299,7 @@ def fix_main_bundle() -> None:
     replace_once(
         "main.py",
         '                bundle_manifest = bundle_reports / "run_manifest.json"\n'
-        '                if bundle_manifest.exists():\n'
+        "                if bundle_manifest.exists():\n"
         '                    shutil.copy2(bundle_manifest, run_artifacts_dir / "manifest.json")\n'
         '                print(f"[AUDIT] P0-3 Run Isolation tamamlandı: {run_artifacts_dir}")',
         '                seal_run_bundle(run_artifacts_dir, run_id, run_type="PIPELINE")\n'
@@ -307,12 +307,11 @@ def fix_main_bundle() -> None:
     )
     replace_once(
         "main.py",
-        '                cur.execute("SELECT COUNT(*) FROM orders")\n'
-        '                row = cur.fetchone()',
+        '                cur.execute("SELECT COUNT(*) FROM orders")\n                row = cur.fetchone()',
         '                cur.execute("SELECT COUNT(*) FROM orders WHERE run_id = ?", (run_id,))\n'
-        '                row = cur.fetchone()',
+        "                row = cur.fetchone()",
     )
-    old = '''        # 2. P0.4: Mutlak En Son Atomik İşlem -> CANONICAL DB Üzerinde ACTIVE Promosyonu
+    old = """        # 2. P0.4: Mutlak En Son Atomik İşlem -> CANONICAL DB Üzerinde ACTIVE Promosyonu
         # Kanonik DB tamamen diske oturduktan sonra tek bir atomik UPDATE ile ACTIVE yapılır.
         # Bu adımın arkasından hata verebilecek HİÇBİR I/O veya operasyon çalıştırılmaz.
         promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
@@ -324,8 +323,8 @@ def fix_main_bundle() -> None:
             db_path=str(canonical_db),
             artifacts_dir=str(base_dir / "artifacts" / "runs"),
         )
-'''
-    new = '''        # Retention canonical DB ve immutable run bundle üzerinde, ACTIVE
+"""
+    new = """        # Retention canonical DB ve immutable run bundle üzerinde, ACTIVE
         # promotion'dan önce tamamlanır. Hata olursa eski ACTIVE değişmeden kalır.
         apply_run_retention_policy(
             keep_last_n=20,
@@ -336,7 +335,7 @@ def fix_main_bundle() -> None:
         # Final critical state transition. Schedule/data mutation does not occur
         # after this point; ACTIVE is the authoritative production pointer.
         promote_run_to_active(run_id=run_id, db_path=str(canonical_db))
-'''
+"""
     replace_once("main.py", old, new)
 
 
