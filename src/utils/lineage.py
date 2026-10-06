@@ -6,8 +6,6 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-
-from src import config
 from src.utils.db import get_db_connection
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
@@ -251,7 +249,6 @@ def record_pipeline_run_metadata(
 
 def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     """Denetim Madde 27: Koşumu her ortamda (fresh clone dahil) garantili olarak RUNNING durumunda başlatır."""
-    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
 
@@ -292,7 +289,6 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
     Durum geçiş kurallarını kesin olarak denetler.
     İllegal geçişlerde ValueError fırlatır, aynı duruma geçişlerde idempotent davranır.
     """
-    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
@@ -337,9 +333,6 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
     from pathlib import Path
 
     import pandas as pd
-
-    from src import config
-    from src.config import get_runtime_paths
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     root_dir = Path(__file__).resolve().parent.parent.parent
@@ -554,7 +547,6 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     allow_fallback=True yalnızca eski/legacy migration testleri veya geriye dönük
     uyumluluk için açıkça istendiğinde COMPLETED/SUCCESS durumuna bakar.
     """
-    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
@@ -608,8 +600,6 @@ def apply_run_retention_policy(keep_last_n: int = 20, db_path: str = None, artif
     import os
     import shutil
     from pathlib import Path
-
-    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     if not os.path.exists(active_db):
@@ -668,7 +658,6 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     import hashlib
     import sys
     from pathlib import Path
-    from src.config import get_runtime_paths
 
     root_dir = Path(__file__).resolve().parent.parent.parent
 
@@ -847,7 +836,6 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     1. Önceki ACTIVE koşumu ARCHIVED yapar.
     2. run_id koşumunu COMPLETED -> ACTIVE durumuna taşır.
     """
-    from src import config
 
     target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
 
@@ -908,8 +896,6 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     import shutil
     import tempfile
     from pathlib import Path
-
-    from src import config
 
     root_dir = Path(__file__).resolve().parent.parent.parent
     cur = conn.cursor()
@@ -995,8 +981,6 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     SHA-256 ve meta verilerini input_source_lineage tablosuna kaydeder.
     """
     import sqlite3
-
-    from src import config
 
     active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
     manifest = generate_run_manifest(run_id, db_path=active_db, input_source_path=input_source_path)
