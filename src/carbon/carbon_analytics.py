@@ -23,6 +23,8 @@ Gerçek Sistem Bağlantı Mimarisi:
 ===============================================================================
 """
 
+from pathlib import Path
+
 import pandas as pd
 
 from src.config import (
@@ -35,13 +37,13 @@ from src.config import (
 from src.utils.db import get_active_run_id, get_db_connection, persist_run_scoped_dataframe
 
 
-def compute_carbon_analytics(run_id=None, db_path=None):
+def compute_carbon_analytics(run_id=None, db_path=None, processed_dir=None, reports_dir=None):
     runtime = get_runtime_paths()
     active_db_path = db_path or runtime["db_path"]
     if not run_id:
         with get_db_connection(active_db_path) as run_conn:
             run_id = get_active_run_id(run_conn)
-    processed_dir = runtime["processed_dir"]
+    processed_dir = Path(processed_dir) if processed_dir is not None else runtime["processed_dir"]
     output_carbon_path = processed_dir / "carbon_analytics.csv"
     output_machine_carbon_path = processed_dir / "carbon_machine_kpis.csv"
     conn = get_db_connection(active_db_path)

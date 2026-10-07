@@ -15,6 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from src.utils.db import get_db_connection
+from src.utils.run_bundle import verify_run_bundle
 
 
 def run_cmd(cmd_list: list[str]) -> str:
@@ -90,6 +91,7 @@ RUN_SCOPED_REFERENCE_FILES = {
     "machine_capacity_plan.csv",
     "mrp_plan.csv",
     "production_schedule.csv",
+    "task_weekly_accounting.csv",
     "energy_kpis.csv",
     "energy_profile_15min.csv",
     "energy_machine_kpis.csv",
@@ -121,6 +123,8 @@ def build_manifest(staging: Path, run: dict[str, str], bundle: Path) -> dict:
             files[path.name] = {
                 "sha256": sha256(path),
                 "bytes": path.stat().st_size,
+                "logical_role": "run_database" if path.suffix == ".db" else "run_artifact",
+                "schema_version": "1.0",
             }
 
     source_manifest = bundle / "manifest.json"
@@ -159,6 +163,7 @@ def freeze_reference_atomic(run_pipeline: bool = True) -> None:
     bundle = BASE_DIR / "artifacts" / "runs" / run_id
     if not bundle.exists():
         raise RuntimeError(f"ACTIVE run bundle bulunamadı: {bundle}")
+    verify_run_bundle(bundle, run_id)
 
     staging = BASE_DIR / "artifacts" / "staging_reference"
     reference = BASE_DIR / "artifacts" / "reference"

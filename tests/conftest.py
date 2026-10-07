@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 
 # Proje kök dizinini sys.path'e ekle
@@ -33,3 +34,32 @@ def ensure_full_pipeline_database():
             except Exception:
                 pass
     yield
+
+
+@pytest.fixture(autouse=True)
+def isolate_mutating_integration_tests(request, tmp_path, monkeypatch, ensure_full_pipeline_database):
+    """Each API/MES solve starts from the same sealed baseline, not another test's ACTIVE run."""
+    if request.module.__name__.split(".")[-1] not in {
+        "test_api_server",
+        "test_dynamic_rescheduler",
+        "test_execution_feedback",
+        "test_frozen_horizon",
+        "test_rescheduler",
+        "test_mes_integration",
+        "test_objective_policies",
+        "test_what_if_engine",
+    }:
+        return
+    import src.config as cfg
+
+    source = Path(cfg.get_runtime_paths()["db_path"])
+    if not source.exists():
+        pytest.fail("Run python main.py before integration tests.")
+    root = tmp_path / "runtime"
+    (root / "data").mkdir(parents=True)
+    target = root / "data" / "factory.db"
+    shutil.copy2(source, target)
+    monkeypatch.setattr(cfg, "BASE_DIR", root)
+    monkeypatch.setenv("FACTORY_DB_PATH", str(target))
+    monkeypatch.setenv("FACTORY_PROCESSED_DIR", str(root / "data" / "processed"))
+    monkeypatch.setenv("FACTORY_REPORTS_DIR", str(root / "reports"))

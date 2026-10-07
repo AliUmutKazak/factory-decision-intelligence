@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from src import config
 from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
 
@@ -35,6 +34,9 @@ def generate_run_id():
 
 
 def get_git_sha():
+    build_sha = os.environ.get("FACTORY_BUILD_GIT_SHA")
+    if build_sha and build_sha != "UNKNOWN":
+        return build_sha
     try:
         return (
             subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, cwd=ROOT_DIR)
@@ -105,7 +107,6 @@ def record_pipeline_run_metadata(
     except Exception:
         pulp_ver = "not_installed"
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     if not run_id:
         run_id = generate_run_id()
 
@@ -180,7 +181,7 @@ def record_pipeline_run_metadata(
     }
 
     # JSON audit artifact kaydı (Staging & Canonical aware)
-    reports_target_dir = Path(os.environ.get("FACTORY_REPORTS_DIR", REPORTS_DIR))
+    reports_target_dir = Path(get_runtime_paths()["reports_dir"])
     reports_target_dir.mkdir(parents=True, exist_ok=True)
     target_meta_json = reports_target_dir / "run_metadata.json"
 
@@ -189,12 +190,13 @@ def record_pipeline_run_metadata(
 
     # SQLite DB denetim kaydı (hata yutulmaz, şema tutarlıdır)
     # Denetim Madde 26: Full Application Isolation için dinamik DB yolu çözümü
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
+    active_db = db_path or str(get_runtime_paths()["db_path"])
 
     if os.path.exists(active_db):
         conn = get_db_connection(active_db)
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
+
         cur.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (run_id,))
         existing_row = cur.fetchone()
         if existing_row:
@@ -253,7 +255,7 @@ def record_pipeline_run_metadata(
 def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     """Denetim Madde 27: Koşumu her ortamda (fresh clone dahil) garantili olarak RUNNING durumunda başlatır."""
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
+    active_db = db_path or str(get_runtime_paths()["db_path"])
 
     # Hedef dizin yoksa oluştur (Fresh clone / CI ortamları için fail-safe)
     db_dir = os.path.dirname(os.path.abspath(active_db))
@@ -264,9 +266,11 @@ def start_pipeline_run(run_id: str, db_path: str = None) -> None:
     try:
         init_pipeline_runs_table(conn)
         cur = conn.cursor()
+        if cur.execute("SELECT 1 FROM pipeline_runs WHERE run_id = ?", (run_id,)).fetchone():
+            raise ValueError(f"Run ID already exists: {run_id}")
         cur.execute(
             """
-            INSERT OR REPLACE INTO pipeline_runs
+            INSERT INTO pipeline_runs
             (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
@@ -293,7 +297,7 @@ def update_pipeline_run_status(run_id: str, status: str, db_path: str = None) ->
     İllegal geçişlerde ValueError fırlatır, aynı duruma geçişlerde idempotent davranır.
     """
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return
     conn = get_db_connection(active_db)
@@ -337,23 +341,36 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
 
     import pandas as pd
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     root_dir = Path(__file__).resolve().parent.parent.parent
 
     # Runtime path is authoritative; validation must never read canonical reports
     # while an isolated staging environment is active.
+    runtime_paths = get_runtime_paths()
     if reports_dir:
         resolved_reports_dir = Path(reports_dir)
-    elif os.environ.get("FACTORY_REPORTS_DIR"):
-        resolved_reports_dir = Path(os.environ["FACTORY_REPORTS_DIR"])
-    elif db_path:
+    elif (
+        db_path
+        and not os.environ.get("FACTORY_REPORTS_DIR")
+        and Path(runtime_paths["reports_dir"]) == Path(runtime_paths["base_dir"]) / "reports"
+    ):
         resolved_reports_dir = Path(db_path).parent / "reports"
     else:
-        resolved_reports_dir = Path(get_runtime_paths()["reports_dir"])
+        resolved_reports_dir = Path(runtime_paths["reports_dir"])
 
     conn = get_db_connection(active_db)
     try:
         cur = conn.cursor()
+
+        plan_schema = {row[1] for row in cur.execute("PRAGMA table_info(sku_production_plan)").fetchall()}
+        zero_production = False
+        if {"planned_units", "run_id", "period_week"} <= plan_schema:
+            planned = pd.read_sql(
+                "SELECT planned_units FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
+                conn,
+                params=(run_id,),
+            )
+            zero_production = not planned.empty and float(planned["planned_units"].sum()) == 0.0
 
         # 1. SAME RUN: validate current run only; historical rows are allowed.
         tables_to_check = [
@@ -379,7 +396,7 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
             if "run_id" not in cols:
                 raise ValueError(f"[VALIDATION GATE FAIL] {tbl} run_id kolonu olmadan kabul edilemez.")
             cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE run_id = ?", (run_id,))
-            if cur.fetchone()[0] == 0:
+            if cur.fetchone()[0] == 0 and not (tbl == "production_schedule" and zero_production):
                 raise ValueError(f"[VALIDATION GATE FAIL] {tbl} için {run_id} verisi yok.")
 
         # 2. MATH: SKU Mutabakatı & Miktar Korunumu
@@ -488,15 +505,13 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
         # 4. SOLVER Feasibility ve Makespan (Fail-Closed: Artifact eksikse FAIL)
         meta_json_path = resolved_reports_dir / "schedule_solver_metadata.json"
         if not meta_json_path.exists():
-            # Eğer açıkça mock bir test veritabanı kullanılmıyorsa dosya zorunludur
-            if not (db_path and "pytest" in str(db_path)):
-                raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu solver metadata dosyası bulunamadı: {meta_json_path}")
+            raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu solver metadata dosyası bulunamadı: {meta_json_path}")
         else:
             with open(meta_json_path, encoding="utf-8") as f:
                 solver_meta = json.load(f)
 
             # Metadata run_id kontrolü
-            if solver_meta.get("run_id") and solver_meta.get("run_id") != run_id:
+            if solver_meta.get("run_id") != run_id:
                 raise ValueError(
                     f"[VALIDATION GATE FAIL] Solver metadata run_id uyumsuzluğu: {solver_meta.get('run_id')} != {run_id}"
                 )
@@ -507,14 +522,13 @@ def validate_pipeline_run(run_id: str, db_path: str = None, reports_dir: str = N
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz CP-SAT Solver Durumu: {status}")
 
             makespan = solver_meta.get("makespan_min") or solver_meta.get("objective_makespan_min", 0)
-            if makespan is not None and float(makespan) <= 0:
+            if makespan is not None and float(makespan) <= 0 and not (zero_production and float(makespan) == 0):
                 raise ValueError(f"[VALIDATION GATE FAIL] Geçersiz solver makespan değeri: {makespan}")
 
         # 5. LINEAGE Bütünlüğü: Metadata doğrulaması (Fail-Closed: Artifact eksikse FAIL)
         run_meta_path = resolved_reports_dir / "run_metadata.json"
         if not run_meta_path.exists():
-            if not (db_path and "pytest" in str(db_path)):
-                raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu run metadata dosyası bulunamadı: {run_meta_path}")
+            raise ValueError(f"[VALIDATION GATE FAIL] Zorunlu run metadata dosyası bulunamadı: {run_meta_path}")
         else:
             with open(run_meta_path, encoding="utf-8") as f:
                 run_meta = json.load(f)
@@ -538,32 +552,31 @@ def get_active_pipeline_run(db_path: str = None, allow_fallback: bool = False) -
     uyumluluk için açıkça istendiğinde COMPLETED/SUCCESS durumuna bakar.
     """
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return None
     conn = get_db_connection(active_db)
-    cur = conn.cursor()
-
-    # 1. Kesin Üretim Kuralı: Sadece ACTIVE durumu aranır
-    cur.execute("""
-        SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
-        FROM pipeline_runs
-        WHERE status = 'ACTIVE'
-        ORDER BY timestamp DESC LIMIT 1
-    """)
-    row = cur.fetchone()
-
-    # 2. Uyumluluk Modu (Yalnızca parametre ile açıkça talep edilirse):
-    if not row and allow_fallback:
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
+            return None
+        cur = conn.cursor()
         cur.execute("""
             SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
-            FROM pipeline_runs
-            WHERE status IN ('COMPLETED', 'SUCCESS')
-            ORDER BY timestamp DESC LIMIT 1
+            FROM pipeline_runs WHERE status = 'ACTIVE' LIMIT 2
         """)
-        row = cur.fetchone()
-
-    conn.close()
+        rows = cur.fetchall()
+        if len(rows) > 1:
+            raise RuntimeError("[RUN GOVERNANCE] Multiple ACTIVE runs; refusing to select a version.")
+        row = rows[0] if rows else None
+        if not row and allow_fallback:
+            cur.execute("""
+                SELECT run_id, timestamp, status, orders_count, git_sha, config_hash, trigger_source, data_source
+                FROM pipeline_runs WHERE status IN ('COMPLETED', 'SUCCESS')
+                ORDER BY timestamp DESC LIMIT 1
+            """)
+            row = cur.fetchone()
+    finally:
+        conn.close()
     if row:
         return {
             "run_id": row[0],
@@ -589,7 +602,7 @@ def apply_run_retention_policy(
     if keep_last_n < 1:
         raise ValueError("keep_last_n en az 1 olmalıdır.")
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return 0
 
@@ -597,6 +610,14 @@ def apply_run_retention_policy(
     init_pipeline_runs_table(conn)
     cur = conn.cursor()
     active_ids = {row[0] for row in cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchall()}
+    # A published reference is an independent durable checkpoint. Retention
+    # may remove volatile runs, but must retain its source run and bundle.
+    protected_ids = set(active_ids)
+    reference_manifest = Path(get_runtime_paths()["base_dir"]) / "artifacts" / "reference" / "manifest.json"
+    if reference_manifest.exists():
+        reference_run = json.loads(reference_manifest.read_text(encoding="utf-8")).get("run_id")
+        if reference_run:
+            protected_ids.add(str(reference_run))
     keep_non_active = max(0, keep_last_n - len(active_ids))
     old_runs = [
         row[0]
@@ -605,6 +626,7 @@ def apply_run_retention_policy(
             (keep_non_active,),
         ).fetchall()
     ]
+    old_runs = [run for run in old_runs if run not in protected_ids]
 
     if old_runs:
         placeholders = ",".join("?" for _ in old_runs)
@@ -618,6 +640,7 @@ def apply_run_retention_policy(
             "mrp_plan",
             "production_schedule",
             "schedule_solver_metadata",
+            "schedule_model_context",
             "energy_kpis",
             "energy_profile_15min",
             "energy_machine_kpis",
@@ -665,13 +688,25 @@ def apply_run_retention_policy(
     else:
         deleted_count = 0
 
-    target_artifacts = (
-        Path(artifacts_dir) if artifacts_dir else Path(get_runtime_paths()["base_dir"]) / "artifacts" / "runs"
-    )
+    # A caller operating on a separate database must never prune bundles in
+    # the application's canonical tree. Derive the default from that database.
+    db_directory = Path(active_db).resolve().parent
+    project_directory = db_directory.parent if db_directory.name == "data" else db_directory
+    target_artifacts = Path(artifacts_dir) if artifacts_dir else project_directory / "artifacts" / "runs"
     for old_run_id in old_runs:
         old_dir = target_artifacts / old_run_id
         if old_dir.exists() and old_dir.is_dir():
             shutil.rmtree(old_dir)
+
+    remaining_ids = {row[0] for row in cur.execute("SELECT run_id FROM pipeline_runs").fetchall()} | protected_ids
+    if target_artifacts.exists():
+        for directory in target_artifacts.iterdir():
+            if not directory.is_dir() or directory.name in remaining_ids or directory.name == "canonical":
+                continue
+            # Only completed snapshots have a manifest. A staging directory
+            # without a manifest may still be in flight and is left alone.
+            if (directory / "manifest.json").exists():
+                shutil.rmtree(directory)
 
     conn.close()
     return deleted_count
@@ -701,12 +736,12 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
         return hasher.hexdigest(), size
 
     # 1. Output Artifacts Takibi (Strict Runtime Resolution)
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     db_p = Path(active_db)
 
     # During a pipeline run, environment paths are authoritative.
-    reports_dirs = [Path(os.environ["FACTORY_REPORTS_DIR"])] if os.environ.get("FACTORY_REPORTS_DIR") else []
-    processed_dirs = [Path(os.environ["FACTORY_PROCESSED_DIR"])] if os.environ.get("FACTORY_PROCESSED_DIR") else []
+    reports_dirs = [Path(get_runtime_paths()["reports_dir"])]
+    processed_dirs = [Path(get_runtime_paths()["processed_dir"])]
 
     runtime_paths = get_runtime_paths()
     if not reports_dirs:
@@ -866,7 +901,7 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
     2. run_id koşumunu COMPLETED -> ACTIVE durumuna taşır.
     """
 
-    target_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    target_db = db_path or str(get_runtime_paths()["db_path"])
 
     conn = get_db_connection(target_db)
     try:
@@ -921,7 +956,6 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
     6. atomic swap
     """
     import json
-    import os
     import shutil
     import tempfile
     from pathlib import Path
@@ -958,7 +992,7 @@ def freeze_canonical_reference(conn, target_dir: str = "artifacts/reference_runs
         raise ValueError(f"Git SHA mismatch: DB '{db_git_sha}' != Metadata '{meta_git_sha}'")
 
     # 4. Explicit Artifact Allowlist
-    active_db = Path(os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db"))
+    active_db = Path(get_runtime_paths()["db_path"])
     allowlist = [
         active_db,
         metadata_file,
@@ -1011,7 +1045,7 @@ def record_input_source_lineage(run_id: str, db_path: str = None, input_source_p
     """
     import sqlite3
 
-    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or getattr(config, "DB_PATH", "data/factory.db")
+    active_db = db_path or str(get_runtime_paths()["db_path"])
     manifest = generate_run_manifest(run_id, db_path=active_db, input_source_path=input_source_path)
     inputs_lineage = manifest.get("inputs", {})
 

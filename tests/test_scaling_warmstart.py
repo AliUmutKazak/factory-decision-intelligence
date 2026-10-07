@@ -8,6 +8,7 @@ import pandas as pd
 from src.config import DB_PATH, PRODUCTION_BATCH_SIZE
 from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.utils.db import clone_run_inputs, get_active_run_id
 
 
 class NoCloseConnectionWrapper:
@@ -51,9 +52,12 @@ def test_large_scale_warm_start_feasibility():
     wrapped_conn = NoCloseConnectionWrapper(mem_conn)
     test_run_id = "RUN-SCALE-WARMSTART-001"
 
+    clone_run_inputs(mem_conn, get_active_run_id(mem_conn), test_run_id)
     try:
         # Planlama verilerini ve adetlerini birbiriyle tutarlı olacak şekilde ölçekle
-        existing_plan = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", mem_conn)
+        existing_plan = pd.read_sql(
+            "SELECT * FROM sku_production_plan WHERE period_week = 1 AND run_id = ?", mem_conn, params=(test_run_id,)
+        )
         if not existing_plan.empty:
             scaled_plan = existing_plan.copy()
             scaled_plan["planned_batches"] = scaled_plan["planned_batches"].apply(lambda x: min(max(int(x), 4), 6))
@@ -76,7 +80,7 @@ def test_large_scale_warm_start_feasibility():
             ),
             patch("src.scheduling.schedule_cpsat.CPSAT_TIME_LIMIT_SECONDS", 15),
         ):
-            result = run_cpsat_scheduling(run_id=test_run_id)
+            result = run_cpsat_scheduling(run_id=test_run_id, persist_outputs=False)
 
             assert isinstance(result, ScheduleSolverMetadata)
             assert result.run_id == test_run_id

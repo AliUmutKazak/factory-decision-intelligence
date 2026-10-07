@@ -1,5 +1,6 @@
 """What-If Scenario and Sensitivity Analysis Engine for CP-SAT Scheduling (Faz 4)."""
 
+import math
 import sqlite3
 
 import pandas as pd
@@ -12,7 +13,9 @@ from src.contracts.schemas import (
     ScenarioType,
     ScheduleSolverMetadata,
 )
+from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.utils.db import clone_run_inputs, get_active_run_id
 
 
 class NoCloseConnectionWrapper:
@@ -58,14 +61,9 @@ class WhatIfEngine:
 
     def run_baseline(self, mem_conn: sqlite3.Connection, run_id: str = "BASELINE") -> ScheduleSolverMetadata:
         """Solves and returns the baseline operational schedule."""
-        from unittest.mock import patch
-
         wrapped_conn = NoCloseConnectionWrapper(mem_conn)
-        with patch(
-            "src.scheduling.schedule_cpsat.get_db_connection",
-            return_value=wrapped_conn,
-        ):
-            meta = run_cpsat_scheduling(run_id=run_id)
+        clone_run_inputs(mem_conn, get_active_run_id(mem_conn), run_id)
+        meta = run_cpsat_scheduling(run_id=run_id, persist_outputs=False, connection=wrapped_conn)
         return meta
 
     def simulate_breakdown(
@@ -79,45 +77,34 @@ class WhatIfEngine:
         pd.DataFrame,
     ]:
         """Simulates an unexpected machine breakdown by adjusting machine calendar/unavailability."""
-        from unittest.mock import patch
-
         mem_conn = self._create_isolated_connection()
         try:
             # 1. Baz Senaryoyu Koştur
             baseline_meta = self.run_baseline(mem_conn, run_id="BASE")
 
             # 2. Makine Takviminde Duruş Simülasyonu
-            cal_df = pd.read_sql(
-                "SELECT * FROM machine_calendar WHERE machine_id = ?",
-                mem_conn,
-                params=(breakdown.machine_id,),
-            )
-            down_hours = breakdown.duration_min / 60.0
-            if not cal_df.empty:
-                # İlgili makinenin vardiya uygunluk saatlerini düşür
-                mem_conn.execute(
-                    "UPDATE machine_calendar SET available_hours = MAX(0.0, available_hours - ?) WHERE machine_id = ?",
-                    (down_hours, breakdown.machine_id),
-                )
-            else:
-                # Fallback: machines tablosundaki max_daily_hours değerini düşür
-                mem_conn.execute(
-                    "UPDATE machines SET max_daily_hours = MAX(1.0, max_daily_hours - ?) WHERE machine_id = ?",
-                    (down_hours / 7.0, breakdown.machine_id),
-                )
-            mem_conn.commit()
-
+            clone_run_inputs(mem_conn, "BASE", scenario_name)
             # 3. Senaryo Çözümü
             wrapped_conn = NoCloseConnectionWrapper(mem_conn)
-            with patch(
-                "src.scheduling.schedule_cpsat.get_db_connection",
-                return_value=wrapped_conn,
-            ):
-                scenario_meta = run_cpsat_scheduling(run_id=scenario_name)
+            scenario_meta = run_cpsat_scheduling(
+                run_id=scenario_name,
+                persist_outputs=False,
+                connection=wrapped_conn,
+                maintenance_overrides=[
+                    MaintenanceWindow(
+                        breakdown.machine_id,
+                        breakdown.start_min,
+                        breakdown.start_min + breakdown.duration_min,
+                        "BREAKDOWN",
+                        breakdown.description,
+                    )
+                ],
+            )
 
             scenario_sched = pd.read_sql(
-                f"SELECT * FROM production_schedule WHERE run_id = '{scenario_name}'",
+                "SELECT * FROM production_schedule WHERE run_id = ?",
                 mem_conn,
+                params=(scenario_name,),
             )
 
             # 4. KPI Delta Hesaplama
@@ -143,15 +130,19 @@ class WhatIfEngine:
         pd.DataFrame,
     ]:
         """Injects a high-priority rush order and assesses the schedule disruption."""
-        from unittest.mock import patch
-
         mem_conn = self._create_isolated_connection()
         try:
             # 1. Baz Senaryoyu Koştur
             baseline_meta = self.run_baseline(mem_conn, run_id="BASE")
 
             # 2. Acil Siparişi sku_production_plan Tablosuna Ekle
-            batches = max(1, (hot_order.quantity // PRODUCTION_BATCH_SIZE) or 1)
+            batches = math.ceil(hot_order.quantity / PRODUCTION_BATCH_SIZE)
+            clone_run_inputs(mem_conn, "BASE", scenario_name)
+            scenario_plan = pd.read_sql(
+                "SELECT * FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
+                mem_conn,
+                params=(scenario_name,),
+            )
 
             # Ürünün family_id bilgisini products tablosundan çek
             p_df = pd.read_sql(
@@ -159,7 +150,9 @@ class WhatIfEngine:
                 mem_conn,
                 params=(hot_order.product_id,),
             )
-            family_id = p_df.iloc[0]["family_id"] if not p_df.empty else "F01"
+            if p_df.empty:
+                raise ValueError(f"Unknown hot-order product: {hot_order.product_id}")
+            family_id = p_df.iloc[0]["family_id"]
 
             new_row = {
                 "period_week": 1,
@@ -170,20 +163,35 @@ class WhatIfEngine:
                 "planned_units": batches * PRODUCTION_BATCH_SIZE,
                 "run_id": scenario_name,
             }
-            df_new = pd.DataFrame([new_row])
-            df_new.to_sql("sku_production_plan", mem_conn, if_exists="append", index=False)
+            updated = mem_conn.execute(
+                "UPDATE sku_production_plan SET planned_batches = planned_batches + ?, "
+                "planned_units = planned_units + ?, weekly_forecast_units = weekly_forecast_units + ? "
+                "WHERE run_id = ? AND product_id = ? AND period_week = 1",
+                (batches, batches * PRODUCTION_BATCH_SIZE, hot_order.quantity, scenario_name, hot_order.product_id),
+            )
+            if updated.rowcount == 0:
+                pd.DataFrame([new_row]).to_sql("sku_production_plan", mem_conn, if_exists="append", index=False)
+            mem_conn.commit()
+            # Keep the rush order as its own lot so its due date and penalty
+            # do not silently change the commitments of baseline quantities.
+            hot_lot = dict(
+                new_row,
+                lot_id=f"HOT_{hot_order.product_id}",
+                due_date_min=hot_order.due_date_min,
+                priority_weight=hot_order.priority_weight,
+            )
+            scenario_plan = pd.concat([scenario_plan, pd.DataFrame([hot_lot])], ignore_index=True)
 
             # 3. Senaryo Çözümü
             wrapped_conn = NoCloseConnectionWrapper(mem_conn)
-            with patch(
-                "src.scheduling.schedule_cpsat.get_db_connection",
-                return_value=wrapped_conn,
-            ):
-                scenario_meta = run_cpsat_scheduling(run_id=scenario_name)
+            scenario_meta = run_cpsat_scheduling(
+                sku_plan=scenario_plan, run_id=scenario_name, persist_outputs=False, connection=wrapped_conn
+            )
 
             scenario_sched = pd.read_sql(
-                f"SELECT * FROM production_schedule WHERE run_id = '{scenario_name}'",
+                "SELECT * FROM production_schedule WHERE run_id = ?",
                 mem_conn,
+                params=(scenario_name,),
             )
 
             # 4. KPI Delta Hesaplama

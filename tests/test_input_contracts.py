@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from src.config import DB_PATH
 from src.contracts.schemas import ScheduleInputPayload, ScheduleTaskInput
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.utils.db import clone_run_inputs, get_active_run_id
 
 
 def test_schedule_task_input_valid():
@@ -55,6 +56,8 @@ def test_run_cpsat_scheduling_rejects_corrupted_task_duration():
     mem_conn = sqlite3.connect(":memory:")
     disk_conn.backup(mem_conn)
     disk_conn.close()
+
+    clone_run_inputs(mem_conn, get_active_run_id(mem_conn), "RUN-TEST-CORRUPT")
 
     # Bozucu veri enjeksiyonu: routing tablosundaki işlem sürelerinden birini 0 yapıyoruz
     mem_conn.execute("UPDATE routing SET processing_time_min = 0 WHERE operation_seq = 1")

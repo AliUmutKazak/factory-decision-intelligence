@@ -4,17 +4,44 @@ Sahadan (MES) gelen telemetri, iş başlatma/bitirme ve arıza (downtime)
 olaylarını yönetir, sapmaları hesaplar ve kapalı çevrim tetikler.
 """
 
+from functools import wraps
 from typing import Any
 
 import pandas as pd
 
-from src.utils.db import get_db_connection
+from src.utils.db import get_db_connection, resolve_db_path
+from src.utils.runtime_lock import run_mutation_lock
+
+
+def _canonical_writer(method):
+    @wraps(method)
+    def write(self, *args, **kwargs):
+        with run_mutation_lock(self.db_path):
+            self.conn = get_db_connection(self.db_path)
+            try:
+                if self._follow_active:
+                    self.run_id = self._get_active_run_id()
+                return method(self, *args, **kwargs)
+            except Exception:
+                self.conn.rollback()
+                raise
+            finally:
+                self.conn.close()
+                self.conn = None
+
+    return write
 
 
 class MESIntegrationService:
     def __init__(self, run_id: str | None = None):
-        self.conn = get_db_connection()
-        self.run_id = run_id or self._get_active_run_id()
+        self.db_path = resolve_db_path()
+        self._follow_active = run_id is None
+        self.conn = get_db_connection(self.db_path)
+        try:
+            self.run_id = run_id or self._get_active_run_id()
+        finally:
+            self.conn.close()
+            self.conn = None
 
     def _get_active_run_id(self) -> str | None:
         """
@@ -29,6 +56,7 @@ class MESIntegrationService:
         finally:
             cur.close()
 
+    @_canonical_writer
     def initialize_tracking_from_schedule(self) -> int:
         """
         Aktif 'production_schedule' verilerini alıp 'mes_order_tracking' tablosuna aktarır.
@@ -60,8 +88,6 @@ class MESIntegrationService:
 
         cur = self.conn.cursor()
         try:
-            cur.execute("DELETE FROM mes_order_tracking WHERE run_id = ?;", (self.run_id,))
-
             insert_data = [
                 (
                     int(row["task_id"]),
@@ -79,7 +105,7 @@ class MESIntegrationService:
 
             cur.executemany(
                 """
-                INSERT OR REPLACE INTO mes_order_tracking (
+                INSERT OR IGNORE INTO mes_order_tracking (
                     task_id, run_id, lot_id, product_id, machine_id,
                     scheduled_start_min, scheduled_end_min, status, variance_min
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
@@ -92,6 +118,7 @@ class MESIntegrationService:
         finally:
             cur.close()
 
+    @_canonical_writer
     def record_event(
         self,
         event_type: str,

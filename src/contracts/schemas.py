@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ProductionOrder(BaseModel):
@@ -24,6 +24,8 @@ class ProductionOrder(BaseModel):
 
 class MESActual(BaseModel):
     """MES Gerçekleşen Üretim Kaydı Sözleşmesi."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
 
     lot_id: str = Field(..., min_length=1)
     machine_id: str = Field(..., min_length=1)
@@ -62,6 +64,8 @@ class MaterialAvailability(BaseModel):
 class ProductionScheduleTask(BaseModel):
     """Çizelge Görev Çıktı Sözleşmesi."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     task_id: str = Field(..., min_length=1)
     lot_id: str = Field(..., min_length=1)
     product_id: str = Field(..., min_length=1)
@@ -95,6 +99,8 @@ class ScenarioRequest(BaseModel):
 
 class ScheduleResult(BaseModel):
     """Çizelgeleme Motoru Çıktı Sözleşmesi."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
 
     status: Literal["OPTIMAL", "FEASIBLE", "INFEASIBLE", "MODEL_INVALID"]
     makespan_hours: float = Field(..., ge=0)
@@ -235,6 +241,8 @@ class ScheduleSolverMetadata(BaseModel):
     proven_optimal: bool = Field(description="Çözümün matematiksel olarak kanıtlanmış optimal olup olmadığı")
     wall_time_seconds: float = Field(ge=0.0, description="Çözücünün harcadığı gerçek süre (saniye)")
     objective_value: float = Field(description="Bileşik amaç fonksiyonu değeri (composite objective)")
+    objective_units: str = Field(default="weighted_minutes", description="Amaç değeri birimi; parasal hedef için EUR")
+    objective_policy: str = Field(default="BALANCED", description="Çözümde uygulanan hedef politikası")
     best_objective_bound: float | None = Field(default=None, description="Dual bound / kanıtlanmış alt sınır")
     random_seed: int = Field(default=42, ge=0, description="Rastgelelik çekirdeği")
     num_search_workers: int = Field(default=4, gt=0, description="Kullanılan paralel iş parçacığı sayısı")
@@ -247,7 +255,15 @@ class ScheduleSolverMetadata(BaseModel):
     # Faz 3 - Madde 4: Çok Amaçlı Fonksiyon Ayrıştırması (Multi-Objective Decomposition)
     makespan_min: int | None = Field(default=None, ge=0, description="Toplam tamamlanma süresi (dakika)")
     total_setup_min: int | None = Field(default=None, ge=0, description="Toplam sıra bağımlı hazırlık süresi (dakika)")
-    total_tardiness_min: int | None = Field(default=None, ge=0, description="Toplam teslim gecikmesi (dakika)")
+    total_tardiness_min: int | None = Field(
+        default=None, ge=0, description="Öncelik ağırlıklı toplam teslim gecikmesi (dakika)"
+    )
+
+    @property
+    def optimality_gap_pct(self) -> float | None:
+        if self.best_objective_bound is None:
+            return None
+        return abs(self.objective_value - self.best_objective_bound) / max(1.0, abs(self.objective_value)) * 100.0
 
 
 class ScenarioShockModel(BaseModel):
@@ -387,6 +403,11 @@ class RescheduleTriggerEvent(BaseModel):
     delay_machine_id: str | None = Field(default=None, description="Gecikme/arıza yaşayan tezgâh kodu")
     delay_duration_min: int = Field(default=0, ge=0, description="Meydana gelen ek duruş/gecikme (dakika)")
     reason: str = Field(default="MES deviation detected")
+    flexible_horizon_min: int = Field(
+        default=240, ge=0, description="Freeze sınırından sonraki sınırlı hareket bölgesi"
+    )
+    max_flexible_shift_min: int = Field(default=240, ge=0, description="FLEXIBLE görevlerin azami başlangıç kayması")
+    allow_local_repair: bool = True
 
 
 class ScheduleNervousnessReport(BaseModel):
@@ -425,3 +446,5 @@ class RescheduleAuditEntry(BaseModel):
     machine_swapped_count: int = Field(ge=0)
     avg_start_delta_min: float = Field(ge=0.0)
     nervousness_score: float = Field(ge=0.0, le=1.0)
+    decision_tier: str = "CPSAT_REOPTIMIZATION"
+    repair_rejection_reason: str | None = None

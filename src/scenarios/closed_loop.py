@@ -4,12 +4,14 @@ Saha fiili üretim verilerini (Actuals) izler, plan sapmalarını (slippage) öl
 ve eşik aşımında yeniden çizelgeleme (Dynamic Replanning) kararını tetikler.
 """
 
-import os
+from contextlib import closing
 from dataclasses import dataclass
 
 import pandas as pd
 
+from src.config import get_runtime_paths
 from src.utils.db import get_db_connection
+from src.utils.runtime_lock import run_mutation_lock
 
 
 @dataclass
@@ -29,7 +31,7 @@ class ClosedLoopEngine:
     """
 
     def __init__(self, db_path: str | None = None, slippage_threshold_pct: float = 10.0, max_delay_hours: float = 4.0):
-        self.db_path = db_path or os.environ.get("FACTORY_DB_PATH", "data/factory.db")
+        self.db_path = str(db_path or get_runtime_paths()["db_path"])
         self.slippage_threshold_pct = slippage_threshold_pct
         self.max_delay_hours = max_delay_hours
 
@@ -37,14 +39,14 @@ class ClosedLoopEngine:
         """
         MES üzerinden gelen fiili üretim ve duruş kayıtlarını veritabanına yazar.
         """
-        conn = get_db_connection(self.db_path)
-        if run_id and "run_id" not in actuals_df.columns:
-            actuals_df = actuals_df.copy()
-            actuals_df["run_id"] = run_id
-
-        actuals_df.to_sql("mes_production_actuals", conn, if_exists="append", index=False)
-        conn.commit()
-        conn.close()
+        # Serialize actuals with pipeline publication; open the DB after the lock
+        # so an atomic replacement cannot strand feedback in the old inode.
+        with run_mutation_lock(self.db_path), closing(get_db_connection(self.db_path)) as conn:
+            if run_id and "run_id" not in actuals_df.columns:
+                actuals_df = actuals_df.copy()
+                actuals_df["run_id"] = run_id
+            actuals_df.to_sql("mes_production_actuals", conn, if_exists="append", index=False)
+            conn.commit()
         return len(actuals_df)
 
     def evaluate_variance_and_trigger(self, run_id: str) -> ReplanningTriggerDecision:

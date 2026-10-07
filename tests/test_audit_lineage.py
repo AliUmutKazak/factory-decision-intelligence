@@ -534,6 +534,25 @@ def test_validation_gate_blocks_overlapping_physics(tmp_path):
     cur.execute("INSERT INTO sku_production_plan VALUES ('P01', 20, 1)")
     cur.execute("INSERT INTO aggregate_plan VALUES (1, 100.0)")  # Boş tablo kontrolünü geçmesi için
     cur.execute("INSERT INTO machine_capacity_plan VALUES ('M01', 100.0)")  # Boş tablo kontrolünü geçmesi için
+    for table in [
+        "production_schedule",
+        "energy_kpis",
+        "energy_machine_kpis",
+        "carbon_kpis",
+        "sku_production_plan",
+        "aggregate_plan",
+        "machine_capacity_plan",
+    ]:
+        cur.execute(f"ALTER TABLE {table} ADD COLUMN run_id TEXT DEFAULT 'RUN_TEST'")
+    for table in [
+        "carbon_machine_kpis",
+        "carbon_price_scenarios",
+        "forecast_demand",
+        "forecast_model_lineage",
+        "mrp_plan",
+    ]:
+        cur.execute(f"CREATE TABLE {table} (run_id TEXT)")
+        cur.execute(f"INSERT INTO {table} VALUES ('RUN_TEST')")
     conn.commit()
     conn.close()
 
@@ -573,20 +592,20 @@ def test_p0_run_scoped_artifact_isolation(tmp_path):
         "carbon_analytics.csv",
     ]
     for csv_name in expected_csvs:
-        csv_file = latest_run_dir / csv_name
+        csv_file = latest_run_dir / "data" / "processed" / csv_name
         assert csv_file.exists(), f"{csv_name} izole run paketinde eksik."
         assert csv_file.stat().st_size > 0, f"{csv_name} boÅŸ olamaz."
 
     # 3. Manifest ve Metadata mÃ¼hÃ¼r kontrolÃ¼
-    assert (latest_run_dir / "run_metadata.json").exists(), "run_metadata.json eksik."
-    assert (latest_run_dir / "run_manifest.json").exists(), "run_manifest.json eksik."
+    assert (latest_run_dir / "reports" / "run_metadata.json").exists(), "run_metadata.json eksik."
+    assert (latest_run_dir / "reports" / "run_manifest.json").exists(), "run_manifest.json eksik."
     assert (latest_run_dir / "manifest.json").exists(), "manifest.json eksik."
 
     # Manifest iÃ§eriÄŸinin JSON olarak geÃ§erliliÄŸini sÄ±na
     with open(latest_run_dir / "manifest.json", encoding="utf-8") as f:
         manifest_data = json.load(f)
     assert "run_id" in manifest_data, "Manifest dosyasÄ± run_id iÃ§ermelidir."
-    assert "artifacts" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
+    assert "files" in manifest_data, "Manifest dosyasÄ± artifacts haritasÄ± iÃ§ermelidir."
 
 
 def test_p1_end_to_end_lineage_contract(tmp_path, monkeypatch):

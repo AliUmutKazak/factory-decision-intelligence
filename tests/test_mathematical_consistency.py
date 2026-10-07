@@ -21,7 +21,10 @@ from src.utils.db import get_db_connection
 def test_aggregate_inventory_balance():
     """Hax & Meal Envanter Denge Kısıtı Doğrulaması: I_t - B_t == I_{t-1} - B_{t-1} + P_t - D_t"""
     conn = get_db_connection(DB_PATH)
-    plan_df = pd.read_sql("SELECT * FROM aggregate_plan ORDER BY family_id, period_week", conn)
+    plan_df = pd.read_sql(
+        "SELECT * FROM aggregate_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') ORDER BY family_id, period_week",
+        conn,
+    )
     conn.close()
 
     assert not plan_df.empty, "aggregate_plan tablosu boş!"
@@ -51,7 +54,9 @@ def test_aggregate_inventory_balance():
 def test_machine_overtime_bounds():
     """Fazla mesainin yasal/teknik AGGREGATE_MAX_OVERTIME_HOURS tavanını aşmadığını doğrular."""
     conn = get_db_connection()
-    plan_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
+    plan_df = pd.read_sql(
+        "SELECT * FROM aggregate_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
     conn.close()
 
     max_ot = plan_df["max_machine_overtime_hours"].max()
@@ -63,8 +68,13 @@ def test_machine_overtime_bounds():
 def test_energy_physics_assertion():
     """Madde 16: Tepe yükün ortalama yükten küçük olamayacağını garanti eder."""
     conn = get_db_connection()
-    kpi_df = pd.read_sql("SELECT * FROM energy_kpis", conn)
-    profile_df = pd.read_sql("SELECT * FROM energy_profile_15min", conn)
+    kpi_df = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
+    profile_df = pd.read_sql(
+        "SELECT * FROM energy_profile_15min WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not kpi_df.empty, "energy_kpis tablosu boş!"
@@ -85,8 +95,14 @@ def test_energy_physics_assertion():
 def test_schedule_mrp_release_time_coupling():
     """Madde 14: MRP expedite kısıtına sahip lotların erken başlamadığını doğrular."""
     conn = get_db_connection()
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
-    mrp_df = pd.read_sql("SELECT * FROM mrp_plan WHERE period_week = 1", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    mrp_df = pd.read_sql(
+        "SELECT * FROM mrp_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') AND period_week = 1",
+        conn,
+    )
     bom_df = pd.read_sql("SELECT * FROM bom", conn)
     conn.close()
 
@@ -109,7 +125,10 @@ def test_schedule_mrp_release_time_coupling():
 def test_precedence_constraints():
     """Eksik 1: Her partinin ardışık operasyonları arasındaki öncelik kısıtını doğrular (Start_{o+1} >= End_o)."""
     conn = get_db_connection()
-    sched_df = pd.read_sql("SELECT * FROM production_schedule ORDER BY lot_id, operation_seq", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') ORDER BY lot_id, operation_seq",
+        conn,
+    )
     conn.close()
 
     assert not sched_df.empty, "production_schedule tablosu boş!"
@@ -129,7 +148,10 @@ def test_precedence_constraints():
 def test_machine_setup_consistency():
     """Eksik 2: Aynı makinede ardışık çalışan işler arasında sıra bağımlı setup süresini doğrular."""
     conn = get_db_connection()
-    sched_df = pd.read_sql("SELECT * FROM production_schedule ORDER BY machine_id, start_min", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') ORDER BY machine_id, start_min",
+        conn,
+    )
     co_df = pd.read_sql("SELECT * FROM changeover_matrix", conn)
     conn.close()
 
@@ -156,7 +178,10 @@ def test_machine_setup_consistency():
 def test_routing_completeness():
     """Eksik 3: Her partinin routing rotasındaki tüm operasyonlara eksiksiz sahip olduğunu doğrular."""
     conn = get_db_connection()
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     routing_df = pd.read_sql("SELECT * FROM routing", conn)
     conn.close()
 
@@ -174,8 +199,14 @@ def test_routing_completeness():
 def test_sku_level_schedule_reconciliation():
     """Eksik 4: Taktik SKU planı ile operasyonel çizelgenin SKU bazında tam mutabakatını doğrular."""
     conn = get_db_connection()
-    sku_plan_df = pd.read_sql("SELECT * FROM sku_production_plan WHERE period_week = 1", conn)
-    sched_df = pd.read_sql("SELECT * FROM production_schedule WHERE operation_seq = 1", conn)
+    sku_plan_df = pd.read_sql(
+        "SELECT * FROM sku_production_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') AND period_week = 1",
+        conn,
+    )
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE') AND operation_seq = 1",
+        conn,
+    )
     conn.close()
 
     plan_by_sku = sku_plan_df.groupby("product_id")["planned_units"].sum().to_dict()
@@ -196,8 +227,13 @@ def test_family_to_sku_disaggregation_reconciliation():
 
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
-    family_df = pd.read_sql("SELECT * FROM aggregate_plan", conn)
-    sku_df = pd.read_sql("SELECT * FROM sku_production_plan", conn)
+    family_df = pd.read_sql(
+        "SELECT * FROM aggregate_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
+    sku_df = pd.read_sql(
+        "SELECT * FROM sku_production_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     sku_sum = sku_df.groupby(["period_week", "family_id"])["planned_batches"].sum().to_dict()
@@ -218,8 +254,13 @@ def test_family_to_sku_disaggregation_reconciliation():
 def test_energy_integrals_reconciliation():
     """Eksik 6: 15 dakikalık yük profil integrali ile enerji KPI toplam tüketiminin uyuştuğunu doğrular."""
     conn = get_db_connection()
-    profile_df = pd.read_sql("SELECT * FROM energy_profile_15min", conn)
-    kpis_df = pd.read_sql("SELECT * FROM energy_kpis", conn)
+    profile_df = pd.read_sql(
+        "SELECT * FROM energy_profile_15min WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    kpis_df = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
     conn.close()
 
     assert not profile_df.empty and not kpis_df.empty, "Enerji tabloları boş!"
@@ -239,7 +280,10 @@ def test_energy_integrals_reconciliation():
 def test_carbon_share_conservation():
     """Eksik 7: Makine bazlı Scope 2 emisyon yüzdelerinin toplamının tam 100 ettiğini doğrular."""
     conn = get_db_connection()
-    machine_kpis = pd.read_sql("SELECT * FROM carbon_machine_kpis", conn)
+    machine_kpis = pd.read_sql(
+        "SELECT * FROM carbon_machine_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not machine_kpis.empty, "carbon_machine_kpis tablosu boş!"
@@ -261,7 +305,9 @@ def test_carbon_share_conservation():
 def test_forecast_output_integrity():
     """Eksik 8: Talep tahmin çıktısının boyut (5 SKU x 28 gün = 140), NaN ve negatiflik kontrollerini doğrular."""
     conn = get_db_connection()
-    fc_df = pd.read_sql("SELECT * FROM forecast_demand", conn)
+    fc_df = pd.read_sql(
+        "SELECT * FROM forecast_demand WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
     conn.close()
 
     assert len(fc_df) == 140, f"Tahmin Çıktı Boyutu Hatalı! Beklenen 140, Mevcut {len(fc_df)}"
@@ -284,8 +330,14 @@ def test_hierarchical_capacity_decomposition():
     db_path = os.path.join("data", "factory.db")
     assert os.path.exists(db_path), "factory.db veritabani dosyasi bulunamadi"
     conn = get_db_connection(db_path)
-    cap_df = pd.read_sql("SELECT * FROM machine_capacity_plan", conn)
-    sched_df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    cap_df = pd.read_sql(
+        "SELECT * FROM machine_capacity_plan WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    sched_df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     w1_cap = cap_df[cap_df["period_week"] == 1]
@@ -338,7 +390,10 @@ def test_explicit_setup_intervals_physical_integrity():
     if not os.path.exists(db_path):
         return
     conn = get_db_connection(db_path)
-    df = pd.read_sql("SELECT * FROM production_schedule", conn)
+    df = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert "setup_start_min" in df.columns, "setup_start_min kolonu schedule..."
@@ -369,7 +424,10 @@ def test_forecast_model_lineage_governance():
 
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
-    lineage_df = pd.read_sql("SELECT * FROM forecast_model_lineage", conn)
+    lineage_df = pd.read_sql(
+        "SELECT * FROM forecast_model_lineage WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status='ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not lineage_df.empty, "forecast_model_lineage tablosu boş!"
@@ -407,7 +465,10 @@ def test_schedule_solver_metadata_governance():
 
     db_path = os.path.join("data", "factory.db")
     conn = get_db_connection(db_path)
-    solver_df = pd.read_sql("SELECT * FROM schedule_solver_metadata", conn)
+    solver_df = pd.read_sql(
+        "SELECT * FROM schedule_solver_metadata WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status='ACTIVE')",
+        conn,
+    )
     conn.close()
 
     assert not solver_df.empty, "schedule_solver_metadata tablosu boş!"
@@ -442,7 +503,10 @@ def test_batch_conservation_invariant():
     import src.config as cfg
 
     conn = get_db_connection(cfg.DB_PATH)
-    sched = pd.read_sql("SELECT * FROM production_schedule", conn)
+    sched = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     if len(sched) == 0:
@@ -466,8 +530,13 @@ def test_energy_schedule_production_units_conservation():
     import src.config as cfg
 
     conn = get_db_connection(cfg.DB_PATH)
-    sched = pd.read_sql("SELECT * FROM production_schedule", conn)
-    energy_kpi = pd.read_sql("SELECT * FROM energy_kpis", conn)
+    sched = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
+    energy_kpi = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
     conn.close()
 
     if len(sched) == 0:
@@ -500,11 +569,19 @@ def test_variable_energy_exact_physics_sum():
     import src.config as cfg
 
     conn = get_db_connection(cfg.DB_PATH)
-    sched = pd.read_sql("SELECT * FROM production_schedule", conn)
+    sched = pd.read_sql(
+        "SELECT * FROM production_schedule WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     routing = pd.read_sql("SELECT product_id, operation_seq, machine_id, variable_kwh_per_unit FROM routing", conn)
     machines = pd.read_sql("SELECT machine_id, base_power_kw FROM machines", conn)
-    energy_kpis = pd.read_sql("SELECT * FROM energy_kpis", conn)
-    energy_machines = pd.read_sql("SELECT * FROM energy_machine_kpis", conn)
+    energy_kpis = pd.read_sql(
+        "SELECT * FROM energy_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')", conn
+    )
+    energy_machines = pd.read_sql(
+        "SELECT * FROM energy_machine_kpis WHERE run_id = (SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE')",
+        conn,
+    )
     conn.close()
 
     if len(sched) == 0:

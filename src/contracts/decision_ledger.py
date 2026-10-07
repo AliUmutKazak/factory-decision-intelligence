@@ -152,14 +152,26 @@ class DecisionLedger:
             return [e for e in self.entries if e.run_id == run_id]
 
         with get_db_connection(self.db_path) as conn:
-            rows = conn.execute(
-                "SELECT decision_id, run_id, decision_type, input_state_json, "
-                "triggered_reason, selected_action, why_json, rejected_alternatives_json, "
-                "expected_kpi_impact_json, model_version, solver_version, timestamp "
-                "FROM decision_ledger WHERE run_id = ? ORDER BY timestamp",
-                (run_id,),
-            ).fetchall()
-        return [self._from_row(row) for row in rows]
+            return self.read_by_run_id(conn, run_id)
+
+    @classmethod
+    def read_by_run_id(cls, conn, run_id: str) -> list[DecisionLedgerEntry]:
+        """Query an existing connection without creating tables or reopening the DB.
+
+        Callers can resolve ACTIVE and read its ledger from the same SQLite
+        snapshot even if the canonical database file is atomically replaced.
+        A run without recorded decisions legitimately has an empty history.
+        """
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='decision_ledger'").fetchone():
+            return []
+        rows = conn.execute(
+            "SELECT decision_id, run_id, decision_type, input_state_json, "
+            "triggered_reason, selected_action, why_json, rejected_alternatives_json, "
+            "expected_kpi_impact_json, model_version, solver_version, timestamp "
+            "FROM decision_ledger WHERE run_id = ? ORDER BY timestamp, decision_id",
+            (run_id,),
+        ).fetchall()
+        return [cls._from_row(row) for row in rows]
 
     def to_json(self) -> str:
         if self.db_path is None:

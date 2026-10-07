@@ -28,8 +28,8 @@ def test_1_pipeline_run_lineage_zero_nulls(isolated_db):
     audit_cols = ["run_id", "timestamp", "git_sha", "config_hash", "status"]
     for col in audit_cols:
         assert df[col].isnull().sum() == 0, f"pipeline_runs icinde {col} kolonunda null deger bulunamaz"
-    assert df["status"].isin(["SUCCESS", "ACTIVE"]).any(), (
-        "En az bir basarili (SUCCESS veya ACTIVE) run_id kaydi bulunmali"
+    assert df["status"].isin(["SUCCESS", "ACTIVE", "COMPLETED"]).any(), (
+        "En az bir doğrulanmış ve tamamlanmış run_id kaydi bulunmali"
     )
 
 
@@ -69,7 +69,9 @@ def test_2_cpsat_calendar_bounds(isolated_db):
 
         # Kesin takvim: Başlangıç ile bitiş arasındaki HİÇBİR gün Pazar (gün indeksi 6) olamaz
         start_day_idx = s_min // 1440
-        end_day_idx = e_min // 1440
+        # Intervals are [start, end): midnight at Sunday is the boundary,
+        # not a minute of Sunday production.
+        end_day_idx = (e_min - 1) // 1440
         for d in range(start_day_idx, end_day_idx + 1):
             assert (d % 7) != 6, f"Pazar gunune sarkan gorev tespit edildi! Gun: {d}, Gorev: {r['task_id']}"
 

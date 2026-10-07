@@ -1,4 +1,6 @@
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -8,6 +10,17 @@ from src.contracts.schemas import EconomicConfigModel
 # Dizin Hiyerarşisi
 SRC_DIR = Path(__file__).resolve().parent
 BASE_DIR = SRC_DIR.parent
+_runtime_overrides = ContextVar("factory_runtime_paths", default={})
+
+
+@contextmanager
+def runtime_path_context(**paths):
+    """Per-thread/task runtime paths without changing process-wide environment."""
+    token = _runtime_overrides.set({**_runtime_overrides.get(), **paths})
+    try:
+        yield
+    finally:
+        _runtime_overrides.reset(token)
 
 
 def get_runtime_paths():
@@ -27,13 +40,15 @@ def get_runtime_paths():
     custom_db = os.getenv("FACTORY_DB_PATH")
     db_path = Path(custom_db) if custom_db else data_dir / "factory.db"
 
-    return {
+    resolved = {
         "base_dir": BASE_DIR,
         "data_dir": data_dir,
         "processed_dir": processed_dir,
         "reports_dir": reports_dir,
         "db_path": db_path,
     }
+    resolved.update({key: Path(value) for key, value in _runtime_overrides.get().items()})
+    return resolved
 
 
 # Geriye dönük uyumluluk ve dinamik Staging İzolasyonu:
@@ -153,7 +168,7 @@ PRODUCTION_BATCH_SIZE = 25  # Referans parti büyüklüğü (adet)
 ENABLE_LOT_STREAMING = True  # Dev partileri alt transfer lotlarına bölerek overlap sağla
 MAX_SUB_LOT_BATCHES = 40  # Bir alt transfer lotunun alabileceği maksimum batch sayısı
 CPSAT_TIME_LIMIT_SECONDS = 30.0  # Çözücü zaman limiti (sn)
-CPSAT_NUM_SEARCH_WORKERS = 8  # Arama iş parçacığı sayısı
+CPSAT_NUM_SEARCH_WORKERS = 1  # Stable deterministic search; parallel portfolio crashed in regression runs.
 CPSAT_RANDOM_SEED = 42  # Tekrarlanabilirlik tohum değeri
 
 
@@ -166,6 +181,7 @@ class SchedulingObjectivePolicy(StrEnum):
     BALANCED = "BALANCED"
     SERVICE_LEVEL_FIRST = "SERVICE_LEVEL_FIRST"
     THROUGHPUT_MAX = "THROUGHPUT_MAX"
+    OPERATIONAL_BALANCED = "OPERATIONAL_BALANCED"
     COST_OPTIMIZED = "COST_OPTIMIZED"
 
 
@@ -196,12 +212,14 @@ OBJECTIVE_POLICIES: dict[SchedulingObjectivePolicy, ObjectiveWeights] = {
         setup_weight=0,
         tardiness_weight=0,
     ),
-    # 4. Ekonomik Etki / Maliyet Odaklı (Sıra bağımlı ayar ve gecikme cezası dengeli)
-    SchedulingObjectivePolicy.COST_OPTIMIZED: ObjectiveWeights(
+    # 4. Operational tradeoff; these minute weights do not optimize monetary TMC.
+    SchedulingObjectivePolicy.OPERATIONAL_BALANCED: ObjectiveWeights(
         makespan_weight=30,
         setup_weight=5,
         tardiness_weight=50,
     ),
+    # Monetary rates come from EconomicConfig, not these operational weights.
+    SchedulingObjectivePolicy.COST_OPTIMIZED: ObjectiveWeights(0, 0, 0),
 }
 
 # Geriye dönük uyumluluk için varsayılan ağırlıklar:

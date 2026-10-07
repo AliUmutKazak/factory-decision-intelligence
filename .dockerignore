@@ -12,3 +12,12 @@ factory-env/
 .gitignore
 .vscode/
 tests/
+data/*.db
+data/processed/*.csv
+data/raw/*.csv
+reports/
+runs/
+artifacts/runs/
+artifacts/reference_runs/
+*.run.lock
+*.log

@@ -1,24 +1,24 @@
 {
-    "run_id": "RUN-TEST-BOUND-002",
-    "run_timestamp": "2026-10-03T18:49:05.017934",
-    "git_sha": "74b05876e4852cf41e9f4e4a22b3464c2df41bab",
-    "data_source": "factory_orders.csv",
+    "run_id": "RUN-20261006-00a0d3",
+    "run_timestamp": "2026-10-06T20:04:42.275858",
+    "git_sha": "63d33899b13894c7b0f963d5e97721d6fd6afa36",
+    "data_source": "data/processed/factory_orders.csv",
     "forecast_origin": "2017-12-31",
     "forecast_method": "Hybrid_Backtest_Selection",
     "selected_models": {
-        "P01": "LightGBM",
+        "P01": "Holt-Winters",
         "P02": "Holt-Winters",
-        "P03": "LightGBM",
-        "P04": "LightGBM",
-        "P05": "LightGBM"
+        "P03": "Holt-Winters",
+        "P04": "Holt-Winters",
+        "P05": "Naive"
     },
-    "config_hash": "92e68e3d9f952ae0",
+    "config_hash": "3fc341c6055a2b6e",
     "status": "COMPLETED",
-    "orders_count": 500,
+    "orders_count": 1825,
     "environment": {
-        "python_version": "3.13.9",
+        "python_version": "3.12.14",
         "pandas_version": "3.0.5",
-        "ortools_version": "9.15.6755",
+        "ortools_version": "9.14.6206",
         "pulp_version": "3.3.2"
     },
     "optimization_metrics": {

@@ -1,28 +1,49 @@
-version: '3.8'
+x-runtime: &runtime
+  build:
+    context: .
+    args:
+      FACTORY_BUILD_GIT_SHA: ${FACTORY_BUILD_GIT_SHA:-UNKNOWN}
+  volumes:
+    - ./data:/app/data
+    - ./reports:/app/reports
+    - ./artifacts/runs:/app/artifacts/runs
+  environment:
+    PYTHONUNBUFFERED: "1"
+    OPENBLAS_NUM_THREADS: "1"
+    OMP_NUM_THREADS: "1"
 
 services:
+  pipeline:
+    <<: *runtime
+    command: python scripts/bootstrap_runtime.py
+    restart: "no"
+
   api:
-    build: .
-    container_name: factory_api_service
+    <<: *runtime
     command: uvicorn src.api.server:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - PYTHONUNBUFFERED=1
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped
 
   dashboard:
-    build: .
-    container_name: factory_dashboard_service
+    <<: *runtime
     command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
     ports:
       - "8501:8501"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - PYTHONUNBUFFERED=1
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8501/_stcore/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     restart: unless-stopped

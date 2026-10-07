@@ -4,39 +4,39 @@
         "selected_model": "Holt-Winters",
         "model_version": "v3.0-rolling-origin-cv",
         "feature_version": "v1.2-lag-calendar",
-        "validation_score_wape": 0.0237,
-        "test_score_rmse": 32.22
+        "validation_score_wape": 0.0363,
+        "test_score_rmse": 8.5
     },
     "P02": {
         "product_id": "P02",
         "selected_model": "Holt-Winters",
         "model_version": "v3.0-rolling-origin-cv",
         "feature_version": "v1.2-lag-calendar",
-        "validation_score_wape": 0.0115,
-        "test_score_rmse": 29.46
+        "validation_score_wape": 0.0133,
+        "test_score_rmse": 8.56
     },
     "P03": {
         "product_id": "P03",
         "selected_model": "Holt-Winters",
         "model_version": "v3.0-rolling-origin-cv",
         "feature_version": "v1.2-lag-calendar",
-        "validation_score_wape": 0.0156,
-        "test_score_rmse": 31.67
+        "validation_score_wape": 0.0185,
+        "test_score_rmse": 7.83
     },
     "P04": {
         "product_id": "P04",
         "selected_model": "Holt-Winters",
         "model_version": "v3.0-rolling-origin-cv",
         "feature_version": "v1.2-lag-calendar",
-        "validation_score_wape": 0.0217,
-        "test_score_rmse": 33.87
+        "validation_score_wape": 0.0371,
+        "test_score_rmse": 8.28
     },
     "P05": {
         "product_id": "P05",
-        "selected_model": "Holt-Winters",
+        "selected_model": "Naive",
         "model_version": "v3.0-rolling-origin-cv",
         "feature_version": "v1.2-lag-calendar",
-        "validation_score_wape": 0.0275,
-        "test_score_rmse": 32.83
+        "validation_score_wape": 0.0464,
+        "test_score_rmse": 8.33
     }
 }

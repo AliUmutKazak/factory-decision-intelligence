@@ -2,14 +2,35 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
+import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 
 
 class RunBundleError(RuntimeError):
     pass
+
+
+def export_run_database(source_db, target_db, run_id: str) -> None:
+    """Create a self-contained snapshot containing only this run and master data."""
+    with closing(sqlite3.connect(source_db)) as source, closing(sqlite3.connect(target_db)) as target:
+        source.backup(target)
+        tables = target.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        for (table,) in tables:
+            if table == "pipeline_runs" or table.startswith("sqlite_"):
+                continue
+            columns = {row[1] for row in target.execute(f'PRAGMA table_info("{table}")')}
+            if "run_id" in columns:
+                target.execute(f'DELETE FROM "{table}" WHERE run_id IS NULL OR run_id != ?', (run_id,))
+            elif table == "reschedule_audit_log":
+                target.execute("DELETE FROM reschedule_audit_log WHERE new_run_id != ?", (run_id,))
+        target.execute("DELETE FROM pipeline_runs WHERE run_id != ?", (run_id,))
+        target.commit()
+        target.execute("VACUUM")
 
 
 def sha256_file(path: Path) -> str:
@@ -80,11 +101,44 @@ def verify_run_bundle(bundle_dir: str | Path, expected_run_id: str) -> dict:
     files = manifest.get("files")
     if not isinstance(files, dict) or not files:
         raise RunBundleError("Bundle manifest has no payload files.")
+    if "factory.db" not in files:
+        raise RunBundleError("Bundle manifest does not seal its database.")
+    actual_files = {
+        str(path.relative_to(bundle)).replace("\\", "/")
+        for path in bundle.rglob("*")
+        if path.is_file() and path.name != "manifest.json"
+    }
+    if actual_files != set(files):
+        raise RunBundleError("Bundle payload and manifest file sets differ.")
     for relative, expected in files.items():
         path = bundle / relative
+        if not path.resolve().is_relative_to(bundle.resolve()):
+            raise RunBundleError(f"Bundle path escapes its directory: {relative}")
         if not path.exists():
             raise RunBundleError(f"Bundle payload missing: {relative}")
         actual_hash = sha256_file(path)
         if actual_hash != expected.get("sha256"):
             raise RunBundleError(f"Bundle hash mismatch: {relative}: {actual_hash} != {expected.get('sha256')}")
+        if path.suffix == ".csv" and path.name in {
+            "forecast_demand.csv",
+            "forecast_model_lineage.csv",
+            "aggregate_plan.csv",
+            "sku_production_plan.csv",
+            "machine_capacity_plan.csv",
+            "mrp_plan.csv",
+            "production_schedule.csv",
+            "task_weekly_accounting.csv",
+            "energy_kpis.csv",
+            "energy_profile_15min.csv",
+            "energy_machine_kpis.csv",
+            "carbon_analytics.csv",
+            "carbon_machine_kpis.csv",
+            "carbon_price_scenarios.csv",
+        }:
+            with path.open(newline="", encoding="utf-8") as handle:
+                rows = csv.DictReader(handle)
+                if "run_id" not in (rows.fieldnames or []):
+                    raise RunBundleError(f"Bundle CSV has no run_id: {relative}")
+                if any(str(row["run_id"]) != str(expected_run_id) for row in rows):
+                    raise RunBundleError(f"Bundle CSV run_id mismatch: {relative}")
     return manifest

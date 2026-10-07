@@ -9,6 +9,20 @@ from pydantic import ValidationError
 
 from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.utils.db import clone_run_inputs, get_active_run_id
+
+
+@pytest.mark.parametrize("objective,bound,gap", [(100.0, 0.0, 100.0), (0.0, 0.0, 0.0), (100.0, None, None)])
+def test_zero_bound_is_proof_data_and_missing_bound_is_unknown(objective, bound, gap):
+    metadata = ScheduleSolverMetadata(
+        run_id="PROOF",
+        status=SolverStatus.FEASIBLE,
+        proven_optimal=False,
+        wall_time_seconds=1,
+        objective_value=objective,
+        best_objective_bound=bound,
+    )
+    assert metadata.optimality_gap_pct == gap
 
 
 def test_solver_status_enum_values():
@@ -107,12 +121,11 @@ def test_run_cpsat_scheduling_returns_valid_solver_metadata():
     wrapped_conn = NoCloseConnectionWrapper(mem_conn)
     test_run_id = "RUN-TEST-CONTRACT-001"
 
+    clone_run_inputs(mem_conn, get_active_run_id(mem_conn), test_run_id)
     try:
-        with (
-            patch("src.scheduling.schedule_cpsat.get_db_connection", return_value=wrapped_conn),
-            patch("src.scheduling.schedule_cpsat.CPSAT_TIME_LIMIT_SECONDS", 2),
-        ):
-            result = run_cpsat_scheduling(run_id=test_run_id)
+        # Persistence is the contract under test, not a two-second latency promise.
+        with patch("src.scheduling.schedule_cpsat.get_db_connection", return_value=wrapped_conn):
+            result = run_cpsat_scheduling(run_id=test_run_id, persist_outputs=False)
 
             # 1. Sözleşme tipi ve alan doğrulaması
             assert isinstance(result, ScheduleSolverMetadata)

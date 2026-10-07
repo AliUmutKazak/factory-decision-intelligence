@@ -7,6 +7,9 @@ data/*.db
 data/processed/*.csv
 !data/processed/.gitkeep
 runs/
+*.run.lock
+/artifacts/runs/
+/data/reschedule_runs/
 
 # Python & Environment
 .vscode/

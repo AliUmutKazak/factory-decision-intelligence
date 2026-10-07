@@ -9,16 +9,19 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.config import DB_PATH
+from src.config import DB_PATH, get_runtime_paths
 
 _SQLITE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def resolve_db_path(db_path: str | os.PathLike | None = None) -> Path:
     """Resolve an explicit DB path or the current runtime DB path."""
-    env_db = os.environ.get("FACTORY_DB_PATH")
+    runtime = get_runtime_paths()
+    runtime_db = Path(runtime["db_path"])
+    default_db = Path(runtime["base_dir"]) / "data" / "factory.db"
+    env_db = str(runtime_db) if os.environ.get("FACTORY_DB_PATH") or runtime_db != default_db else None
     if db_path is None:
-        return Path(env_db if env_db else DB_PATH)
+        return runtime_db
 
     requested = Path(db_path)
     canonical = Path(DB_PATH)
@@ -38,12 +41,51 @@ def get_db_connection(db_path=None):
 
 def get_active_run_id(conn: sqlite3.Connection) -> str:
     """Return the sole ACTIVE pipeline run; fail fast when none exists."""
-    row = conn.execute(
-        "SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' ORDER BY timestamp DESC LIMIT 1"
-    ).fetchone()
-    if not row or not row[0]:
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
+        raise RuntimeError("[RUN GOVERNANCE] ACTIVE run bulunamadı: pipeline_runs tablosu yok.")
+    rows = conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE' LIMIT 2").fetchall()
+    if not rows or not rows[0][0]:
         raise RuntimeError("[RUN GOVERNANCE] ACTIVE run bulunamadı.")
-    return str(row[0])
+    if len(rows) != 1:
+        raise RuntimeError("[RUN GOVERNANCE] Multiple ACTIVE runs; refusing to select a version.")
+    return str(rows[0][0])
+
+
+def clone_run_inputs(conn, source_run_id: str, target_run_id: str, tables=None) -> None:
+    """Explicitly copy one run's inputs into a new isolated version."""
+    if source_run_id == target_run_id:
+        raise ValueError("Source and target run IDs must differ.")
+    has_registry = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone()
+    if has_registry:
+        conn.execute(
+            "INSERT INTO pipeline_runs (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status) "
+            "SELECT ?, datetime('now'), 'INPUT_CLONE', orders_count, git_sha, config_hash, data_source, 'RUNNING' "
+            "FROM pipeline_runs WHERE run_id = ? AND NOT EXISTS (SELECT 1 FROM pipeline_runs WHERE run_id = ?)",
+            (target_run_id, source_run_id, target_run_id),
+        )
+    tables = tables or (
+        "orders",
+        "forecast_demand",
+        "forecast_model_lineage",
+        "aggregate_plan",
+        "sku_production_plan",
+        "machine_capacity_plan",
+        "mrp_plan",
+        "machine_state_snapshot",
+        "mes_order_tracking",
+    )
+    for table in tables:
+        if not _SQLITE_IDENTIFIER.fullmatch(table):
+            raise ValueError(f"Invalid table: {table}")
+        info = conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+        if "run_id" not in {row[1] for row in info}:
+            continue
+        columns = [row[1] for row in info if not (row[5] == 1 and row[2].upper() == "INTEGER")]
+        df = pd.read_sql(f'SELECT * FROM "{table}" WHERE run_id = ?', conn, params=(source_run_id,))
+        df = df[columns].copy()
+        df["run_id"] = target_run_id
+        persist_run_scoped_dataframe(conn, table, df, target_run_id)
+    conn.commit()
 
 
 def _sqlite_value(value):
@@ -139,3 +181,21 @@ def persist_run_scoped_dataframe(
 def table_has_column(conn: sqlite3.Connection, table_name: str, column_name: str) -> bool:
     rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     return column_name in {row[1] for row in rows}
+
+
+def migrate_schedule_commitments(conn) -> None:
+    """Add explicit due-date/priority fields to pre-existing schedule history."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(production_schedule)")}
+    if columns:
+        for column in ("due_date_min", "priority_weight"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE production_schedule ADD COLUMN {column} INTEGER")
+
+
+def migrate_solver_objective_contract(conn):
+    """Keep historic unknown policy/units NULL while recording all new solves."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(schedule_solver_metadata)")}
+    if columns:
+        for column in ("objective_units", "objective_policy"):
+            if column not in columns:
+                conn.execute(f"ALTER TABLE schedule_solver_metadata ADD COLUMN {column} TEXT")

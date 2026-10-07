@@ -8,6 +8,25 @@ from src.integration.rescheduler import ClosedLoopRescheduler
 from src.utils.db import get_db_connection
 
 
+def test_execution_commitments_override_planned_start_and_zero_freeze_window():
+    from src.contracts.schemas import RescheduleTriggerEvent
+    from src.scheduling.rescheduler import DynamicRescheduler
+
+    baseline = pd.DataFrame(
+        [
+            {"task_id": 1, "machine_id": "M01", "start_min": 480, "end_min": 600, "execution_status": "SCHEDULED"},
+            {"task_id": 2, "machine_id": "M01", "start_min": 900, "end_min": 960, "execution_status": "IN_PROGRESS"},
+            {"task_id": 3, "machine_id": "M01", "start_min": 1000, "end_min": 1060, "execution_status": "SCHEDULED"},
+            {"task_id": 4, "machine_id": "M01", "start_min": 1200, "end_min": 1260, "execution_status": "SCHEDULED"},
+        ]
+    )
+    trigger = RescheduleTriggerEvent(event_id="ZERO-FREEZE", current_time_min=480, freeze_horizon_min=0)
+    engine = DynamicRescheduler.__new__(DynamicRescheduler)
+    frozen = engine._build_frozen_positions(baseline, trigger, {"3"})
+    assert set(frozen) == {"1", "2", "3"}
+    assert frozen["2"] == ("M01", 900.0, 960.0)
+
+
 def test_frozen_horizon_data_model_columns_exist():
     conn = get_db_connection()
     df = pd.read_sql("SELECT * FROM production_schedule LIMIT 10;", conn)
@@ -36,24 +55,19 @@ def test_multi_tiered_state_transitions_on_breakdown():
     down_start = 600.0
     down_dur = 90.0
 
-    result = rescheduler.reschedule_on_machine_breakdown(
-        machine_id="M01",
-        down_start_min=down_start,
-        down_duration_min=down_dur,
-        reason="Madde 20 Horizon Audit",
-        commit=False,
-    )
-    assert result["status"] == "RESCHEDULED"
+    from src.contracts.schemas import RescheduleTriggerEvent
 
-    # CP-SAT çözümü üzerinden durumları denetle
-    df_resched = rescheduler._solve_cpsat_reschedule(
-        df=df_init.copy(),
-        machine_id="M01",
-        down_start_min=down_start,
-        down_duration_min=down_dur,
+    base, df_resched, meta, report, audit = rescheduler._engine.execute_reschedule(
+        RescheduleTriggerEvent(
+            event_id="FREEZE-AUDIT",
+            current_time_min=int(down_start),
+            freeze_horizon_min=240,
+            delay_machine_id="M01",
+            delay_duration_min=int(down_dur),
+        ),
+        persist_audit=False,
     )
-    if df_resched is None:
-        df_resched = df_init.copy()
+    assert len(df_resched) == len(df_init) > 0
 
     # 1. COMPLETED -> Immutable (Arıza öncesinde biten işlerin zamanları değişmez)
     completed_tasks = df_init[df_init["end_min"] <= down_start]
@@ -62,6 +76,7 @@ def test_multi_tiered_state_transitions_on_breakdown():
         row_new = df_resched[df_resched["task_id"] == tid].iloc[0]
         assert row_new["start_min"] == row["start_min"], f"{tid} COMPLETED işin başlangıcı değişmiş!"
         assert row_new["end_min"] == row["end_min"], f"{tid} COMPLETED işin bitişi değişmiş!"
+        assert row_new["schedule_state"] == "FROZEN"
 
     # 2. IN_PROGRESS -> Locked start (Arıza anında çalışan işin başlangıcı korunur)
     running_tasks = df_init[(df_init["start_min"] <= down_start) & (df_init["end_min"] > down_start)]

@@ -304,6 +304,8 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
         cursor.execute("DROP TABLE mes_order_tracking_legacy")
     conn.commit()
 
+    if not run_id:
+        run_id = generate_run_id()
     orders_df = orders_df.copy()
     orders_df["run_id"] = run_id
     orders_df.to_sql("orders", conn, index=False, if_exists="append")
@@ -317,9 +319,12 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
 
     cursor.execute(
         """
-        INSERT OR REPLACE INTO pipeline_runs
+        INSERT INTO pipeline_runs
         (run_id, timestamp, trigger_source, orders_count, git_sha, config_hash, data_source, status)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id) DO UPDATE SET
+            orders_count=excluded.orders_count, git_sha=excluded.git_sha,
+            config_hash=excluded.config_hash, data_source=excluded.data_source
     """,
         (
             run_id,

@@ -10,6 +10,8 @@ from typing import Any
 import pandas as pd
 
 from src.config import ECONOMIC_CONFIG
+from src.scheduling.analytics_schema import calendar_overtime_minutes, schedule_job_summary
+from src.scheduling.service_level import CUSTOMER_CLASS_WEIGHTS
 
 
 @dataclass
@@ -93,20 +95,28 @@ class EconomicDecisionEngine:
         base_labor_cost = run_hours * self.params.labor_rate_per_hour
         setup_cost = setup_hours * self.params.setup_cost_per_hour
 
-        # 2. Fazla Mesai (Overtime) Maliyeti
-        # Hafta 1 sınırı (168 saat / 10080 dk) üstü veya overtime bayrağı
-        overtime_min = 0.0
-        if "overtime_minutes" in df.columns:
-            overtime_min = float(df["overtime_minutes"].sum())
-        elif "is_overtime" in df.columns:
+        # Base processing/setup costs already include all worked minutes.
+        # Overtime adds only the premium, separately for processing and setup.
+        processing_ot = next((col for col in ("production_overtime_minutes", "overtime_minutes") if col in df), None)
+        if processing_ot:
+            overtime_min = float(df[processing_ot].sum())
+        elif "is_overtime" in df:
             overtime_min = float(df.loc[df["is_overtime"] == 1, run_duration_col].sum())
-        elif "end_min" in df.columns:
-            # Fallback yalnızca schedule çıktısında explicit OT muhasebesi yoksa kullanılır.
-            weekly_regular_min = 6 * 16 * 60
-            overtime_min = max(0.0, float(df["end_min"].max() - weekly_regular_min))
-
-        overtime_hours = overtime_min / 60.0
-        overtime_cost = overtime_hours * (self.params.labor_rate_per_hour * self.params.overtime_multiplier)
+        else:
+            overtime_min = sum(calendar_overtime_minutes(row.start_min, row.end_min) for row in df.itertuples())
+        if "setup_overtime_minutes" in df:
+            setup_ot_min = float(df["setup_overtime_minutes"].sum())
+        else:
+            setup_ot_min = sum(
+                calendar_overtime_minutes(
+                    row["start_min"] - row.get("setup_before_min", row.get("setup_duration", 0)), row["start_min"]
+                )
+                for _, row in df.iterrows()
+            )
+        overtime_cost = (self.params.overtime_multiplier - 1.0) * (
+            overtime_min / 60.0 * self.params.labor_rate_per_hour
+            + setup_ot_min / 60.0 * self.params.setup_cost_per_hour
+        )
 
         # 3. Enerji ve Karbon Maliyeti
         energy_cost = energy_kwh_total * self.params.energy_cost_per_kwh
@@ -120,36 +130,15 @@ class EconomicDecisionEngine:
         holding_cost_total = 0.0
         order_cost_list: list[dict[str, Any]] = []
 
-        group_col = "job_id" if "job_id" in df.columns else "product_id"
-        setup_group_col = (
-            "setup_before_min"
-            if "setup_before_min" in df.columns
-            else ("setup_duration" if "setup_duration" in df.columns else run_duration_col)
-        )
-        job_summary = (
-            df.groupby(group_col)
-            .agg(
-                completion_min=("end_min", "max"),
-                start_min=("start_min", "min"),
-                job_run_min=(run_duration_col, "sum"),
-                job_setup_min=(setup_group_col, "sum"),
-                quantity=("production_units", "sum")
-                if "production_units" in df.columns
-                else (run_duration_col, lambda x: len(x)),
-            )
-            .reset_index()
-        )
-
-        if orders_df is not None and not orders_df.empty:
-            merged = pd.merge(job_summary, orders_df, on=group_col, how="left")
-        else:
-            merged = job_summary.copy()
+        group_col, merged = schedule_job_summary(df, orders_df)
 
         # Eksik sütun varsayılanları
         if "due_date_min" not in merged.columns:
             merged["due_date_min"] = 7 * 24 * 60  # 1 hafta
         if "customer_class" not in merged.columns:
             merged["customer_class"] = "STANDARD"
+        merged["due_date_min"] = merged["due_date_min"].fillna(7 * 24 * 60)
+        merged["customer_class"] = merged["customer_class"].fillna("STANDARD")
         if "quantity" not in merged.columns:
             merged["quantity"] = 0.0
 
@@ -162,12 +151,12 @@ class EconomicDecisionEngine:
             # Tardiness
             tardy_min = max(0.0, comp_min - due_min)
             tardy_cost = (tardy_min / 60.0) * self.params.default_tardiness_cost_per_hour
-            if row["customer_class"] == "TIER_1":
-                tardy_cost *= 2.0  # VIP müşteri cezası
+            priority = row.get("priority", row.get("priority_weight", 1))
+            tardy_cost *= priority * CUSTOMER_CLASS_WEIGHTS.get(row["customer_class"], 1.0)
 
             # Holding / Stokta bekleme süresi (gün)
             wip_days = (comp_min - row["start_min"]) / (24 * 60.0)
-            holding_cost = qty * max(0.1, wip_days) * self.params.holding_cost_per_unit_per_day
+            holding_cost = qty * max(0.0, wip_days) * self.params.holding_cost_per_unit_per_day
 
             direct_labor = (row["job_run_min"] / 60.0) * self.params.labor_rate_per_hour
             direct_setup = (row["job_setup_min"] / 60.0) * self.params.setup_cost_per_hour
