@@ -1,5 +1,5 @@
 {
-  "run_id": "RUN-20261006-38b141",
+  "run_id": "RUN-20261006-00a0d3",
   "solver_name": "Google OR-Tools CP-SAT",
   "solver_status": "FEASIBLE",
   "objective_policy": "BALANCED",
@@ -10,7 +10,7 @@
   "objective_value_min": 1392220.0,
   "best_bound_min": 865550.0,
   "optimality_gap_pct": 37.8295,
-  "solve_time_seconds": 30.0038,
+  "solve_time_seconds": 30.0029,
   "configured_num_search_workers": 1,
   "effective_num_search_workers": 1,
   "num_workers": 1,
