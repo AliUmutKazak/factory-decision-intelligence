@@ -61,7 +61,7 @@ def test_dynamic_reschedule_with_freeze_horizon_and_audit():
 
 
 def test_zero_nervousness_on_identical_run():
-    """Verify that rescheduling without disruptions results in a low nervousness score."""
+    """A valid plan stays unchanged when a routine check reports no disruption."""
     rescheduler = DynamicRescheduler()
 
     trigger = RescheduleTriggerEvent(
@@ -84,8 +84,31 @@ def test_zero_nervousness_on_identical_run():
     assert isinstance(report, ScheduleNervousnessReport)
     assert isinstance(audit, RescheduleAuditEntry)
     assert report.machine_swapped_count == 0
-    # Sıfır kesinti durumunda haftalık ufka göre sarsıntı skoru kontrollü olmalıdır
-    assert report.nervousness_score <= 0.15
+    assert audit.decision_tier == "VALIDATED_LOCAL_REPAIR"
+    assert report.nervousness_score == 0
+    assert report.rescheduled_tasks_count == 0
+    assert new_df.set_index("task_id").start_min.to_dict() == base_df.set_index("task_id").start_min.to_dict()
+
+
+def test_affected_count_reports_actual_moves_instead_of_mutable_tasks():
+    import pandas as pd
+
+    baseline = pd.DataFrame(
+        [
+            dict(task_id="UNCHANGED", machine_id="M01", start_min=480, end_min=500),
+            dict(task_id="EXTENDED", machine_id="M01", start_min=510, end_min=530),
+            dict(task_id="SWAPPED", machine_id="M01", start_min=540, end_min=560),
+        ]
+    )
+    current = baseline.copy()
+    current.loc[current.task_id == "EXTENDED", "end_min"] = 535
+    current.loc[current.task_id == "SWAPPED", "machine_id"] = "M02"
+    engine = DynamicRescheduler.__new__(DynamicRescheduler)
+    report = engine._calculate_nervousness(baseline, current, frozen_count=0)
+    assert report.total_tasks == 3
+    assert report.rescheduled_tasks_count == 2
+    assert report.machine_swapped_count == 1
+    assert report.average_start_delta_min == 0
 
 
 def test_scan_pending_mes_events():
@@ -108,6 +131,7 @@ def test_local_repair_is_certified_and_persists_real_model_context():
     assert audit.decision_tier == "VALIDATED_LOCAL_REPAIR"
     assert metadata.proven_optimal is False
     assert metadata.best_objective_bound is None
+    assert metadata.optimality_gap_pct is None
     assert schedule.set_index("task_id").start_min.to_dict() == base.set_index("task_id").start_min.to_dict()
     with sqlite3.connect(engine.disk_db_path) as conn:
         context = load_model_context(conn, "LOCAL-CERTIFIED")
@@ -145,7 +169,13 @@ def test_rejected_local_candidate_falls_back_to_authoritative_solver(monkeypatch
     monkeypatch.setattr(module, "run_cpsat_scheduling", bounded_solve)
     engine = DynamicRescheduler()
     _, schedule, _, _, audit = engine.execute_reschedule(
-        RescheduleTriggerEvent(event_id="LOCAL-FALLBACK", current_time_min=0, freeze_horizon_min=100000),
+        RescheduleTriggerEvent(
+            event_id="LOCAL-FALLBACK",
+            current_time_min=0,
+            freeze_horizon_min=100000,
+            delay_machine_id="M01",
+            delay_duration_min=1,
+        ),
         new_run_id="LOCAL-FALLBACK",
         persist_audit=False,
     )

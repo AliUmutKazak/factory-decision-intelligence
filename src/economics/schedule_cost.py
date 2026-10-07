@@ -49,6 +49,12 @@ def evaluate_schedule_cost(conn, schedule, run_id, economic=None):
             product_cost.get(row.product_id, 0) + row.qty_per_unit * materials.loc[row.material_id]
         )
     first_operations = schedule.sort_values("operation_seq").groupby("lot_id").first()
+    scope_1 = (
+        DEFAULT_FORKLIFT_LITERS * float(schedule.end_min.max()) / 10080 * DIESEL_EMISSION_FACTOR
+        if first_operations.production_units.sum() > 0
+        else 0.0
+    )
+    emissions = energy * GRID_EMISSION_FACTOR / 1000 + scope_1
     material = sum(row.production_units * product_cost[row.product_id] for row in first_operations.itertuples())
     mrp = pd.read_sql("SELECT * FROM mrp_plan WHERE run_id = ? AND period_week = 1", conn, params=(run_id,))
     expedited = int(mrp.action_message.astype(str).str.contains("EXPEDITE").sum()) if "action_message" in mrp else 0
@@ -66,8 +72,14 @@ def evaluate_schedule_cost(conn, schedule, run_id, economic=None):
     cost = EconomicDecisionEngine(params).compute_total_manufacturing_cost(
         schedule,
         energy_kwh_total=energy,
-        carbon_emissions_ton=energy * GRID_EMISSION_FACTOR / 1000 + DEFAULT_FORKLIFT_LITERS * DIESEL_EMISSION_FACTOR,
+        carbon_emissions_ton=emissions,
         material_cost_total=material,
         expedited_orders_count=expedited,
     )
-    return {"currency": str(rates.currency), "energy_kwh": energy, **asdict(cost)}
+    return {
+        "currency": str(rates.currency),
+        "energy_kwh": energy,
+        "scope_1_tco2e": scope_1,
+        "carbon_tco2e": emissions,
+        **asdict(cost),
+    }

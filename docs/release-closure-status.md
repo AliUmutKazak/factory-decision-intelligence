@@ -21,7 +21,7 @@ The supplied review begins at section 5 and ends at section 17. This package cov
 | 8 vendor acceptance | **External dependency:** actual customer test tenant, transport/version agreement and response traces required | Explicit pilot acceptance package; no false vendor claim |
 | 9 Docker | Clean bootstrap, shared persistent runtime, health/readiness, ACTIVE verification and restart reuse | Docker CI smoke job |
 | 10 what-if/orchestrator | One authoritative production engine; sandbox solves do not publish; persist/validate/audit/version/promote flow retained | What-if/dynamic/API tests |
-| 10 Tier-1 | Preserve machine order, regular-shift local repair, exact production-model certification; FEASIBLE certificate without global optimum claim | Local-tier success and fallback audit tests |
+| 10 Tier-1 | Preserve and certify the existing plan for no-disruption checks; otherwise regular-shift local repair preserving machine order, exact production-model certification; FEASIBLE certificate without global optimum/bound/gap claim | Local-tier success, unchanged-plan and fallback audit tests |
 | 10 FLEXIBLE | Same machine and hard lower/upper start displacement around source positions; actual context persisted for replay | Bounds/machine mismatch tests and model-context regression |
 | 10 fallback/freeze/audit | Rejected candidate records reason and uses full CP-SAT; frozen commitments remain hard; old ACTIVE survives failure | Dynamic and release tests |
 | 11–12 maturity | Advanced engineering prototype / single-host factory POC; no production SaaS claim | README, Docker/deployment docs |
@@ -40,5 +40,7 @@ The supplied review begins at section 5 and ends at section 17. This package cov
 The preceding hardening head `0e078a6dc9db6168ef74dd1cb982603214c1fae0` passed 195 tests and clean-start/restart Docker verification ([run 37542007742](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/37542007742)). This evidence applies to that source, not automatically to later edits. The new decision/adapter/demo implementation has additional focused tests; final full-suite and Docker results are recorded against the actual PR head.
 
 The measured demo stores its source workload and model hashes. A time-limited monetary solve need not outperform another policy; positive business value is measured rather than hardcoded. Energy is analytic, and configured holding/tardiness penalties are not automatically realized cash benefits. Reference and demo source revisions are deliberately retained instead of being mislabeled as an unrelated artifact-only commit.
+
+The monetary objective and independent cost evaluation use the same makespan-scaled Scope 1 forklift assumption as canonical carbon analytics. Reschedule audit and API affected-task counts include actual machine/start/end changes, not every task outside the freeze horizon.
 
 The technical package and reproducible pilot preparation can be completed here. Actual vendor interoperability, customer pilot execution, paid implementation and verified customer ROI remain unexecuted until the required customer data/access and acceptance evidence exist.

@@ -597,22 +597,29 @@ class DynamicRescheduler:
                                 key = (machine, row["from_product"], row["to_product"])
                                 if row.get("machine_id") in machines or key not in setup_matrix:
                                     setup_matrix[key] = int(round(row["setup_time_min"]))
-                        candidate = local_repair_candidate(
-                            baseline_sched,
-                            trigger.current_time_min,
-                            frozen,
-                            flexible,
-                            MachineCalendarService.load_daily_hours(mem_conn),
-                            setup_matrix,
-                            get_initial_machine_states(mem_conn, new_run_id),
-                            load_machine_maintenance_windows(mem_conn) + outage_windows,
-                        )
+                        if not trigger.delay_machine_id or trigger.delay_duration_min == 0:
+                            candidate = {
+                                str(row.task_id): (str(row.machine_id), float(row.start_min), float(row.end_min))
+                                for row in baseline_sched.itertuples()
+                            }
+                        else:
+                            candidate = local_repair_candidate(
+                                baseline_sched,
+                                trigger.current_time_min,
+                                frozen,
+                                flexible,
+                                MachineCalendarService.load_daily_hours(mem_conn),
+                                setup_matrix,
+                                get_initial_machine_states(mem_conn, new_run_id),
+                                load_machine_maintenance_windows(mem_conn) + outage_windows,
+                            )
                         meta = run_cpsat_scheduling(**solve_args, frozen_task_positions=candidate, time_limit_seconds=3)
                         meta = meta.model_copy(
                             update={
                                 "status": SolverStatus.FEASIBLE,
                                 "proven_optimal": False,
                                 "best_objective_bound": None,
+                                "optimality_gap_pct": None,
                                 "wall_time_seconds": perf_counter() - repair_started,
                             }
                         )
@@ -659,7 +666,6 @@ class DynamicRescheduler:
                 baseline_sched,
                 new_sched,
                 len(frozen),
-                max(0, len(baseline_sched) - len(frozen)),
             )
             audit = RescheduleAuditEntry(
                 audit_id=f"AUD-{uuid.uuid4().hex[:8].upper()}",
@@ -743,7 +749,6 @@ class DynamicRescheduler:
         baseline_sched: pd.DataFrame,
         new_sched: pd.DataFrame,
         frozen_count: int,
-        rescheduled_count: int,
     ) -> ScheduleNervousnessReport:
         base_indexed = baseline_sched.set_index("task_id")
         new_indexed = new_sched.set_index("task_id")
@@ -754,7 +759,7 @@ class DynamicRescheduler:
             return ScheduleNervousnessReport(
                 total_tasks=0,
                 frozen_tasks_count=frozen_count,
-                rescheduled_tasks_count=rescheduled_count,
+                rescheduled_tasks_count=0,
                 machine_swapped_count=0,
                 average_start_delta_min=0.0,
                 max_start_delta_min=0.0,
@@ -762,13 +767,19 @@ class DynamicRescheduler:
             )
 
         machine_swaps = 0
+        rescheduled_count = 0
         start_deltas = []
         for task_id in common_tasks:
             baseline = base_indexed.loc[task_id]
             current = new_indexed.loc[task_id]
-            if baseline["machine_id"] != current["machine_id"]:
+            machine_changed = baseline["machine_id"] != current["machine_id"]
+            start_delta = abs(float(current["start_min"]) - float(baseline["start_min"]))
+            end_delta = abs(float(current["end_min"]) - float(baseline["end_min"]))
+            if machine_changed:
                 machine_swaps += 1
-            start_deltas.append(abs(float(current["start_min"]) - float(baseline["start_min"])))
+            if machine_changed or start_delta > 1e-6 or end_delta > 1e-6:
+                rescheduled_count += 1
+            start_deltas.append(start_delta)
 
         avg_delta = float(np.mean(start_deltas)) if start_deltas else 0.0
         max_delta = float(np.max(start_deltas)) if start_deltas else 0.0

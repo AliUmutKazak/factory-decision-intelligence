@@ -109,9 +109,12 @@ def build_monetary_objective(
     carbon_rate = GRID_EMISSION_FACTOR / 1000 * economic.carbon_price_per_ton
     objective.constant_components["processing_energy"] = process_kwh * energy_rate
     objective.constant_components["processing_carbon"] = process_kwh * carbon_rate
-    objective.constant_components["scope_1_carbon"] = (
-        DEFAULT_FORKLIFT_LITERS * DIESEL_EMISSION_FACTOR * economic.carbon_price_per_ton
-    )
+    if task_frame.sort_values("operation_seq").groupby("lot_id").first()["production_units"].sum() > 0:
+        objective.add(
+            "scope_1_carbon",
+            makespan,
+            DEFAULT_FORKLIFT_LITERS / 10080 * DIESEL_EMISSION_FACTOR * economic.carbon_price_per_ton,
+        )
     for machine_id, machine in specs.iterrows():
         base = float(machine.base_power_kw)
         setup_kw = float(machine.get("setup_kw", round(base * 0.45, 2)))

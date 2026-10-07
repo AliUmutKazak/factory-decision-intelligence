@@ -196,6 +196,7 @@ def test_dispatch_benchmark_preserves_snapshot_and_shared_disruption_constraints
 
 
 def test_energy_setup_and_partial_buckets_match_independent_schedule_cost(tmp_path):
+    from src.carbon.carbon_analytics import compute_carbon_analytics
     from src.energy.energy_analytics import compute_energy_analytics
 
     conn, tasks = private_case()
@@ -227,6 +228,11 @@ def test_energy_setup_and_partial_buckets_match_independent_schedule_cost(tmp_pa
         (profile.total_load_kw * profile.interval_min / 60).sum(), abs=0.001
     )
     assert machines.set_index("machine_id").loc["M01", "setup_hours"] == 2
+    compute_carbon_analytics(run_id="TINY", db_path=path, processed_dir=tmp_path / "processed")
+    with sqlite3.connect(path) as conn:
+        carbon = pd.read_sql("SELECT * FROM carbon_kpis WHERE run_id='TINY'", conn).iloc[0]
+    assert expected["scope_1_tco2e"] == pytest.approx(carbon.scope_1_tco2e, abs=0.0001)
+    assert expected["carbon_tco2e"] == pytest.approx(carbon.total_tco2e, abs=0.0001)
 
 
 def test_financial_scenario_includes_material_and_expedite_with_shared_tmc():
