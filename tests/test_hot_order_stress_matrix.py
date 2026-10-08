@@ -25,6 +25,10 @@ def test_matrix_audits_three_distinct_hot_orders_without_changing_reference():
         scenario_limit_seconds=2,
     )
     assert report["scope"] == "LAB_SYNTHETIC_HOT_ORDER_MATRIX_NO_FACTORY_VALIDATION_OR_SLO"
+    assert report["cases_manifest_sha256"] == hashlib.sha256(CASES.read_bytes()).hexdigest()
+    assert (
+        report["matrix_code_sha256"] == hashlib.sha256(Path(hot_order_stress_matrix.__file__).read_bytes()).hexdigest()
+    )
     assert report["case_count"] == report["attempt_count"] == report["independently_accepted_count"] == 3
     assert report["all_accepted"] is True
     assert {row["report"]["hot_order"]["product_id"] for row in report["cases"]} == {"P01", "P03"}
