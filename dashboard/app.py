@@ -916,31 +916,36 @@ with tab_mes:
                 run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)")
 
             if run_bd_btn:
-                with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
-                    engine = WhatIfEngine()
-                    event = MachineBreakdownEvent(
-                        machine_id=sel_machine,
-                        start_min=int(bd_start),
-                        duration_min=int(bd_dur),
-                        reason=bd_reason,
+                try:
+                    with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
+                        engine = WhatIfEngine()
+                        event = MachineBreakdownEvent(
+                            machine_id=sel_machine,
+                            start_min=int(bd_start),
+                            duration_min=int(bd_dur),
+                            reason=bd_reason,
+                        )
+                        b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
+                except TimeoutError:
+                    st.warning(
+                        "Çözücü zaman sınırında geçerli bir arıza senaryosu bulamadı. ACTIVE plan değiştirilmedi."
                     )
-                    b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
-
-                st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    "Yeni Makespan",
-                    f"{report.scenario_makespan_min:,.0f} dk",
-                    delta=f"{report.makespan_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k2.metric(
-                    "Gecikme (Tardiness)",
-                    f"{report.scenario_total_tardiness_min:,.0f} dk",
-                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
+                else:
+                    st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric(
+                        "Yeni Makespan",
+                        f"{report.scenario_makespan_min:,.0f} dk",
+                        delta=f"{report.makespan_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k2.metric(
+                        "Gecikme (Tardiness)",
+                        f"{report.scenario_total_tardiness_min:,.0f} dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
 
         elif sim_type == "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)":
             with st.form("hot_order_form"):
@@ -961,32 +966,37 @@ with tab_mes:
                 run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle")
 
             if run_ho_btn:
-                with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
-                    engine = WhatIfEngine()
-                    injection = HotOrderInjection(
-                        order_id=f"HOT-{ho_product}-{int(ho_qty)}",
-                        product_id=ho_product,
-                        quantity=int(ho_qty),
-                        due_date_min=int(ho_due),
-                        priority_weight=float(ho_prio),
+                try:
+                    with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
+                        engine = WhatIfEngine()
+                        injection = HotOrderInjection(
+                            order_id=f"HOT-{ho_product}-{int(ho_qty)}",
+                            product_id=ho_product,
+                            quantity=int(ho_qty),
+                            due_date_min=int(ho_due),
+                            priority_weight=float(ho_prio),
+                        )
+                        b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
+                except TimeoutError:
+                    st.warning(
+                        "Çözücü zaman sınırında geçerli bir acil sipariş planı bulamadı. ACTIVE plan değiştirilmedi."
                     )
-                    b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
-
-                st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    "Yeni Makespan",
-                    f"{report.scenario_makespan_min:,.0f} dk",
-                    delta=f"{report.makespan_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k2.metric(
-                    "Gecikme (Tardiness)",
-                    f"{report.scenario_total_tardiness_min:,.0f} dk",
-                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
+                else:
+                    st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric(
+                        "Yeni Makespan",
+                        f"{report.scenario_makespan_min:,.0f} dk",
+                        delta=f"{report.makespan_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k2.metric(
+                        "Gecikme (Tardiness)",
+                        f"{report.scenario_total_tardiness_min:,.0f} dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
 
         else:
             with st.form("dynamic_resched_form"):
