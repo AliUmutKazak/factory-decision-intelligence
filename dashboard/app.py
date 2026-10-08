@@ -959,9 +959,10 @@ with tab_mes:
                 )
                 ho_prio = st.slider(
                     "Öncelik Ağırlığı:",
-                    min_value=1.0,
-                    max_value=10.0,
-                    value=5.0,
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                    step=1,
                 )
                 run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle")
 
@@ -974,7 +975,7 @@ with tab_mes:
                             product_id=ho_product,
                             quantity=int(ho_qty),
                             due_date_min=int(ho_due),
-                            priority_weight=float(ho_prio),
+                            priority_weight=int(ho_prio),
                         )
                         b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
                 except TimeoutError:
