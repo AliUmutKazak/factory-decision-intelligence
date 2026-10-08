@@ -4,6 +4,7 @@ Closed-Loop Dynamic Rescheduling motorunun test süiti.
 
 import pandas as pd
 
+from src.contracts.schemas import RescheduleTriggerEvent
 from src.data.build_database_and_eda import initialize_database
 from src.integration.rescheduler import ClosedLoopRescheduler
 from src.utils.db import get_db_connection
@@ -13,11 +14,12 @@ from src.utils.lineage import start_pipeline_run
 def test_closed_loop_machine_breakdown_impact():
     rescheduler = ClosedLoopRescheduler()
 
-    # M01 tezgahında 500. dakikada 120 dakikalık plansız duruş senaryosu
+    # M01's running task stays frozen until minute 1440; the outage is
+    # therefore queued after it. 180 minutes overlaps the next queued task.
     result = rescheduler.reschedule_on_machine_breakdown(
         machine_id="M01",
         down_start_min=500.0,
-        down_duration_min=120.0,
+        down_duration_min=180.0,
         reason="Acil Rulman Değişimi",
         commit=False,
     )
@@ -160,6 +162,7 @@ def test_frozen_horizon_preserves_completed_and_running_tasks():
         conn,
         params=(rescheduler.run_id,),
     )
+    conn.close()
     if not df_first.empty:
         task = df_first.iloc[0]
         mach = task["machine_id"]
@@ -167,12 +170,22 @@ def test_frozen_horizon_preserves_completed_and_running_tasks():
         t_end = float(task["end_min"])
 
         mid_time = (t_start + t_end) / 2.0
-        result = rescheduler.reschedule_on_machine_breakdown(
-            machine_id=mach,
-            down_start_min=mid_time,
-            down_duration_min=45.0,
-            reason="Test Mid-run Breakdown",
-            commit=False,
+        baseline, updated, _, report, _ = rescheduler._engine.execute_reschedule(
+            trigger=RescheduleTriggerEvent(
+                event_id="EVT-FROZEN-TEST",
+                current_time_min=int(mid_time),
+                freeze_horizon_min=240,
+                delay_machine_id=mach,
+                delay_duration_min=45,
+                reason="Test Mid-run Breakdown",
+            ),
+            persist_audit=False,
         )
-        assert result["status"] == "RESCHEDULED"
-        assert result["affected_tasks_count"] >= 1
+        base_task = baseline.loc[baseline.task_id == task["task_id"]].iloc[0]
+        updated_task = updated.loc[updated.task_id == task["task_id"]].iloc[0]
+        assert (
+            updated_task["machine_id"],
+            updated_task["start_min"],
+            updated_task["end_min"],
+        ) == (base_task["machine_id"], base_task["start_min"], base_task["end_min"])
+        assert report.frozen_tasks_count >= 1

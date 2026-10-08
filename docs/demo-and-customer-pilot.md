@@ -2,6 +2,8 @@
 
 This is a single-host manufacturing decision-support POC. The demo proves its own engineering behavior, not production SaaS readiness or customer ROI. No new ERP replacement, predictive maintenance, digital twin, SAP/SCADA gateway or distributed platform is introduced.
 
+Docker Compose publishes the API and Streamlit ports on `127.0.0.1` only. Remote users must not be given direct access until the G2 identity, role-policy, TLS/network and audit controls are accepted for the pilot.
+
 ## Reproduce the technical demo
 
 1. Install `requirements.txt`, run `python main.py`, then `python scripts/verify_active_run.py`.
@@ -34,6 +36,10 @@ python scripts/export_business_case.py --output-dir artifacts/customer-case \
 These inputs are assumptions, not observed customer data. Annual gross benefit is `(baseline cost - candidate cost) × cycles × realization fraction`. Net benefit subtracts operating costs; first-year ROI also subtracts implementation cost. Payback is undefined when annual net benefit is nonpositive. Modeled holding/tardiness penalties must be reconciled to cash flow before claiming financial ROI; projected production savings cannot automatically be called realized cash savings.
 
 ## Customer data boundary and B2MML
+
+For a narrower file-pilot preflight, `python -m src.integration.pilot_preflight examples/pilot-package/manifest.json` checks a labeled synthetic package of canonical UTF-8 CSV orders, machines, routing, shifts, current plan and optional actuals. It reports accepted rows, per-file SHA-256 values and rejection reasons without changing ACTIVE. This is an intake check, not a solver import, Excel adapter or real customer acceptance.
+
+The what-if and reschedule API routes return HTTP 503 with `detail.code=SOLVER_TIMEOUT` when CP-SAT reaches its time limit without a feasible schedule. A timeout is a failed request; callers must not treat it as a published plan. The previous ACTIVE run remains the fallback. G7 still needs measured latency and timeout rates at an agreed pilot load.
 
 `CustomerFileAdapter` takes explicit canonical-to-source column maps and customer-to-internal product/machine ID maps. It imports supplied CSV orders and MES actuals into validated contracts, rejects unknown IDs, duplicates, missing columns and nonfinite quantities, and creates no synthetic substitute records. It is a read-only file adapter; endpoint transport is customer-specific.
 

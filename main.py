@@ -247,4 +247,8 @@ def _run_end_to_end_pipeline(run_id):
 
 
 if __name__ == "__main__":
+    # Keep report output legible on Windows consoles with a legacy code page.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     run_end_to_end_pipeline()

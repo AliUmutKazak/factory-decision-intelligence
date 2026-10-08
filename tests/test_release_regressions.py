@@ -73,9 +73,11 @@ def test_validation_uses_context_reports_before_environment_reports(tmp_path, mo
     staging = tmp_path / "staging.db"
     reports = tmp_path / "staging-reports"
     shutil.copy2(paths["db_path"], staging)
-    shutil.copytree(paths["reports_dir"], reports)
     with sqlite3.connect(staging) as conn:
         active = get_active_run_id(conn)
+    # The shared reports directory can contain a prior test scenario. Pin the
+    # report set to the ACTIVE run copied above instead of ambient files.
+    shutil.copytree(paths["base_dir"] / "runs" / active / "reports", reports)
     wrong_reports = tmp_path / "environment-reports"
     monkeypatch.setenv("FACTORY_REPORTS_DIR", str(wrong_reports))
     with runtime_path_context(db_path=staging, reports_dir=reports):

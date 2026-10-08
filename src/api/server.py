@@ -17,7 +17,7 @@ from src.contracts.schemas import (
 )
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
-from src.utils.db import get_active_run_id, get_db_connection
+from src.utils.db import get_active_run_id
 
 
 class DynamicRescheduleRequest(BaseModel):
@@ -32,10 +32,36 @@ app = FastAPI(
 )
 
 
+def _solver_timeout_error(exc: TimeoutError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={
+            "code": "SOLVER_TIMEOUT",
+            "message": "Çözücü zaman sınırında geçerli bir plan bulamadı; işlem yeniden denenebilir.",
+        },
+    )
+
+
 def get_db() -> sqlite3.Connection:
-    conn = get_db_connection(get_runtime_paths()["db_path"])
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Read one consistent database version without pinning the published file.
+
+    Windows cannot atomically replace an open SQLite file. Copying the database
+    through SQLite's backup API closes the file handle before an API handler
+    reads ACTIVE and its related rows, while preserving one request snapshot.
+    """
+    path = Path(get_runtime_paths()["db_path"]).resolve()
+    snapshot = sqlite3.connect(":memory:")
+    try:
+        source = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)
+        try:
+            source.backup(snapshot)
+        finally:
+            source.close()
+        snapshot.row_factory = sqlite3.Row
+        return snapshot
+    except Exception:
+        snapshot.close()
+        raise
 
 
 def require_active_run_id(conn: sqlite3.Connection) -> str:
@@ -117,6 +143,8 @@ def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
             "solver_status": scenario_meta.status,
             "tasks_count": len(scenario_df),
         }
+    except TimeoutError as exc:
+        raise _solver_timeout_error(exc) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -136,6 +164,8 @@ def simulate_hot_order(injection: HotOrderInjection) -> dict[str, Any]:
             "solver_status": scenario_meta.status,
             "tasks_count": len(scenario_df),
         }
+    except TimeoutError as exc:
+        raise _solver_timeout_error(exc) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -162,6 +192,8 @@ def execute_dynamic_reschedule(
             "solver_status": new_meta.status,
             "new_makespan_min": new_meta.makespan_min,
         }
+    except TimeoutError as exc:
+        raise _solver_timeout_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception as exc:

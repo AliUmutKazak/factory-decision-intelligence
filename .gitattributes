@@ -1,0 +1,5 @@
+# These published artifacts are hashed byte-for-byte by their manifests.
+# Git must not rewrite line endings on checkout, including on Windows.
+artifacts/reference/** -text
+artifacts/demo/** -text
+src/contracts/xsd/b2mml-0701/** -text

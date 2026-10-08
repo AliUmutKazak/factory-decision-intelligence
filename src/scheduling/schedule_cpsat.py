@@ -1011,7 +1011,7 @@ def run_cpsat_scheduling(
         conn.close()
         raise TimeoutError(
             f"[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/Çözüm Yok). "
-            f"Zaman limiti ({CPSAT_TIME_LIMIT_SECONDS}s) aşıldı ve geçerli bir başlangıç çözümü bulunamadı. "
+            f"Zaman limiti ({limit}s) aşıldı ve geçerli bir başlangıç çözümü bulunamadı. "
             "Safe Fallback / Retry stratejisi gerekiyor."
         )
     elif status == cp_model.INFEASIBLE:

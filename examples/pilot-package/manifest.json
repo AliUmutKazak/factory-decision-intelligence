@@ -1,0 +1,15 @@
+{
+  "dataset_id": "FDI-LAB-EXAMPLE-01",
+  "source_type": "SYNTHETIC",
+  "origin": "2026-01-05T00:00:00+03:00",
+  "quantity_unit": "piece",
+  "time_unit": "minute",
+  "files": {
+    "orders": "orders.csv",
+    "machines": "machines.csv",
+    "routing": "routing.csv",
+    "shifts": "shifts.csv",
+    "current_plan": "current_plan.csv",
+    "actuals": "actuals.csv"
+  }
+}
