@@ -31,7 +31,10 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
             scenario_time_limit_seconds=2,
         )
     with closing(sqlite3.connect(source)) as conn:
-        assert audit_hot_order_schedule(conn, active_run_id, order, schedule)["status"] == "ACCEPTED"
+        accepted = audit_hot_order_schedule(conn, active_run_id, order, schedule)
+        assert accepted["status"] == "ACCEPTED"
+        assert accepted["material_release_by_product_min"]["P01"] == 480
+        assert accepted["material_release_by_product_min"]["P03"] == 960
 
         wrong_units = schedule.copy()
         wrong_units.loc[0, "production_units"] += 25
@@ -128,4 +131,36 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
                 for item in audit_hot_order_schedule(corrupted_source, active_run_id, order, schedule)["issues"]
             }
             assert "OT_BUDGET_EXCEEDED" in codes
+
+        wrong_material_release = schedule.copy()
+        p03_row = wrong_material_release[wrong_material_release["product_id"] == "P03"].index[0]
+        wrong_material_release.loc[p03_row, "release_time_min"] = 0
+        codes = {
+            item["code"]
+            for item in audit_hot_order_schedule(conn, active_run_id, order, wrong_material_release)["issues"]
+        }
+        assert "MATERIAL_RELEASE_MISMATCH" in codes
+
+        early_material_start = schedule.copy()
+        early_material_start.loc[p03_row, "start_min"] = 0
+        early_material_start.loc[p03_row, "end_min"] = int(schedule.loc[p03_row, "duration_min"])
+        early_material_start.loc[p03_row, "setup_end_min"] = 0
+        early_material_start.loc[p03_row, "setup_start_min"] = -int(schedule.loc[p03_row, "setup_before_min"])
+        codes = {
+            item["code"]
+            for item in audit_hot_order_schedule(conn, active_run_id, order, early_material_start)["issues"]
+        }
+        assert "MATERIAL_EARLY_START" in codes
+
+        with closing(sqlite3.connect(":memory:")) as corrupted_source:
+            conn.backup(corrupted_source)
+            corrupted_source.execute(
+                "DELETE FROM mrp_plan WHERE run_id = ? AND period_week = 1 AND material_id = 'RAW_ALLOY_ROD'",
+                (active_run_id,),
+            )
+            codes = {
+                item["code"]
+                for item in audit_hot_order_schedule(corrupted_source, active_run_id, order, schedule)["issues"]
+            }
+            assert "MISSING_MRP_MATERIAL" in codes
     assert hashlib.sha256(source.read_bytes()).hexdigest() == before
