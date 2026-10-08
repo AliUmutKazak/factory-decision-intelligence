@@ -92,6 +92,7 @@ def probe_hot_order_replay(
     baseline_run_id: str,
     *,
     expected_sha256: str,
+    hot_order: HotOrderInjection | None = None,
     repeats: int = 3,
     baseline_limit_seconds: float = 5.0,
     scenario_limit_seconds: float = 2.0,
@@ -105,7 +106,7 @@ def probe_hot_order_replay(
     source_hash = _sha256(source)
     if source_hash.lower() != expected_sha256.lower():
         raise ValueError(f"source DB SHA-256 mismatch: {source_hash}")
-    hot_order = HotOrderInjection(
+    hot_order = hot_order or HotOrderInjection(
         order_id="G7-RUSH-P01-51",
         product_id="P01",
         quantity=51,

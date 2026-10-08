@@ -1,0 +1,390 @@
+{
+  "scope": "LAB_SYNTHETIC_HOT_ORDER_MATRIX_NO_FACTORY_VALIDATION_OR_SLO",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "cases_manifest_sha256": "d6726ada27ed42bba5f589ae4d1ef6f213bddc7650b581f64f05b14a0b77b273",
+  "cases_manifest_name": "g7-hot-order-stress-cases.json",
+  "matrix_code_sha256": "8687e6282bafe0f119ec79dafebdcfd3ba2fc6c909ace574ef7c0d6fedb97ab7",
+  "git_sha": "5357fe40f35e9f41d346d70d3ce5f88084b71212",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "dispatch_rule": "EDD",
+  "scenario_limit_seconds": 2.0,
+  "repeats_per_case": 3,
+  "case_count": 3,
+  "attempt_count": 9,
+  "independently_accepted_count": 9,
+  "all_accepted": true,
+  "cases": [
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "report": {
+        "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
+        "measured_at_utc": "2026-10-08T16:23:36.101803+00:00",
+        "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+        "source_run_id": "RUN-20261006-00a0d3",
+        "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
+        "git_sha": "5357fe40f35e9f41d346d70d3ce5f88084b71212",
+        "code_hashes": {
+          "src/scheduling/hot_order_load_probe.py": "c94b4076c7ea162bf2d8a5386988583b96751409a31bf79d9540b198f7be24d1",
+          "src/scheduling/hot_order_schedule_audit.py": "313db40c4e7e95bd85d3ae3297b23f818ec03900d83b7cfbbc589c959ee82bf1",
+          "src/scheduling/what_if.py": "42de81bccc750ee0d528ca1397fbf908684d13b65fe05ce1f67e01eb0580bbd7",
+          "src/scheduling/schedule_cpsat.py": "43e8b7066e3a1df437494aad932456f4c1507362d1b66ce9c1d5783b3a4cf351",
+          "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0"
+        },
+        "platform": "Windows-11-10.0.26300-SP0",
+        "python_version": "3.13.15",
+        "ortools_version": "9.14.6206",
+        "hot_order": {
+          "order_id": "G7-SMALL-P01-1",
+          "product_id": "P01",
+          "quantity": 1,
+          "due_date_min": 480,
+          "priority_weight": 20
+        },
+        "baseline_limit_seconds": null,
+        "baseline_source": "ACTIVE_SNAPSHOT",
+        "scenario_dispatch_rule": "EDD",
+        "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+        "scenario_limit_seconds": 2.0,
+        "repeats": 3,
+        "attempts": [
+          {
+            "number": 1,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0525,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 76469,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2334,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 2,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0489,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 76469,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.214,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 3,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0483,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 76469,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2133,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          }
+        ],
+        "summary": {
+          "scenario_status_counts": {
+            "OPTIMAL": 3
+          },
+          "scenario_accepted_count": 3,
+          "baseline_failure_count": 0,
+          "scenario_failure_count": 0,
+          "audit_failure_count": 0,
+          "baseline_timeout_count": 0,
+          "scenario_timeout_count": 0,
+          "replay_wall_p50_seconds": 0.214,
+          "replay_wall_p95_seconds": 0.2315,
+          "accepted_scenario_solver_wall_p50_seconds": 0.0489,
+          "accepted_scenario_solver_wall_p95_seconds": 0.0521,
+          "percentile_method": "linear interpolation over sorted samples"
+        }
+      }
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "report": {
+        "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
+        "measured_at_utc": "2026-10-08T16:23:36.903671+00:00",
+        "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+        "source_run_id": "RUN-20261006-00a0d3",
+        "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
+        "git_sha": "5357fe40f35e9f41d346d70d3ce5f88084b71212",
+        "code_hashes": {
+          "src/scheduling/hot_order_load_probe.py": "c94b4076c7ea162bf2d8a5386988583b96751409a31bf79d9540b198f7be24d1",
+          "src/scheduling/hot_order_schedule_audit.py": "313db40c4e7e95bd85d3ae3297b23f818ec03900d83b7cfbbc589c959ee82bf1",
+          "src/scheduling/what_if.py": "42de81bccc750ee0d528ca1397fbf908684d13b65fe05ce1f67e01eb0580bbd7",
+          "src/scheduling/schedule_cpsat.py": "43e8b7066e3a1df437494aad932456f4c1507362d1b66ce9c1d5783b3a4cf351",
+          "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0"
+        },
+        "platform": "Windows-11-10.0.26300-SP0",
+        "python_version": "3.13.15",
+        "ortools_version": "9.14.6206",
+        "hot_order": {
+          "order_id": "G7-RUSH-P01-51",
+          "product_id": "P01",
+          "quantity": 51,
+          "due_date_min": 1200,
+          "priority_weight": 20
+        },
+        "baseline_limit_seconds": null,
+        "baseline_source": "ACTIVE_SNAPSHOT",
+        "scenario_dispatch_rule": "EDD",
+        "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+        "scenario_limit_seconds": 2.0,
+        "repeats": 3,
+        "attempts": [
+          {
+            "number": 1,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0492,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 62669,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2151,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 2,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0488,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 62669,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2139,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 3,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0498,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 62669,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2145,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 34,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          }
+        ],
+        "summary": {
+          "scenario_status_counts": {
+            "OPTIMAL": 3
+          },
+          "scenario_accepted_count": 3,
+          "baseline_failure_count": 0,
+          "scenario_failure_count": 0,
+          "audit_failure_count": 0,
+          "baseline_timeout_count": 0,
+          "scenario_timeout_count": 0,
+          "replay_wall_p50_seconds": 0.2145,
+          "replay_wall_p95_seconds": 0.215,
+          "accepted_scenario_solver_wall_p50_seconds": 0.0492,
+          "accepted_scenario_solver_wall_p95_seconds": 0.0497,
+          "percentile_method": "linear interpolation over sorted samples"
+        }
+      }
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "report": {
+        "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
+        "measured_at_utc": "2026-10-08T16:23:37.610024+00:00",
+        "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+        "source_run_id": "RUN-20261006-00a0d3",
+        "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
+        "git_sha": "5357fe40f35e9f41d346d70d3ce5f88084b71212",
+        "code_hashes": {
+          "src/scheduling/hot_order_load_probe.py": "c94b4076c7ea162bf2d8a5386988583b96751409a31bf79d9540b198f7be24d1",
+          "src/scheduling/hot_order_schedule_audit.py": "313db40c4e7e95bd85d3ae3297b23f818ec03900d83b7cfbbc589c959ee82bf1",
+          "src/scheduling/what_if.py": "42de81bccc750ee0d528ca1397fbf908684d13b65fe05ce1f67e01eb0580bbd7",
+          "src/scheduling/schedule_cpsat.py": "43e8b7066e3a1df437494aad932456f4c1507362d1b66ce9c1d5783b3a4cf351",
+          "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0"
+        },
+        "platform": "Windows-11-10.0.26300-SP0",
+        "python_version": "3.13.15",
+        "ortools_version": "9.14.6206",
+        "hot_order": {
+          "order_id": "G7-DIFFERENT-P03-200",
+          "product_id": "P03",
+          "quantity": 200,
+          "due_date_min": 2880,
+          "priority_weight": 10
+        },
+        "baseline_limit_seconds": null,
+        "baseline_source": "ACTIVE_SNAPSHOT",
+        "scenario_dispatch_rule": "EDD",
+        "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+        "scenario_limit_seconds": 2.0,
+        "repeats": 3,
+        "attempts": [
+          {
+            "number": 1,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0456,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 58119,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2084,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 33,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 2,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0455,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 58119,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2077,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 33,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          },
+          {
+            "number": 3,
+            "baseline_status": "FEASIBLE",
+            "baseline_solver_wall_seconds": null,
+            "baseline_original_solver_wall_seconds": 30.0029,
+            "scenario_status": "OPTIMAL",
+            "scenario_solver_wall_seconds": 0.0452,
+            "scenario_makespan_min": 14149,
+            "scenario_total_tardiness_min": 58119,
+            "scenario_total_setup_min": 390,
+            "scenario_proven_optimal_within_scope": true,
+            "replay_wall_seconds": 0.2058,
+            "failure_stage": null,
+            "failure_type": null,
+            "failure_reason": null,
+            "independent_audit": {
+              "status": "ACCEPTED",
+              "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+              "task_count": 33,
+              "lot_count": 13,
+              "issues": []
+            },
+            "staged_active_unchanged": true
+          }
+        ],
+        "summary": {
+          "scenario_status_counts": {
+            "OPTIMAL": 3
+          },
+          "scenario_accepted_count": 3,
+          "baseline_failure_count": 0,
+          "scenario_failure_count": 0,
+          "audit_failure_count": 0,
+          "baseline_timeout_count": 0,
+          "scenario_timeout_count": 0,
+          "replay_wall_p50_seconds": 0.2077,
+          "replay_wall_p95_seconds": 0.2083,
+          "accepted_scenario_solver_wall_p50_seconds": 0.0455,
+          "accepted_scenario_solver_wall_p95_seconds": 0.0456,
+          "percentile_method": "linear interpolation over sorted samples"
+        }
+      }
+    }
+  ]
+}

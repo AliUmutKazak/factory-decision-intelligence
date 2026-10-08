@@ -1,0 +1,36 @@
+{
+  "source_type": "SYNTHETIC",
+  "description": "Labeled laboratory hot-order inputs; no customer or factory data",
+  "cases": [
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      }
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      }
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      }
+    }
+  ]
+}
