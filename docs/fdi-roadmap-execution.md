@@ -13,7 +13,7 @@ Kaynak: `FDI_Nihai_Birlesik_Yol_Haritasi.pdf`, v1.1, 7 Ekim 2026 (13 sayfa; SHA-
 
 Her kayıt için kapı/görev kimliği, sorumlu, commit/run/dataset kimliği, ölçüm tarihi, kapsam, sonuç, açık risk, artifact bağlantısı ve kabul veren rol tutulur. Kaynak kod, veri, vendor profili veya ölçüm kapsamı değişirse etkilenen kanıt yeniden değerlendirilir. Takvim dolması kapıyı geçirmez.
 
-Fabrika bulunana kadarki teknik sıra: **G0 sürüm → G1-T referans profil → G2 güvenlik ve G3 veri platformu → G4-T veri hazırlığı ve G5-T mesajlaşma → G6-T üretim semantiği ve G7 işletim → G8-T bağımsız kıyas → dar kapsamlı dosya pilotu teklifi**. Fabrika anlaşmasından sonra G1, G4-G8 saha kabulü, G9 gölge pilot, G10 kontrollü üretim, G11 ekonomik kabul ve G12 ikinci tesis kurulumu izlenir. G13 ayrı yatırım kararıdır. Bağımsız tasarım işleri uygun bağımlılıklar altında paralel ilerleyebilir.
+Fabrika bağımsız teknik sıra: **G0 sürüm → G1-T referans profil → G2/G3 teknik sınırları → G4-T veri hazırlığı ve G5-T mesajlaşma → G6-T üretim semantiği ve G7 işletim → G8-T bağımsız kıyas → paylaşılabilir teknik POC ve dar kapsamlı dosya pilotu teklifi**. Fabrika arayışı bu işlerin ön şartı değildir; proje sahibinin tercihine göre teknik hazırlık ve paylaşım olgunlaştıktan sonraki aşamadır. Erken gelen ilgi kaydedilebilir, fakat saha kapısı varsayımla kapanmaz. Fabrika anlaşmasından sonra G1, G4-G8 saha kabulü, G9 gölge pilot, G10 kontrollü üretim, G11 ekonomik kabul ve G12 ikinci tesis kurulumu izlenir. G13 ayrı yatırım kararıdır. Bağımsız tasarım işleri uygun bağımlılıklar altında paralel ilerleyebilir. [Benzer projelerle teknik konum](benzer-projeler-teknik-konum.md) bu sıranın gerekçesini açıklar.
 
 ## Güncel teknik dayanak (8 Ekim 2026)
 

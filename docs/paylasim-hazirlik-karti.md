@@ -22,4 +22,4 @@ Bu liste tamamlanınca kullanılacak ifade **“teknik olarak gösterilebilir ka
 3. **G9:** FDI önerisi ile insan kararını ve uygulanmış planı actuals'a bağlayan gölge gözlemi yap; üretim sistemine otomatik talimat gönderme.
 4. **G10–G11:** Yalnız kabul edilen kapsamda kontrollü işletim, geri dönüş ve finans tarafından uzlaştırılmış gerçekleşmiş faydayı ölç.
 
-Fabrika bağlantısı olmaması kodu, CI'ı, bağımsız kıyası veya demo açıklığını geliştirmeyi durdurmaz. İlk paylaşım sonrasında ilgi gelirse G1 görüşmesi açılır; ilgi başlı başına pilot kabulü sayılmaz. [Proje sahibi katkı raporu](proje-sahibi-katki-raporu.md) ilk görüşmede toplanacak bilgiyi listeler.
+Fabrika bağlantısı olmaması kodu, CI'ı, bağımsız kıyası veya demo açıklığını geliştirmeyi durdurmaz. Fabrika arayışı [fabrika bağımsız teknik hazırlıkların](benzer-projeler-teknik-konum.md) sonrasına bırakılır. Paylaşım sırasında erken ilgi gelirse kaydedilir; ilgi başlı başına pilot kabulü sayılmaz. G1 görüşmesinde gerçek tesis, kapsam ve izinler ayrıca kararlaştırılır. [Proje sahibi katkı raporu](proje-sahibi-katki-raporu.md) o görüşmede toplanacak bilgiyi listeler.
