@@ -31,7 +31,7 @@ Aynı olayda kabul edilmiş baz plan ve **2 saniye** solver sınırıyla her kur
 
 | Sıra kuralı | Kabul | Replay p50 / p95 | Makespan | Ağırlıklı gecikme | Kapsam |
 |---|---:|---:|---:|---:|---|
-| [EDD](../artifacts/research/g7-hot-order-edd-2s.json) | 5/5 | 0,2290 / 0,2466 sn | 14149 dk | 62669 dk | Sabit sıra içinde `OPTIMAL` |
+| [EDD](../artifacts/research/g7-hot-order-edd-2s.json) | 5/5 | 0,2319 / 0,2587 sn | 14149 dk | 62669 dk | Sabit sıra içinde `OPTIMAL` |
 | [FIFO](../artifacts/research/g7-hot-order-fifo-2s.json) | 5/5 | 0,2393 / 0,2463 sn | 14149 dk | 62669 dk | Sabit sıra içinde `OPTIMAL` |
 | [SPT](../artifacts/research/g7-hot-order-spt-2s.json) | 5/5 | 0,2388 / 0,2736 sn | 14320 dk | 68920 dk | Sabit sıra içinde `OPTIMAL` |
 | [Greedy](../artifacts/research/g7-hot-order-greedy-2s.json) | 5/5 | 0,2258 / 0,3184 sn | 14320 dk | 68920 dk | Sabit sıra içinde `OPTIMAL` |
