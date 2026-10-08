@@ -13,6 +13,7 @@ from src.contracts.schemas import (
     MachineBreakdownEvent,
     ScenarioDeltaReport,
     ScenarioType,
+    ScheduleSolverMetadata,
     SolverStatus,
 )
 from src.scheduling.what_if import WhatIfEngine
@@ -139,3 +140,29 @@ def test_hot_order_timeout_keeps_source_active_run_unchanged(reference_active_db
     with sqlite3.connect(reference_active_db) as conn:
         assert conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchone()[0] == active_before
         assert conn.execute("SELECT 1 FROM pipeline_runs WHERE run_id = 'SCENARIO_TIMEOUT'").fetchone() is None
+
+
+def test_hot_order_uses_distinct_baseline_and_scenario_limits(reference_active_db, monkeypatch):
+    observed = []
+
+    def record_solve(**kwargs):
+        observed.append((kwargs["run_id"], kwargs["time_limit_seconds"]))
+        return ScheduleSolverMetadata(
+            run_id=kwargs["run_id"],
+            status=SolverStatus.FEASIBLE,
+            proven_optimal=False,
+            wall_time_seconds=0.1,
+            objective_value=1.0,
+        )
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    before = sha256_file(reference_active_db)
+    engine.simulate_hot_order(
+        HotOrderInjection(order_id="LIMIT-CHECK", product_id="P01", quantity=51, due_date_min=1200),
+        scenario_name="SCENARIO_LIMIT_CHECK",
+        baseline_time_limit_seconds=7,
+        scenario_time_limit_seconds=2,
+    )
+    assert observed == [("BASE", 7), ("SCENARIO_LIMIT_CHECK", 2)]
+    assert sha256_file(reference_active_db) == before
