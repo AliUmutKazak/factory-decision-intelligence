@@ -11,11 +11,17 @@ Proje **fabrika beklerken durmuyor**. Kod, test, veri sözleşmesi, güvenlik s�
 
 **Terimler:** *Kapı (G0–G13)*, geçişi kanıt ve sorumlu kabulüyle yapılan aşamadır; `-T` yalnız teknik/laboratuvar hazırlığıdır. *Mevcut plan (baseline)* fabrikanın o anda kullandığı çizelgedir. *Actuals* üretimde gerçekten başlayan, biten ve değişen işlerdir. *Gölge pilot* FDI önerilerinin incelendiği, üretim sistemine otomatik talimat gönderilmeyen dönemdir.
 
-## Senin katkı verebileceğin işler — öncelik sırasıyla
+## Şimdi: fabrika olmadan yapılacaklar
 
-**8 Ekim 2026 kararı:** Şu anda fabrika bağlantısı yok. Öncelik, [paylaşım kartındaki](paylasim-hazirlik-karti.md) teknik POC'yi dürüst ve tekrar üretilebilir biçimde yayımlamak; ilgi duyan bir tesis olduğunda aşağıdaki saha bilgilerini toplamaktır. Fabrika adayı bulmak bugünkü teknik çalışmanın blokajı değildir.
+**Benim işim:** Paylaşılabilir teknik POC için temiz kurulum, CI ve Docker kanıtı, mühürlü demo, bağımsız kıyas, güvenlik sınırı, açık veri/sentetik veri etiketleri ve sürüm açıklığını geliştirmek. Bunlar gerçek fabrika verisi gerektirmez; tamamlanan her sonucu commit ve çalıştırılabilir kanıtla ilişkilendireceğim.
 
-| Öncelik | Senden yararlı olacak bilgi/karar | Çıktı | Neden gerekli? |
+**Senden şu an beklenen saha işi yok:** Fabrika bulman, üretim dosyası toplaman, ERP/MES erişimi ayarlaman, pilot KPI eşiği belirlemen veya aşağıdaki görüşme şablonunu doldurman gerekmiyor. Dilersen paylaşım metninin hedef kitleye açık gelip gelmediğini değerlendirebilirsin; bu teknik ilerlemenin ön koşulu değildir.
+
+## Ancak ilgilenen bir tesis olduğunda: saha görüşmesi işleri
+
+**8 Ekim 2026 kararı:** Şu anda fabrika bağlantısı yok. Öncelik, [paylaşım kartındaki](paylasim-hazirlik-karti.md) teknik POC'yi dürüst ve tekrar üretilebilir biçimde yayımlamaktır. Aşağıdaki tablo bugünün görev listesi değil, ilgi geldikten sonraki görüşme sırasıdır.
+
+| Görüşme aşaması | Senden yararlı olacak bilgi/karar | Çıktı | Neden gerekli? |
 |---|---|---|---|
 | **1 — Paylaşım sonrası ilgi gelirse** | Pilot için konuşabileceğimiz bir tesis veya üretim sorumlusu var mı? Varsa **tek hat / tek ürün ailesi** ve planlama sorumlusunu belirle. | Aday tesis, hat/ürün ailesi, ilgili rol, temas ve izin durumu; `bilinmiyor` kabul edilir. | G1 pilot kapsamı ancak adı belli bir fabrika ve karar sahibiyle kurulabilir. |
 | **2 — İlk görüşmede** | Mevcut plan nasıl yapılıyor: Excel, ERP, MES veya başka yöntem? Siparişten tamamlanmaya kadar hangi kayıtlar tutuluyor? | Bir sayfalık süreç özeti ve veri sahibi listesi. | FDI önerisini fabrikanın **fiilî planıyla** eşit koşullarda kıyaslamak için başlangıç noktası gerekir. |
@@ -28,7 +34,7 @@ Bu satırlarda bütün cevapların bir anda hazır olması beklenmiyor. Her bili
 
 **İlgi geldikten sonra araştırma yolu:** İlgilenen ayrık üretim tesisi veya üretim danışmanıyla planlamacı/üretim yöneticisi üzerinden kısa görüşme olasılığını araştır. İlk görüşmede üç şeyi öğrenmek yeterli: plan hangi araçla hazırlanıyor, aynı iş için alternatif makineler var mı, geçmiş plan ve gerçekleşme kayıtları tutuluyor mu? Teknik çözüm veya veri aktarımı sözü vermene gerek yok; çıkan belirsizlikleri bana iletmen tasarımı yönlendirecek.
 
-## İlk dosya pilotunda sorulacak veri listesi
+## Tesis dosya incelemesini kabul ederse: sorulacak veri listesi
 
 | Öncelik | Alanlar | Olmazsa sonuç |
 |---|---|---|
@@ -39,7 +45,7 @@ Bu satırlarda bütün cevapların bir anda hazır olması beklenmiyor. Her bili
 
 Her dosya için kaynak sahibi, alan açıklaması, kimlik eşlemesi, ölçü birimi, zaman dilimi, tarih aralığı ve paylaşım izni kaydedilir. İlk örnek **salt okunur** incelenir; üretim sistemine plan yazılmaz. Mevcut [kanonik CSV ön kontrol örneği](../examples/pilot-package/README.md) hangi dosyaları isteyeceğimizi somutlaştırır; müşteri Excel'i veya vendor şemasını henüz otomatik kabul etmiyor.
 
-## Benim ilerleteceğim teknik işler
+## Benim şimdi ilerleteceğim teknik işler
 
 | Yol haritası | Sorumluluğum | Saha geldiğinde ayrıca gereken |
 |---|---|---|
