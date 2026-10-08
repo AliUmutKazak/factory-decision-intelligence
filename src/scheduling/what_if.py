@@ -61,11 +61,21 @@ class WhatIfEngine:
         disk_conn.close()
         return mem_conn
 
-    def run_baseline(self, mem_conn: sqlite3.Connection, run_id: str = "BASELINE") -> ScheduleSolverMetadata:
+    def run_baseline(
+        self,
+        mem_conn: sqlite3.Connection,
+        run_id: str = "BASELINE",
+        time_limit_seconds: float | None = None,
+    ) -> ScheduleSolverMetadata:
         """Solves and returns the baseline operational schedule."""
         wrapped_conn = NoCloseConnectionWrapper(mem_conn)
         clone_run_inputs(mem_conn, get_active_run_id(mem_conn), run_id)
-        meta = run_cpsat_scheduling(run_id=run_id, persist_outputs=False, connection=wrapped_conn)
+        meta = run_cpsat_scheduling(
+            run_id=run_id,
+            persist_outputs=False,
+            connection=wrapped_conn,
+            time_limit_seconds=time_limit_seconds,
+        )
         return meta
 
     def simulate_breakdown(
@@ -125,6 +135,8 @@ class WhatIfEngine:
         self,
         hot_order: HotOrderInjection,
         scenario_name: str = "HOT_ORDER_SCENARIO",
+        baseline_time_limit_seconds: float | None = None,
+        scenario_time_limit_seconds: float | None = None,
     ) -> tuple[
         ScheduleSolverMetadata,
         ScheduleSolverMetadata,
@@ -135,7 +147,7 @@ class WhatIfEngine:
         mem_conn = self._create_isolated_connection()
         try:
             # 1. Baz Senaryoyu Koştur
-            baseline_meta = self.run_baseline(mem_conn, run_id="BASE")
+            baseline_meta = self.run_baseline(mem_conn, run_id="BASE", time_limit_seconds=baseline_time_limit_seconds)
 
             # 2. Acil Siparişi sku_production_plan Tablosuna Ekle
             batches = math.ceil(hot_order.quantity / PRODUCTION_BATCH_SIZE)
@@ -187,7 +199,11 @@ class WhatIfEngine:
             # 3. Senaryo Çözümü
             wrapped_conn = NoCloseConnectionWrapper(mem_conn)
             scenario_meta = run_cpsat_scheduling(
-                sku_plan=scenario_plan, run_id=scenario_name, persist_outputs=False, connection=wrapped_conn
+                sku_plan=scenario_plan,
+                run_id=scenario_name,
+                persist_outputs=False,
+                connection=wrapped_conn,
+                time_limit_seconds=scenario_time_limit_seconds,
             )
 
             scenario_sched = pd.read_sql(
