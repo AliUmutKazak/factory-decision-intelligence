@@ -1023,31 +1023,34 @@ with tab_mes:
                 run_resched_btn = st.form_submit_button("🔄 Freeze Horizon ile Yeniden Çizelgele")
 
             if run_resched_btn:
-                with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
-                    rescheduler = DynamicRescheduler()
-                    trig = RescheduleTriggerEvent(
-                        event_id=f"EVT-UI-{int(curr_t)}",
-                        current_time_min=int(curr_t),
-                        freeze_horizon_min=int(freeze_h),
-                        delay_machine_id=None if dev_mac == "Yok" else dev_mac,
-                        delay_duration_min=int(dev_dur),
-                        reason="Kullanıcı arayüzü dinamik müdahalesi",
-                    )
-                    base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
-                        trigger=trig,
-                        new_run_id=f"UI_RESCHED_{int(curr_t)}",
-                    )
+                try:
+                    with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
+                        rescheduler = DynamicRescheduler()
+                        trig = RescheduleTriggerEvent(
+                            event_id=f"EVT-UI-{int(curr_t)}",
+                            current_time_min=int(curr_t),
+                            freeze_horizon_min=int(freeze_h),
+                            delay_machine_id=None if dev_mac == "Yok" else dev_mac,
+                            delay_duration_min=int(dev_dur),
+                            reason="Kullanıcı arayüzü dinamik müdahalesi",
+                        )
+                        base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
+                            trigger=trig,
+                            new_run_id=f"UI_RESCHED_{int(curr_t)}",
+                        )
+                except TimeoutError:
+                    st.warning("Çözücü zaman sınırında geçerli bir yeni plan bulamadı. Önceki ACTIVE plan korunuyor.")
+                else:
+                    st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
+                    n1, n2, n3 = st.columns(3)
+                    n1.metric("Kilitlenen İşler", f"{n_rep.frozen_tasks_count} ad")
+                    n2.metric("Tezgâhı Değişenler", f"{n_rep.machine_swapped_count} ad")
+                    n3.metric("Sarsıntı (Nervousness)", f"{n_rep.nervousness_score:.4f}")
 
-                st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
-                n1, n2, n3 = st.columns(3)
-                n1.metric("Kilitlenen İşler", f"{n_rep.frozen_tasks_count} ad")
-                n2.metric("Tezgâhı Değişenler", f"{n_rep.machine_swapped_count} ad")
-                n3.metric("Sarsıntı (Nervousness)", f"{n_rep.nervousness_score:.4f}")
-
-                st.info(
-                    f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
-                    f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
-                )
+                    st.info(
+                        f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
+                        f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
+                    )
 
         st.markdown("---")
         st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
