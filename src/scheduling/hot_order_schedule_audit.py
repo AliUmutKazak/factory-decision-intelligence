@@ -1,8 +1,8 @@
 """Independent, read-only checks for the G7 synthetic hot-order schedule.
 
 This module does not import the production solver or its constraint builders.
-Its scope is quantity, routing, timing, setup and machine occupancy. Calendar,
-MRP, overtime and economic optimality need separate checks.
+It checks quantity, routing, timing, setup, machine occupancy and the source
+calendar's closed/authorized intervals. MRP and economics need separate checks.
 """
 
 from __future__ import annotations
@@ -47,6 +47,81 @@ def _integer(value: Any) -> int | None:
     except (TypeError, ValueError, OverflowError):
         return None
     return int(number) if math.isfinite(number) and number.is_integer() else None
+
+
+def _overlap(start: int, end: int, left: int, right: int) -> int:
+    return max(0, min(end, right) - max(start, left))
+
+
+def _audit_calendar(
+    conn: sqlite3.Connection,
+    run_id: str,
+    tasks: list[dict[str, Any]],
+    issue: Any,
+) -> None:
+    """Check occupied intervals against source shifts, OT and maintenance."""
+    daily_hours = {
+        str(machine): float(hours)
+        for machine, hours in conn.execute("SELECT machine_id, max_daily_hours FROM machines")
+    }
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'").fetchone():
+        for machine, hours in conn.execute(
+            "SELECT machine_id, AVG(available_hours) FROM machine_calendar WHERE is_available = 1 GROUP BY machine_id"
+        ):
+            daily_hours[str(machine)] = float(hours)
+    budgets = {
+        str(machine): float(hours) * 60
+        for machine, hours in conn.execute(
+            "SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE run_id = ? AND period_week = 1",
+            (run_id,),
+        )
+    }
+    maintenance: dict[str, list[tuple[int, int]]] = defaultdict(list)
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_maintenance'").fetchone():
+        for machine, start, end in conn.execute(
+            "SELECT machine_id, start_min, end_min FROM machine_maintenance WHERE is_active = 1"
+        ):
+            maintenance[str(machine)].append((int(start), int(end)))
+
+    used_week1: dict[str, int] = defaultdict(int)
+    used_nights: dict[str, set[int]] = defaultdict(set)
+    for task in tasks:
+        machine = task["machine_id"]
+        hours = daily_hours.get(machine)
+        budget = budgets.get(machine)
+        if hours is None or not math.isfinite(hours) or not 0 < hours <= 24:
+            issue("MISSING_CALENDAR", machine)
+            continue
+        if budget is None or not math.isfinite(budget) or budget < 0:
+            issue("MISSING_OT_BUDGET", machine)
+            continue
+        night = int(round((24 - hours) * 60))
+        for start, end in ((task["setup_start_min"], task["setup_end_min"]), (task["start_min"], task["end_min"])):
+            if start < 0 or end <= start:
+                continue
+            for left, right in maintenance.get(machine, []):
+                if _overlap(start, end, left, right):
+                    issue("MAINTENANCE_OVERLAP", task["task_id"])
+            for day in range(start // 1440, (end - 1) // 1440 + 1):
+                day_start = day * 1440
+                if day % 7 == 6 and _overlap(start, end, day_start, day_start + 1440):
+                    issue("SUNDAY_CLOSED", task["task_id"])
+                night_usage = _overlap(start, end, day_start, day_start + night)
+                if not night_usage:
+                    continue
+                if day >= 7:
+                    issue("WEEK2_OVERTIME", task["task_id"])
+                else:
+                    used_week1[machine] += night_usage
+                    used_nights[machine].add(day)
+    for machine, used in used_week1.items():
+        budget = budgets[machine]
+        if used > budget + 1e-6:
+            issue("OT_BUDGET_EXCEEDED", f"{machine}: used={used}, budget={budget:g}")
+        night = int(round((24 - daily_hours[machine]) * 60))
+        max_nights = math.ceil(budget / night) if night else 0
+        if len(used_nights[machine]) > max_nights:
+            issue("OT_WINDOW_COUNT", f"{machine}: used={len(used_nights[machine])}, allowed={max_nights}")
 
 
 def audit_hot_order_schedule(
@@ -226,9 +301,11 @@ def audit_hot_order_schedule(
             previous_product = row["product_id"]
             previous_end = row["end_min"]
 
+    _audit_calendar(conn, baseline_run_id, tasks, issue)
+
     return {
         "status": "ACCEPTED" if not issues else "REJECTED",
-        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_PRECEDENCE_ONLY",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_CALENDAR_OT_MAINTENANCE",
         "task_count": len(tasks),
         "lot_count": len(by_lot),
         "issues": issues,
