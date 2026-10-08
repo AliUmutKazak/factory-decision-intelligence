@@ -1,0 +1,61 @@
+{
+  "scope": "LAB_SYNTHETIC_FILE_PREFLIGHT_NO_FACTORY_ACCEPTANCE",
+  "git_sha": "62ae0387c83ee5f06f7b886266d8592f48b8f638",
+  "preflight_code_sha256": "e2e4761a573d55125b50fc5f5b3eec9ce0829439ecf68b449582e3a7fff508f6",
+  "report": {
+    "dataset_id": "FDI-LAB-EXAMPLE-01",
+    "source_type": "SYNTHETIC",
+    "origin": "2026-01-05T00:00:00+03:00",
+    "quantity_unit": "piece",
+    "time_unit": "minute",
+    "provenance": {},
+    "manifest_sha256": "ac78700ed709cded2335fc620458f6169211da42efca57577cb15c0572c6a05c",
+    "files": {
+      "orders": {
+        "path": "orders.csv",
+        "sha256": "844966d5d655b5446a1ef190d20db874a05869dc4dd9ef45e6b5d0e4050fb077",
+        "size_bytes": 71,
+        "parsed_rows": 1
+      },
+      "machines": {
+        "path": "machines.csv",
+        "sha256": "92a79e624e177eaa531ccb9af7a0ff5493195c079d7244427b0c2e76d94a36cd",
+        "size_bytes": 19,
+        "parsed_rows": 1
+      },
+      "routing": {
+        "path": "routing.csv",
+        "sha256": "9425c5691517fe14d17d55590feb4e663d6c77cbdf5f1297eee6154cb39ab348",
+        "size_bytes": 76,
+        "parsed_rows": 1
+      },
+      "shifts": {
+        "path": "shifts.csv",
+        "sha256": "cc9795f01a1e2a3d3eec841ff1db26e5d2706d53aa28dff2be726fb5bdff1c3b",
+        "size_bytes": 43,
+        "parsed_rows": 1
+      },
+      "current_plan": {
+        "path": "current_plan.csv",
+        "sha256": "db9988bac4151d98f0dbe28e0c87a4ef1a06a7942acb134c35d3c2fa419250a1",
+        "size_bytes": 72,
+        "parsed_rows": 1
+      },
+      "actuals": {
+        "path": "actuals.csv",
+        "sha256": "bbc5ffebc6c1f1541db7f70dc41d1c5c2e0590725652a3791004fc0a6fd33efc",
+        "size_bytes": 129,
+        "parsed_rows": 1
+      }
+    },
+    "actuals_timing": {
+      "status": "ASSESSED",
+      "declared_max_reporting_lag_min": 30.0,
+      "max_observed_reporting_lag_min": 8.0,
+      "actual_count": 1
+    },
+    "status": "ACCEPTED",
+    "rejections": [],
+    "scope": "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION"
+  }
+}

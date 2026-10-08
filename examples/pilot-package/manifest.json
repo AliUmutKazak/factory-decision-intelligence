@@ -4,6 +4,7 @@
   "origin": "2026-01-05T00:00:00+03:00",
   "quantity_unit": "piece",
   "time_unit": "minute",
+  "max_actual_reporting_lag_min": 30,
   "files": {
     "orders": "orders.csv",
     "machines": "machines.csv",
