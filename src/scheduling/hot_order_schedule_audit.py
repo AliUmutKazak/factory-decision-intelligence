@@ -1,8 +1,8 @@
 """Independent, read-only checks for the G7 synthetic hot-order schedule.
 
 This module does not import the production solver or its constraint builders.
-It checks quantity, routing, timing, setup, machine occupancy and the source
-calendar's closed/authorized intervals. MRP and economics need separate checks.
+It checks quantity, routing, timing, setup, machine occupancy, source calendar
+and the synthetic W1 MRP release policy. Economic outcomes need separate checks.
 """
 
 from __future__ import annotations
@@ -122,6 +122,63 @@ def _audit_calendar(
         max_nights = math.ceil(budget / night) if night else 0
         if len(used_nights[machine]) > max_nights:
             issue("OT_WINDOW_COUNT", f"{machine}: used={len(used_nights[machine])}, allowed={max_nights}")
+
+
+def _audit_material_release(
+    conn: sqlite3.Connection,
+    run_id: str,
+    tasks: list[dict[str, Any]],
+    issue: Any,
+) -> dict[str, int]:
+    """Rebuild the replay's synthetic W1 material gate from BOM and MRP rows."""
+    product_materials: dict[str, set[str]] = defaultdict(set)
+    for product, material in conn.execute("SELECT product_id, material_id FROM bom"):
+        product_materials[str(product)].add(str(material))
+
+    material_ready: dict[str, int] = {}
+    invalid_materials: set[str] = set()
+    for material, action, release_week in conn.execute(
+        "SELECT material_id, action_message, planned_release_week FROM mrp_plan WHERE run_id = ? AND period_week = 1",
+        (run_id,),
+    ):
+        material = str(material)
+        if material in material_ready or material in invalid_materials:
+            issue("DUPLICATE_MRP_MATERIAL", material)
+            invalid_materials.add(material)
+            continue
+        week = _integer(release_week)
+        if week is None:
+            issue("INVALID_MRP_RELEASE_WEEK", material)
+            invalid_materials.add(material)
+            continue
+        material_ready[material] = 480 + max(0, -week) * 480 if "EXPEDITE" in str(action) else 0
+
+    release_by_product: dict[str, int] = {}
+    for product in sorted({task["product_id"] for task in tasks}):
+        materials = product_materials.get(product)
+        if not materials:
+            issue("MISSING_BOM", product)
+            continue
+        missing = materials - material_ready.keys()
+        if missing:
+            issue("MISSING_MRP_MATERIAL", f"{product}: {','.join(sorted(missing))}")
+            continue
+        if materials & invalid_materials:
+            continue
+        release_by_product[product] = max(material_ready[material] for material in materials)
+
+    for task in tasks:
+        expected = release_by_product.get(task["product_id"])
+        if expected is None:
+            continue
+        if task["release_time_min"] != expected:
+            issue(
+                "MATERIAL_RELEASE_MISMATCH",
+                f"{task['task_id']}: expected={expected}, actual={task['release_time_min']}",
+            )
+        if task["start_min"] < expected:
+            issue("MATERIAL_EARLY_START", f"{task['task_id']}: start={task['start_min']}, ready={expected}")
+    return release_by_product
 
 
 def audit_hot_order_schedule(
@@ -302,11 +359,13 @@ def audit_hot_order_schedule(
             previous_end = row["end_min"]
 
     _audit_calendar(conn, baseline_run_id, tasks, issue)
+    material_release = _audit_material_release(conn, baseline_run_id, tasks, issue)
 
     return {
         "status": "ACCEPTED" if not issues else "REJECTED",
-        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_INTERVAL_SETUP_CALENDAR_OT_MAINTENANCE",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
         "task_count": len(tasks),
         "lot_count": len(by_lot),
+        "material_release_by_product_min": material_release,
         "issues": issues,
     }
