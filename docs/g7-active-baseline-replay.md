@@ -1,6 +1,6 @@
 # G7-T: kabul edilmiş planla acil sipariş oynatması
 
-Bu deney, [ilk acil sipariş ölçümündeki](g7-hot-order-replay.md) baz planın her istekte yeniden çözülmesi maliyetini ayırır. Mühürlü sentetik referans verisinin yalnız geçici kopyası `ACTIVE` yapılır. Yeni yol, o kopyadaki **tek kabul edilmiş** `ACTIVE` solver kaydını ve çizelgeyi okur, acil sipariş için ayrı run girdilerini klonlar ve mevcut çizelgeyi CP-SAT başlangıç ipucu olarak kullanır. Kaynak dosyaya veya gerçek `ACTIVE` plana yazmaz. Eksik/`UNKNOWN` baz planı reddeder; önceki planı yeni sipariş kabul edilmiş gibi sunmaz.
+Bu deney, [ilk acil sipariş ölçümündeki](g7-hot-order-replay.md) baz planın her istekte yeniden çözülmesi maliyetini ayırır. Mühürlü sentetik referans verisinin yalnız geçici kopyası `ACTIVE` yapılır. Yeni yol, o kopyadaki **tek kabul edilmiş** `ACTIVE` solver kaydını ve çizelgeyi okur, acil sipariş için ayrı run girdilerini klonlar ve mevcut çizelgeyi CP-SAT başlangıç ipucu olarak kullanır. Kaynak dosyaya veya gerçek `ACTIVE` plana yazmaz. Eksik/`UNKNOWN` baz planı reddeder; önceki planı yeni sipariş kabul edilmiş gibi sunmaz. Referansın model bağlamı boştur; dondurulmuş görev, esnek pencere, bakım kısıtı veya ileri başlangıç zamanı taşıyan `ACTIVE` planı, bu kısıtlar senaryoya aktarılmadığı için açıkça reddeder.
 
 ## Bilimsel ve teknik dayanak
 

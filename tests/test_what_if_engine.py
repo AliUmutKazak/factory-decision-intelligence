@@ -219,6 +219,24 @@ def test_hot_order_rejects_unaccepted_active_baseline(reference_active_db, monke
     assert sha256_file(reference_active_db) == before
 
 
+def test_hot_order_rejects_active_context_it_cannot_replay(reference_active_db):
+    with sqlite3.connect(reference_active_db) as conn:
+        conn.execute(
+            "UPDATE schedule_model_context SET payload_json = ?",
+            (
+                '{"earliest_start_min": 0, "frozen_positions": {"1": ["M01", 0, 10]}, "flexible_windows": {}, "maintenance_overrides": []}',
+            ),
+        )
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with pytest.raises(RuntimeError, match="cannot preserve"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-FROZEN", product_id="P01", quantity=51, due_date_min=1200),
+            reuse_active_baseline=True,
+        )
+    assert sha256_file(reference_active_db) == before
+
+
 def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db):
     before = sha256_file(reference_active_db)
     engine = WhatIfEngine(disk_db_path=str(reference_active_db))

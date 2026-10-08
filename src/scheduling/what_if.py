@@ -16,6 +16,7 @@ from src.contracts.schemas import (
     SolverStatus,
 )
 from src.scheduling.maintenance import MaintenanceWindow
+from src.scheduling.model_context import load_model_context
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.utils.db import clone_run_inputs, get_active_run_id
 
@@ -94,6 +95,14 @@ class WhatIfEngine:
         )
         if metadata.run_id != active_run_id or metadata.status not in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
             raise RuntimeError("ACTIVE baseline has no accepted solver result")
+        context = load_model_context(mem_conn, active_run_id)
+        if (
+            context.get("earliest_start_min", 0) != 0
+            or context.get("frozen_positions")
+            or context.get("flexible_windows")
+            or context.get("maintenance_overrides")
+        ):
+            raise RuntimeError("ACTIVE baseline has replay constraints that this hot-order experiment cannot preserve")
         schedule = pd.read_sql(
             "SELECT * FROM production_schedule WHERE run_id = ?",
             mem_conn,
