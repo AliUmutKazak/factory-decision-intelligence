@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "source_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "code_sha256": "310b05202dbb0c491cdb5869ae7cd574f1b2532fdedecb1c60bb17f82de3e8d2",
+  "snapshot_sha256": "cf93b89a823ec12afe3a79a7f982fa13644d00751d1d32de5123e7724da3b20d",
+  "restored_sha256": "cf93b89a823ec12afe3a79a7f982fa13644d00751d1d32de5123e7724da3b20d",
+  "logical_sha256": "cf51ac90e90b71506e90b14a8697c46fee7477c49b4b18a9d9a81ed165897940",
+  "sqlite_version": "3.53.1",
+  "python_version": "3.11.16",
+  "table_count": 32,
+  "pipeline_run_count": 1,
+  "integrity_check": "ok",
+  "foreign_key_check": "ok",
+  "source_unchanged": true,
+  "scope": "LAB_OFFLINE_SQLITE_DB_ONLY_NO_LIVE_OR_BUNDLE_RECOVERY_PROOF"
+}
