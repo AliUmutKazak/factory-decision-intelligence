@@ -21,7 +21,8 @@ Kaynak özeti: `demand_fixture.csv` **Git blob ham baytları** SHA-256 `1df96565
 | Tür | Aday / mevcut kaynak | Uygun teknik sınama | Sınır |
 |---|---|---|---|
 | Etiketli sentetik | Proje fixture'ları ve mühürlü referans | Uçtan uca sözleşme, fail-safe, fizik ve maliyet kontrolleri | Müşteri performansı, vendor kabulü, nakit fayda göstermez |
-| Açık çizelgeleme benchmark'ı | [OR-Library Job Shop](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/jobshopinfo.html) | Ortak problem tanımıyla CP-SAT çekirdek ve çözüm statüsü kıyası | Sipariş geçmişi, BOM, ERP/MES actuals veya ROI kaynağı değildir; dosya ve kullanım koşulu içe almadan önce kaydedilir |
+| Açık çizelgeleme benchmark'ı | [OR-Library Job Shop](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/jobshopinfo.html) | [`ft06` sabit makineli laboratuvar kıyası](external-jsp-benchmark.md): üretim CP-SAT ve bağımsız kontrol | Sipariş geçmişi, BOM, ERP/MES actuals veya ROI kaynağı değildir; diğer örnekler ayrıca eşit kısıt kontrolü ister |
+| Açık ambalaj verisi | [Mendeley Data v1](https://data.mendeley.com/datasets/h66hb89k6z/1) | [Hash/alan/anahtar/zaman profili](open-packaging-data-profile.md) ve kaynak ile hesaplanmış alan ayrımı | Alternatif makine, süre birimi, vardiya ve actuals çözülmeden solver kıyası veya müşteri kanıtı değildir |
 | Açık üretim/tezgâh verisi | [NIST SMS Test Bed](https://www.nist.gov/laboratories/tools-instruments/smart-manufacturing-systems-sms-test-bed) | Olay alımı, zaman damgası, geç/sırasız kayıt ve veri kalitesi denemeleri | Tam planlama zinciri içerdiği varsayılmaz; kullanılacak akış/paket ve koşulları ayrıca seçilir |
 | Şema kaynağı | [MESA B2MML-BatchML](https://github.com/MESAInternational/B2MML-BatchML) ve depodaki mühürlü 0701 bağımlılıkları | XSD ve yerel mesaj davranışı | Gerçek vendor profil/endpoint uyumluluğu değildir |
 

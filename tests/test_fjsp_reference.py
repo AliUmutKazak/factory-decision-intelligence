@@ -4,7 +4,11 @@ from copy import deepcopy
 
 import pytest
 
-from src.scheduling.fjsp_reference import check_fjsp_schedule, parse_brandimarte_fjs
+from src.scheduling.fjsp_reference import (
+    check_fjsp_schedule,
+    parse_brandimarte_fjs,
+    parse_orlibrary_jobshop1,
+)
 
 SMALL = """2 2 2
 2 2 1 3 2 4 1 2 2
@@ -55,3 +59,43 @@ def test_parser_rejects_ambiguous_or_incomplete_source():
         parse_brandimarte_fjs("1 2\n1 2 1 3 1 4")
     with pytest.raises(ValueError, match="trailing tokens"):
         parse_brandimarte_fjs("1 2\n1 1 1 3 9")
+
+
+def test_orlibrary_fixed_machine_import_preserves_route_and_checks_schedule():
+    source = """OR-Library example
+    +++++++++++++++++++++
+    instance demo
+    +++++++++++++++++++++
+    Example 2x2 instance
+    2 2
+    0 3 1 2
+    1 2 0 4
+    +++++++++++++++++++++
+    instance other
+    +++++++++++++++++++++
+    Another instance
+    1 1
+    0 1
+    """
+    instance = parse_orlibrary_jobshop1(source, "demo")
+    assert (len(instance.jobs), instance.machine_count, instance.operation_count) == (2, 2, 4)
+    assert instance.jobs[0] == (((1, 3),), ((2, 2),))
+    rows = [
+        {"job_id": 1, "operation_seq": 1, "machine_id": 1, "start": 0, "end": 3},
+        {"job_id": 1, "operation_seq": 2, "machine_id": 2, "start": 3, "end": 5},
+        {"job_id": 2, "operation_seq": 1, "machine_id": 2, "start": 0, "end": 2},
+        {"job_id": 2, "operation_seq": 2, "machine_id": 1, "start": 3, "end": 7},
+    ]
+    assert check_fjsp_schedule(instance, rows)["status"] == "ACCEPTED"
+
+
+def test_orlibrary_import_rejects_missing_or_corrupt_instance():
+    source = "instance demo\n2 2\n0 3 1 2\n1 2 0 4\n"
+    with pytest.raises(ValueError, match="expected one"):
+        parse_orlibrary_jobshop1(source, "missing")
+    with pytest.raises(ValueError, match="invalid machine/duration"):
+        parse_orlibrary_jobshop1(source.replace("1 2 0 4", "1 2 1 4"), "demo")
+    with pytest.raises(ValueError, match="integer >= 0"):
+        parse_orlibrary_jobshop1(source.replace("1 2 0 4", "-1 2 0 4"), "demo")
+    with pytest.raises(ValueError, match="expected 2 job rows"):
+        parse_orlibrary_jobshop1(source.replace("1 2 0 4\n", ""), "demo")

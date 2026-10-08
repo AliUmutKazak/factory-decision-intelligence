@@ -7,6 +7,7 @@ Times and durations are integer benchmark units, not factory calendar minutes.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -70,6 +71,44 @@ def parse_brandimarte_fjs(text: str) -> FjspInstance:
             operations.append(tuple(alternatives))
         if cursor != len(values):
             raise ValueError(f"job {job_id} contains trailing tokens")
+        jobs.append(tuple(operations))
+    return FjspInstance(machine_count=machine_count, jobs=tuple(jobs))
+
+
+def parse_orlibrary_jobshop1(text: str, instance_name: str) -> FjspInstance:
+    """Extract a fixed-machine JSP from OR-Library jobshop1.
+
+    The source uses 0-based machine IDs. They become 1-based IDs here, so the
+    independent schedule checker can use one explicit convention.
+    """
+    matches = list(re.finditer(r"(?im)^\s*instance\s+(\S+)\s*$", text))
+    selected = [index for index, match in enumerate(matches) if match.group(1).casefold() == instance_name.casefold()]
+    if len(selected) != 1:
+        raise ValueError(f"expected one OR-Library instance named {instance_name!r}, found {len(selected)}")
+    index = selected[0]
+    section = text[matches[index].end() : matches[index + 1].start() if index + 1 < len(matches) else None]
+    lines = [line.strip() for line in section.splitlines() if line.strip() and not set(line.strip()) == {"+"}]
+    header_index = next((i for i, line in enumerate(lines) if re.fullmatch(r"\d+\s+\d+", line)), None)
+    if header_index is None:
+        raise ValueError(f"instance {instance_name!r} has no job/machine counts")
+    job_count, machine_count = map(int, lines[header_index].split())
+    if job_count <= 0 or machine_count <= 0:
+        raise ValueError("job and machine counts must be positive")
+    source_rows = lines[header_index + 1 :]
+    if len(source_rows) != job_count:
+        raise ValueError(f"instance {instance_name!r} expected {job_count} job rows, found {len(source_rows)}")
+    jobs = []
+    for job_id, line in enumerate(source_rows, start=1):
+        values = [_integer(token, f"job {job_id} token") for token in line.split()]
+        if len(values) != 2 * machine_count:
+            raise ValueError(f"job {job_id} expected {machine_count} machine/duration pairs")
+        operations = []
+        used_machines = set()
+        for machine, duration in zip(values[::2], values[1::2]):
+            if machine < 0 or machine >= machine_count or duration <= 0 or machine in used_machines:
+                raise ValueError(f"job {job_id} has invalid machine/duration pair")
+            used_machines.add(machine)
+            operations.append(((machine + 1, duration),))
         jobs.append(tuple(operations))
     return FjspInstance(machine_count=machine_count, jobs=tuple(jobs))
 

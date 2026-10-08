@@ -14,6 +14,12 @@
 
 ---
 
+## Yol haritası ve kanıt durumu
+
+Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md) ve [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) bu kayda bağlı teknik kanıtlardır. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
+
+---
+
 ## 🌐 Executive Summary / Yönetici Özeti
 
 ### [TR] Sistem Özeti
