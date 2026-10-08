@@ -219,6 +219,7 @@ def probe_hot_order_replay(
             name: _sha256(code_root / name)
             for name in (
                 "src/scheduling/hot_order_load_probe.py",
+                "src/scheduling/hot_order_schedule_audit.py",
                 "src/scheduling/what_if.py",
                 "src/scheduling/schedule_cpsat.py",
                 "src/contracts/schemas.py",
