@@ -83,4 +83,49 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
         )
         codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, overlapping)["issues"]}
         assert "MACHINE_OVERLAP" in codes
+
+        def shifted_to(start_min):
+            shifted = schedule.copy()
+            shifted.loc[0, "start_min"] = start_min
+            shifted.loc[0, "end_min"] = start_min + int(schedule.loc[0, "duration_min"])
+            shifted.loc[0, "setup_end_min"] = start_min
+            shifted.loc[0, "setup_start_min"] = start_min - int(schedule.loc[0, "setup_before_min"])
+            return shifted
+
+        sunday = shifted_to(6 * 1440 + 480)
+        codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, sunday)["issues"]}
+        assert "SUNDAY_CLOSED" in codes
+
+        week2_night = shifted_to(7 * 1440 + 60)
+        codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, week2_night)["issues"]}
+        assert "WEEK2_OVERTIME" in codes
+
+        with closing(sqlite3.connect(":memory:")) as corrupted_source:
+            conn.backup(corrupted_source)
+            corrupted_source.execute(
+                "INSERT INTO machine_maintenance (machine_id, start_min, end_min) VALUES (?, ?, ?)",
+                (
+                    str(schedule.loc[0, "machine_id"]),
+                    int(schedule.loc[0, "start_min"]),
+                    int(schedule.loc[0, "end_min"]),
+                ),
+            )
+            codes = {
+                item["code"]
+                for item in audit_hot_order_schedule(corrupted_source, active_run_id, order, schedule)["issues"]
+            }
+            assert "MAINTENANCE_OVERLAP" in codes
+
+        with closing(sqlite3.connect(":memory:")) as corrupted_source:
+            conn.backup(corrupted_source)
+            corrupted_source.execute(
+                "UPDATE machine_capacity_plan SET overtime_hours = 0 "
+                "WHERE run_id = ? AND period_week = 1 AND machine_id = 'M01'",
+                (active_run_id,),
+            )
+            codes = {
+                item["code"]
+                for item in audit_hot_order_schedule(corrupted_source, active_run_id, order, schedule)["issues"]
+            }
+            assert "OT_BUDGET_EXCEEDED" in codes
     assert hashlib.sha256(source.read_bytes()).hexdigest() == before
