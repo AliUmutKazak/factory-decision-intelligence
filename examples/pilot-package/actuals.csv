@@ -1,2 +1,2 @@
-lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty
-EX-L1,1,EX-M1,61,82,9,1
+lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min
+EX-L1,1,EX-M1,61,82,9,1,90

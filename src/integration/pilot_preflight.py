@@ -97,6 +97,8 @@ def _read_csv(path: Path, kind: str, reject: Any) -> list[dict[str, Any]]:
                 continue
             try:
                 item = _validate_row(kind, row)
+                if kind == "actuals" and "reported_min" in columns:
+                    item["reported_min"] = _number(_required(row.get("reported_min"), "reported_min"))
                 item["_line"] = line
                 rows.append(item)
             except (TypeError, ValueError, OverflowError) as exc:
@@ -142,6 +144,15 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     time_unit = str(manifest.get("time_unit", ""))
     if time_unit != "minute":
         reject("manifest", None, "invalid_time_unit", "time_unit must be minute")
+    lag_limit = None
+    if "max_actual_reporting_lag_min" in manifest:
+        try:
+            value = manifest["max_actual_reporting_lag_min"]
+            if isinstance(value, bool):
+                raise ValueError("must be a finite nonnegative number")
+            lag_limit = _number(str(value))
+        except (TypeError, ValueError, OverflowError) as exc:
+            reject("manifest", None, "invalid_actual_lag_limit", str(exc))
     origin = str(manifest.get("origin", ""))
     try:
         parsed_origin = datetime.fromisoformat(origin)
@@ -265,6 +276,46 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         elif (lots[lot], op, machine) not in routing:
             reject("actuals", row["_line"], "unmapped_operation", str((lot, op)))
 
+    actual_rows = data.get("actuals", [])
+    actual_by_lot: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    actual_by_machine: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in actual_rows:
+        actual_by_lot[row["lot_id"]].append(row)
+        actual_by_machine[row["machine_id"]].append(row)
+    for lot, rows in actual_by_lot.items():
+        ordered = sorted(rows, key=lambda item: item["operation_seq"])
+        for previous, current in zip(ordered, ordered[1:]):
+            if current["actual_start_min"] < previous["actual_end_min"]:
+                reject("actuals", current["_line"], "actual_precedence", lot)
+            if "reported_min" in previous and "reported_min" in current:
+                if current["reported_min"] < previous["reported_min"]:
+                    reject("actuals", current["_line"], "out_of_order_actual_report", lot)
+    for machine, rows in actual_by_machine.items():
+        ordered = sorted(rows, key=lambda item: item["actual_start_min"])
+        for previous, current in zip(ordered, ordered[1:]):
+            if current["actual_start_min"] < previous["actual_end_min"]:
+                reject("actuals", current["_line"], "actual_machine_overlap", machine)
+
+    reported_rows = [row for row in actual_rows if "reported_min" in row]
+    if lag_limit is not None and len(reported_rows) != len(actual_rows):
+        reject("actuals", None, "missing_reporting_time", "reported_min is required to assess the declared lag limit")
+    observed_lags = []
+    for row in reported_rows:
+        lag = row["reported_min"] - row["actual_end_min"]
+        observed_lags.append(lag)
+        if lag < 0:
+            reject("actuals", row["_line"], "reported_before_completion", str(row["lot_id"]))
+        elif lag_limit is not None and lag > lag_limit:
+            reject("actuals", row["_line"], "late_actual_report", f"lag={lag:g}, limit={lag_limit:g}")
+    if not actual_rows:
+        timing_status = "NO_ACTUALS"
+    elif len(reported_rows) != len(actual_rows):
+        timing_status = "NO_REPORTING_TIMES"
+    elif lag_limit is None:
+        timing_status = "NO_DECLARED_LAG_LIMIT"
+    else:
+        timing_status = "ASSESSED"
+
     return {
         "dataset_id": dataset_id,
         "source_type": source_type,
@@ -278,6 +329,12 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         },
         "manifest_sha256": manifest_digest,
         "files": evidence,
+        "actuals_timing": {
+            "status": timing_status,
+            "declared_max_reporting_lag_min": lag_limit,
+            "max_observed_reporting_lag_min": max(observed_lags) if observed_lags else None,
+            "actual_count": len(actual_rows),
+        },
         "status": "ACCEPTED" if not rejections else "REJECTED",
         "rejections": rejections,
         "scope": "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION",

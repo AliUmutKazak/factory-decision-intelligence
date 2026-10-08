@@ -14,8 +14,8 @@ def package(tmp_path: Path) -> Path:
         "routing": "product_id,operation_seq,machine_id,duration_min_per_unit\nP1,1,M1,2\n",
         "shifts": "machine_id,start_min,end_min\nM1,0,600\n",
         "current_plan": "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\n",
-        "actuals": "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty\n"
-        "L1,1,M1,61,82,9,1\n",
+        "actuals": "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,9,1,90\n",
     }
     for name, content in files.items():
         (tmp_path / f"{name}.csv").write_text(content, encoding="utf-8")
@@ -28,6 +28,7 @@ def package(tmp_path: Path) -> Path:
                 "origin": "2026-01-05T00:00:00+03:00",
                 "quantity_unit": "piece",
                 "time_unit": "minute",
+                "max_actual_reporting_lag_min": 30,
                 "files": {name: f"{name}.csv" for name in files},
             }
         ),
@@ -46,6 +47,8 @@ def test_preflight_accepts_small_labeled_case_without_runtime_writes(tmp_path):
     assert report["files"]["orders"]["parsed_rows"] == 1
     assert report["files"]["orders"]["sha256"] == before["orders.csv"]
     assert report["scope"] == "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION"
+    assert report["actuals_timing"]["status"] == "ASSESSED"
+    assert report["actuals_timing"]["max_observed_reporting_lag_min"] == 8
     assert {path.name: sha256_file(path) for path in tmp_path.iterdir()} == before
 
 
@@ -101,3 +104,76 @@ def test_preflight_does_not_accept_unimplemented_alternative_machines(tmp_path):
     report = inspect_pilot_package(manifest)
     assert report["status"] == "REJECTED"
     assert "unsupported_alternative_machine" in {issue["code"] for issue in report["rejections"]}
+
+
+def test_preflight_rejects_late_and_out_of_order_actual_reports(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "routing.csv").write_text(
+        "product_id,operation_seq,machine_id,duration_min_per_unit\nP1,1,M1,2\nP1,2,M1,2\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\nL1,2,M1,90,110\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,9,1,130\nL1,2,M1,90,110,9,1,120\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert {"late_actual_report", "out_of_order_actual_report"} <= {issue["code"] for issue in report["rejections"]}
+
+
+def test_preflight_rejects_actual_precedence_and_machine_overlap(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "routing.csv").write_text(
+        "product_id,operation_seq,machine_id,duration_min_per_unit\nP1,1,M1,2\nP1,2,M1,2\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,9,1,90\nL1,2,M1,70,100,9,1,105\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert {"actual_precedence", "actual_machine_overlap"} <= {issue["code"] for issue in report["rejections"]}
+
+
+def test_preflight_does_not_claim_actual_latency_without_reporting_evidence(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty\nL1,1,M1,61,82,9,1\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert "missing_reporting_time" in {issue["code"] for issue in report["rejections"]}
+    assert report["actuals_timing"]["status"] == "NO_REPORTING_TIMES"
+
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content["files"].pop("actuals")
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["actuals_timing"]["status"] == "NO_ACTUALS"
+
+    content["files"]["actuals"] = "actuals.csv"
+    content.pop("max_actual_reporting_lag_min")
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,9,1,900\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["actuals_timing"]["status"] == "NO_DECLARED_LAG_LIMIT"
+
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,9,1,80\n",
+        encoding="utf-8",
+    )
+    assert "reported_before_completion" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
