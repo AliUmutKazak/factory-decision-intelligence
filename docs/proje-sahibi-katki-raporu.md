@@ -13,18 +13,20 @@ Proje **fabrika beklerken durmuyor**. Kod, test, veri sözleşmesi, güvenlik s�
 
 ## Senin katkı verebileceğin işler — öncelik sırasıyla
 
+**8 Ekim 2026 kararı:** Şu anda fabrika bağlantısı yok. Öncelik, [paylaşım kartındaki](paylasim-hazirlik-karti.md) teknik POC'yi dürüst ve tekrar üretilebilir biçimde yayımlamak; ilgi duyan bir tesis olduğunda aşağıdaki saha bilgilerini toplamaktır. Fabrika adayı bulmak bugünkü teknik çalışmanın blokajı değildir.
+
 | Öncelik | Senden yararlı olacak bilgi/karar | Çıktı | Neden gerekli? |
 |---|---|---|---|
-| **1 — Şimdi** | Pilot için konuşabileceğimiz bir tesis veya üretim sorumlusu var mı? Varsa **tek hat / tek ürün ailesi** ve planlama sorumlusunu belirle. Yoksa uygun olabilecek 1–3 aday ve temas yolunu listele. | Aday tesis, hat/ürün ailesi, ilgili rol, temas ve izin durumu; `bilinmiyor` kabul edilir. | G1 pilot kapsamı ancak adı belli bir fabrika ve karar sahibiyle kurulabilir. |
+| **1 — Paylaşım sonrası ilgi gelirse** | Pilot için konuşabileceğimiz bir tesis veya üretim sorumlusu var mı? Varsa **tek hat / tek ürün ailesi** ve planlama sorumlusunu belirle. | Aday tesis, hat/ürün ailesi, ilgili rol, temas ve izin durumu; `bilinmiyor` kabul edilir. | G1 pilot kapsamı ancak adı belli bir fabrika ve karar sahibiyle kurulabilir. |
 | **2 — İlk görüşmede** | Mevcut plan nasıl yapılıyor: Excel, ERP, MES veya başka yöntem? Siparişten tamamlanmaya kadar hangi kayıtlar tutuluyor? | Bir sayfalık süreç özeti ve veri sahibi listesi. | FDI önerisini fabrikanın **fiilî planıyla** eşit koşullarda kıyaslamak için başlangıç noktası gerekir. |
 | **3 — Veri sahibiyle** | Salt okunur geçmiş dosya paylaşımı mümkün mü? Önce dosya/alan **envanteri** iste; gerçek kayıtları paylaşmadan önce yetki ve aktarım yöntemi netleşsin. | `var / yok / bilinmiyor` tablosu: sipariş/lot, ürün, rota/operasyon, makine, vardiya/duruş, mevcut plan, operasyon gerçekleşmeleri. | İlk dosya pilotu ERP/MES bağlantısına ihtiyaç duymaz; bu kayıtlar G4/G8 için asgari karşılaştırma sınırını kurar. |
 | **4 — Planlamacı/proses uzmanıyla** | Bir operasyon birden çok makinede yapılabilir mi? Hazırlık süresi ürün sırasına mı bağlı? Başlamış iş, kesinti, kısmi tamamlama, hurda ve rework nasıl ele alınıyor? | Her kural için kısa açıklama, bir gerçek örnek ve karar sahibi. | Mevcut üretim rotası operasyon başına **tek makine** tutuyor. Alternatif makine yaygınsa bunu açık tasarım işi olarak planlamalıyız; sessizce eşdeğer sayamayız. |
 | **5 — Planlamacı ve finansla** | İlk pilotta başarı ne demek? Teslim zamanı, setup, fazla mesai, WIP, plan değişkenliği ve solve süresi için hangi mevcut plan/gerçekleşme kaynağı var? | KPI başına dönem, kapsam, pay/payda, kaynak ve sorumlu; sayısal hedef daha sonra ortak kararla. | Gösterim raporundaki maliyet ve ROI sayıları müşteri kazanımı değildir. G8/G11 için gerçek baseline ve actuals gerekir. |
 | **6 — IT/veri sahibiyle** | Paylaşım izni, anonimleştirme, saklama/silme süresi, kimlik ve rol sahipleri, yedek/kurtarma sorumlusu kim? ERP/MES test erişimi daha sonra açılabilir mi? | Yetki ve veri aktarım kararı; vendor/sürüm ve test ortamı durumu. | G2/G3/G5 saha kabulü ve gerçek veri kullanımı için gerekir; **ilk keşif görüşmesinin ön şartı değildir**. |
 
-Bu satırlarda bütün cevapların bir anda hazır olması beklenmiyor. Her bilinmeyeni açık bırakmak, varsayımla doldurmaktan daha yararlı. Tesis bulunamasa bile aday listesi, hedeflenen üretim tipi ve olası veri kaynaklarını paylaşman sonraki teknik tasarımı daraltır.
+Bu satırlarda bütün cevapların bir anda hazır olması beklenmiyor. Her bilinmeyeni açık bırakmak, varsayımla doldurmaktan daha yararlı. Şu an senden fabrika adayı listesi beklenmiyor; ilgi geldiğinde görüşme kapsamını birlikte daraltırız.
 
-**Henüz fabrika bağlantısı yoksa araştırma yolu:** Erişebileceğin 1–3 ayrık üretim tesisi veya üretim danışmanını not et; planlamacı/üretim yöneticisiyle kısa görüşme olasılığını araştır. İlk görüşmede üç şeyi öğrenmek yeterli: plan hangi araçla hazırlanıyor, aynı iş için alternatif makineler var mı, geçmiş plan ve gerçekleşme kayıtları tutuluyor mu? Teknik çözüm veya veri aktarımı sözü vermene gerek yok; çıkan belirsizlikleri bana iletmen tasarımı yönlendirecek.
+**İlgi geldikten sonra araştırma yolu:** İlgilenen ayrık üretim tesisi veya üretim danışmanıyla planlamacı/üretim yöneticisi üzerinden kısa görüşme olasılığını araştır. İlk görüşmede üç şeyi öğrenmek yeterli: plan hangi araçla hazırlanıyor, aynı iş için alternatif makineler var mı, geçmiş plan ve gerçekleşme kayıtları tutuluyor mu? Teknik çözüm veya veri aktarımı sözü vermene gerek yok; çıkan belirsizlikleri bana iletmen tasarımı yönlendirecek.
 
 ## İlk dosya pilotunda sorulacak veri listesi
 
@@ -49,7 +51,7 @@ Her dosya için kaynak sahibi, alan açıklaması, kimlik eşlemesi, ölçü bir
 
 Kod tarafında bir özelliği gerçek fabrikanın desteklediği varsayılmayacak. Özellikle alternatif makine seçimi, hızdan türetilen işlem süresi ve gerçek maliyet, gözlenen veri veya açıkça onaylı kural olmadan ürün kabiliyeti/ROI olarak sunulmayacak.
 
-## İstersen bugün şu kısa şablonla yanıt verebilirsin
+## İlgilenen bir tesis olduğunda kısa görüşme şablonu
 
 ```
 1. Olası fabrika veya sektör (yoksa "henüz yok"):
@@ -62,6 +64,6 @@ Kod tarafında bir özelliği gerçek fabrikanın desteklediği varsayılmayacak
 8. Başarıyı hangi karar veya ölçüyle görmek isterler?:
 ```
 
-**En küçük yararlı yanıt:** İlk üç madde. Geri kalanı henüz bilinmiyorsa teknik hazırlığa devam edilir. Gerçek müşteri dosyası veya erişim bilgisi için önce veri sahibinin izni ve paylaşım yöntemi belirlenir.
+**En küçük yararlı yanıt:** İlk üç madde. Bugün bunları doldurmana gerek yok; geri kalanı henüz bilinmiyorsa teknik hazırlığa devam edilir. Gerçek müşteri dosyası veya erişim bilgisi için önce veri sahibinin izni ve paylaşım yöntemi belirlenir.
 
 İlk temasta şu kısa çerçeveyi kullanabilirsin: “Üretim planlamasına yönelik bir karar destek prototipi geliştiriyoruz. Tek bir hat veya ürün ailesi için mevcut planlama sürecini ve hangi geçmiş dosyaların bulunduğunu anlamak istiyoruz. İlk görüşmede canlı sistem erişimi veya veri aktarımı istemiyoruz; olası salt okunur değerlendirme ancak sizin kapsam ve paylaşım onayınızla yapılır.”

@@ -18,15 +18,25 @@
 
 Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Proje sahibi katkı raporu](docs/proje-sahibi-katki-raporu.md), saha için gereken bilgi ve kararları pratik sırayla açıklar. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [run paketi geri yükleme provası](docs/bundle-restore-rehearsal.md) teknik kanıtlardır. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
 
+**Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API'de kimlik/rol denetimi bulunmadığı için servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
+
+### İnceleyenler için üç doğrulanabilir sonuç
+
+| Sonuç | Kanıt | Geçerlilik sınırı |
+|---|---|---|
+| Uçtan uca planlama ve mühürlü ACTIVE sürümü | `python main.py` ardından `python scripts/verify_active_run.py`; [referans manifesti](artifacts/reference/manifest.json) | Referans veri sentetiktir; müşteri planı değildir |
+| Dış çizelgeleme örneğinde optimum ve bağımsız fiziksel denetim | [OR-Library `ft06`: 55 birim, `OPTIMAL`](docs/external-jsp-benchmark.md) | Yalnız sabit makineli, düz statik JSP alt problemi |
+| Aynı fiziksel girdide politika karşılaştırması ve maliyet bileşenleri | [Ölçülmüş model demosu](artifacts/demo/business-case.md) ve [yeniden üretme adımları](docs/demo-and-customer-pilot.md) | Hesaplanan karşılaştırma; gerçekleşmiş tasarruf veya finansal ROI değil |
+
 ---
 
 ## 🌐 Executive Summary / Yönetici Özeti
 
 ### [TR] Sistem Özeti
-**Factory Decision Intelligence System**, ayrık imalat (discrete manufacturing) tesisleri için operasyonel araştırmalar (Operations Research), malzeme gereksinim planlaması (MRP-I), yeşil imalat (green manufacturing) ve gerçek zamanlı dinamik çizelgelemeyi bir araya getiren ileri düzey bir karar destek prototipidir. Taktiksel düzeydeki çok dönemli kapasite ve emisyon kararlarını, operasyonel düzeyde sıra bağımlı hazırlık sürelerine (SDST) sahip sonlu kapasiteli tezgah çizelgelerine bağlar. Atölye zeminindeki beklenmeyen aksaklıklarda (makine arızaları, acil siparişler) dondurulmuş ufuk (freeze horizon) ve çizelge gerginliği (schedule nervousness) metrikleriyle kararlı yeniden çizelgeleme yürütür.
+**Factory Decision Intelligence System**, ayrık imalat (discrete manufacturing) tesisleri için operasyonel araştırmalar (Operations Research), malzeme gereksinim planlaması (MRP-I), yeşil imalat (green manufacturing) ve olay tabanlı dinamik çizelgelemeyi bir araya getiren karar destek prototipidir. Taktiksel düzeydeki çok dönemli kapasite ve emisyon kararlarını, operasyonel düzeyde sıra bağımlı hazırlık sürelerine (SDST) sahip sonlu kapasiteli tezgah çizelgelerine bağlar. Atölye zeminindeki beklenmeyen aksaklıklarda (makine arızaları, acil siparişler) dondurulmuş ufuk (freeze horizon) ve çizelge gerginliği (schedule nervousness) metrikleriyle kontrollü yeniden çizelgeleme yürütür.
 
 ### [EN] System Overview
-The **Factory Decision Intelligence System** is an advanced decision intelligence prototype uniting Operations Research (OR), multi-level Material Requirements Planning (MRP-I), green manufacturing constraints, and dynamic shop-floor rescheduling for discrete manufacturing plants. It bridges aggregate tactical decisions (capacity, energy costs, carbon emission caps) with operational finite-capacity machine scheduling featuring Sequence-Dependent Setup Times (SDST). During stochastic events (breakdowns, hot orders), it executes controlled dynamic rescheduling governed by a freeze horizon and quantitative schedule nervousness metrics.
+The **Factory Decision Intelligence System** is a decision-support prototype uniting Operations Research (OR), multi-level Material Requirements Planning (MRP-I), green manufacturing constraints, and event-driven shop-floor rescheduling for discrete manufacturing plants. It bridges aggregate tactical decisions (capacity, energy costs, carbon emission caps) with operational finite-capacity machine scheduling featuring Sequence-Dependent Setup Times (SDST). For modeled events such as breakdowns and hot orders, it executes controlled rescheduling governed by a freeze horizon and quantitative schedule nervousness metrics.
 
 ---
 
@@ -289,21 +299,30 @@ Streamlit karar paneli (`http://localhost:8501`), karar vericilere interaktif ye
 
 ### 1. Yerel Python Ortamı Kurulumu
 
-```bash
-# 1. Depoyu klonlayın
+```text
 git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
 cd factory-decision-intelligence
-
-# 2. Sanal ortamı oluşturun ve aktifleştirin
-python -m venv factory-env
-# Windows:
-factory-env\Scripts\activate
-# Linux/macOS:
-source factory-env/bin/activate
-
-# 3. Bağımlılıkları yükleyin
-pip install -r requirements.txt
 ```
+
+Python 3.11 ile, kullandığınız kabuğa uygun komutları çalıştırın.
+
+Windows PowerShell:
+
+```powershell
+python --version # 3.11.x olmalı
+python -m venv factory-env
+.\factory-env\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Linux/macOS:
+
+```bash
+python3.11 -m venv factory-env
+source factory-env/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Sonraki `python` komutlarında Windows'ta `.\factory-env\Scripts\python.exe` kullanın veya ortamı `.\factory-env\Scripts\Activate.ps1` ile etkinleştirin. PowerShell yürütme ilkesi etkinleştirmeyi engelliyorsa doğrudan `python.exe` yolu yeterlidir.
 
 ### 2. Pipeline, doğrulama ve testler
 
@@ -337,9 +356,17 @@ streamlit run dashboard/app.py
 
 Docker Compose ilk başlangıçta pipeline çalıştırır, bundle ve ACTIVE run doğrulamasından sonra API ve dashboard servislerini açar. Sonraki başlangıçlarda doğrulanmış mevcut ACTIVE sürümü kullanır:
 
+Linux/macOS:
+
 ```bash
-# Servisleri derleyin ve başlatın
-export FACTORY_BUILD_GIT_SHA=$(git rev-parse HEAD)
+export FACTORY_BUILD_GIT_SHA="$(git rev-parse HEAD)"
+docker compose up --build -d --wait --wait-timeout 240 api dashboard
+```
+
+Windows PowerShell:
+
+```powershell
+$env:FACTORY_BUILD_GIT_SHA = git rev-parse HEAD
 docker compose up --build -d --wait --wait-timeout 240 api dashboard
 ```
 
@@ -383,4 +410,4 @@ factory-decision-intelligence/
 ## 📜 Lisans & Geliştirici / License & Author
 
 * **Geliştirici / Author:** Ali Umut Kazak — Endüstri Mühendisi / Karar Zekası & Optimizasyon
-* **Lisans / License:** MIT Lisansı — Detaylar için `LICENSE` dosyasına bakınız.
+* **Lisans / License:** Projenin özgün kodu ve belgeleri [MIT](LICENSE) lisanslıdır. `src/contracts/xsd/b2mml-0701/` altındaki MESA şemaları [kendi lisansı](src/contracts/xsd/b2mml-0701/LICENSE) kapsamındadır. The Business To Manufacturing Markup Language (B2MML) is used courtesy of MESA International.
