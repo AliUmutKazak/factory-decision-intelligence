@@ -163,6 +163,7 @@ class WhatIfEngine:
         baseline_time_limit_seconds: float | None = None,
         scenario_time_limit_seconds: float | None = None,
         reuse_active_baseline: bool = False,
+        scenario_dispatch_rule: str | None = None,
     ) -> tuple[
         ScheduleSolverMetadata,
         ScheduleSolverMetadata,
@@ -240,6 +241,7 @@ class WhatIfEngine:
                 connection=wrapped_conn,
                 time_limit_seconds=scenario_time_limit_seconds,
                 reference_schedule=reference_schedule,
+                dispatch_rule=scenario_dispatch_rule,
             )
 
             scenario_sched = pd.read_sql(

@@ -189,11 +189,13 @@ def test_hot_order_reuses_accepted_active_baseline_without_resolving_it(referenc
         scenario_name="SCENARIO_SNAPSHOT",
         reuse_active_baseline=True,
         scenario_time_limit_seconds=2,
+        scenario_dispatch_rule="EDD",
     )
     assert baseline.status == SolverStatus.FEASIBLE
     assert len(observed) == 1
     assert observed[0]["run_id"] == "SCENARIO_SNAPSHOT"
     assert observed[0]["time_limit_seconds"] == 2
+    assert observed[0]["dispatch_rule"] == "EDD"
     assert not observed[0]["reference_schedule"].empty
     assert (observed[0]["sku_plan"]["lot_id"] == "HOT_P01").any()
     assert sha256_file(reference_active_db) == before

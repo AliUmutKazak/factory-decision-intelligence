@@ -95,6 +95,7 @@ def probe_hot_order_replay(
     baseline_limit_seconds: float = 5.0,
     scenario_limit_seconds: float = 2.0,
     reuse_active_baseline: bool = False,
+    scenario_dispatch_rule: str | None = None,
 ) -> dict[str, Any]:
     """Replay one labeled synthetic rush order without touching the source DB."""
     source = Path(source_path).resolve()
@@ -130,6 +131,7 @@ def probe_hot_order_replay(
                     baseline_time_limit_seconds=baseline_limit_seconds,
                     scenario_time_limit_seconds=scenario_limit_seconds,
                     reuse_active_baseline=reuse_active_baseline,
+                    scenario_dispatch_rule=scenario_dispatch_rule,
                 )
         except (TimeoutError, RuntimeError) as exc:
             failure = exc
@@ -159,6 +161,10 @@ def probe_hot_order_replay(
                 ),
                 "scenario_status": scenario_meta.status.value if scenario_meta else "NO_ACCEPTED_SOLUTION",
                 "scenario_solver_wall_seconds": scenario_meta.wall_time_seconds if scenario_meta else None,
+                "scenario_makespan_min": scenario_meta.makespan_min if scenario_meta else None,
+                "scenario_total_tardiness_min": scenario_meta.total_tardiness_min if scenario_meta else None,
+                "scenario_total_setup_min": scenario_meta.total_setup_min if scenario_meta else None,
+                "scenario_proven_optimal_within_scope": scenario_meta.proven_optimal if scenario_meta else None,
                 "replay_wall_seconds": round(elapsed, 4),
                 "failure_stage": failure_stage,
                 "failure_type": type(failure).__name__ if failure else None,
@@ -195,6 +201,8 @@ def probe_hot_order_replay(
         "hot_order": hot_order.model_dump(mode="json"),
         "baseline_limit_seconds": None if reuse_active_baseline else baseline_limit_seconds,
         "baseline_source": "ACTIVE_SNAPSHOT" if reuse_active_baseline else "FRESH_SOLVE",
+        "scenario_dispatch_rule": scenario_dispatch_rule,
+        "optimization_scope": "FIXED_DISPATCH_SEQUENCE" if scenario_dispatch_rule else "FULL_PRODUCTION_MODEL",
         "scenario_limit_seconds": scenario_limit_seconds,
         "repeats": repeats,
         "attempts": attempts,
@@ -227,6 +235,7 @@ def main() -> int:
     parser.add_argument("--baseline-limit", type=float, default=5.0)
     parser.add_argument("--scenario-limit", type=float, default=2.0)
     parser.add_argument("--reuse-active-baseline", action="store_true")
+    parser.add_argument("--dispatch-rule", choices=("FIFO", "EDD", "SPT", "Greedy"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = probe_hot_order_replay(
@@ -237,6 +246,7 @@ def main() -> int:
         baseline_limit_seconds=args.baseline_limit,
         scenario_limit_seconds=args.scenario_limit,
         reuse_active_baseline=args.reuse_active_baseline,
+        scenario_dispatch_rule=args.dispatch_rule,
     )
     rendered = json.dumps(report, indent=2, ensure_ascii=True) + "\n"
     if args.output:
