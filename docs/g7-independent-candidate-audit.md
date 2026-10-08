@@ -15,7 +15,7 @@
 
 ## Tekrarlanabilir sonuç
 
-[Ham JSON](../artifacts/research/g7-hot-order-independent-audit-edd-2s.json) kaynak DB SHA-256, kod/commit hash'leri, beş ayrı geçici kopya ve her denemenin denetim sonucunu içerir. `P01` için 51 adetlik sentetik acil sipariş, kabul edilmiş `ACTIVE` baz ve `EDD` sabit sıra ile 2 saniye solver sınırında **5/5 aday** üretti. Her adayın 34 görevi bağımsız denetimde **0 ihlalle kabul edildi**; replay p50/p95 **0,2338 / 0,2726 saniye** ölçüldü. Kaynak dosya ve geçici `ACTIVE` sürüm değişmedi.
+[Ham JSON](../artifacts/research/g7-hot-order-independent-audit-edd-2s.json) kaynak DB SHA-256, kod/commit hash'leri, beş ayrı geçici kopya ve her denemenin denetim sonucunu içerir. `P01` için 51 adetlik sentetik acil sipariş, kabul edilmiş `ACTIVE` baz ve `EDD` sabit sıra ile 2 saniye solver sınırında **5/5 aday** üretti. Her adayın 34 görevi bağımsız denetimde **0 ihlalle kabul edildi**; replay p50/p95 **0,2166 / 0,2263 saniye** ölçüldü. Kaynak dosya ve geçici `ACTIVE` sürüm değişmedi.
 
 Bu denetimin kapsamı **miktar, rota, işlem aralığı, setup, öncüllük ve makine işgali** ile sınırlıdır. Takvim vardiyası, MRP malzeme zamanı, hafta bazlı fazla mesai bütçesi, ekonomik hedef ve gerçek ERP/MES karşılaştırması bağımsız olarak burada doğrulanmadı. `EDD` sonucu `OPTIMAL` olsa bile bu yalnız sabit sıra alt problemindedir. Beş sentetik tekrar saha güvenilirliği veya hizmet süresi hedefi değildir. Bu adaylar API'nin varsayılan yayınına alınmadı.
 
