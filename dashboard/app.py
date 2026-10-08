@@ -805,6 +805,10 @@ with tab_scenarios:
             )
         else:
             st.info("Bu ACTIVE plan için senaryo karşılaştırmasını hesaplamak üzere butona basın.")
+    except TimeoutError:
+        st.warning(
+            "Senaryo matrisi zaman sınırında tamamlanamadı. Yeni sonuç gösterilmiyor; ACTIVE plan değiştirilmedi."
+        )
     except Exception as e:
         st.error(f"Senaryo motoru hatası: {e}")
 
@@ -916,36 +920,41 @@ with tab_mes:
                 run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)")
 
             if run_bd_btn:
-                with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
-                    engine = WhatIfEngine()
-                    event = MachineBreakdownEvent(
-                        machine_id=sel_machine,
-                        start_min=int(bd_start),
-                        duration_min=int(bd_dur),
-                        reason=bd_reason,
+                try:
+                    with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
+                        engine = WhatIfEngine()
+                        event = MachineBreakdownEvent(
+                            machine_id=sel_machine,
+                            start_min=int(bd_start),
+                            duration_min=int(bd_dur),
+                            reason=bd_reason,
+                        )
+                        b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
+                except TimeoutError:
+                    st.warning(
+                        "Çözücü zaman sınırında geçerli bir arıza senaryosu bulamadı. ACTIVE plan değiştirilmedi."
                     )
-                    b_meta, s_meta, report, sc_df = engine.simulate_breakdown(event)
-
-                st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    "Yeni Makespan",
-                    f"{report.scenario_makespan_min:,.0f} dk",
-                    delta=f"{report.makespan_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k2.metric(
-                    "Gecikme (Tardiness)",
-                    f"{report.scenario_total_tardiness_min:,.0f} dk",
-                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
+                else:
+                    st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric(
+                        "Yeni Makespan",
+                        f"{report.scenario_makespan_min:,.0f} dk",
+                        delta=f"{report.makespan_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k2.metric(
+                        "Gecikme (Tardiness)",
+                        f"{report.scenario_total_tardiness_min:,.0f} dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
 
         elif sim_type == "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)":
             with st.form("hot_order_form"):
                 ho_product = st.selectbox("Ürün Tipi:", ["P01", "P02", "P03", "P04", "P05"])
-                ho_qty = st.number_input("Sipariş Miktarı:", min_value=100, value=400, step=50)
+                ho_qty = st.number_input("Sipariş Miktarı:", min_value=1, value=400, step=1)
                 ho_due = st.number_input(
                     "İstenen Teslim Zamanı (Dakika):",
                     min_value=100,
@@ -954,39 +963,45 @@ with tab_mes:
                 )
                 ho_prio = st.slider(
                     "Öncelik Ağırlığı:",
-                    min_value=1.0,
-                    max_value=10.0,
-                    value=5.0,
+                    min_value=1,
+                    max_value=10,
+                    value=5,
+                    step=1,
                 )
                 run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle")
 
             if run_ho_btn:
-                with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
-                    engine = WhatIfEngine()
-                    injection = HotOrderInjection(
-                        order_id=f"HOT-{ho_product}-{int(ho_qty)}",
-                        product_id=ho_product,
-                        quantity=int(ho_qty),
-                        due_date_min=int(ho_due),
-                        priority_weight=float(ho_prio),
+                try:
+                    with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
+                        engine = WhatIfEngine()
+                        injection = HotOrderInjection(
+                            order_id=f"HOT-{ho_product}-{int(ho_qty)}",
+                            product_id=ho_product,
+                            quantity=int(ho_qty),
+                            due_date_min=int(ho_due),
+                            priority_weight=int(ho_prio),
+                        )
+                        b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
+                except TimeoutError:
+                    st.warning(
+                        "Çözücü zaman sınırında geçerli bir acil sipariş planı bulamadı. ACTIVE plan değiştirilmedi."
                     )
-                    b_meta, s_meta, report, sc_df = engine.simulate_hot_order(injection)
-
-                st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
-                k1, k2, k3 = st.columns(3)
-                k1.metric(
-                    "Yeni Makespan",
-                    f"{report.scenario_makespan_min:,.0f} dk",
-                    delta=f"{report.makespan_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k2.metric(
-                    "Gecikme (Tardiness)",
-                    f"{report.scenario_total_tardiness_min:,.0f} dk",
-                    delta=f"{report.tardiness_delta_min:+,.0f} dk",
-                    delta_color="inverse",
-                )
-                k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
+                else:
+                    st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
+                    k1, k2, k3 = st.columns(3)
+                    k1.metric(
+                        "Yeni Makespan",
+                        f"{report.scenario_makespan_min:,.0f} dk",
+                        delta=f"{report.makespan_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k2.metric(
+                        "Gecikme (Tardiness)",
+                        f"{report.scenario_total_tardiness_min:,.0f} dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        delta_color="inverse",
+                    )
+                    k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
 
         else:
             with st.form("dynamic_resched_form"):
@@ -1013,31 +1028,34 @@ with tab_mes:
                 run_resched_btn = st.form_submit_button("🔄 Freeze Horizon ile Yeniden Çizelgele")
 
             if run_resched_btn:
-                with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
-                    rescheduler = DynamicRescheduler()
-                    trig = RescheduleTriggerEvent(
-                        event_id=f"EVT-UI-{int(curr_t)}",
-                        current_time_min=int(curr_t),
-                        freeze_horizon_min=int(freeze_h),
-                        delay_machine_id=None if dev_mac == "Yok" else dev_mac,
-                        delay_duration_min=int(dev_dur),
-                        reason="Kullanıcı arayüzü dinamik müdahalesi",
-                    )
-                    base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
-                        trigger=trig,
-                        new_run_id=f"UI_RESCHED_{int(curr_t)}",
-                    )
+                try:
+                    with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
+                        rescheduler = DynamicRescheduler()
+                        trig = RescheduleTriggerEvent(
+                            event_id=f"EVT-UI-{int(curr_t)}",
+                            current_time_min=int(curr_t),
+                            freeze_horizon_min=int(freeze_h),
+                            delay_machine_id=None if dev_mac == "Yok" else dev_mac,
+                            delay_duration_min=int(dev_dur),
+                            reason="Kullanıcı arayüzü dinamik müdahalesi",
+                        )
+                        base_df, new_df, n_meta, n_rep, audit = rescheduler.execute_reschedule(
+                            trigger=trig,
+                            new_run_id=f"UI_RESCHED_{int(curr_t)}",
+                        )
+                except TimeoutError:
+                    st.warning("Çözücü zaman sınırında geçerli bir yeni plan bulamadı. Önceki ACTIVE plan korunuyor.")
+                else:
+                    st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
+                    n1, n2, n3 = st.columns(3)
+                    n1.metric("Kilitlenen İşler", f"{n_rep.frozen_tasks_count} ad")
+                    n2.metric("Tezgâhı Değişenler", f"{n_rep.machine_swapped_count} ad")
+                    n3.metric("Sarsıntı (Nervousness)", f"{n_rep.nervousness_score:.4f}")
 
-                st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
-                n1, n2, n3 = st.columns(3)
-                n1.metric("Kilitlenen İşler", f"{n_rep.frozen_tasks_count} ad")
-                n2.metric("Tezgâhı Değişenler", f"{n_rep.machine_swapped_count} ad")
-                n3.metric("Sarsıntı (Nervousness)", f"{n_rep.nervousness_score:.4f}")
-
-                st.info(
-                    f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
-                    f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
-                )
+                    st.info(
+                        f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
+                        f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
+                    )
 
         st.markdown("---")
         st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
