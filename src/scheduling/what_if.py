@@ -89,7 +89,9 @@ class WhatIfEngine:
         rows = cursor.fetchall()
         if len(rows) != 1:
             raise RuntimeError("ACTIVE baseline requires exactly one solver metadata row")
-        metadata = ScheduleSolverMetadata.model_validate(dict(zip((column[0] for column in cursor.description), rows[0])))
+        metadata = ScheduleSolverMetadata.model_validate(
+            dict(zip((column[0] for column in cursor.description), rows[0]))
+        )
         if metadata.run_id != active_run_id or metadata.status not in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
             raise RuntimeError("ACTIVE baseline has no accepted solver result")
         schedule = pd.read_sql(
@@ -178,7 +180,9 @@ class WhatIfEngine:
                 baseline_meta, reference_schedule = self.load_active_baseline(mem_conn)
                 source_run_id = baseline_meta.run_id
             else:
-                baseline_meta = self.run_baseline(mem_conn, run_id="BASE", time_limit_seconds=baseline_time_limit_seconds)
+                baseline_meta = self.run_baseline(
+                    mem_conn, run_id="BASE", time_limit_seconds=baseline_time_limit_seconds
+                )
 
             # 2. Acil Siparişi sku_production_plan Tablosuna Ekle
             batches = math.ceil(hot_order.quantity / PRODUCTION_BATCH_SIZE)
