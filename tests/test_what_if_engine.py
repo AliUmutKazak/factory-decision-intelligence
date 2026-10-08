@@ -109,3 +109,33 @@ def test_hot_order_injection_scenario_simulation(reference_active_db, monkeypatc
 
     # Acil sipariş sonrasında çizelgelenen iş sayısı baz plana eşit veya daha fazla olmalıdır
     assert delta_report.makespan_delta_min == delta_report.scenario_makespan_min - delta_report.baseline_makespan_min
+
+
+def test_hot_order_timeout_keeps_source_active_run_unchanged(reference_active_db, monkeypatch):
+    """A failed in-memory scenario must not alter the source ACTIVE version."""
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    before = sha256_file(reference_active_db)
+    with sqlite3.connect(reference_active_db) as conn:
+        active_before = conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchone()[0]
+
+    def baseline_then_timeout(**kwargs):
+        if kwargs["run_id"] == "BASE":
+            return object()
+        raise TimeoutError("UNKNOWN: no accepted hot-order schedule")
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", baseline_then_timeout)
+    hot_order = HotOrderInjection(
+        order_id="RUSH-TIMEOUT",
+        product_id="P01",
+        quantity=51,
+        due_date_min=1200,
+        priority_weight=20,
+    )
+
+    with pytest.raises(TimeoutError, match="no accepted hot-order schedule"):
+        engine.simulate_hot_order(hot_order, scenario_name="SCENARIO_TIMEOUT")
+
+    assert sha256_file(reference_active_db) == before
+    with sqlite3.connect(reference_active_db) as conn:
+        assert conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchone()[0] == active_before
+        assert conn.execute("SELECT 1 FROM pipeline_runs WHERE run_id = 'SCENARIO_TIMEOUT'").fetchone() is None

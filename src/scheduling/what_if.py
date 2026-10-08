@@ -2,6 +2,7 @@
 
 import math
 import sqlite3
+from pathlib import Path
 
 import pandas as pd
 
@@ -53,7 +54,8 @@ class WhatIfEngine:
         self.disk_db_path = str(disk_db_path or get_runtime_paths()["db_path"])
 
     def _create_isolated_connection(self) -> sqlite3.Connection:
-        disk_conn = sqlite3.connect(self.disk_db_path)
+        source = Path(self.disk_db_path).resolve()
+        disk_conn = sqlite3.connect(f"{source.as_uri()}?mode=ro", uri=True)
         mem_conn = sqlite3.connect(":memory:")
         disk_conn.backup(mem_conn)
         disk_conn.close()

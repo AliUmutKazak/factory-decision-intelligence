@@ -19,6 +19,8 @@ python -m src.scheduling.reference_load_probe `
 
 8 Ekim 2026 yerel koşumunda, kod commit'i `b905ab7` üzerinde 2 saniye sınırıyla **5/5 `FEASIBLE`** sonuç alındı; optimum kanıtlanmadı. Kabul edilmiş çözümlerin CP-SAT süreleri için p50 **2,0026 sn**, p95 **2,0038 sn**; tüm deneme süresi için p50 **2,7585 sn**, p95 **2,7776 sn** ölçüldü. Bu küçük örnek yalnız referans yükte araç ve raporlama zincirinin çalıştığını gösterir.
 
+`WhatIfEngine` de kaynak veritabanını salt okunur açar. Yerel testte acil sipariş senaryosu zaman aşımı hatasıyla durdurulduğunda kaynak dosyanın hash'i, önceki `ACTIVE` run kimliği ve run kayıtları değişmedi. Bu başarısız çözüm emniyeti kanıtıdır; gerçek timeout/fallback oranı ölçümü değildir.
+
 ## Kanıtın sınırı
 
 Bu ölçüm tek yerel bilgisayarda, sentetik/tamamlanmış referans yükte, tek iş parçacığıyla çalışır. Hot-order olay replay'i, eşzamanlı API istekleri, gerçek müşteri yükü, `ACTIVE` yaşlanması, fallback, actuals gecikmesi ve saha SLO'su ölçülmüş sayılmaz. `FEASIBLE`, optimum kanıtı değildir. `NO_ACCEPTED_SOLUTION` genel sayısı doğrudan timeout oranına eşit değildir; `UNKNOWN`, `INFEASIBLE` ve diğer hata nedenleri ayrı yorumlanmalıdır. G7 kabulü için temsilî yük zarfı, başarısız çözüm yolu, alarm/runbook ve saha sorumlusu ayrıca gerekir.
