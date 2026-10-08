@@ -1,6 +1,6 @@
 {
   "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
-  "measured_at_utc": "2026-10-08T15:06:37.106209+00:00",
+  "measured_at_utc": "2026-10-08T15:08:55.512038+00:00",
   "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
   "source_run_id": "RUN-20261006-00a0d3",
   "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
@@ -23,8 +23,8 @@
   },
   "baseline_limit_seconds": null,
   "baseline_source": "ACTIVE_SNAPSHOT",
-  "scenario_limit_seconds": 2.0,
-  "repeats": 5,
+  "scenario_limit_seconds": 20.0,
+  "repeats": 3,
   "attempts": [
     {
       "number": 1,
@@ -33,10 +33,10 @@
       "baseline_original_solver_wall_seconds": 30.0029,
       "scenario_status": "NO_ACCEPTED_SOLUTION",
       "scenario_solver_wall_seconds": null,
-      "replay_wall_seconds": 2.1507,
+      "replay_wall_seconds": 20.2039,
       "failure_stage": "SCENARIO",
       "failure_type": "TimeoutError",
-      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (2.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (20.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
       "staged_active_unchanged": true
     },
     {
@@ -46,10 +46,10 @@
       "baseline_original_solver_wall_seconds": 30.0029,
       "scenario_status": "NO_ACCEPTED_SOLUTION",
       "scenario_solver_wall_seconds": null,
-      "replay_wall_seconds": 2.4461,
+      "replay_wall_seconds": 20.4657,
       "failure_stage": "SCENARIO",
       "failure_type": "TimeoutError",
-      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (2.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (20.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
       "staged_active_unchanged": true
     },
     {
@@ -59,50 +59,24 @@
       "baseline_original_solver_wall_seconds": 30.0029,
       "scenario_status": "NO_ACCEPTED_SOLUTION",
       "scenario_solver_wall_seconds": null,
-      "replay_wall_seconds": 2.6286,
+      "replay_wall_seconds": 20.4551,
       "failure_stage": "SCENARIO",
       "failure_type": "TimeoutError",
-      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (2.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
-      "staged_active_unchanged": true
-    },
-    {
-      "number": 4,
-      "baseline_status": "FEASIBLE",
-      "baseline_solver_wall_seconds": null,
-      "baseline_original_solver_wall_seconds": 30.0029,
-      "scenario_status": "NO_ACCEPTED_SOLUTION",
-      "scenario_solver_wall_seconds": null,
-      "replay_wall_seconds": 2.6578,
-      "failure_stage": "SCENARIO",
-      "failure_type": "TimeoutError",
-      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (2.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
-      "staged_active_unchanged": true
-    },
-    {
-      "number": 5,
-      "baseline_status": "FEASIBLE",
-      "baseline_solver_wall_seconds": null,
-      "baseline_original_solver_wall_seconds": 30.0029,
-      "scenario_status": "NO_ACCEPTED_SOLUTION",
-      "scenario_solver_wall_seconds": null,
-      "replay_wall_seconds": 2.6373,
-      "failure_stage": "SCENARIO",
-      "failure_type": "TimeoutError",
-      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (2.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (20.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
       "staged_active_unchanged": true
     }
   ],
   "summary": {
     "scenario_status_counts": {
-      "NO_ACCEPTED_SOLUTION": 5
+      "NO_ACCEPTED_SOLUTION": 3
     },
     "scenario_accepted_count": 0,
     "baseline_failure_count": 0,
-    "scenario_failure_count": 5,
+    "scenario_failure_count": 3,
     "baseline_timeout_count": 0,
-    "scenario_timeout_count": 5,
-    "replay_wall_p50_seconds": 2.6286,
-    "replay_wall_p95_seconds": 2.6537,
+    "scenario_timeout_count": 3,
+    "replay_wall_p50_seconds": 20.4551,
+    "replay_wall_p95_seconds": 20.4646,
     "accepted_scenario_solver_wall_p50_seconds": null,
     "accepted_scenario_solver_wall_p95_seconds": null,
     "percentile_method": "linear interpolation over sorted samples"

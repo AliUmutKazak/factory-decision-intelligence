@@ -217,3 +217,22 @@ def test_hot_order_rejects_unaccepted_active_baseline(reference_active_db, monke
             reuse_active_baseline=True,
         )
     assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db):
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
+        baseline, scenario, _, schedule = engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-EDD", product_id="P01", quantity=51, due_date_min=1200),
+            scenario_name="SCENARIO_EDD",
+            reuse_active_baseline=True,
+            scenario_dispatch_rule="EDD",
+            scenario_time_limit_seconds=2,
+        )
+    assert baseline.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    assert scenario.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    assert schedule["task_id"].is_unique
+    assert (schedule["parent_lot_id"] == "HOT_P01").any()
+    assert sha256_file(reference_active_db) == before
