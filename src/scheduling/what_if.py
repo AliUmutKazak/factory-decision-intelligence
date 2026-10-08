@@ -13,6 +13,7 @@ from src.contracts.schemas import (
     ScenarioDeltaReport,
     ScenarioType,
     ScheduleSolverMetadata,
+    SolverStatus,
 )
 from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
@@ -78,6 +79,28 @@ class WhatIfEngine:
         )
         return meta
 
+    def load_active_baseline(self, mem_conn: sqlite3.Connection) -> tuple[ScheduleSolverMetadata, pd.DataFrame]:
+        """Read the accepted ACTIVE schedule as the current what-if baseline."""
+        active_run_id = get_active_run_id(mem_conn)
+        cursor = mem_conn.execute(
+            "SELECT * FROM schedule_solver_metadata WHERE run_id = ? ORDER BY rowid DESC LIMIT 2",
+            (active_run_id,),
+        )
+        rows = cursor.fetchall()
+        if len(rows) != 1:
+            raise RuntimeError("ACTIVE baseline requires exactly one solver metadata row")
+        metadata = ScheduleSolverMetadata.model_validate(dict(zip((column[0] for column in cursor.description), rows[0])))
+        if metadata.run_id != active_run_id or metadata.status not in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
+            raise RuntimeError("ACTIVE baseline has no accepted solver result")
+        schedule = pd.read_sql(
+            "SELECT * FROM production_schedule WHERE run_id = ?",
+            mem_conn,
+            params=(active_run_id,),
+        )
+        if schedule.empty or schedule["task_id"].isna().any() or schedule["task_id"].duplicated().any():
+            raise RuntimeError("ACTIVE baseline schedule is empty or has invalid task IDs")
+        return metadata, schedule
+
     def simulate_breakdown(
         self,
         breakdown: MachineBreakdownEvent,
@@ -137,6 +160,7 @@ class WhatIfEngine:
         scenario_name: str = "HOT_ORDER_SCENARIO",
         baseline_time_limit_seconds: float | None = None,
         scenario_time_limit_seconds: float | None = None,
+        reuse_active_baseline: bool = False,
     ) -> tuple[
         ScheduleSolverMetadata,
         ScheduleSolverMetadata,
@@ -146,12 +170,19 @@ class WhatIfEngine:
         """Injects a high-priority rush order and assesses the schedule disruption."""
         mem_conn = self._create_isolated_connection()
         try:
-            # 1. Baz Senaryoyu Koştur
-            baseline_meta = self.run_baseline(mem_conn, run_id="BASE", time_limit_seconds=baseline_time_limit_seconds)
+            # The accepted ACTIVE version is already solved; interactive replay
+            # can use it directly instead of spending its budget solving it again.
+            reference_schedule = None
+            source_run_id = "BASE"
+            if reuse_active_baseline:
+                baseline_meta, reference_schedule = self.load_active_baseline(mem_conn)
+                source_run_id = baseline_meta.run_id
+            else:
+                baseline_meta = self.run_baseline(mem_conn, run_id="BASE", time_limit_seconds=baseline_time_limit_seconds)
 
             # 2. Acil Siparişi sku_production_plan Tablosuna Ekle
             batches = math.ceil(hot_order.quantity / PRODUCTION_BATCH_SIZE)
-            clone_run_inputs(mem_conn, "BASE", scenario_name)
+            clone_run_inputs(mem_conn, source_run_id, scenario_name)
             scenario_plan = pd.read_sql(
                 "SELECT * FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
                 mem_conn,
@@ -204,6 +235,7 @@ class WhatIfEngine:
                 persist_outputs=False,
                 connection=wrapped_conn,
                 time_limit_seconds=scenario_time_limit_seconds,
+                reference_schedule=reference_schedule,
             )
 
             scenario_sched = pd.read_sql(

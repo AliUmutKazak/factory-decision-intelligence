@@ -316,6 +316,7 @@ def run_cpsat_scheduling(
     # Lot Streaming / Transfer Batching desteği ile alt lot ayrıştırma
     tasks = []
     task_counter = 0
+    reserved_task_ids = {str(task_id) for task_id in reference_ids.values()}
     batch_size = cfg.PRODUCTION_BATCH_SIZE
     enable_streaming = cfg.ENABLE_LOT_STREAMING
     max_sub_batches = cfg.MAX_SUB_LOT_BATCHES
@@ -368,10 +369,17 @@ def run_cpsat_scheduling(
                 mid = op["machine_id"]
                 proc_time_per_batch = float(op["processing_time_min"])
                 duration = int(round(sub_b_qty * proc_time_per_batch))
+                reference_key = (sub_lot_id, seq)
+                if reference_key in reference_ids:
+                    task_id = reference_ids[reference_key]
+                else:
+                    while str(task_counter) in reserved_task_ids:
+                        task_counter += 1
+                    task_id = task_counter
 
                 tasks.append(
                     {
-                        "task_id": reference_ids.get((sub_lot_id, seq), task_counter),
+                        "task_id": task_id,
                         "lot_id": sub_lot_id,
                         "parent_lot_id": lot_prefix,
                         "sub_lot_index": sub_idx,
@@ -387,6 +395,8 @@ def run_cpsat_scheduling(
                     }
                 )
                 task_counter += 1
+    if len({str(task["task_id"]) for task in tasks}) != len(tasks):
+        raise ValueError("Generated schedule contains duplicate task IDs")
     if task_override is not None:
         required = {
             "task_id",

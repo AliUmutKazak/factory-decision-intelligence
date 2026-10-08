@@ -57,6 +57,11 @@ class _MeasuredWhatIfEngine(WhatIfEngine):
         self.baseline_metadata = metadata
         return metadata
 
+    def load_active_baseline(self, mem_conn: sqlite3.Connection):
+        metadata, schedule = super().load_active_baseline(mem_conn)
+        self.baseline_metadata = metadata
+        return metadata, schedule
+
 
 def _stage_completed_reference(source: Path, run_id: str) -> Path:
     descriptor, name = tempfile.mkstemp(prefix="fdi-g7-hot-order-", suffix=".db")
@@ -89,6 +94,7 @@ def probe_hot_order_replay(
     repeats: int = 3,
     baseline_limit_seconds: float = 5.0,
     scenario_limit_seconds: float = 2.0,
+    reuse_active_baseline: bool = False,
 ) -> dict[str, Any]:
     """Replay one labeled synthetic rush order without touching the source DB."""
     source = Path(source_path).resolve()
@@ -123,6 +129,7 @@ def probe_hot_order_replay(
                     scenario_name=f"G7-HOT-{number}",
                     baseline_time_limit_seconds=baseline_limit_seconds,
                     scenario_time_limit_seconds=scenario_limit_seconds,
+                    reuse_active_baseline=reuse_active_baseline,
                 )
         except (TimeoutError, RuntimeError) as exc:
             failure = exc
@@ -144,7 +151,12 @@ def probe_hot_order_replay(
             {
                 "number": number,
                 "baseline_status": baseline_meta.status.value if baseline_meta else "NO_ACCEPTED_SOLUTION",
-                "baseline_solver_wall_seconds": baseline_meta.wall_time_seconds if baseline_meta else None,
+                "baseline_solver_wall_seconds": (
+                    baseline_meta.wall_time_seconds if baseline_meta and not reuse_active_baseline else None
+                ),
+                "baseline_original_solver_wall_seconds": (
+                    baseline_meta.wall_time_seconds if baseline_meta and reuse_active_baseline else None
+                ),
                 "scenario_status": scenario_meta.status.value if scenario_meta else "NO_ACCEPTED_SOLUTION",
                 "scenario_solver_wall_seconds": scenario_meta.wall_time_seconds if scenario_meta else None,
                 "replay_wall_seconds": round(elapsed, 4),
@@ -181,7 +193,8 @@ def probe_hot_order_replay(
         "python_version": platform.python_version(),
         "ortools_version": version("ortools"),
         "hot_order": hot_order.model_dump(mode="json"),
-        "baseline_limit_seconds": baseline_limit_seconds,
+        "baseline_limit_seconds": None if reuse_active_baseline else baseline_limit_seconds,
+        "baseline_source": "ACTIVE_SNAPSHOT" if reuse_active_baseline else "FRESH_SOLVE",
         "scenario_limit_seconds": scenario_limit_seconds,
         "repeats": repeats,
         "attempts": attempts,
@@ -213,6 +226,7 @@ def main() -> int:
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--baseline-limit", type=float, default=5.0)
     parser.add_argument("--scenario-limit", type=float, default=2.0)
+    parser.add_argument("--reuse-active-baseline", action="store_true")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = probe_hot_order_replay(
@@ -222,6 +236,7 @@ def main() -> int:
         repeats=args.repeats,
         baseline_limit_seconds=args.baseline_limit,
         scenario_limit_seconds=args.scenario_limit,
+        reuse_active_baseline=args.reuse_active_baseline,
     )
     rendered = json.dumps(report, indent=2, ensure_ascii=True) + "\n"
     if args.output:

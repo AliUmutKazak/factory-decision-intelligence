@@ -166,3 +166,52 @@ def test_hot_order_uses_distinct_baseline_and_scenario_limits(reference_active_d
     )
     assert observed == [("BASE", 7), ("SCENARIO_LIMIT_CHECK", 2)]
     assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_reuses_accepted_active_baseline_without_resolving_it(reference_active_db, monkeypatch):
+    observed = []
+
+    def record_solve(**kwargs):
+        observed.append(kwargs)
+        return ScheduleSolverMetadata(
+            run_id=kwargs["run_id"],
+            status=SolverStatus.FEASIBLE,
+            proven_optimal=False,
+            wall_time_seconds=0.1,
+            objective_value=1.0,
+        )
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    baseline, _, _, _ = engine.simulate_hot_order(
+        HotOrderInjection(order_id="RUSH-SNAPSHOT", product_id="P01", quantity=51, due_date_min=1200),
+        scenario_name="SCENARIO_SNAPSHOT",
+        reuse_active_baseline=True,
+        scenario_time_limit_seconds=2,
+    )
+    assert baseline.status == SolverStatus.FEASIBLE
+    assert len(observed) == 1
+    assert observed[0]["run_id"] == "SCENARIO_SNAPSHOT"
+    assert observed[0]["time_limit_seconds"] == 2
+    assert not observed[0]["reference_schedule"].empty
+    assert (observed[0]["sku_plan"]["lot_id"] == "HOT_P01").any()
+    assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_rejects_unaccepted_active_baseline(reference_active_db, monkeypatch):
+    with sqlite3.connect(reference_active_db) as conn:
+        conn.execute("UPDATE schedule_solver_metadata SET status = 'UNKNOWN'")
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+
+    def unexpected_solve(**kwargs):
+        pytest.fail("solver must not run with an unaccepted ACTIVE baseline")
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", unexpected_solve)
+    with pytest.raises(RuntimeError, match="no accepted solver result"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-INVALID", product_id="P01", quantity=51, due_date_min=1200),
+            reuse_active_baseline=True,
+        )
+    assert sha256_file(reference_active_db) == before
