@@ -204,7 +204,7 @@ MES'te başlamış veya tamamlanmış operasyonlar, planlanan başlangıçları 
 
 Duruş, etkilenen tezgâhtaki dondurulmuş görevlerden sonra uygulanır; başlamış operasyonu kesip devam ettirme modellenmez. Ayrıntılar: [Run isolation and rescheduling](docs/run-isolation-and-rescheduling.md).
 
-`OPERATIONAL_BALANCED` süreleri dengeler. `COST_OPTIMIZED` artık gerçek parasal TMC hedefidir: işçilik, setup, OT primleri, WIP holding, ağırlıklı gecikme, enerji, karbon, malzeme ve W1 expedite maliyetlerini `EconomicConfig` oranlarıyla minimize eder. Sonuç ve bound para birimindedir; mikro para birimi yuvarlaması kaydedilir. FEASIBLE sonuç optimum veya diğer politikadan daha düşük maliyet garantisi değildir.
+`OPERATIONAL_BALANCED` süreleri dengeler. `COST_OPTIMIZED` parasal olarak ifade edilen TMC hedefidir: işçilik, setup, OT primleri, WIP holding, ağırlıklı gecikme, enerji, karbon, malzeme ve W1 expedite maliyetlerini `EconomicConfig` oranlarıyla minimize eder. Bu oranlar fabrika finansınca doğrulanmış tutarlar değildir. Sonuç ve bound para birimindedir; mikro para birimi yuvarlaması kaydedilir. FEASIBLE sonuç optimum veya diğer politikadan daha düşük maliyet garantisi değildir.
 
 Orkestratör önce mevcut makine sırasını koruyan yerel onarım adayı üretir ve ortak üretim CP-SAT modeliyle bütün zamanları doğrular. Kabul edilirse `VALIDATED_LOCAL_REPAIR`, reddedilirse gerekçesiyle `CPSAT_REOPTIMIZATION` audit’e kaydedilir. Yerel doğrulama küresel optimum olarak işaretlenmez. Gerçek freeze/FLEXIBLE/duruş kısıtları yeni sürümde yeniden oynatılabilir biçimde saklanır.
 
@@ -281,7 +281,7 @@ Karar geçmişi SQLite'ta kalıcıdır; yeniden çizelgeleme kararları sürüm 
 
 ISA-95 adaptörleri kanonik sözleşmeler ile MESA B2MML 0701 resmî XSD’lerine karşı doğrulanan çizelge/MES XML export ve import sağlar. Desteklenen fabrika profili, timezone-aware Pazartesi başlangıç zamanı ve kaynak şema hash’leri açıkça tanımlıdır. Belirli vendor endpoint’iyle gerçek birlikte çalışabilirlik müşteri kabul testi gerektirir; yapılmış olarak gösterilmez.
 
-Dashboard benchmark’ı kullanıcı düğmesiyle başlatılır. FIFO/EDD/SPT/Greedy makine sırasını seçer; her çizelge aynı üretim CP-SAT modeli, veri snapshot’ı, takvim, bakım, rota, setup, malzeme, OT ve freeze/FLEXIBLE kısıtları altında yerleştirilir. Gerçek lot gecikmeleri, maliyetler, süreler ve ölçülen EDD farkı raporlanır. Saf sezgisel runtime karşılaştırması veya müşteri ROI kanıtı değildir. [Ölçülmüş demo](artifacts/demo/business-case.md) ve [demo/müşteri pilot rehberi](docs/demo-and-customer-pilot.md) yeniden üretme adımlarını içerir.
+Dashboard benchmark’ı kullanıcı düğmesiyle başlatılır. FIFO/EDD/SPT/Greedy makine sırasını seçer; her çizelge aynı üretim CP-SAT modeli, veri snapshot’ı, takvim, bakım, rota, setup, malzeme, OT ve freeze/FLEXIBLE kısıtları altında yerleştirilir. Çizelge üzerindeki lot gecikmeleri, model maliyetleri, süreler ve ölçülen EDD farkı raporlanır. Saf sezgisel runtime karşılaştırması veya müşteri ROI kanıtı değildir. [Ölçülmüş demo](artifacts/demo/business-case.md) ve [demo/müşteri pilot rehberi](docs/demo-and-customer-pilot.md) yeniden üretme adımlarını içerir.
 
 ---
 
