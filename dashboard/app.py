@@ -805,6 +805,10 @@ with tab_scenarios:
             )
         else:
             st.info("Bu ACTIVE plan için senaryo karşılaştırmasını hesaplamak üzere butona basın.")
+    except TimeoutError:
+        st.warning(
+            "Senaryo matrisi zaman sınırında tamamlanamadı. Yeni sonuç gösterilmiyor; ACTIVE plan değiştirilmedi."
+        )
     except Exception as e:
         st.error(f"Senaryo motoru hatası: {e}")
 
