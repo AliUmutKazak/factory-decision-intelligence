@@ -20,6 +20,7 @@ Fabrika bulunana kadarki teknik sıra: **G0 sürüm → G1-T referans profil →
 - Proje sahibi 7 Ekim 2026'da henüz pilot fabrika, temsilî müşteri verisi ve ERP/MES test erişimi bulunmadığını bildirdi. Bu nedenle saha kabulü gerektiren kapılar için kanıt toplama başlamadı; teknik hazırlık sentetik/veri-sözleşmesi düzeyinde yürütülür.
 - PR [#1](https://github.com/AliUmutKazak/factory-decision-intelligence/pull/1) birleşti: PR head `665b14995b9824e99e6d890a7c1e5a0832410fbd`, birleşme commit'i `a938aaaf5a328f42cf9fb00bfb104f210803794b`. PDF'deki "PR açık" gözlemi tarihsel durumdur.
 - PR [#2](https://github.com/AliUmutKazak/factory-decision-intelligence/pull/2) 8 Ekim'de birleşti: head `9f9e558f51cd1631d956d596c5208bd26f20ec74`, birleşme commit'i `67d3b80e8d4e3250d302945a04b2b89234f7ceed`. Head commit'inde kalite/test ve temiz Docker kontrolleri geçti; birleşme commit'inin main CI durumu ayrıca izlenir. Bu birleşme G0 sürüm etiketi veya G1 pilot kabulü değildir.
+- PR [#3](https://github.com/AliUmutKazak/factory-decision-intelligence/pull/3) 8 Ekim'de birleşti: head `ab10b3cde5bb27f467e26a1719549559b11b5e97`, birleşme commit'i `95ed6ce83c7fdb1a0b17449401f42f74c1020740`. Head commit'inde iki CI işi geçti; main birleşme commit'inin kalite işi bu kayıt yazılırken sürüyordu. G3 laboratuvar yedeği canlı kurtarma kabulü değildir.
 - Birleşme commit'inin [main CI koşumu 37639606808](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/37639606808) başarılıdır. Kalite/entegrasyon/test ve temiz Docker başlangıcı/yeniden başlatma işleri ayrı ayrı başarılıdır. Görünen uyarılar GitHub Actions Node 20 kullanımı ve yaklaşan `ubuntu-latest` geçişi hakkındadır.
 - Depoda henüz Git sürüm etiketi yoktur. CI yayımlanmış bir image veya indirilebilir release artifact üretmiyor; dolayısıyla image digest'i mevcut kanıt olarak gösterilemez.
 - Kanonik referans `RUN-20261006-00a0d3`, kaynak commit `63d33899b13894c7b0f963d5e97721d6fd6afa36` üzerinde üretilmiştir. Depodaki ham referans manifest SHA-256: `6c6a61358608d12d3d374428446621b8dda0156cd20bc0a449dd732d96ecaf6e`. Bu kaynak, birleşme commit'iyle aynıymış gibi sunulmaz.
@@ -93,6 +94,8 @@ Veri kaynağı türü her kayıt için **gerçek müşteri / açık benchmark / 
 4. **G7'de doğruluk ve süreyi ayrı kabul etme:** Hot-order örneği 30 sn sınırında `UNKNOWN`, daha uzun doğruluk testinde çözüm üretebildi. SLO belirlenene kadar timeout/fallback oranı ve yük zarfı ayrıca raporlanır; süreyi artırarak başarısızlık görünmez yapılmaz. Çözüm bulunmazsa önceki ACTIVE korunur.
 
 ## Açık dış girdiler ve karar sahipleri
+
+Proje sahibinin katkı sırası ve kısa yanıt şablonu: [proje sahibi katkı ve karar raporu](proje-sahibi-katki-raporu.md).
 
 1. Pilot fabrika, hat, ürün ailesi, planlama sahibi ve kabul verecek kişiler (şu anda pilot fabrika yok).
 2. ERP/MES vendor'ı, test tenant/endpoint, transport ve actuals kaynağı (şu anda test erişimi yok).
