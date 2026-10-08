@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "source_bundle": "reference",
+  "run_id": "RUN-20261006-00a0d3",
+  "manifest_sha256": "6c6a61358608d12d3d374428446621b8dda0156cd20bc0a449dd732d96ecaf6e",
+  "code_sha256": "8dbfa4fed582e8e6d473cd107e0b0a23d7b78c72173aac953fef0ff283dc0158",
+  "payload_count": 18,
+  "payload_bytes": 675263,
+  "snapshot_verified": true,
+  "restored_verified": true,
+  "restored_sqlite_integrity": "ok",
+  "restored_sqlite_foreign_keys": "ok",
+  "source_unchanged": true,
+  "scope": "LAB_OFFLINE_SEALED_BUNDLE_ONLY_NO_LIVE_RTO_RPO_PROOF"
+}
