@@ -1,0 +1,58 @@
+{
+  "source": "OR-Library jobshop1",
+  "source_url": "https://people.brunel.ac.uk/~mastjjb/jeb/orlib/files/jobshop1.txt",
+  "instance_name": "la01",
+  "source_sha256": "7f36d103332f94cfdeb76358e40927a57cfa7a426ebeaabd4de666350c69f028",
+  "reference_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "code_hashes": {
+    "src/config.py": "d6a664187dd784bb9b19c2655883f0d6a515640456c6d41b14542bb7681655cf",
+    "src/scheduling/schedule_cpsat.py": "0890d796d76efd576555553be2e4ceb2f38ec7bac9f492c11573aaf97a8ba772",
+    "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+    "src/scheduling/fjsp_reference.py": "da29e272564ff13753bc4ef174e064b9337a86e237b324cdc77814865a52785d",
+    "src/scheduling/external_jsp_benchmark.py": "c54e394a72d770d7f2dde4ae166553bbe9cc06dfa05e13df4713a604e594197d"
+  },
+  "source_unit": "abstract benchmark time unit",
+  "model_unit_mapping": "one benchmark unit = one model minute; origin offset +480",
+  "job_count": 10,
+  "machine_count": 5,
+  "operation_count": 50,
+  "solver_status": "OPTIMAL",
+  "proven_optimal_for_model": true,
+  "solver_version": "9.14.6206",
+  "python_version": "3.11.16",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "objective_policy": "THROUGHPUT_MAX",
+  "objective_weights": {
+    "makespan": 100,
+    "setup": 0,
+    "tardiness": 0
+  },
+  "solver_time_limit_seconds": 30.0,
+  "random_seed": 42,
+  "num_search_workers": 1,
+  "objective_value": 114600.0,
+  "best_objective_bound": 114600.0,
+  "solver_wall_time_seconds": 0.1269,
+  "model_absolute_makespan_min": 1146,
+  "relative_makespan": 666,
+  "independent_check": {
+    "status": "ACCEPTED",
+    "job_count": 10,
+    "machine_count": 5,
+    "operation_count": 50,
+    "makespan": 666,
+    "issues": [],
+    "scope": "STATIC_FJSP_ASSIGNMENT_DURATION_PRECEDENCE_MACHINE_CAPACITY_ONLY"
+  },
+  "neutrality_checks": {
+    "pure_makespan_policy": true,
+    "zero_setup": true,
+    "zero_tardiness": true,
+    "within_first_regular_shift": true,
+    "zero_overtime": true,
+    "all_operations_present": true,
+    "independent_feasibility": true
+  },
+  "comparable_static_jsp_subset": true,
+  "scope": "LAB_STATIC_FIXED_MACHINE_JSP_ONLY_NO_CUSTOMER_KPI_NO_PUBLICATION"
+}

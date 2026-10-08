@@ -12,7 +12,7 @@
 
 ## Bugünkü dürüst değerlendirme
 
-- **Güçlü taraf:** LP kapasite planı, MRP, CP-SAT çizelge, olay tabanlı yeniden çizelgeleme, enerji/karbon analitiği, API/dashboard ve mühürlü run kanıtı aynı karar akışında. Temiz kurulum ve Docker CI, bağımsız çizelge denetimi ve [OR-Library `ft06` sabit JSP deneyinde](external-jsp-benchmark.md) 55 birimlik optimum var. Bu sonuçların kapsamı etiketli sentetik/statik örneklerdir.
+- **Güçlü taraf:** LP kapasite planı, MRP, CP-SAT çizelge, olay tabanlı yeniden çizelgeleme, enerji/karbon analitiği, API/dashboard ve mühürlü run kanıtı aynı karar akışında. Temiz kurulum ve Docker CI ile [dört OR-Library sabit JSP örneğinde](external-jsp-benchmark.md) bağımsız çizelge denetimi var: üçü `OPTIMAL`, daha büyük `ft10` 30 saniyede `FEASIBLE`. Bu sonuçların kapsamı etiketli sentetik/statik örneklerdir.
 - **En belirgin teknik açık:** Alternatif makine seçimi yok. Açık ambalaj verisinin proses-makine, hız/süre, setup ve zaman ekseni kuralları belirsizken bu alanları tahmin ederek genel FJSP sonucu sunmak yanlış olur. [Kaynak profili](open-packaging-data-profile.md) bu sınırı belgeler.
 - **İşletim açığı:** G7'de referans yük için p50/p95, timeout ve fallback oranları ile runbook eksik. Yerelde 30 saniyelik bir hot-order senaryosu `UNKNOWN` vermiştir; geçerli önceki ACTIVE korunması önemlidir, fakat kabul edilmiş servis hedefi değildir.
 - **Saha açığı:** Gerçek plan/actuals, vendor round-trip, proses uzmanı kabulü ve finans uzlaştırması bulunmadığı için müşteri performansı veya ROI sıralaması yapılamaz.
@@ -20,7 +20,7 @@
 ## Fabrika arayışından önceki iş sırası
 
 1. **G0 ve vitrin:** PR'ların `main` üzerinde kalite/Docker kanıtını sabitle; sürüm etiketi/artifact kararını ver; README, güncel ekran görüntüleri ve kısa demo için aynı commit'i kullan. API yalnız yerel/denetimli ortamda gösterilsin.
-2. **G8-T karşılaştırma:** `ft06` sonrasına birden fazla sabit makineli dış örnek ekle. Aynı problem/kısıt, açık veri kökeni, bağımsız uygunluk denetimi, süre sınırı, optimum/FEASIBLE/bound ayrımı ve tekrarlanabilir sonuç tablosu zorunlu olsun. FJSP ayrı problem olarak kalsın.
+2. **G8-T karşılaştırma:** `ft06`, `la01`, `la02` ve `ft10` için aynı problem/kısıt, açık veri kökeni, bağımsız uygunluk denetimi ve optimum/FEASIBLE/bound ayrımı kaydedildi. Daha geniş yük, tekrarlı çalışma, farklı tohum/süre sınırı ve olay replay'iyle dayanıklılığı ölç; FJSP ayrı problem olarak kalsın.
 3. **G7 işletim:** Referans yük ve olay replay'inde solve süresi dağılımı, timeout/infeasible, ACTIVE yaşı ve başarısız çözümden geri dönüşü ölç; önceden tanımlı yükte tekrar et. Kısa süreli solver sonucunu optimum diye sunma.
 4. **G4-T/G5-T/G6-T veri ve olay:** Kanonik CSV ön kontrolünden açık ret/eşleme raporuna ilerle; kaynak/hesaplanan/varsayım alanlarını ayır. Yerel tekrarlı/geç mesaj ve küçük kesinti/kısmi üretim örneklerini sınayarak veri kaybı veya iki kez sayım riskini araştır.
 5. **G2/G3 sınırı:** Yerel demo erişimi ve secret sınırını koru; geri yükleme/run izolasyonu ile eşzamanlı yayın tasarımını güçlendir. Kimlik sağlayıcısı, vendor taşıması ve canlı RTO/RPO sahaya göre belirlenecek; bunları varsayımla kabul etme.
