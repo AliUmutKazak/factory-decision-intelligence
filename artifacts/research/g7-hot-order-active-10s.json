@@ -1,0 +1,84 @@
+{
+  "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
+  "measured_at_utc": "2026-10-08T14:59:05.640104+00:00",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
+  "git_sha": "306acb1ea08e5113b3881115b3a6043ab3aa5a20",
+  "code_hashes": {
+    "src/scheduling/hot_order_load_probe.py": "bff0519fb9afc70594d26df25ba26ad93ad50cf41313bdbc3895c37e83ffdcbd",
+    "src/scheduling/what_if.py": "6c9e6cfe09da3ee5a4024fc2efddaf8b8e7095d79b7b1d4f9abcd48ff5d1ce1a",
+    "src/scheduling/schedule_cpsat.py": "48e19dbbc344a5daf05ec684860553f786e906390120ac81d9a69943e745f1af",
+    "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0"
+  },
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python_version": "3.13.15",
+  "ortools_version": "9.14.6206",
+  "hot_order": {
+    "order_id": "G7-RUSH-P01-51",
+    "product_id": "P01",
+    "quantity": 51,
+    "due_date_min": 1200,
+    "priority_weight": 20
+  },
+  "baseline_limit_seconds": null,
+  "baseline_source": "ACTIVE_SNAPSHOT",
+  "scenario_limit_seconds": 10.0,
+  "repeats": 3,
+  "attempts": [
+    {
+      "number": 1,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "FEASIBLE",
+      "scenario_solver_wall_seconds": 10.0015,
+      "replay_wall_seconds": 10.1672,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "staged_active_unchanged": true
+    },
+    {
+      "number": 2,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "FEASIBLE",
+      "scenario_solver_wall_seconds": 10.0014,
+      "replay_wall_seconds": 10.1501,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "staged_active_unchanged": true
+    },
+    {
+      "number": 3,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "FEASIBLE",
+      "scenario_solver_wall_seconds": 10.0017,
+      "replay_wall_seconds": 10.1789,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "staged_active_unchanged": true
+    }
+  ],
+  "summary": {
+    "scenario_status_counts": {
+      "FEASIBLE": 3
+    },
+    "scenario_accepted_count": 3,
+    "baseline_failure_count": 0,
+    "scenario_failure_count": 0,
+    "baseline_timeout_count": 0,
+    "scenario_timeout_count": 0,
+    "replay_wall_p50_seconds": 10.1672,
+    "replay_wall_p95_seconds": 10.1777,
+    "accepted_scenario_solver_wall_p50_seconds": 10.0015,
+    "accepted_scenario_solver_wall_p95_seconds": 10.0017,
+    "percentile_method": "linear interpolation over sorted samples"
+  }
+}

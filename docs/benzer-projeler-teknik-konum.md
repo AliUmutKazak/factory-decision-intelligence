@@ -14,7 +14,7 @@
 
 - **Güçlü taraf:** LP kapasite planı, MRP, CP-SAT çizelge, olay tabanlı yeniden çizelgeleme, enerji/karbon analitiği, API/dashboard ve mühürlü run kanıtı aynı karar akışında. Temiz kurulum ve Docker CI ile [dört OR-Library sabit JSP örneğinde](external-jsp-benchmark.md) bağımsız çizelge denetimi var: üçü `OPTIMAL`, daha büyük `ft10` 30 saniyede `FEASIBLE`. Bu sonuçların kapsamı etiketli sentetik/statik örneklerdir.
 - **En belirgin teknik açık:** Alternatif makine seçimi yok. Açık ambalaj verisinin proses-makine, hız/süre, setup ve zaman ekseni kuralları belirsizken bu alanları tahmin ederek genel FJSP sonucu sunmak yanlış olur. [Kaynak profili](open-packaging-data-profile.md) bu sınırı belgeler.
-- **İşletim açığı:** G7'de [mühürlü referans için ilk tekrarlı p50/p95 ölçümü](g7-reference-load-probe.md) var; olay replay'i, gerçek timeout/fallback oranları, `ACTIVE` yaşı ve runbook eksik. Yerelde 30 saniyelik bir hot-order senaryosu `UNKNOWN` vermiştir; geçerli önceki ACTIVE korunması önemlidir, fakat kabul edilmiş servis hedefi değildir.
+- **İşletim açığı:** G7'de [mühürlü referans için ilk tekrarlı p50/p95 ölçümü](g7-reference-load-probe.md) ve [sentetik acil sipariş replay'i](g7-active-baseline-replay.md) var. Kabul edilmiş `ACTIVE` baz planıyla 10 saniye sınırında 3/3 `FEASIBLE`, 2 saniyede 0/5 sonuç alındı. Gerçek eşzamanlılık, `ACTIVE` yaşı, olay çeşitliliği ve müşteri hizmet hedefi hâlâ açık.
 - **Saha açığı:** Gerçek plan/actuals, vendor round-trip, proses uzmanı kabulü ve finans uzlaştırması bulunmadığı için müşteri performansı veya ROI sıralaması yapılamaz.
 
 ## Fabrika arayışından önceki iş sırası

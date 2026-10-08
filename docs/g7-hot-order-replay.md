@@ -21,4 +21,4 @@ Bu profil özellikle kısa etkileşimli süre sınırını sınar; **5 saniyelik
 
 ## Sonraki teknik iş ve sınır
 
-Baz planı her what-if isteğinde yeniden çözmenin maliyetini azaltmak için mühürlü mevcut planın güvenli yeniden kullanımı veya geçerli warm start araştırılmalı; acil sipariş için belirlenmiş yük zarfında süre/çözüm oranı yeniden ölçülmelidir. Başarısız denemede doğrulanmamış plan yayımlanmaz; fakat gerçek API eşzamanlılığı, kuyruk, alarm, fallback politikası, `ACTIVE` yaşı ve müşteri SLO'su bu deneyle kanıtlanmaz. Bu sonuç, G7 saha kabulü veya fabrika performansı değildir.
+Baz planı yeniden çözmenin maliyeti için [kabul edilmiş `ACTIVE` planını yeniden kullanan takip ölçümü](g7-active-baseline-replay.md) yapıldı. Başarısız denemede doğrulanmamış plan yayımlanmaz; fakat gerçek API eşzamanlılığı, kuyruk, alarm, fallback politikası, `ACTIVE` yaşı ve müşteri SLO'su bu deneyle kanıtlanmaz. Bu sonuç, G7 saha kabulü veya fabrika performansı değildir.
