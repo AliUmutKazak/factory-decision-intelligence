@@ -954,7 +954,7 @@ with tab_mes:
         elif sim_type == "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)":
             with st.form("hot_order_form"):
                 ho_product = st.selectbox("Ürün Tipi:", ["P01", "P02", "P03", "P04", "P05"])
-                ho_qty = st.number_input("Sipariş Miktarı:", min_value=100, value=400, step=50)
+                ho_qty = st.number_input("Sipariş Miktarı:", min_value=1, value=400, step=1)
                 ho_due = st.number_input(
                     "İstenen Teslim Zamanı (Dakika):",
                     min_value=100,
