@@ -13,6 +13,7 @@ from src.contracts.schemas import (
     MachineBreakdownEvent,
     ScenarioDeltaReport,
     ScenarioType,
+    ScheduleSolverMetadata,
     SolverStatus,
 )
 from src.scheduling.what_if import WhatIfEngine
@@ -109,3 +110,147 @@ def test_hot_order_injection_scenario_simulation(reference_active_db, monkeypatc
 
     # Acil sipariş sonrasında çizelgelenen iş sayısı baz plana eşit veya daha fazla olmalıdır
     assert delta_report.makespan_delta_min == delta_report.scenario_makespan_min - delta_report.baseline_makespan_min
+
+
+def test_hot_order_timeout_keeps_source_active_run_unchanged(reference_active_db, monkeypatch):
+    """A failed in-memory scenario must not alter the source ACTIVE version."""
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    before = sha256_file(reference_active_db)
+    with sqlite3.connect(reference_active_db) as conn:
+        active_before = conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchone()[0]
+
+    def baseline_then_timeout(**kwargs):
+        if kwargs["run_id"] == "BASE":
+            return object()
+        raise TimeoutError("UNKNOWN: no accepted hot-order schedule")
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", baseline_then_timeout)
+    hot_order = HotOrderInjection(
+        order_id="RUSH-TIMEOUT",
+        product_id="P01",
+        quantity=51,
+        due_date_min=1200,
+        priority_weight=20,
+    )
+
+    with pytest.raises(TimeoutError, match="no accepted hot-order schedule"):
+        engine.simulate_hot_order(hot_order, scenario_name="SCENARIO_TIMEOUT")
+
+    assert sha256_file(reference_active_db) == before
+    with sqlite3.connect(reference_active_db) as conn:
+        assert conn.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchone()[0] == active_before
+        assert conn.execute("SELECT 1 FROM pipeline_runs WHERE run_id = 'SCENARIO_TIMEOUT'").fetchone() is None
+
+
+def test_hot_order_uses_distinct_baseline_and_scenario_limits(reference_active_db, monkeypatch):
+    observed = []
+
+    def record_solve(**kwargs):
+        observed.append((kwargs["run_id"], kwargs["time_limit_seconds"]))
+        return ScheduleSolverMetadata(
+            run_id=kwargs["run_id"],
+            status=SolverStatus.FEASIBLE,
+            proven_optimal=False,
+            wall_time_seconds=0.1,
+            objective_value=1.0,
+        )
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    before = sha256_file(reference_active_db)
+    engine.simulate_hot_order(
+        HotOrderInjection(order_id="LIMIT-CHECK", product_id="P01", quantity=51, due_date_min=1200),
+        scenario_name="SCENARIO_LIMIT_CHECK",
+        baseline_time_limit_seconds=7,
+        scenario_time_limit_seconds=2,
+    )
+    assert observed == [("BASE", 7), ("SCENARIO_LIMIT_CHECK", 2)]
+    assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_reuses_accepted_active_baseline_without_resolving_it(reference_active_db, monkeypatch):
+    observed = []
+
+    def record_solve(**kwargs):
+        observed.append(kwargs)
+        return ScheduleSolverMetadata(
+            run_id=kwargs["run_id"],
+            status=SolverStatus.FEASIBLE,
+            proven_optimal=False,
+            wall_time_seconds=0.1,
+            objective_value=1.0,
+        )
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    baseline, _, _, _ = engine.simulate_hot_order(
+        HotOrderInjection(order_id="RUSH-SNAPSHOT", product_id="P01", quantity=51, due_date_min=1200),
+        scenario_name="SCENARIO_SNAPSHOT",
+        reuse_active_baseline=True,
+        scenario_time_limit_seconds=2,
+        scenario_dispatch_rule="EDD",
+    )
+    assert baseline.status == SolverStatus.FEASIBLE
+    assert len(observed) == 1
+    assert observed[0]["run_id"] == "SCENARIO_SNAPSHOT"
+    assert observed[0]["time_limit_seconds"] == 2
+    assert observed[0]["dispatch_rule"] == "EDD"
+    assert not observed[0]["reference_schedule"].empty
+    assert (observed[0]["sku_plan"]["lot_id"] == "HOT_P01").any()
+    assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_rejects_unaccepted_active_baseline(reference_active_db, monkeypatch):
+    with sqlite3.connect(reference_active_db) as conn:
+        conn.execute("UPDATE schedule_solver_metadata SET status = 'UNKNOWN'")
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+
+    def unexpected_solve(**kwargs):
+        pytest.fail("solver must not run with an unaccepted ACTIVE baseline")
+
+    monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", unexpected_solve)
+    with pytest.raises(RuntimeError, match="no accepted solver result"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-INVALID", product_id="P01", quantity=51, due_date_min=1200),
+            reuse_active_baseline=True,
+        )
+    assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_rejects_active_context_it_cannot_replay(reference_active_db):
+    with sqlite3.connect(reference_active_db) as conn:
+        conn.execute(
+            "UPDATE schedule_model_context SET payload_json = ?",
+            (
+                '{"earliest_start_min": 0, "frozen_positions": {"1": ["M01", 0, 10]}, "flexible_windows": {}, "maintenance_overrides": []}',
+            ),
+        )
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with pytest.raises(RuntimeError, match="cannot preserve"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-FROZEN", product_id="P01", quantity=51, due_date_min=1200),
+            reuse_active_baseline=True,
+        )
+    assert sha256_file(reference_active_db) == before
+
+
+def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db):
+    before = sha256_file(reference_active_db)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
+        baseline, scenario, _, schedule = engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-EDD", product_id="P01", quantity=51, due_date_min=1200),
+            scenario_name="SCENARIO_EDD",
+            reuse_active_baseline=True,
+            scenario_dispatch_rule="EDD",
+            scenario_time_limit_seconds=2,
+        )
+    assert baseline.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    assert scenario.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    assert schedule["task_id"].is_unique
+    assert (schedule["parent_lot_id"] == "HOT_P01").any()
+    assert sha256_file(reference_active_db) == before

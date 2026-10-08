@@ -34,7 +34,7 @@ def production_benchmark(
     if not path.is_file():
         raise ValueError("Benchmark requires an existing ACTIVE database.")
     snapshot = sqlite3.connect(":memory:")
-    with sqlite3.connect(path) as source:
+    with sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True) as source:
         source.backup(snapshot)
     try:
         baseline = baseline_run_id or get_active_run_id(snapshot)

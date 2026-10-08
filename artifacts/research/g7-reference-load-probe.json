@@ -1,0 +1,79 @@
+{
+  "scope": "LAB_REFERENCE_SNAPSHOT_ONLY_NO_CUSTOMER_SLO",
+  "measured_at_utc": "2026-10-08T13:54:17.969705+00:00",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "input_hash": "3b661b07be4b97c3b5d9385789efb111cccf50217b41dcd6c27f0788169070cd",
+  "git_sha": "b905ab75deebb797f8a2244b9c5216ad7d7448d9",
+  "code_hashes": {
+    "src/config.py": "d6a664187dd784bb9b19c2655883f0d6a515640456c6d41b14542bb7681655cf",
+    "src/scheduling/schedule_cpsat.py": "0890d796d76efd576555553be2e4ceb2f38ec7bac9f492c11573aaf97a8ba772",
+    "src/scheduling/dispatch.py": "5a00e736e364dae4efcdffcdfec1f8b0cdc83f0162f31ae5e8b34d99a6b61dd9",
+    "src/scheduling/production_benchmark.py": "4f7e9fceaa3d368cb19b8e8a8dca9d36ac21d8f938f1f93c12b2d1b93ee14003",
+    "src/scheduling/monetary_objective.py": "c69e89df13a026a749ad539d4a497e38115f7b1bcbd2ca72b71ef6eefe67a273",
+    "src/scheduling/model_context.py": "4fd6b94ff13c68e030c758cb41c207d505632b25065a6b435ff996ca7af7a958",
+    "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+    "src/scheduling/analytics_schema.py": "46fe7798a034c7f11db0b0f00b1bf73e5bd8f7bd9f55ebbc1cd5b011a83b0dee",
+    "src/scheduling/maintenance.py": "e3308288f6108faf4ae07b071e78dbf3c8aed3659bcb02c229784b21c8d54c09",
+    "src/economics/schedule_cost.py": "0e3a19276b52c70dc7519e8396477b707a37aabd8fcca1ddb8b63319fb3eeba4",
+    "src/economics/cost_to_serve.py": "0df8a6d976ff2dce7dafd50ccaf2f6c3513fe63448d9ab7dba2c4384e1b21430",
+    "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0",
+    "src/utils/db.py": "9caf99fc2016e6558c84835fbdee436d4ef1b094b9c1fb036f70ae2ebb07ba89"
+  },
+  "probe_code_sha256": "7632831f41282a8ee42dfab569702a301b3d1acbdadb894d35e76f5b9d544e67",
+  "ortools_version": "9.14.6206",
+  "platform": "Windows-10-10.0.26300-SP0",
+  "python_version": "3.11.16",
+  "policy": "CP-SAT BALANCED via production_benchmark",
+  "time_limit_seconds": 2.0,
+  "repeats": 5,
+  "attempts": [
+    {
+      "number": 1,
+      "status": "FEASIBLE",
+      "attempt_wall_seconds": 2.4703,
+      "solver_wall_seconds": 2.004,
+      "reason": null
+    },
+    {
+      "number": 2,
+      "status": "FEASIBLE",
+      "attempt_wall_seconds": 2.7605,
+      "solver_wall_seconds": 2.0026,
+      "reason": null
+    },
+    {
+      "number": 3,
+      "status": "FEASIBLE",
+      "attempt_wall_seconds": 2.7585,
+      "solver_wall_seconds": 2.0028,
+      "reason": null
+    },
+    {
+      "number": 4,
+      "status": "FEASIBLE",
+      "attempt_wall_seconds": 2.7819,
+      "solver_wall_seconds": 2.0014,
+      "reason": null
+    },
+    {
+      "number": 5,
+      "status": "FEASIBLE",
+      "attempt_wall_seconds": 2.7424,
+      "solver_wall_seconds": 2.0026,
+      "reason": null
+    }
+  ],
+  "summary": {
+    "status_counts": {
+      "FEASIBLE": 5
+    },
+    "accepted_count": 5,
+    "no_accepted_solution_count": 0,
+    "attempt_wall_p50_seconds": 2.7585,
+    "attempt_wall_p95_seconds": 2.7776,
+    "accepted_solver_wall_p50_seconds": 2.0026,
+    "accepted_solver_wall_p95_seconds": 2.0038,
+    "percentile_method": "linear interpolation over sorted samples"
+  }
+}
