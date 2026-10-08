@@ -237,7 +237,7 @@ def test_hot_order_rejects_active_context_it_cannot_replay(reference_active_db):
     assert sha256_file(reference_active_db) == before
 
 
-def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db):
+def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db, capsys):
     before = sha256_file(reference_active_db)
     engine = WhatIfEngine(disk_db_path=str(reference_active_db))
     with warnings.catch_warnings():
@@ -254,3 +254,4 @@ def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db)
     assert schedule["task_id"].is_unique
     assert (schedule["parent_lot_id"] == "HOT_P01").any()
     assert sha256_file(reference_active_db) == before
+    assert "MUTABAKAT: %100" in capsys.readouterr().out

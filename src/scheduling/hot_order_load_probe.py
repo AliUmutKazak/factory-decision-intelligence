@@ -20,6 +20,7 @@ from time import perf_counter
 from typing import Any
 
 from src.contracts.schemas import HotOrderInjection, ScheduleSolverMetadata
+from src.scheduling.hot_order_schedule_audit import audit_hot_order_schedule
 from src.scheduling.what_if import WhatIfEngine
 from src.utils.lineage import get_git_sha
 
@@ -118,6 +119,7 @@ def probe_hot_order_replay(
         engine = _MeasuredWhatIfEngine(str(staged))
         baseline_meta: ScheduleSolverMetadata | None = None
         scenario_meta: ScheduleSolverMetadata | None = None
+        independent_audit: dict[str, Any] | None = None
         failure: Exception | None = None
         started = perf_counter()
         try:
@@ -125,7 +127,7 @@ def probe_hot_order_replay(
                 warnings.filterwarnings(
                     "ignore", message="pandas only supports SQLAlchemy connectable", category=UserWarning
                 )
-                baseline_meta, scenario_meta, _, _ = engine.simulate_hot_order(
+                baseline_meta, scenario_meta, _, scenario_schedule = engine.simulate_hot_order(
                     hot_order,
                     scenario_name=f"G7-HOT-{number}",
                     baseline_time_limit_seconds=baseline_limit_seconds,
@@ -133,7 +135,13 @@ def probe_hot_order_replay(
                     reuse_active_baseline=reuse_active_baseline,
                     scenario_dispatch_rule=scenario_dispatch_rule,
                 )
-        except (TimeoutError, RuntimeError) as exc:
+                with closing(sqlite3.connect(f"{staged.as_uri()}?mode=ro", uri=True)) as audit_conn:
+                    independent_audit = audit_hot_order_schedule(
+                        audit_conn, baseline_run_id, hot_order, scenario_schedule
+                    )
+                if independent_audit["status"] != "ACCEPTED":
+                    raise RuntimeError("independent hot-order schedule audit rejected the candidate")
+        except (TimeoutError, RuntimeError, ValueError, sqlite3.Error) as exc:
             failure = exc
         finally:
             elapsed = perf_counter() - started
@@ -148,7 +156,15 @@ def probe_hot_order_replay(
                 staged.unlink(missing_ok=True)
 
         baseline_meta = baseline_meta or engine.baseline_metadata
-        failure_stage = None if failure is None else "SCENARIO" if baseline_meta else "BASELINE"
+        failure_stage = (
+            None
+            if failure is None
+            else "AUDIT"
+            if scenario_meta is not None
+            else "SCENARIO"
+            if baseline_meta is not None
+            else "BASELINE"
+        )
         attempts.append(
             {
                 "number": number,
@@ -159,7 +175,13 @@ def probe_hot_order_replay(
                 "baseline_original_solver_wall_seconds": (
                     baseline_meta.wall_time_seconds if baseline_meta and reuse_active_baseline else None
                 ),
-                "scenario_status": scenario_meta.status.value if scenario_meta else "NO_ACCEPTED_SOLUTION",
+                "scenario_status": (
+                    "REJECTED_BY_AUDIT"
+                    if scenario_meta is not None and failure_stage == "AUDIT"
+                    else scenario_meta.status.value
+                    if scenario_meta
+                    else "NO_ACCEPTED_SOLUTION"
+                ),
                 "scenario_solver_wall_seconds": scenario_meta.wall_time_seconds if scenario_meta else None,
                 "scenario_makespan_min": scenario_meta.makespan_min if scenario_meta else None,
                 "scenario_total_tardiness_min": scenario_meta.total_tardiness_min if scenario_meta else None,
@@ -169,13 +191,20 @@ def probe_hot_order_replay(
                 "failure_stage": failure_stage,
                 "failure_type": type(failure).__name__ if failure else None,
                 "failure_reason": str(failure) if failure else None,
+                "independent_audit": independent_audit,
                 "staged_active_unchanged": True,
             }
         )
 
     if _sha256(source) != source_hash:
         raise RuntimeError("sealed source DB changed during hot-order replay")
-    accepted = [row for row in attempts if row["scenario_status"] in {"OPTIMAL", "FEASIBLE"}]
+    accepted = [
+        row
+        for row in attempts
+        if row["scenario_status"] in {"OPTIMAL", "FEASIBLE"}
+        and row["independent_audit"] is not None
+        and row["independent_audit"]["status"] == "ACCEPTED"
+    ]
     replay_times = [float(row["replay_wall_seconds"]) for row in attempts]
     scenario_times = [float(row["scenario_solver_wall_seconds"]) for row in accepted]
     code_root = Path(__file__).resolve().parents[2]
@@ -190,6 +219,7 @@ def probe_hot_order_replay(
             name: _sha256(code_root / name)
             for name in (
                 "src/scheduling/hot_order_load_probe.py",
+                "src/scheduling/hot_order_schedule_audit.py",
                 "src/scheduling/what_if.py",
                 "src/scheduling/schedule_cpsat.py",
                 "src/contracts/schemas.py",
@@ -211,6 +241,7 @@ def probe_hot_order_replay(
             "scenario_accepted_count": len(accepted),
             "baseline_failure_count": sum(row["failure_stage"] == "BASELINE" for row in attempts),
             "scenario_failure_count": sum(row["failure_stage"] == "SCENARIO" for row in attempts),
+            "audit_failure_count": sum(row["failure_stage"] == "AUDIT" for row in attempts),
             "baseline_timeout_count": sum(
                 row["failure_stage"] == "BASELINE" and row["failure_type"] == "TimeoutError" for row in attempts
             ),

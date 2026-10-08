@@ -1434,9 +1434,8 @@ def run_cpsat_scheduling(
     sched_summary = (
         sched_df[sched_df["operation_seq"] == 1].groupby("product_id")["production_units"].sum().reset_index()
     )
-    merged_audit = pd.merge(
-        sku_plan[["product_id", "planned_units"]], sched_summary, on="product_id", how="left"
-    ).fillna(0)
+    planned_summary = sku_plan.groupby("product_id", as_index=False)["planned_units"].sum()
+    merged_audit = pd.merge(planned_summary, sched_summary, on="product_id", how="left").fillna(0)
     merged_audit.rename(columns={"production_units": "scheduled_units"}, inplace=True)
     merged_audit["diff"] = merged_audit["planned_units"] - merged_audit["scheduled_units"]
 
