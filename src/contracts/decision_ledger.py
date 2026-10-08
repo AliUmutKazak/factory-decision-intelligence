@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -60,7 +61,7 @@ class DecisionLedger:
             self._ensure_table()
 
     def _ensure_table(self) -> None:
-        with get_db_connection(self.db_path) as conn:
+        with closing(get_db_connection(self.db_path)) as conn, conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS decision_ledger (
@@ -106,7 +107,7 @@ class DecisionLedger:
             self.entries.append(entry)
             return
 
-        with get_db_connection(self.db_path) as conn:
+        with closing(get_db_connection(self.db_path)) as conn, conn:
             conn.execute(
                 """
                 INSERT INTO decision_ledger (
@@ -137,7 +138,7 @@ class DecisionLedger:
         if self.db_path is None:
             return next((e for e in self.entries if e.decision_id == decision_id), None)
 
-        with get_db_connection(self.db_path) as conn:
+        with closing(get_db_connection(self.db_path)) as conn:
             row = conn.execute(
                 "SELECT decision_id, run_id, decision_type, input_state_json, "
                 "triggered_reason, selected_action, why_json, rejected_alternatives_json, "
@@ -151,7 +152,7 @@ class DecisionLedger:
         if self.db_path is None:
             return [e for e in self.entries if e.run_id == run_id]
 
-        with get_db_connection(self.db_path) as conn:
+        with closing(get_db_connection(self.db_path)) as conn:
             return self.read_by_run_id(conn, run_id)
 
     @classmethod
@@ -177,7 +178,7 @@ class DecisionLedger:
         if self.db_path is None:
             entries = self.entries
         else:
-            with get_db_connection(self.db_path) as conn:
+            with closing(get_db_connection(self.db_path)) as conn:
                 run_ids = [
                     row[0]
                     for row in conn.execute("SELECT DISTINCT run_id FROM decision_ledger ORDER BY run_id").fetchall()

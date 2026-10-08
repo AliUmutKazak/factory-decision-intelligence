@@ -1,5 +1,7 @@
 """Tests for Scenario Engine Contracts (Faz 3 - Scenario Shock & Result Validation)."""
 
+from contextlib import closing
+
 import pytest
 from pydantic import ValidationError
 
@@ -14,16 +16,16 @@ def test_scenario_matrix_pins_one_baseline_during_active_promotion(tmp_path, mon
     from src.utils.db import get_active_run_id
 
     db = tmp_path / "factory.db"
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn, conn:
         conn.execute("CREATE TABLE pipeline_runs(run_id TEXT, status TEXT)")
         conn.execute("INSERT INTO pipeline_runs VALUES ('OLD', 'ACTIVE')")
     observed = []
 
     def evaluate(snapshot_engine, shock):
-        with sqlite3.connect(snapshot_engine.db_path) as conn:
+        with closing(sqlite3.connect(snapshot_engine.db_path)) as conn:
             observed.append(get_active_run_id(conn))
         if len(observed) == 1:
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn, conn:
                 conn.execute("UPDATE pipeline_runs SET status = 'ARCHIVED'")
                 conn.execute("INSERT INTO pipeline_runs VALUES ('NEW', 'ACTIVE')")
         return ScenarioResult(shock.name, 0, 100, 0, 0, 0, 0, 0, 0)
@@ -34,7 +36,7 @@ def test_scenario_matrix_pins_one_baseline_during_active_promotion(tmp_path, mon
     result = engine.run_all_scenarios()
     assert observed == ["OLD", "OLD"]
     assert set(result["Baseline Run"]) == {"OLD"}
-    with sqlite3.connect(db) as conn:
+    with closing(sqlite3.connect(db)) as conn:
         assert get_active_run_id(conn) == "NEW"
 
 

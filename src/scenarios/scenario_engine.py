@@ -178,7 +178,7 @@ class ScenarioEngine:
             with closing(sqlite3.connect(self.db_path)) as source, closing(sqlite3.connect(db)) as target:
                 source.backup(target)
             scenario_id = f"SCENARIO-{uuid.uuid4().hex[:12]}"
-            with sqlite3.connect(db) as conn:
+            with closing(sqlite3.connect(db)) as conn, conn:
                 clone_run_inputs(conn, source_run_id, scenario_id)
                 if shock.demand_multiplier != 1.0:
                     conn.execute(
@@ -210,7 +210,7 @@ class ScenarioEngine:
                 )
                 compute_energy_analytics(run_id=scenario_id, db_path=db, processed_dir=processed)
                 compute_carbon_analytics(run_id=scenario_id, db_path=db, processed_dir=processed)
-                with sqlite3.connect(db) as conn:
+                with closing(sqlite3.connect(db)) as conn:
                     schedule = pd.read_sql(
                         "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(scenario_id,)
                     )
@@ -263,7 +263,7 @@ class ScenarioEngine:
         - Finansal Şoklar (Energy, CO2): Analitik duyarlılık (Sensitivity) analizi.
         """
         try:
-            with get_db_connection(self.db_path) as conn:
+            with closing(get_db_connection(self.db_path)) as conn:
                 run_id = get_active_run_id(conn)
         except RuntimeError as exc:
             raise ScenarioDataUnavailableError(f"DATA_UNAVAILABLE: {exc}") from exc
@@ -297,7 +297,7 @@ class ScenarioEngine:
             sim_sched, sim_kwh, sim_tco2, orders_df, costs = self._solve_operational_shock(shock, run_id)
             sim_makespan = float(sim_sched["end_min"].max()) / 60.0 if not sim_sched.empty else 0.0
         else:
-            with get_db_connection(self.db_path) as conn:
+            with closing(get_db_connection(self.db_path)) as conn:
                 costs = evaluate_schedule_cost(conn, sim_sched, run_id, self._economic_rates(shock))
 
         # =====================================================================

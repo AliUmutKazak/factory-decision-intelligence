@@ -1,7 +1,12 @@
 """Tests for What-If Scenario Simulation and Sensitivity Analysis Engine (Faz 4)."""
 
+import shutil
+import sqlite3
 import warnings
+from contextlib import closing
 from pathlib import Path
+
+import pytest
 
 from src.contracts.schemas import (
     HotOrderInjection,
@@ -13,13 +18,25 @@ from src.contracts.schemas import (
 from src.scheduling.what_if import WhatIfEngine
 from src.utils.run_bundle import sha256_file
 
+REFERENCE_DB = Path(__file__).resolve().parents[1] / "artifacts" / "reference" / "factory.db"
 
-def test_machine_breakdown_scenario_simulation():
+
+@pytest.fixture
+def reference_active_db(tmp_path):
+    """Use one sealed input set, independent of the mutable local ACTIVE run."""
+    db = tmp_path / "factory.db"
+    shutil.copy2(REFERENCE_DB, db)
+    with closing(sqlite3.connect(db)) as conn, conn:
+        conn.execute("UPDATE pipeline_runs SET status = 'ACTIVE' WHERE status = 'COMPLETED'")
+    return db
+
+
+def test_machine_breakdown_scenario_simulation(reference_active_db):
     """Verify that a machine breakdown event simulates isolated CP-SAT replanning
 
     and generates an accurate delta report.
     """
-    engine = WhatIfEngine()
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
     breakdown_event = MachineBreakdownEvent(
         machine_id="M01",
         start_min=600,
@@ -52,12 +69,15 @@ def test_machine_breakdown_scenario_simulation():
     assert delta_report.impacted_tasks_count == len(sched_df)
 
 
-def test_hot_order_injection_scenario_simulation():
+def test_hot_order_injection_scenario_simulation(reference_active_db, monkeypatch):
     """Verify that injecting a rush hot order triggers schedule expansion
 
     and evaluates tardiness/makespan impacts.
     """
-    engine = WhatIfEngine()
+    # This checks scenario correctness, not the G7 solve-time SLO. The rush
+    # workload can need more than the interactive default on slower hosts.
+    monkeypatch.setattr("src.scheduling.schedule_cpsat.CPSAT_TIME_LIMIT_SECONDS", 90.0)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
     hot_order = HotOrderInjection(
         order_id="RUSH-999",
         product_id="P01",

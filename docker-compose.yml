@@ -22,7 +22,7 @@ services:
     <<: *runtime
     command: uvicorn src.api.server:app --host 0.0.0.0 --port 8000
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       pipeline:
         condition: service_completed_successfully
@@ -37,7 +37,7 @@ services:
     <<: *runtime
     command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     depends_on:
       api:
         condition: service_healthy

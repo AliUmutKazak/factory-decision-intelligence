@@ -14,6 +14,12 @@
 
 ---
 
+## Yol haritası ve kanıt durumu
+
+Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [SQLite geri yükleme provası](docs/sqlite-restore-rehearsal.md) bu kayda bağlı teknik kanıtlardır. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
+
+---
+
 ## 🌐 Executive Summary / Yönetici Özeti
 
 ### [TR] Sistem Özeti
@@ -47,45 +53,46 @@ The **Factory Decision Intelligence System** is an advanced decision intelligenc
 Sistem, endüstriyel karar piramidini hiyerarşik katmanlar halinde modeller:
 
 ```mermaid
-graph TD
-    subgraph Katman 1: Veri Ambarı & ETL / Data Persistence
-        A[Staging Veri Ambarı / SQLite3] --> B[Siparişler, Çok Seviyeli BOM, İstasyon Rotaları]
+flowchart TD
+    subgraph layer1["Katman 1: Veri Ambarı & ETL / Data Persistence"]
+        A["Staging Veri Ambarı / SQLite3"] --> B["Siparişler, Çok Seviyeli BOM, İstasyon Rotaları"]
     end
 
-    subgraph Katman 2: Taktiksel Planlama & Yeşil İmalat / Tactical LP Layer
-        B --> C[Linear Programming - PuLP / CBC]
-        C --> D[Haftalık Lot Büyüklükleri & Güvenlik Stoğu]
-        C --> E[Fazla Mesai, Enerji Tüketimi & Karbon Emisyon Kotası]
+    subgraph layer2["Katman 2: Taktiksel Planlama & Yeşil İmalat / Tactical LP Layer"]
+        B --> C["Linear Programming - PuLP / CBC"]
+        C --> D["Haftalık Lot Büyüklükleri & Güvenlik Stoğu"]
+        C --> E["Fazla Mesai, Enerji Tüketimi & Karbon Emisyon Kotası"]
     end
 
-    subgraph Katman 3: Malzeme İhtiyaç Planlaması / MRP-I Engine
-        D --> F[BOM Patlatma & Net İhtiyaç Hesabı]
-        F --> G[Tedarikçi Teslim Süresi - Lead Time & MOQ]
-        G --> H[Bileşen Kısıtlı İmalat Başlangıç Pencereleri - Release Dates]
+    subgraph layer3["Katman 3: Malzeme İhtiyaç Planlaması / MRP-I Engine"]
+        D --> F["BOM Patlatma & Net İhtiyaç Hesabı"]
+        F --> G["Tedarikçi Teslim Süresi - Lead Time & MOQ"]
+        G --> H["Bileşen Kısıtlı İmalat Başlangıç Pencereleri - Release Dates"]
     end
 
-    subgraph Katman 4: Operasyonel Çizelgeleme / Operational CP-SAT
-        E --> I[Constraint Programming Motoru - OR-Tools]
+    subgraph layer4["Katman 4: Operasyonel Çizelgeleme / Operational CP-SAT"]
+        E --> I["Constraint Programming Motoru - OR-Tools"]
         H --> I
-        I --> J[Sonlu Kapasiteli İş-Makine Eşleme]
-        I --> K[Sıra Bağımlı Hazırlık Süresi SDST Minimizasyonu]
-        I --> L[Vardiya, Mola ve Takvim Kısıtları]
+        I --> J["Sonlu Kapasiteli İş-Makine Eşleme"]
+        I --> K["Sıra Bağımlı Hazırlık Süresi SDST Minimizasyonu"]
+        I --> L["Vardiya, Mola ve Takvim Kısıtları"]
     end
 
-    subgraph Katman 5: Simülasyon, Yeniden Çizelgeleme & Denetim / Reactive Layer
-        J --> M[What-If Motoru: Makine Arızası Simülasyonu]
-        J --> N[What-If Motoru: Acil Sipariş / Hot-Order Enjeksiyonu]
-        M --> O[Dinamik Rescheduler / Dondurulmuş Ufuk - Freeze Horizon]
+    subgraph layer5["Katman 5: Simülasyon, Yeniden Çizelgeleme & Denetim / Reactive Layer"]
+        J --> M["What-If Motoru: Makine Arızası Simülasyonu"]
+        J --> N["What-If Motoru: Acil Sipariş / Hot-Order Enjeksiyonu"]
+        M --> O["Dinamik Rescheduler / Dondurulmuş Ufuk - Freeze Horizon"]
         N --> O
-        O --> P[Çizelge Gerginliği - Nervousness Metrikleri]
-        O --> Q[SHA-256 İmzalı Lineage & Audit Log]
+        O --> P["Çizelge Gerginliği - Nervousness Metrikleri"]
+        O --> Q["SHA-256 İmzalı Lineage & Audit Log"]
     end
 
-    subgraph Katman 6: Servis & Görsel Kokpit / Presentation & API
-        P --> R[FastAPI REST API Servisi - Port 8000]
+    subgraph layer6["Katman 6: Servis & Görsel Kokpit / Presentation & API"]
+        P --> R["FastAPI REST API Servisi - Port 8000"]
         Q --> R
-        P --> S[Streamlit Karar Kokpiti & Plotly Gantt - Port 8501]
+        P --> S["Streamlit Karar Kokpiti & Plotly Gantt - Port 8501"]
         R --> S
+    end
 ```
 
 ---

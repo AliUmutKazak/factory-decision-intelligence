@@ -20,6 +20,7 @@ gerçek zamanlı aktif güç (kW) telemetrisi ile karşılaştırılarak enerji 
 ===============================================================================
 """
 
+from contextlib import closing
 from pathlib import Path
 
 import pandas as pd
@@ -74,7 +75,7 @@ def compute_energy_analytics(
     output_energy_kpi_path = processed_dir / "energy_kpis.csv"
     output_profile_path = processed_dir / "energy_profile_15min.csv"
     if not run_id:
-        with get_db_connection(active_db_path) as run_conn:
+        with closing(get_db_connection(active_db_path)) as run_conn:
             run_id = get_active_run_id(run_conn)
 
     if schedule_df is None or machines_df is None:
@@ -84,7 +85,7 @@ def compute_energy_analytics(
         if machines_df is None:
             machines_df = loaded_mach
     machine_specs = load_machine_specs(active_db_path)
-    with get_db_connection(active_db_path) as calendar_conn:
+    with closing(get_db_connection(active_db_path)) as calendar_conn:
         daily_hours = MachineCalendarService.load_daily_hours(calendar_conn)
     if schedule_df.empty or len(schedule_df) == 0:
         # Madde 12: 0 Uretim durumunda fiziksel sifir enerji dengesi
@@ -162,7 +163,7 @@ def compute_energy_analytics(
     # ---------------------------------------------------------------------
     # Taktik LP'den makine OT saatlerini oku (Hafta bazlı)
     weekly_machine_ot_hours = {}
-    with get_db_connection(active_db_path) as conn:
+    with closing(get_db_connection(active_db_path)) as conn:
         cap_df = pd.read_sql(
             "SELECT period_week, machine_id, overtime_hours FROM machine_capacity_plan WHERE run_id = ?",
             conn,

@@ -3,7 +3,9 @@
 import hashlib
 import os
 import sqlite3
+from contextlib import closing
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.server import app
@@ -58,7 +60,7 @@ def test_decisions_remain_on_one_snapshot_during_atomic_publication(tmp_path, mo
     target = tmp_path / "canonical.db"
     replacement = tmp_path / "replacement.db"
     for path, run_id in ((target, "OLD"), (replacement, "NEW")):
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             conn.execute("CREATE TABLE pipeline_runs (run_id TEXT, status TEXT)")
             conn.execute("INSERT INTO pipeline_runs VALUES (?, 'ACTIVE')", (run_id,))
         DecisionLedger(path).record(
@@ -83,7 +85,7 @@ def test_decisions_remain_on_one_snapshot_during_atomic_publication(tmp_path, mo
     response = client.get("/api/v1/decisions")
     assert response.status_code == 200
     assert [row["decision_id"] for row in response.json()] == ["D-OLD"]
-    with sqlite3.connect(target) as conn:
+    with closing(sqlite3.connect(target)) as conn:
         assert conn.execute("SELECT run_id FROM pipeline_runs").fetchone()[0] == "NEW"
 
 
@@ -121,6 +123,51 @@ def test_what_if_hot_order_endpoint():
     data = response.json()
     assert data["status"] == "SUCCESS"
     assert data["scenario_type"] == "HOT_ORDER_INJECTION"
+
+
+@pytest.mark.parametrize(
+    ("path", "method", "payload"),
+    [
+        (
+            "/api/v1/schedule/what-if/breakdown",
+            "src.api.server.WhatIfEngine.simulate_breakdown",
+            {"machine_id": "M01", "start_min": 480, "duration_min": 120, "reason": "Test"},
+        ),
+        (
+            "/api/v1/schedule/what-if/hot-order",
+            "src.api.server.WhatIfEngine.simulate_hot_order",
+            {
+                "order_id": "HOT-TIMEOUT",
+                "product_id": "P01",
+                "quantity": 300,
+                "due_date_min": 2880,
+                "priority_weight": 5.0,
+            },
+        ),
+        (
+            "/api/v1/schedule/reschedule",
+            "src.api.server.DynamicRescheduler.execute_reschedule",
+            {
+                "trigger": {
+                    "event_id": "EVT-TIMEOUT",
+                    "current_time_min": 480,
+                    "freeze_horizon_min": 60,
+                    "delay_machine_id": "M01",
+                    "delay_duration_min": 60,
+                    "reason": "Test",
+                }
+            },
+        ),
+    ],
+)
+def test_solver_timeout_is_explicit_and_retryable(monkeypatch, path, method, payload):
+    def timeout(*args, **kwargs):
+        raise TimeoutError("solver exhausted")
+
+    monkeypatch.setattr(method, timeout)
+    response = client.post(path, json=payload)
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "SOLVER_TIMEOUT"
 
 
 def test_dynamic_reschedule_endpoint():
