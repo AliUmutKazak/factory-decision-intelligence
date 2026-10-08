@@ -6,12 +6,12 @@
 
 `src/scheduling/hot_order_schedule_audit.py` üretim çözücüsünü veya onun kısıt kurucularını çağırmaz. Mühürlü referans veritabanını salt okunur açar ve aday çizelgenin şu özelliklerini kaynak plan, rota, setup matrisi ve makine başlangıç durumuyla karşılaştırır:
 
-- Ürün bazında planlanan ve çizelgelenen birim sayısı; acil siparişin parti boyuna yuvarlanan ek miktarı.
+- Ürün bazında planlanan ve çizelgelenen birim sayısı; acil siparişe ayrılan lotların parti boyuna yuvarlanan ek miktarı.
 - Her lotta rota operasyonlarının tamlığı, doğru makine, parti/süre hesabı ve işlem sırası.
 - Benzersiz görev kimliği; işlem ve setup zaman aralıklarının tutarlılığı, makine çakışmaması.
-- Acil siparişin ürün, teslim zamanı ve öncelik kimliği.
+- Acil siparişin ürün, teslim zamanı, öncelik ve kendisine ayrılan miktar kimliği.
 
-Önceki solver içi plan–çizelge görüntüsü aynı ürüne eklenen acil sipariş satırını ürün toplamına çevirmediği için yanlış miktar alarmı veriyordu. Toplam ürün bazında alınacak şekilde düzeltildi. Bağımsız denetim ayrıca yanlış miktar, yanlış makine, eksik operasyon, yanlış setup ve makine çakışması eklenmiş kopyaları reddeden testlerden geçti.
+Önceki solver içi plan–çizelge görüntüsü aynı ürüne eklenen acil sipariş satırını ürün toplamına çevirmediği için yanlış miktar alarmı veriyordu. Toplam ürün bazında alınacak şekilde düzeltildi. Bağımsız denetim ayrıca yanlış miktar, acil siparişe fazla lot atama, yanlış makine, eksik operasyon, yanlış setup ve makine çakışması eklenmiş kopyaları reddeden testlerden geçti.
 
 ## Tekrarlanabilir sonuç
 

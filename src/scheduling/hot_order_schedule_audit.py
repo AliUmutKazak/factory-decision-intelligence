@@ -180,7 +180,12 @@ def audit_hot_order_schedule(
         if {row["operation_seq"] for row in ordered} != expected_sequences or len(ordered) != len(expected_sequences):
             issue("INCOMPLETE_ROUTE", lot)
         if any(
-            row["product_id"] != product or row["production_units"] != ordered[0]["production_units"] for row in ordered
+            row["product_id"] != product
+            or row["production_units"] != ordered[0]["production_units"]
+            or row["parent_lot_id"] != ordered[0]["parent_lot_id"]
+            or row["due_date_min"] != ordered[0]["due_date_min"]
+            or row["priority_weight"] != ordered[0]["priority_weight"]
+            for row in ordered
         ):
             issue("LOT_INCONSISTENT", lot)
         for previous, following in zip(ordered, ordered[1:]):
@@ -198,6 +203,14 @@ def audit_hot_order_schedule(
         for row in hot_rows
     ):
         issue("HOT_ORDER_IDENTITY", hot_order.order_id)
+    hot_units = sum(
+        operations[0]["production_units"]
+        for operations in by_lot.values()
+        if operations[0]["parent_lot_id"] == f"HOT_{hot_order.product_id}"
+    )
+    expected_hot_units = math.ceil(hot_order.quantity / PRODUCTION_BATCH_SIZE) * PRODUCTION_BATCH_SIZE
+    if hot_units != expected_hot_units:
+        issue("HOT_ORDER_QUANTITY", f"expected={expected_hot_units}, actual={hot_units}")
     for machine, operations in by_machine.items():
         if machine not in states:
             issue("MISSING_MACHINE_STATE", machine)

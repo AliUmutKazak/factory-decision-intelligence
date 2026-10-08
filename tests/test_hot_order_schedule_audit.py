@@ -38,6 +38,22 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
         codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, wrong_units)["issues"]}
         assert "UNIT_CONSERVATION" in codes
 
+        wrong_hot_allocation = schedule.copy()
+        baseline_lot = wrong_hot_allocation.loc[
+            (wrong_hot_allocation["product_id"] == order.product_id)
+            & (wrong_hot_allocation["parent_lot_id"] != f"HOT_{order.product_id}"),
+            "lot_id",
+        ].iloc[0]
+        baseline_rows = wrong_hot_allocation["lot_id"] == baseline_lot
+        wrong_hot_allocation.loc[baseline_rows, "parent_lot_id"] = f"HOT_{order.product_id}"
+        wrong_hot_allocation.loc[baseline_rows, "due_date_min"] = order.due_date_min
+        wrong_hot_allocation.loc[baseline_rows, "priority_weight"] = order.priority_weight
+        codes = {
+            item["code"]
+            for item in audit_hot_order_schedule(conn, active_run_id, order, wrong_hot_allocation)["issues"]
+        }
+        assert "HOT_ORDER_QUANTITY" in codes
+
         wrong_machine = schedule.copy()
         wrong_machine.loc[0, "machine_id"] = "UNKNOWN"
         codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, wrong_machine)["issues"]}
