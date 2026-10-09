@@ -1,0 +1,62 @@
+{
+  "status": "ACCEPTED",
+  "scope": "LOCAL_SYNTHETIC_B2MML_DELIVERY_REPLAY_NO_RUNTIME_WRITES",
+  "manifest_sha256": "6f0d659947df09103205f00c35a6923be70aa9ea7ced24a3088fd20e614aecfd",
+  "implementation_sha256": "b6b0b83ac5e4beb0da682a362966033b5bc318b0d88571750bac98524e883b7d",
+  "deliveries": [
+    {
+      "message_id": "m-op2",
+      "operation_seq": 2,
+      "received_min": 125,
+      "delivery_lag_min": 5.0,
+      "xml_sha256": "98a83fcec12ae49812505a274dd17945dfe21625b69bfd8645e9f26d67489584",
+      "action": "BUFFERED",
+      "released_operation_seqs": []
+    },
+    {
+      "message_id": "m-op1",
+      "operation_seq": 1,
+      "received_min": 130,
+      "delivery_lag_min": 50.0,
+      "xml_sha256": "472961d15ffa81d654f7e9686d0b6df8188a9682670dc717017df8503afee18d",
+      "action": "RELEASED",
+      "released_operation_seqs": [
+        1,
+        2
+      ]
+    },
+    {
+      "message_id": "m-op2",
+      "action": "DUPLICATE_IGNORED",
+      "xml_sha256": "98a83fcec12ae49812505a274dd17945dfe21625b69bfd8645e9f26d67489584"
+    }
+  ],
+  "accepted_actuals": [
+    {
+      "lot_id": "EX-L1",
+      "machine_id": "EX-M1",
+      "operation_seq": 1,
+      "actual_start_min": 60.0,
+      "actual_end_min": 80.0,
+      "produced_qty": 9.0,
+      "scrap_qty": 1.0
+    },
+    {
+      "lot_id": "EX-L1",
+      "machine_id": "EX-M2",
+      "operation_seq": 2,
+      "actual_start_min": 90.0,
+      "actual_end_min": 120.0,
+      "produced_qty": 8.0,
+      "scrap_qty": 1.0
+    }
+  ],
+  "lot_id": "EX-L1",
+  "source_type": "SYNTHETIC",
+  "expected_operation_seqs": [
+    1,
+    2
+  ],
+  "max_delivery_lag_min": 60,
+  "duplicate_messages_ignored": 1
+}
