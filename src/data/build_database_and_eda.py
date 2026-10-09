@@ -258,6 +258,19 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
         );
         """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mes_external_inbox (
+            source_system TEXT NOT NULL,
+            external_message_id TEXT NOT NULL,
+            payload_sha256 TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            event_id INTEGER NOT NULL,
+            outcome_json TEXT NOT NULL,
+            PRIMARY KEY (source_system, external_message_id),
+            FOREIGN KEY (event_id) REFERENCES mes_execution_events(event_id)
+        );
+        """)
+
     # Run-scoped execution tracking: aynı task_id farklı run sürümlerinde tekrar kullanılabilir.
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mes_order_tracking'")
     tracking_exists = cursor.fetchone() is not None
