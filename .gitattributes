@@ -5,3 +5,5 @@ artifacts/demo/** -text
 src/contracts/xsd/b2mml-0701/** -text
 examples/g6-partial-interruption.json -text
 artifacts/research/g6-partial-interruption-replay.json -text
+examples/g5-local-messages/** -text
+artifacts/research/g5-local-message-replay.json -text

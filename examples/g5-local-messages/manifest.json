@@ -1,0 +1,12 @@
+{
+  "source_type": "SYNTHETIC",
+  "origin": "2026-10-05T00:00:00+03:00",
+  "lot_id": "EX-L1",
+  "expected_operation_seqs": [1, 2],
+  "max_delivery_lag_min": 60,
+  "messages": [
+    {"message_id": "m-op2", "received_min": 125, "xml_file": "actual-op2.xml"},
+    {"message_id": "m-op1", "received_min": 130, "xml_file": "actual-op1.xml"},
+    {"message_id": "m-op2", "received_min": 140, "xml_file": "actual-op2.xml"}
+  ]
+}
