@@ -1,0 +1,16 @@
+{
+  "source_type": "SYNTHETIC",
+  "lot_id": "EX-L1",
+  "operation_seq": 1,
+  "machine_id": "EX-M1",
+  "planned_units": 10,
+  "events": [
+    {"event_id": "e1", "type": "START", "occurred_min": 60, "quantity": 0},
+    {"event_id": "e2", "type": "PRODUCE", "occurred_min": 70, "quantity": 4},
+    {"event_id": "e3", "type": "INTERRUPT", "occurred_min": 72, "quantity": 0},
+    {"event_id": "e4", "type": "RESUME", "occurred_min": 90, "quantity": 0},
+    {"event_id": "e5", "type": "PRODUCE", "occurred_min": 100, "quantity": 5},
+    {"event_id": "e6", "type": "SCRAP", "occurred_min": 102, "quantity": 1},
+    {"event_id": "e7", "type": "COMPLETE", "occurred_min": 105, "quantity": 0}
+  ]
+}

@@ -60,7 +60,7 @@ Bu matris teknik uygunluk taramasıdır; tablo satırındaki "mevcut" ifadesi ka
 | G3 | Mühürlü SQLite referansı ve [tam run paketi](bundle-restore-rehearsal.md) için geçici alanda backup/restore testi var; repository/migration, eşzamanlı ACTIVE ve PostgreSQL çalışması açık | Pilot yükü, canlı geri yükleme ve IT kurtarma kabulü daha sonra gerekir |
 | G4-T | `pilot_preflight` ve `examples/pilot-package/` ile etiketli sentetik kanonik CSV'de profil, reject ve provenance başlangıcı var; [gerçekleşen işlem sırası ve beyan edilmiş bildirim gecikmesi](g4-actuals-timing-preflight.md) de dosya düzeyinde denetlendi. [Açık ambalaj verisinin](open-packaging-data-profile.md) altı Excel dosyası hash/alan/tekrar/zaman ekseni yönünden incelendi; müşteri sütun eşlemesi, kabul edilmiş Excel dönüşümü ve solver aktarımı açık | Gerçek müşteri veri seti veya MES gecikme kabulü yerine geçmez |
 | G5-T | Yerel dosya/test servisiyle B2MML mesaj, tekrar, geç ve sırasız olay davranışı | Vendor endpoint business acceptance yerine geçmez |
-| G6-T | Küçük elle doğrulanabilir kesinti/devam, kalan miktar, hurda, rework ve freeze örnekleri | Fabrika proses uzmanı onayı yerine geçmez |
+| G6-T | [Tek lot/operasyon için sentetik olay replay'i](g6-synthetic-execution-replay.md): kısmi üretim, kesinti/devam, kalan miktar, hurda, tekrar olay ve freeze işareti; rework desteklenmediği için açıkça reddedilir | Fabrika proses uzmanı onayı veya gerçek MES akışı yerine geçmez |
 | G7 | Referans yükte solve süresi, hata, ACTIVE yaşı ve kurtarma gözlemi | Saha SLO ve operasyon ekibi kabulü ayrıca ölçülür |
 | G8-T | OR benchmark, olay replay ve ayrı kaynaklara bağlı maliyet/fizik kıyası | Gerçek planner baseline ve müşteri forecast kabulü yerine geçmez |
 
