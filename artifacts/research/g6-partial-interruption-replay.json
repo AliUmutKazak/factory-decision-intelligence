@@ -1,0 +1,88 @@
+{
+  "status": "ACCEPTED",
+  "scope": "SYNTHETIC_SINGLE_LOT_OPERATION_READ_ONLY",
+  "source_type": "SYNTHETIC",
+  "lot_id": "EX-L1",
+  "operation_seq": 1,
+  "machine_id": "EX-M1",
+  "planned_units": 10,
+  "final_state": "COMPLETED",
+  "good_units": 9,
+  "scrap_units": 1,
+  "remaining_units": 0,
+  "duplicate_events_ignored": 0,
+  "trace": [
+    {
+      "event_id": "e1",
+      "type": "START",
+      "occurred_min": 60,
+      "state": "RUNNING",
+      "good_units": 0,
+      "scrap_units": 0,
+      "remaining_units": 10,
+      "frozen": true
+    },
+    {
+      "event_id": "e2",
+      "type": "PRODUCE",
+      "occurred_min": 70,
+      "state": "RUNNING",
+      "good_units": 4,
+      "scrap_units": 0,
+      "remaining_units": 6,
+      "frozen": true
+    },
+    {
+      "event_id": "e3",
+      "type": "INTERRUPT",
+      "occurred_min": 72,
+      "state": "INTERRUPTED",
+      "good_units": 4,
+      "scrap_units": 0,
+      "remaining_units": 6,
+      "frozen": true
+    },
+    {
+      "event_id": "e4",
+      "type": "RESUME",
+      "occurred_min": 90,
+      "state": "RUNNING",
+      "good_units": 4,
+      "scrap_units": 0,
+      "remaining_units": 6,
+      "frozen": true
+    },
+    {
+      "event_id": "e5",
+      "type": "PRODUCE",
+      "occurred_min": 100,
+      "state": "RUNNING",
+      "good_units": 9,
+      "scrap_units": 0,
+      "remaining_units": 1,
+      "frozen": true
+    },
+    {
+      "event_id": "e6",
+      "type": "SCRAP",
+      "occurred_min": 102,
+      "state": "RUNNING",
+      "good_units": 9,
+      "scrap_units": 1,
+      "remaining_units": 0,
+      "frozen": true
+    },
+    {
+      "event_id": "e7",
+      "type": "COMPLETE",
+      "occurred_min": 105,
+      "state": "COMPLETED",
+      "good_units": 9,
+      "scrap_units": 1,
+      "remaining_units": 0,
+      "frozen": false
+    }
+  ],
+  "input_sha256": "bbc8bf6b86b55181c115cbe5e2941d6754c7c37d400509c660574960f32b48f0",
+  "implementation_sha256": "7d92d03d056cf00264f2e0292e649606ec33a1781707fad2480646029a819fa8"
+}
