@@ -42,6 +42,10 @@ def test_exact_replay_is_idempotent_but_conflicting_duplicate_is_rejected():
     rejected = replay_execution(example)
     assert rejected["issue"]["code"] == "conflicting_duplicate"
 
+    example["events"][1]["quantity"] = 1
+    example["events"][2]["quantity"] = True  # True == 1 in Python, but is not an identical event.
+    assert replay_execution(example)["issue"]["code"] == "conflicting_duplicate"
+
 
 def test_invalid_transitions_and_incomplete_completion_are_rejected():
     example = case()

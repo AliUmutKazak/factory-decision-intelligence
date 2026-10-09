@@ -57,7 +57,8 @@ def replay_execution(case: Any) -> dict[str, Any]:
         if not isinstance(event_id, str) or not event_id.strip():
             return _reject("invalid_event_id", index, "event_id must be nonempty")
         if event_id in seen:
-            if seen[event_id] != event:
+            previous = seen[event_id]
+            if any(type(previous[key]) is not type(event[key]) or previous[key] != event[key] for key in event):
                 return _reject("conflicting_duplicate", index, "same event_id has different contents")
             duplicate_count += 1
             continue
