@@ -12,4 +12,6 @@ python -m src.integration.pilot_preflight examples/pilot-package/manifest.json
 
 [Ham kanıtta](../artifacts/research/g4-actuals-timing-preflight.json) sentetik örnek `ACCEPTED`: işlem 82. dakikada bitmiş, 90. dakikada bildirilmiş, **8 dakika** gözlenen gecikme manifestteki **30 dakika** sentetik sınırın altında. Dosya ve kod SHA-256 değerleri ile yürütme commit'i `62ae0387c83ee5f06f7b886266d8592f48b8f638` kayıtlıdır. Sekiz hedefli test, geç/sırasız bildirim, operasyon öncüllüğü, makine çakışması, eksik zaman alanı ve eşiğin yokluğunu doğrular.
 
+Bu ham kanıt tarihsel commit'e aittir. Güncel örnek `current_plan.csv` dosyasında ayrıca `planned_qty` vardır; güncel dosyanın SHA-256 değeri tarihsel kanıttakiyle aynı değildir.
+
 Bu kabul yalnız dosya yapısı ve tanımlanan laboratuvar zaman kuralları içindir. Gerçek MES olayının kaynağı, saat eşzamanı, veri kesiti eksiksizliği, kesinti/devam, kısmi miktar, rework, operatör düzeltmesi ve fabrika hizmet eşiği ayrı G4/G5/G6 saha kararlarıdır. `reported_min` dışa aktarma zamanı olarak doldurulursa bildirim gecikmesi ölçüsü anlamını kaybeder; gerçek pilotta alanın kaynak semantiği veri sahibiyle onaylanmalıdır.

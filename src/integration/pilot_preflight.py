@@ -69,6 +69,8 @@ def _required(value: str | None, name: str) -> str:
 
 def _validate_row(kind: str, row: dict[str, str | None]) -> dict[str, Any]:
     item: dict[str, Any] = {name: _required(row[name], name) for name in FILES[kind]}
+    if kind == "current_plan" and "planned_qty" in row:
+        item["planned_qty"] = _number(_required(row["planned_qty"], "planned_qty"), positive=True)
     for name in ("quantity", "duration_min_per_unit"):
         if name in item:
             item[name] = _number(item[name], positive=True)
@@ -88,11 +90,12 @@ def _column_mapping(kind: str, headers: list[str], configured: Any, reject: Any)
     if len(named) != len(set(named)):
         reject(kind, None, "duplicate_columns", "column names must be unique")
         return None
-    allowed = set(FILES[kind]) | ({"reported_min"} if kind == "actuals" else set())
+    optional = {"reported_min"} if kind == "actuals" else {"planned_qty"} if kind == "current_plan" else set()
+    allowed = set(FILES[kind]) | optional
     if configured is None:
         mapping = {name: name for name in FILES[kind]}
-        if kind == "actuals" and "reported_min" in headers:
-            mapping["reported_min"] = "reported_min"
+        for name in optional & set(headers):
+            mapping[name] = name
     elif not isinstance(configured, dict) or any(
         key not in allowed or not isinstance(source, str) or not source.strip() for key, source in configured.items()
     ):
@@ -189,6 +192,20 @@ def _read_xlsx(
         return rows, mapping
     finally:
         workbook.close()
+
+
+def _covered_by_shifts(start: float, end: float, windows: list[tuple[float, float, int]]) -> bool:
+    """Require continuous declared availability for one nonpreemptive operation."""
+    cursor = start
+    for left, right, _ in windows:
+        if right <= cursor:
+            continue
+        if left > cursor:
+            return False
+        cursor = max(cursor, right)
+        if cursor >= end:
+            return True
+    return False
 
 
 def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
@@ -339,6 +356,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         lot_quantities[row["lot_id"]] = row["quantity"]
 
     routing: set[tuple[str, int, str]] = set()
+    route_duration: dict[tuple[str, int, str], float] = {}
     operations: dict[str, set[int]] = defaultdict(set)
     route_machines: dict[tuple[str, int], set[str]] = defaultdict(set)
     for row in data.get("routing", []):
@@ -346,6 +364,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         if key in routing:
             reject("routing", row["_line"], "duplicate_route", str(key))
         routing.add(key)
+        route_duration[key] = row["duration_min_per_unit"]
         operations[row["product_id"]].add(row["operation_seq"])
         route_machines[(row["product_id"], row["operation_seq"])].add(row["machine_id"])
         if row["machine_id"] not in machines:
@@ -381,6 +400,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
 
     planned: set[tuple[str, int]] = set()
     planned_rows = data.get("current_plan", [])
+    duration_assessed = 0
     for row in planned_rows:
         lot, op, machine = row["lot_id"], row["operation_seq"], row["machine_id"]
         key = (lot, op)
@@ -392,6 +412,25 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             reject("current_plan", row["_line"], "unknown_lot", lot)
         elif (product, op, machine) not in routing:
             reject("current_plan", row["_line"], "unmapped_operation", str(key))
+        elif "planned_qty" in row:
+            duration_assessed += 1
+            if row["planned_qty"] > lot_quantities[lot] and not math.isclose(
+                row["planned_qty"], lot_quantities[lot], rel_tol=0, abs_tol=1e-9
+            ):
+                reject("current_plan", row["_line"], "planned_quantity_exceeds_order", lot)
+            required_duration = row["planned_qty"] * route_duration[(product, op, machine)]
+            planned_duration = row["end_min"] - row["start_min"]
+            if planned_duration < required_duration and not math.isclose(
+                planned_duration, required_duration, rel_tol=0, abs_tol=1e-9
+            ):
+                reject(
+                    "current_plan",
+                    row["_line"],
+                    "planned_duration_shortfall",
+                    f"{lot}/op{op}: {planned_duration:g} < {required_duration:g} min",
+                )
+        if machine in shifts and not _covered_by_shifts(row["start_min"], row["end_min"], shifts[machine]):
+            reject("current_plan", row["_line"], "planned_outside_shift", machine)
     planned_by_lot: dict[str, list[dict[str, Any]]] = defaultdict(list)
     planned_by_machine: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in planned_rows:
@@ -490,6 +529,13 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             "planned_operations": len(expected_plan & planned),
             "missing_operations": len(missing_plan),
             "missing_examples": [list(key) for key in missing_plan[:20]],
+        },
+        "baseline_duration": {
+            "status": "ASSESSED"
+            if planned_rows and duration_assessed == len(planned_rows)
+            else "PARTIAL_OR_UNKNOWN_QUANTITY",
+            "checked_operations": duration_assessed,
+            "unassessed_operations": len(planned_rows) - duration_assessed,
         },
         "actuals_timing": {
             "status": timing_status,
