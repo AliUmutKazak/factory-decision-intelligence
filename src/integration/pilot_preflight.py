@@ -202,6 +202,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     if len(machines) != len(data.get("machines", [])):
         reject("machines", None, "duplicate_machine", "machine_id must be unique")
     lots: dict[str, str] = {}
+    lot_quantities: dict[str, float] = {}
     order_ids: set[str] = set()
     for row in data.get("orders", []):
         if row["order_id"] in order_ids:
@@ -210,6 +211,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         if row["lot_id"] in lots:
             reject("orders", row["_line"], "duplicate_lot", row["lot_id"])
         lots[row["lot_id"]] = row["product_id"]
+        lot_quantities[row["lot_id"]] = row["quantity"]
 
     routing: set[tuple[str, int, str]] = set()
     operations: dict[str, set[int]] = defaultdict(set)
@@ -280,6 +282,8 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         for previous, current in zip(ordered, ordered[1:]):
             if current["start_min"] < previous["end_min"]:
                 reject("current_plan", current["_line"], "planned_machine_overlap", machine)
+    expected_plan = {(lot, op) for lot, product in lots.items() for op in operations.get(product, set())}
+    missing_plan = sorted(expected_plan - planned)
     actual_keys: set[tuple[str, int]] = set()
     for row in data.get("actuals", []):
         lot, op, machine = row["lot_id"], row["operation_seq"], row["machine_id"]
@@ -291,6 +295,16 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             reject("actuals", row["_line"], "unknown_lot", lot)
         elif (lots[lot], op, machine) not in routing:
             reject("actuals", row["_line"], "unmapped_operation", str((lot, op)))
+        if lot in lot_quantities:
+            accounted = row["produced_qty"] + row["scrap_qty"]
+            order_quantity = lot_quantities[lot]
+            if accounted > order_quantity and not math.isclose(accounted, order_quantity, rel_tol=0, abs_tol=1e-9):
+                reject(
+                    "actuals",
+                    row["_line"],
+                    "actual_quantity_exceeds_order",
+                    f"{lot}: {accounted:g} > {order_quantity:g}",
+                )
 
     actual_rows = data.get("actuals", [])
     actual_by_lot: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -345,6 +359,13 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         },
         "manifest_sha256": manifest_digest,
         "files": evidence,
+        "baseline_coverage": {
+            "status": "NO_ROUTING" if not expected_plan else "INCOMPLETE" if missing_plan else "COMPLETE",
+            "expected_operations": len(expected_plan),
+            "planned_operations": len(expected_plan & planned),
+            "missing_operations": len(missing_plan),
+            "missing_examples": [list(key) for key in missing_plan[:20]],
+        },
         "actuals_timing": {
             "status": timing_status,
             "declared_max_reporting_lag_min": lag_limit,
