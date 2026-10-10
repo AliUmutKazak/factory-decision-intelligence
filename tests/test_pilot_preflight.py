@@ -49,6 +49,8 @@ def test_preflight_accepts_small_labeled_case_without_runtime_writes(tmp_path):
     assert report["scope"] == "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION"
     assert report["actuals_timing"]["status"] == "ASSESSED"
     assert report["actuals_timing"]["max_observed_reporting_lag_min"] == 8
+    assert report["baseline_coverage"]["status"] == "COMPLETE"
+    assert report["baseline_coverage"]["expected_operations"] == 1
     assert {path.name: sha256_file(path) for path in tmp_path.iterdir()} == before
 
 
@@ -178,6 +180,48 @@ def test_preflight_rejects_current_plan_precedence_and_allows_touching_intervals
         encoding="utf-8",
     )
     assert inspect_pilot_package(manifest)["status"] == "ACCEPTED"
+
+
+def test_preflight_reports_partial_baseline_without_claiming_complete_comparison(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "routing.csv").write_text(
+        "product_id,operation_seq,machine_id,duration_min_per_unit\nP1,1,M1,2\nP1,2,M1,2\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["baseline_coverage"] == {
+        "status": "INCOMPLETE",
+        "expected_operations": 2,
+        "planned_operations": 1,
+        "missing_operations": 1,
+        "missing_examples": [["L1", 2]],
+    }
+
+
+def test_preflight_rejects_actual_quantity_above_order(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,10,1,90\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert ("actuals", 2, "actual_quantity_exceeds_order") in {
+        (issue["file"], issue["line"], issue["code"]) for issue in report["rejections"]
+    }
+
+    (tmp_path / "orders.csv").write_text(
+        "order_id,lot_id,product_id,quantity,due_min\nO1,L1,P1,1000000000,480\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "actuals.csv").write_text(
+        "lot_id,operation_seq,machine_id,actual_start_min,actual_end_min,produced_qty,scrap_qty,reported_min\n"
+        "L1,1,M1,61,82,1000000001,0,90\n",
+        encoding="utf-8",
+    )
+    assert "actual_quantity_exceeds_order" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
 
 
 def test_preflight_does_not_claim_actual_latency_without_reporting_evidence(tmp_path):
