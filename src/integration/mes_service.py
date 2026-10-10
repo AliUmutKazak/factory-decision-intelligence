@@ -16,7 +16,7 @@ from src.utils.db import get_db_connection, resolve_db_path
 from src.utils.runtime_lock import run_mutation_lock
 
 
-def _external_payload_hash(event_type, machine_id, event_timestamp_min, task_id, delay_reason):
+def _external_payload_hash(event_type, machine_id, event_timestamp_min, task_id, delay_reason, outage_duration_min):
     """Validate the narrow external event contract and hash its canonical payload."""
     if not isinstance(event_type, str) or event_type not in {"TASK_START", "TASK_COMPLETE", "MACHINE_DOWN"}:
         raise ValueError("Unsupported external MES event_type.")
@@ -35,6 +35,15 @@ def _external_payload_hash(event_type, machine_id, event_timestamp_min, task_id,
         raise ValueError("External task event requires task_id.")
     if delay_reason is not None and not isinstance(delay_reason, str):
         raise ValueError("External MES delay_reason must be text or null.")
+    if outage_duration_min is not None:
+        if event_type != "MACHINE_DOWN":
+            raise ValueError("outage_duration_min is only valid for MACHINE_DOWN.")
+        if (
+            not isinstance(outage_duration_min, int)
+            or isinstance(outage_duration_min, bool)
+            or outage_duration_min <= 0
+        ):
+            raise ValueError("outage_duration_min must be a positive integer.")
     payload = {
         "event_type": event_type,
         "machine_id": machine_id,
@@ -42,8 +51,18 @@ def _external_payload_hash(event_type, machine_id, event_timestamp_min, task_id,
         "task_id": task_id,
         "delay_reason": delay_reason,
     }
+    # Old messages omitted this optional field; keep their original hash stable.
+    if outage_duration_min is not None:
+        payload["outage_duration_min"] = outage_duration_min
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _ensure_execution_duration_column(conn):
+    """Add the optional duration to databases created before this MES contract."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(mes_execution_events)")}
+    if "actual_duration_min" not in columns:
+        conn.execute("ALTER TABLE mes_execution_events ADD COLUMN actual_duration_min REAL")
 
 
 def _ensure_reschedule_outbox(conn):
@@ -195,6 +214,7 @@ class MESIntegrationService:
         *,
         source_system: str | None = None,
         external_message_id: str | None = None,
+        outage_duration_min: int | None = None,
     ) -> dict[str, Any]:
         """
         MES olayını kaydeder (TASK_START, TASK_COMPLETE, MACHINE_DOWN vb.)
@@ -205,6 +225,8 @@ class MESIntegrationService:
         cur = self.conn.cursor()
         try:
             external = source_system is not None or external_message_id is not None
+            if outage_duration_min is not None and not external:
+                raise ValueError("outage_duration_min requires external MES message identity.")
             if external:
                 if not all(
                     isinstance(value, str) and value.strip() and value == value.strip()
@@ -214,9 +236,10 @@ class MESIntegrationService:
                         "source_system and external_message_id are both required without outer whitespace."
                     )
                 payload_sha256 = _external_payload_hash(
-                    event_type, machine_id, event_timestamp_min, task_id, delay_reason
+                    event_type, machine_id, event_timestamp_min, task_id, delay_reason, outage_duration_min
                 )
                 cur.execute("BEGIN IMMEDIATE")
+                _ensure_execution_duration_column(self.conn)
                 cur.execute(
                     """
                     CREATE TABLE IF NOT EXISTS mes_external_inbox (
@@ -274,14 +297,33 @@ class MESIntegrationService:
                         raise ValueError("External MES task is absent from this run or machine_id differs.")
 
             # Doğru kolon adı: event_timestamp_min
-            cur.execute(
-                """
-                INSERT INTO mes_execution_events (
-                    run_id, event_type, machine_id, task_id, event_timestamp_min, delay_reason
-                ) VALUES (?, ?, ?, ?, ?, ?);
-            """,
-                (self.run_id, event_type, machine_id, task_id, event_timestamp_min, delay_reason),
-            )
+            if external:
+                cur.execute(
+                    """
+                    INSERT INTO mes_execution_events (
+                        run_id, event_type, machine_id, task_id, event_timestamp_min,
+                        actual_duration_min, delay_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.run_id,
+                        event_type,
+                        machine_id,
+                        task_id,
+                        event_timestamp_min,
+                        outage_duration_min,
+                        delay_reason,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO mes_execution_events (
+                        run_id, event_type, machine_id, task_id, event_timestamp_min, delay_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (self.run_id, event_type, machine_id, task_id, event_timestamp_min, delay_reason),
+                )
             event_id = cur.lastrowid
 
             trigger_reschedule = False
@@ -345,6 +387,8 @@ class MESIntegrationService:
                         "reschedule_intent_status": "PENDING" if trigger_reschedule else "NONE",
                     }
                 )
+                if outage_duration_min is not None:
+                    result["outage_duration_min"] = outage_duration_min
                 if trigger_reschedule:
                     cur.execute(
                         "INSERT INTO mes_reschedule_outbox (event_id, run_id, status) VALUES (?, ?, 'PENDING')",
@@ -373,6 +417,7 @@ class MESIntegrationService:
         with run_mutation_lock(self.db_path):
             with get_db_connection(self.db_path) as conn:
                 conn.execute("BEGIN IMMEDIATE")
+                _ensure_execution_duration_column(conn)
                 _ensure_reschedule_outbox(conn)
                 if not conn.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mes_external_inbox'"
@@ -382,6 +427,7 @@ class MESIntegrationService:
                     """
                     SELECT o.event_id, o.run_id, e.event_type, e.machine_id,
                            e.task_id, e.event_timestamp_min, e.delay_reason,
+                           e.actual_duration_min,
                            i.source_system, i.external_message_id
                     FROM mes_reschedule_outbox AS o
                     JOIN mes_execution_events AS e ON e.event_id = o.event_id
@@ -398,6 +444,7 @@ class MESIntegrationService:
             "task_id",
             "event_timestamp_min",
             "delay_reason",
+            "outage_duration_min",
             "source_system",
             "external_message_id",
         )

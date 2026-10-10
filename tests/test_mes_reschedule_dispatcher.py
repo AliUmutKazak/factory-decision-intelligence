@@ -41,7 +41,7 @@ def mes_db(tmp_path, monkeypatch):
     return path
 
 
-def seed_breakdown():
+def seed_breakdown(duration=None):
     return MESIntegrationService().record_event(
         event_type="MACHINE_DOWN",
         machine_id="M01",
@@ -49,6 +49,7 @@ def seed_breakdown():
         delay_reason="synthetic stop",
         source_system="SYNTHETIC-MES",
         external_message_id="stop-1",
+        outage_duration_min=duration,
     )["event_id"]
 
 
@@ -95,6 +96,17 @@ def test_machine_outage_requires_duration_then_dispatches_and_acks(mes_db):
     assert dispatcher.dispatch_one(event_id)["status"] == "ALREADY_ACKED"
     assert len(engine.calls) == 1
     assert MESIntegrationService().list_pending_reschedule_intents() == []
+
+
+def test_recorded_duration_dispatches_without_override_and_rejects_conflict(mes_db):
+    event_id = seed_breakdown(duration=45)
+    engine = AuditedEngine(mes_db)
+    dispatcher = MESRescheduleDispatcher(engine=engine)
+    with pytest.raises(ValueError, match="conflicts"):
+        dispatcher.dispatch_one(event_id, outage_duration_min=60)
+    assert engine.calls == []
+    assert dispatcher.dispatch_one(event_id)["status"] == "DISPATCHED"
+    assert engine.calls[0].delay_duration_min == 45
 
 
 def test_promoted_schedule_is_recovered_after_interrupted_ack(mes_db):

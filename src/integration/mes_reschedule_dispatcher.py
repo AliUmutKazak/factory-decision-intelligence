@@ -48,7 +48,7 @@ class MESRescheduleDispatcher:
                 row = conn.execute(
                     """
                     SELECT o.run_id, o.status, o.audit_id, e.event_type, e.machine_id,
-                           e.event_timestamp_min, e.delay_reason
+                           e.event_timestamp_min, e.delay_reason, e.actual_duration_min
                     FROM mes_reschedule_outbox AS o
                     JOIN mes_execution_events AS e ON e.event_id = o.event_id
                     WHERE o.event_id = ?
@@ -57,7 +57,18 @@ class MESRescheduleDispatcher:
                 ).fetchone()
                 if not row:
                     raise ValueError("Reschedule intent not found.")
-                source_run, status, audit_id, event_type, machine_id, event_time, reason = row
+                source_run, status, audit_id, event_type, machine_id, event_time, reason, stored_duration = row
+                if stored_duration is not None:
+                    if (
+                        not isinstance(stored_duration, (int, float))
+                        or not math.isfinite(stored_duration)
+                        or stored_duration <= 0
+                        or not float(stored_duration).is_integer()
+                    ):
+                        raise ValueError("Stored MES outage duration is invalid.")
+                    stored_duration = int(stored_duration)
+                    if outage_duration_min is not None and outage_duration_min != stored_duration:
+                        raise ValueError("Supplied outage duration conflicts with the recorded MES event.")
                 if status == "ACKED":
                     return {"status": "ALREADY_ACKED", "event_id": event_id, "audit_id": audit_id}
 
@@ -104,7 +115,8 @@ class MESRescheduleDispatcher:
 
             if event_type != "MACHINE_DOWN":
                 return {"status": "NEEDS_EVENT_POLICY", "event_id": event_id, "event_type": event_type}
-            if outage_duration_min is None:
+            duration = stored_duration if stored_duration is not None else outage_duration_min
+            if duration is None:
                 return {"status": "NEEDS_DURATION", "event_id": event_id}
 
             trigger = RescheduleTriggerEvent(
@@ -112,7 +124,7 @@ class MESRescheduleDispatcher:
                 current_time_min=math.ceil(event_time),
                 freeze_horizon_min=freeze_horizon_min,
                 delay_machine_id=machine_id,
-                delay_duration_min=outage_duration_min,
+                delay_duration_min=duration,
                 reason=f"MACHINE_DOWN: {reason or 'Unspecified outage'}",
             )
             _, _, _, _, audit = self.engine.execute_reschedule(trigger=trigger, persist_audit=True)
