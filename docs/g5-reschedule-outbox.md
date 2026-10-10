@@ -6,7 +6,7 @@
 
 `ack_reschedule_intent(event_id, audit_id)` yalnız `reschedule_audit_log` içinde aynı `trigger_event_id` ve kaynak run'a bağlı kayıt, ayrıca bu kaydın yeni run'ı `ACTIVE` veya `ARCHIVED` ise niyeti `ACKED` yapar. Aynı audit ile tekrar ACK etkisizdir; farklı audit reddedilir. ACK'ten sonraki MES tekrarı `reschedule_required=False` döner. İşleyici, `RescheduleTriggerEvent.event_id` alanına MES `event_id` değerini metin olarak koymalı; başarılı ve yayımlanmış yeniden çizelgelemenin audit kimliğiyle ACK vermelidir.
 
-Bu API **işleyici veya gerçek MES bağlantısı değildir**. Bekleyen kaydı bir sürecin okuması, duruş süresini ve freeze kuralını güvenilir sözleşmeden üretmesi, solver'ı çalıştırması ve sonucu ACK etmesi hâlâ gerekir. PENDING iş iki kez işlenmeye çalışılabilir; paralel worker claim/idempotent solver sınırı kurulmadan exactly-once veya otomatik üretim davranışı iddia edilmez. Kimliksiz eski MES çağrıları bu korumaya dahil değildir. G5 saha kabulü açık kalır.
+Bu API tek başına işleyici veya gerçek MES bağlantısı değildir. Sonraki [açık çağrılı dispatcher](g5-reschedule-dispatcher.md) kilitli aktarım ve yayın sonrası ACK toparlamasını ekledi. Duruş süresini güvenilir sözleşmeden sağlama, görev sapması politikası, gerçek worker ve vendor transport hâlâ açık; uçtan uca exactly-once veya otomatik üretim davranışı iddia edilmez. Kimliksiz eski MES çağrıları bu korumaya dahil değildir. G5 saha kabulü açık kalır.
 
 Hedefli testler: yeniden başlatma/tekrar teslim ve run değişimi, ilk sürüm inbox geri kazanımı, yanlış veya yayımlanmamış audit reddi, idempotent ACK, çıkış yazısı hatasında atomik rollback. Komut:
 
