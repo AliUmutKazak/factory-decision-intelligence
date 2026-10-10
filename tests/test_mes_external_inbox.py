@@ -1,5 +1,7 @@
 """External MES message identity survives service recreation and rolls back atomically."""
 
+import hashlib
+import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 
@@ -58,6 +60,21 @@ def test_exact_retry_after_service_recreation_does_not_write_twice(mes_db):
         assert conn.execute("SELECT COUNT(*) FROM mes_execution_events").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM mes_external_inbox").fetchone()[0] == 1
         assert conn.execute("SELECT actual_start_min FROM mes_order_tracking WHERE run_id='RUN-A'").fetchone()[0] == 65
+
+
+def test_message_without_duration_preserves_original_payload_hash(mes_db):
+    record_start()
+    legacy_payload = {
+        "event_type": "TASK_START",
+        "machine_id": "M01",
+        "event_timestamp_min": 65.0,
+        "task_id": 1,
+        "delay_reason": None,
+    }
+    encoded = json.dumps(legacy_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    with sqlite3.connect(mes_db) as conn:
+        saved_hash = conn.execute("SELECT payload_sha256 FROM mes_external_inbox").fetchone()[0]
+    assert saved_hash == hashlib.sha256(encoded).hexdigest()
 
 
 def test_conflicting_retry_is_rejected_and_identity_is_global_across_runs(mes_db):
@@ -204,6 +221,57 @@ def test_large_task_delay_creates_pending_intent(mes_db):
     assert result["variance_min"] == 61
     assert result["reschedule_intent_status"] == "PENDING"
     assert MESIntegrationService().list_pending_reschedule_intents()[0]["event_id"] == result["event_id"]
+
+
+def test_outage_duration_is_durable_and_part_of_message_identity(mes_db):
+    def deliver(duration):
+        return MESIntegrationService().record_event(
+            event_type="MACHINE_DOWN",
+            machine_id="M01",
+            event_timestamp_min=120,
+            source_system="SYNTHETIC-MES",
+            external_message_id="duration-1",
+            outage_duration_min=duration,
+        )
+
+    first = deliver(45)
+    assert first["outage_duration_min"] == 45
+    assert deliver(45)["status"] == "DUPLICATE_IGNORED"
+    with pytest.raises(ValueError, match="Conflicting"):
+        deliver(60)
+    with sqlite3.connect(mes_db) as conn:
+        assert conn.execute("SELECT actual_duration_min FROM mes_execution_events").fetchone()[0] == 45
+        assert conn.execute("SELECT COUNT(*) FROM mes_execution_events").fetchone()[0] == 1
+    pending = MESIntegrationService().list_pending_reschedule_intents()
+    assert pending[0]["outage_duration_min"] == 45
+
+
+def test_outage_duration_rejects_invalid_or_unidentified_values(mes_db):
+    service = MESIntegrationService()
+    for invalid in (0, -1, 1.5, True):
+        with pytest.raises(ValueError, match="outage_duration_min"):
+            service.record_event(
+                event_type="MACHINE_DOWN",
+                machine_id="M01",
+                event_timestamp_min=120,
+                source_system="SYNTHETIC-MES",
+                external_message_id="invalid-duration",
+                outage_duration_min=invalid,
+            )
+    with pytest.raises(ValueError, match="only valid for MACHINE_DOWN"):
+        service.record_event(
+            event_type="TASK_START",
+            machine_id="M01",
+            event_timestamp_min=65,
+            task_id=1,
+            source_system="SYNTHETIC-MES",
+            external_message_id="task-duration",
+            outage_duration_min=45,
+        )
+    with pytest.raises(ValueError, match="requires external"):
+        service.record_event("MACHINE_DOWN", "M01", 120, outage_duration_min=45)
+    with sqlite3.connect(mes_db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM mes_execution_events").fetchone()[0] == 0
 
 
 def test_outbox_failure_rolls_back_mes_event_and_inbox(mes_db):
