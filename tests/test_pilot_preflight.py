@@ -185,6 +185,36 @@ def test_preflight_rejects_current_plan_precedence_and_allows_touching_intervals
     assert inspect_pilot_package(manifest)["status"] == "ACCEPTED"
 
 
+def test_preflight_rejects_current_plan_shorter_than_declared_processing_time(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,79\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert ("current_plan", 2, "planned_duration_shortfall") in {
+        (issue["file"], issue["line"], issue["code"]) for issue in report["rejections"]
+    }
+
+
+def test_preflight_requires_continuous_declared_shift_for_current_plan(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "shifts.csv").write_text(
+        "machine_id,start_min,end_min\nM1,0,70\nM1,80,600\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert "planned_outside_shift" in {issue["code"] for issue in report["rejections"]}
+
+    (tmp_path / "shifts.csv").write_text(
+        "machine_id,start_min,end_min\nM1,0,70\nM1,70,600\n",
+        encoding="utf-8",
+    )
+    assert inspect_pilot_package(manifest)["status"] == "ACCEPTED"
+
+
 def test_preflight_reports_partial_baseline_without_claiming_complete_comparison(tmp_path):
     manifest = package(tmp_path)
     (tmp_path / "routing.csv").write_text(
