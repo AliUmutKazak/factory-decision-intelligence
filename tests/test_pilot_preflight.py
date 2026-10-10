@@ -141,6 +141,45 @@ def test_preflight_rejects_actual_precedence_and_machine_overlap(tmp_path):
     assert {"actual_precedence", "actual_machine_overlap"} <= {issue["code"] for issue in report["rejections"]}
 
 
+def test_preflight_rejects_overlapping_current_plan_on_same_machine(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "orders.csv").write_text(
+        "order_id,lot_id,product_id,quantity,due_min\nO1,L1,P1,10,480\nO2,L2,P1,10,480\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\nL2,1,M1,70,90\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert ("current_plan", 3, "planned_machine_overlap") in {
+        (issue["file"], issue["line"], issue["code"]) for issue in report["rejections"]
+    }
+
+
+def test_preflight_rejects_current_plan_precedence_and_allows_touching_intervals(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "routing.csv").write_text(
+        "product_id,operation_seq,machine_id,duration_min_per_unit\nP1,1,M1,2\nP1,2,M1,2\n",
+        encoding="utf-8",
+    )
+    plan = tmp_path / "current_plan.csv"
+    plan.write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\nL1,2,M1,70,90\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert "planned_precedence" in {issue["code"] for issue in report["rejections"]}
+
+    plan.write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\nL1,2,M1,80,100\n",
+        encoding="utf-8",
+    )
+    assert inspect_pilot_package(manifest)["status"] == "ACCEPTED"
+
+
 def test_preflight_does_not_claim_actual_latency_without_reporting_evidence(tmp_path):
     manifest = package(tmp_path)
     (tmp_path / "actuals.csv").write_text(
