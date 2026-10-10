@@ -1,0 +1,11 @@
+# G5-T: Bekleyen MES olayının kontrollü çizelgeleme aktarımı
+
+**Tarih:** 10 Ekim 2026. `MESRescheduleDispatcher.dispatch_one(event_id, ...)` tek bir [kalıcı niyeti](g5-reschedule-outbox.md) açık çağrıyla işler. Otomatik polling, MES bağlantısı veya üretim talimatı yoktur. Aynı veritabanına yönelik çağrılar run mutation kilidi altında serileştirilir.
+
+Akış: önce aynı MES olayını ve kaynak run'ı gösteren, yayımlanmış (`ACTIVE`/`ARCHIVED`) bir reschedule audit'i aranır. Varsa servis kesintisinin ACK öncesinde yaşandığı kabul edilip niyet `ACKED` olarak geri kazanılır; ikinci solve açılmaz. Birden fazla böyle audit varsa `CONFLICTING_AUDITS` döner ve insan incelemesi gerekir. Audit yoksa kaynak run hâlâ tek ACTIVE run olmalıdır; değilse `STALE_BASELINE` veya `RUN_GOVERNANCE_BLOCKED` döner ve eski plan üzerine sessizce solve yapılmaz.
+
+Yalnız `MACHINE_DOWN` için dispatch yolu açıktır. MES olayı duruş süresini taşımadığından çağıran taraf pozitif tamsayı `outage_duration_min` vermelidir; yoksa `NEEDS_DURATION` döner. `freeze_horizon_min` açık parametredir (varsayılan 60 dakika). `TASK_START` ve `TASK_COMPLETE` sapmaları için gerçek proses kuralı ve zaman anlamı netleşmediğinden `NEEDS_EVENT_POLICY` döner; kayıt beklemede kalır. Olay zamanı kesirliyse çizelgeleyicinin dakika sözleşmesine yukarı yuvarlanır. Tetikleyici `event_id` doğrudan MES olay kimliğidir.
+
+Başarılı çizelgeleme sonrası audit ve yeni run doğrulanarak `ACKED` yazılır. Solver/promotion hatası niyeti `PENDING` bırakır. Yayın sonrası ACK öncesi kapanma, sonraki çağrıda audit üzerinden toparlanır. Tek veritabanı içindeki kilit eşzamanlı çağrıların aynı olayı iki kez solve etmesini engeller; farklı altyapılar, harici worker'lar ve vendor transport için uçtan uca exactly-once garantisi değildir.
+
+Sentetik testler: eksik duruş süresi, doğru trigger/audit/ACK aktarımı, yayın sonrası kesinti, stale baseline, görev sapması politikası, solver hatasında bekleme, çelişkili audit ve eşzamanlı iki çağrı. Bunlar gerçek saha kabulü değildir. G5 kapısı açık kalır.

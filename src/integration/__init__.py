@@ -12,6 +12,7 @@ from src.integration.interfaces import (
     MachineTelemetryAdapterInterface,
     MESAdapterInterface,
 )
+from src.integration.mes_reschedule_dispatcher import MESRescheduleDispatcher
 from src.integration.mes_service import MESIntegrationService
 from src.integration.rescheduler import ClosedLoopRescheduler
 
@@ -25,5 +26,6 @@ __all__ = [
     "MockInventoryAdapter",
     "MockTelemetryAdapter",
     "MESIntegrationService",
+    "MESRescheduleDispatcher",
     "ClosedLoopRescheduler",
 ]
