@@ -270,6 +270,17 @@ def initialize_database(force_recreate=False, run_id=None, db_path=None):
             FOREIGN KEY (event_id) REFERENCES mes_execution_events(event_id)
         );
         """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS mes_reschedule_outbox (
+            event_id INTEGER PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('PENDING', 'ACKED')),
+            audit_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            acknowledged_at TEXT,
+            FOREIGN KEY (event_id) REFERENCES mes_execution_events(event_id)
+        );
+        """)
 
     # Run-scoped execution tracking: aynı task_id farklı run sürümlerinde tekrar kullanılabilir.
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mes_order_tracking'")
