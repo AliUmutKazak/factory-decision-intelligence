@@ -2,6 +2,7 @@
 
 import math
 from contextlib import closing
+from pathlib import Path
 from typing import Any
 
 from src.contracts.schemas import RescheduleTriggerEvent
@@ -17,7 +18,7 @@ class MESRescheduleDispatcher:
     def __init__(self, engine: DynamicRescheduler | None = None):
         self.db_path = resolve_db_path()
         self.engine = engine or DynamicRescheduler(disk_db_path=str(self.db_path))
-        if resolve_db_path(self.engine.disk_db_path).resolve() != self.db_path.resolve():
+        if Path(self.engine.disk_db_path).resolve() != self.db_path.resolve():
             raise ValueError("Rescheduler and MES service must use the same database.")
 
     def dispatch_one(

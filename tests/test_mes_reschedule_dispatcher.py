@@ -52,6 +52,11 @@ def seed_breakdown():
     )["event_id"]
 
 
+def test_dispatcher_rejects_engine_for_another_database(mes_db, tmp_path):
+    with pytest.raises(ValueError, match="same database"):
+        MESRescheduleDispatcher(engine=AuditedEngine(tmp_path / "another.db"))
+
+
 class AuditedEngine:
     def __init__(self, db_path, crash_after_promotion=False):
         self.disk_db_path = str(db_path)
