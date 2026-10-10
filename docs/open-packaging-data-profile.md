@@ -30,7 +30,7 @@ Tüm 59 sipariş ürün tipi kimlikleri mevcut 26 ürün tipinde, ürünlerin ro
 
 ## FDI'ye alma kararı
 
-Bu kaynak, G4-T'de **alan sözlüğü ve kontrollü dönüşüm provası** için uygundur. Şu an üretim CP-SAT motoruna tüm veri kümesini özgün esnek iş çizelgeleme problemi olarak vermek uygun değildir: FDI rotası her ürün/operasyon için tek `machine_id` gerektiriyor, kaynak ise prose açık makine seçeneklerini ve hız temelli süreleri tekil görev süresi olarak sağlamıyor. Alternatif makine seçimini veya birim/süre kuralını tahmin edip ardından çözüm üretmek, veri kaynağının tanımlamadığı farklı bir problem olur.
+Bu kaynak, G4-T'de **alan sözlüğü ve kontrollü dönüşüm provası** için uygundur. Genel dosya ön incelemesi artık açıkça seçilmiş XLSX sayfası ve sütun eşlemesini okuyabilir; bu, bu veri kümesindeki eksik üretim alanlarını veya fiziksel dönüşüm kararlarını doldurmaz. Şu an üretim CP-SAT motoruna tüm veri kümesini özgün esnek iş çizelgeleme problemi olarak vermek uygun değildir: FDI rotası her ürün/operasyon için tek `machine_id` gerektiriyor, kaynak ise proseslere açık makine seçeneklerini ve hız temelli süreleri tekil görev süresi olarak sağlamıyor. Alternatif makine seçimini veya birim/süre kuralını tahmin edip ardından çözüm üretmek, veri kaynağının tanımlamadığı farklı bir problem olur.
 
 Kaynakta fabrika vardiyası, duruşlar, malzeme/BOM ve stok, uygulanmış mevcut plan, operasyon actuals, gerçekleşmiş maliyet veya finans mutabakatı yok. Bu nedenle 59 sipariş için FDI'nin teslim başarısı, tasarruf veya ROI iddiası üretilemez. Veri kümesinin açıklaması dinamik çizelgeleme araştırması için kullanım önerir; mevcut dosyaları incelemek tek başına olay geçmişi veya sahadaki dinamik davranışın gözlendiğini kanıtlamaz.
 

@@ -1,7 +1,10 @@
 """G4-T file intake: provenance and reject behavior without runtime writes."""
 
 import json
+from datetime import datetime
 from pathlib import Path
+
+from openpyxl import Workbook
 
 from src.integration.pilot_preflight import inspect_pilot_package
 from src.utils.run_bundle import sha256_file
@@ -222,6 +225,102 @@ def test_preflight_rejects_actual_quantity_above_order(tmp_path):
         encoding="utf-8",
     )
     assert "actual_quantity_exceeds_order" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
+
+
+def test_preflight_reads_explicitly_mapped_customer_style_csv(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "orders.csv").write_text(
+        "Order No,Lot No,SKU,Units,Due Minute\nO1,L1,P1,10,480\n",
+        encoding="utf-8",
+    )
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content["files"]["orders"] = {
+        "path": "orders.csv",
+        "columns": {
+            "order_id": "Order No",
+            "lot_id": "Lot No",
+            "product_id": "SKU",
+            "quantity": "Units",
+            "due_min": "Due Minute",
+        },
+    }
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["files"]["orders"]["columns"]["quantity"] == "Units"
+    assert report["baseline_coverage"]["status"] == "COMPLETE"
+
+
+def test_preflight_reads_only_declared_xlsx_sheet_and_rejects_formulas(tmp_path):
+    manifest = package(tmp_path)
+    workbook = Workbook()
+    copy = workbook.active
+    copy.title = "Embedded Copy"
+    copy.append(["Order No", "Lot No", "SKU", "Units", "Due Minute"])
+    copy.append(["BAD", "BAD", "BAD", 999, 999])
+    orders = workbook.create_sheet("Orders")
+    orders.append(["Customer export"])
+    orders.append(["Order No", "Lot No", "SKU", "Units", "Due Minute"])
+    orders.append(["O1", "L1", "P1", 10, 480])
+    workbook.save(tmp_path / "orders.xlsx")
+
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content["files"]["orders"] = {
+        "path": "orders.xlsx",
+        "sheet": "Orders",
+        "header_row": 2,
+        "columns": {
+            "order_id": "Order No",
+            "lot_id": "Lot No",
+            "product_id": "SKU",
+            "quantity": "Units",
+            "due_min": "Due Minute",
+        },
+    }
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    before = sha256_file(tmp_path / "orders.xlsx")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["files"]["orders"]["parsed_rows"] == 1
+    assert report["files"]["orders"]["sheet"] == "Orders"
+    assert sha256_file(tmp_path / "orders.xlsx") == before
+
+    content["files"]["orders"]["sheet"] = "Missing"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    assert "unknown_sheet" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
+    content["files"]["orders"]["sheet"] = "Orders"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+
+    orders["D3"] = "=5+5"
+    workbook.save(tmp_path / "orders.xlsx")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert ("orders", 3, "formula_cell") in {
+        (issue["file"], issue["line"], issue["code"]) for issue in report["rejections"]
+    }
+
+    orders["D3"] = datetime(2026, 1, 5)
+    workbook.save(tmp_path / "orders.xlsx")
+    assert ("orders", 3, "invalid_value") in {
+        (issue["file"], issue["line"], issue["code"]) for issue in inspect_pilot_package(manifest)["rejections"]
+    }
+
+
+def test_preflight_requires_declared_xlsx_sheet_and_complete_column_map(tmp_path):
+    manifest = package(tmp_path)
+    (tmp_path / "orders.xlsx").write_bytes(b"not an xlsx workbook")
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content["files"]["orders"] = {"path": "orders.xlsx"}
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    assert "missing_sheet" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
+
+    content["files"]["orders"]["sheet"] = "Orders"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    assert "invalid_xlsx" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
+
+    content["files"]["orders"] = {"path": "orders.csv", "columns": {"order_id": "order_id"}}
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    assert "invalid_column_map" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
 
 
 def test_preflight_does_not_claim_actual_latency_without_reporting_evidence(tmp_path):

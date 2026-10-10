@@ -16,4 +16,23 @@ python -m src.integration.pilot_preflight examples/pilot-package/manifest.json
 
 Mevcut planın aynı makinedeki çakışan aralıkları ve lot içindeki operasyon sıra ihlalleri satır numarasıyla reddedilir; bitiş ve sonraki başlangıcın aynı dakika olması geçerlidir. Bu yalnız dar bir fiziksel tutarlılık kontrolüdür. Vardiya/mesai, setup, kısmi iş, alternatif kaynak ve malzeme uygunluğu henüz denetlenmez.
 
-Mevcut sınır: yalnız UTF-8 CSV ve kanonik sütun adları desteklenir. Mevcut üretim `routing` tablosu ürün/operasyon başına tek makine tanımladığı için alternatif makine satırları `unsupported_alternative_machine` ile reddedilir. Excel, müşteri sütun eşlemeleri, BOM/stok, tam fiziksel plan doğrulaması ve solver'a aktarım sonraki teknik işlerdir. Bu ön incelemenin geçmesi G4 müşteri verisi kabulü veya G8 plan kıyası anlamına gelmez.
+CSV veya `.xlsx` dosyası kullanılabilir. Farklı sütun adları varsa manifestte **her dosya için** kanonik alan → kaynak başlık eşlemesi açıkça verilir. Excel için sayfa adı zorunludur; bir çalışma kitabındaki diğer sayfalar otomatik birleştirilmez. Başlık satırı varsayılan olarak 1'dir ve `header_row` ile seçilebilir. Örneğin `orders` dosyası:
+
+```json
+{
+  "path": "orders.xlsx",
+  "sheet": "Orders",
+  "header_row": 2,
+  "columns": {
+    "order_id": "Order No",
+    "lot_id": "Lot No",
+    "product_id": "SKU",
+    "quantity": "Units",
+    "due_min": "Due Minute"
+  }
+}
+```
+
+Excel'de eşlenen hücrelerde formül, tarih/saat veya boolean kabul edilmez. Tarihleri, zaman dilimi tanımlı `origin` noktasından itibaren dakikaya; miktarları da beyan edilmiş ortak birime kaynak sahibiyle dönüştürmek gerekir. Bu okuyucu yalnız sütun başlıklarını eşler; ürün/makine kimliklerini, birimleri ve zaman eksenini tahmin ederek dönüştürmez. Ham dosyanın SHA-256 değeri, seçilen sayfa ve uygulanan eşleme raporda görünür; dosya değiştirilmez.
+
+Mevcut üretim `routing` tablosu ürün/operasyon başına tek makine tanımladığı için alternatif makine satırları `unsupported_alternative_machine` ile reddedilir. BOM/stok, tam fiziksel plan doğrulaması ve solver'a aktarım sonraki teknik işlerdir. Bu ön incelemenin geçmesi G4 müşteri verisi kabulü veya G8 plan kıyası anlamına gelmez.

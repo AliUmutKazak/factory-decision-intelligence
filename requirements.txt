@@ -27,3 +27,6 @@ pydantic==2.13.5
 
 # B2MML XSD validation
 lxml==6.1.1
+
+# Read-only Excel pilot intake
+openpyxl==3.1.5
