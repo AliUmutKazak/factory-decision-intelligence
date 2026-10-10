@@ -253,7 +253,8 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         reject("shifts", None, "machine_without_shift", machine)
 
     planned: set[tuple[str, int]] = set()
-    for row in data.get("current_plan", []):
+    planned_rows = data.get("current_plan", [])
+    for row in planned_rows:
         lot, op, machine = row["lot_id"], row["operation_seq"], row["machine_id"]
         key = (lot, op)
         if key in planned:
@@ -264,6 +265,21 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             reject("current_plan", row["_line"], "unknown_lot", lot)
         elif (product, op, machine) not in routing:
             reject("current_plan", row["_line"], "unmapped_operation", str(key))
+    planned_by_lot: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    planned_by_machine: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in planned_rows:
+        planned_by_lot[row["lot_id"]].append(row)
+        planned_by_machine[row["machine_id"]].append(row)
+    for lot, rows in planned_by_lot.items():
+        ordered = sorted(rows, key=lambda item: item["operation_seq"])
+        for previous, current in zip(ordered, ordered[1:]):
+            if current["start_min"] < previous["end_min"]:
+                reject("current_plan", current["_line"], "planned_precedence", lot)
+    for machine, rows in planned_by_machine.items():
+        ordered = sorted(rows, key=lambda item: item["start_min"])
+        for previous, current in zip(ordered, ordered[1:]):
+            if current["start_min"] < previous["end_min"]:
+                reject("current_plan", current["_line"], "planned_machine_overlap", machine)
     actual_keys: set[tuple[str, int]] = set()
     for row in data.get("actuals", []):
         lot, op, machine = row["lot_id"], row["operation_seq"], row["machine_id"]
