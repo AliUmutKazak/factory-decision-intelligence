@@ -1,2 +1,2 @@
-lot_id,operation_seq,machine_id,start_min,end_min
-EX-L1,1,EX-M1,60,80
+lot_id,operation_seq,machine_id,start_min,end_min,planned_qty
+EX-L1,1,EX-M1,60,80,10
