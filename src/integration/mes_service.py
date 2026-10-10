@@ -46,6 +46,39 @@ def _external_payload_hash(event_type, machine_id, event_timestamp_min, task_id,
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _ensure_reschedule_outbox(conn):
+    """Create the outbox and conservatively recover pre-outbox inbox decisions."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mes_reschedule_outbox (
+            event_id INTEGER PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('PENDING', 'ACKED')),
+            audit_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            acknowledged_at TEXT,
+            FOREIGN KEY (event_id) REFERENCES mes_execution_events(event_id)
+        )
+        """
+    )
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mes_external_inbox'").fetchone():
+        return
+    old_messages = conn.execute(
+        """
+        SELECT i.event_id, i.run_id, i.outcome_json
+        FROM mes_external_inbox AS i
+        LEFT JOIN mes_reschedule_outbox AS o ON o.event_id = i.event_id
+        WHERE o.event_id IS NULL
+        """
+    ).fetchall()
+    for event_id, run_id, outcome_json in old_messages:
+        if json.loads(outcome_json).get("trigger_reschedule"):
+            conn.execute(
+                "INSERT INTO mes_reschedule_outbox (event_id, run_id, status) VALUES (?, ?, 'PENDING')",
+                (event_id, run_id),
+            )
+
+
 def _canonical_writer(method):
     @wraps(method)
     def write(self, *args, **kwargs):
@@ -198,6 +231,7 @@ class MESIntegrationService:
                     )
                     """
                 )
+                _ensure_reschedule_outbox(self.conn)
                 cur.execute(
                     "SELECT payload_sha256, outcome_json FROM mes_external_inbox "
                     "WHERE source_system = ? AND external_message_id = ?",
@@ -208,13 +242,25 @@ class MESIntegrationService:
                     if existing[0] != payload_sha256:
                         raise ValueError("Conflicting external MES message ID and payload.")
                     original = json.loads(existing[1])
-                    self.conn.rollback()
+                    intent_status = "NONE"
+                    if original["trigger_reschedule"]:
+                        cur.execute(
+                            "SELECT status FROM mes_reschedule_outbox WHERE event_id = ?",
+                            (original["event_id"],),
+                        )
+                        intent = cur.fetchone()
+                        if not intent:
+                            raise RuntimeError("External MES reschedule intent is missing.")
+                        intent_status = intent[0]
+                    # The legacy inbox backfill above may have inserted a pending intent.
+                    self.conn.commit()
                     return {
                         **original,
                         "status": "DUPLICATE_IGNORED",
                         "original_trigger_reschedule": original["trigger_reschedule"],
-                        "trigger_reschedule": False,
-                        "reschedule_required": False,
+                        "trigger_reschedule": intent_status == "PENDING",
+                        "reschedule_required": intent_status == "PENDING",
+                        "reschedule_intent_status": intent_status,
                     }
                 if not self.run_id:
                     raise ValueError("External MES message requires an ACTIVE run.")
@@ -292,8 +338,18 @@ class MESIntegrationService:
             }
             if external:
                 result.update(
-                    {"source_system": source_system, "external_message_id": external_message_id, "run_id": self.run_id}
+                    {
+                        "source_system": source_system,
+                        "external_message_id": external_message_id,
+                        "run_id": self.run_id,
+                        "reschedule_intent_status": "PENDING" if trigger_reschedule else "NONE",
+                    }
                 )
+                if trigger_reschedule:
+                    cur.execute(
+                        "INSERT INTO mes_reschedule_outbox (event_id, run_id, status) VALUES (?, ?, 'PENDING')",
+                        (event_id, self.run_id),
+                    )
                 cur.execute(
                     "INSERT INTO mes_external_inbox "
                     "(source_system, external_message_id, payload_sha256, run_id, event_id, outcome_json) "
@@ -311,6 +367,86 @@ class MESIntegrationService:
             return result
         finally:
             cur.close()
+
+    def list_pending_reschedule_intents(self) -> list[dict[str, Any]]:
+        """Recover unacknowledged external MES triggers across run changes."""
+        with run_mutation_lock(self.db_path):
+            with get_db_connection(self.db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                _ensure_reschedule_outbox(conn)
+                if not conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='mes_external_inbox'"
+                ).fetchone():
+                    return []
+                rows = conn.execute(
+                    """
+                    SELECT o.event_id, o.run_id, e.event_type, e.machine_id,
+                           e.task_id, e.event_timestamp_min, e.delay_reason,
+                           i.source_system, i.external_message_id
+                    FROM mes_reschedule_outbox AS o
+                    JOIN mes_execution_events AS e ON e.event_id = o.event_id
+                    JOIN mes_external_inbox AS i ON i.event_id = o.event_id
+                    WHERE o.status = 'PENDING'
+                    ORDER BY o.event_id
+                    """
+                ).fetchall()
+        fields = (
+            "event_id",
+            "run_id",
+            "event_type",
+            "machine_id",
+            "task_id",
+            "event_timestamp_min",
+            "delay_reason",
+            "source_system",
+            "external_message_id",
+        )
+        return [dict(zip(fields, row)) for row in rows]
+
+    def ack_reschedule_intent(self, event_id: int, audit_id: str) -> bool:
+        """Acknowledge only an audited, promoted reschedule of this MES event."""
+        if not isinstance(event_id, int) or isinstance(event_id, bool) or event_id <= 0:
+            raise ValueError("event_id must be a positive integer.")
+        if not isinstance(audit_id, str) or not audit_id.strip():
+            raise ValueError("audit_id is required.")
+        with run_mutation_lock(self.db_path):
+            with get_db_connection(self.db_path) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                _ensure_reschedule_outbox(conn)
+                intent = conn.execute(
+                    "SELECT run_id, status, audit_id FROM mes_reschedule_outbox WHERE event_id = ?",
+                    (event_id,),
+                ).fetchone()
+                if not intent:
+                    raise ValueError("Reschedule intent not found.")
+                if intent[1] == "ACKED":
+                    if intent[2] != audit_id:
+                        raise ValueError("Reschedule intent was acknowledged with another audit.")
+                    return False
+                if not conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='reschedule_audit_log'"
+                ).fetchone():
+                    raise ValueError("No matching audit for a promoted reschedule run.")
+                audit = conn.execute(
+                    """
+                    SELECT a.new_run_id FROM reschedule_audit_log AS a
+                    JOIN pipeline_runs AS p ON p.run_id = a.new_run_id
+                    WHERE a.audit_id = ? AND a.trigger_event_id = ?
+                      AND a.previous_run_id = ? AND p.status IN ('ACTIVE', 'ARCHIVED')
+                    """,
+                    (audit_id, str(event_id), intent[0]),
+                ).fetchone()
+                if not audit:
+                    raise ValueError("No matching audit for a promoted reschedule run.")
+                conn.execute(
+                    """
+                    UPDATE mes_reschedule_outbox
+                    SET status = 'ACKED', audit_id = ?, acknowledged_at = CURRENT_TIMESTAMP
+                    WHERE event_id = ? AND status = 'PENDING'
+                    """,
+                    (audit_id, event_id),
+                )
+                return True
 
     def close(self):
         if hasattr(self, "conn") and self.conn:

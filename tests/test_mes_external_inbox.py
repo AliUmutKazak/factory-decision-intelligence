@@ -129,24 +129,113 @@ def test_concurrent_same_message_keeps_one_event(mes_db):
         assert conn.execute("SELECT COUNT(*) FROM mes_external_inbox").fetchone()[0] == 1
 
 
-def test_breakdown_retry_does_not_trigger_reschedule_again(mes_db):
-    def deliver():
-        return MESIntegrationService().record_event(
-            event_type="MACHINE_DOWN",
-            machine_id="M01",
-            event_timestamp_min=120,
-            delay_reason="synthetic stop",
-            source_system="SYNTHETIC-MES",
-            external_message_id="stop-1",
-        )
+def deliver_breakdown():
+    return MESIntegrationService().record_event(
+        event_type="MACHINE_DOWN",
+        machine_id="M01",
+        event_timestamp_min=120,
+        delay_reason="synthetic stop",
+        source_system="SYNTHETIC-MES",
+        external_message_id="stop-1",
+    )
 
-    assert deliver()["reschedule_required"] is True
-    retry = deliver()
+
+def test_breakdown_retry_remains_pending_until_audited_reschedule(mes_db):
+    first = deliver_breakdown()
+    assert first["reschedule_required"] is True
+    assert first["reschedule_intent_status"] == "PENDING"
+    retry = deliver_breakdown()
     assert retry["status"] == "DUPLICATE_IGNORED"
+    assert retry["event_id"] == first["event_id"]
     assert retry["original_trigger_reschedule"] is True
-    assert retry["reschedule_required"] is False
+    assert retry["reschedule_required"] is True
     with sqlite3.connect(mes_db) as conn:
         assert conn.execute("SELECT COUNT(*) FROM mes_execution_events").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM mes_reschedule_outbox").fetchone()[0] == 1
+        conn.execute("UPDATE pipeline_runs SET status='HISTORICAL' WHERE run_id='RUN-A'")
+        conn.execute("INSERT INTO pipeline_runs VALUES ('RUN-B', 'ACTIVE', '2026-10-09T01:00:00')")
+    pending = MESIntegrationService().list_pending_reschedule_intents()
+    assert len(pending) == 1
+    assert pending[0]["event_id"] == first["event_id"]
+    assert pending[0]["run_id"] == "RUN-A"
+    assert deliver_breakdown()["reschedule_required"] is True
+
+
+def test_ack_requires_matching_audit_and_promoted_run(mes_db):
+    event_id = deliver_breakdown()["event_id"]
+    service = MESIntegrationService()
+    with pytest.raises(ValueError, match="No matching audit"):
+        service.ack_reschedule_intent(event_id, "audit-1")
+    with sqlite3.connect(mes_db) as conn:
+        conn.execute("INSERT INTO pipeline_runs VALUES ('RUN-B', 'RUNNING', '2026-10-09T01:00:00')")
+        conn.execute(
+            "CREATE TABLE reschedule_audit_log (audit_id TEXT PRIMARY KEY, trigger_event_id TEXT, "
+            "previous_run_id TEXT, new_run_id TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO reschedule_audit_log VALUES ('audit-1', ?, 'RUN-A', 'RUN-B')",
+            (str(event_id),),
+        )
+    with pytest.raises(ValueError, match="No matching audit"):
+        service.ack_reschedule_intent(event_id, "audit-1")
+    with sqlite3.connect(mes_db) as conn:
+        conn.execute("UPDATE pipeline_runs SET status='ACTIVE' WHERE run_id='RUN-B'")
+    with pytest.raises(ValueError, match="No matching audit"):
+        service.ack_reschedule_intent(event_id, "other-audit")
+    assert service.ack_reschedule_intent(event_id, "audit-1") is True
+    assert service.ack_reschedule_intent(event_id, "audit-1") is False
+    with pytest.raises(ValueError, match="another audit"):
+        service.ack_reschedule_intent(event_id, "other-audit")
+    assert service.list_pending_reschedule_intents() == []
+    retry = deliver_breakdown()
+    assert retry["reschedule_required"] is False
+    assert retry["reschedule_intent_status"] == "ACKED"
+
+
+def test_large_task_delay_creates_pending_intent(mes_db):
+    result = MESIntegrationService().record_event(
+        event_type="TASK_COMPLETE",
+        machine_id="M01",
+        event_timestamp_min=141,
+        task_id=1,
+        source_system="SYNTHETIC-MES",
+        external_message_id="late-task-1",
+    )
+    assert result["variance_min"] == 61
+    assert result["reschedule_intent_status"] == "PENDING"
+    assert MESIntegrationService().list_pending_reschedule_intents()[0]["event_id"] == result["event_id"]
+
+
+def test_outbox_failure_rolls_back_mes_event_and_inbox(mes_db):
+    assert deliver_breakdown()["reschedule_required"] is True
+    with sqlite3.connect(mes_db) as conn:
+        conn.execute(
+            "CREATE TRIGGER fail_outbox BEFORE INSERT ON mes_reschedule_outbox "
+            "BEGIN SELECT RAISE(FAIL, 'outbox unavailable'); END"
+        )
+    with pytest.raises(sqlite3.IntegrityError, match="outbox unavailable"):
+        MESIntegrationService().record_event(
+            event_type="MACHINE_DOWN",
+            machine_id="M01",
+            event_timestamp_min=130,
+            source_system="SYNTHETIC-MES",
+            external_message_id="stop-2",
+        )
+    with sqlite3.connect(mes_db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM mes_execution_events").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM mes_external_inbox").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM mes_reschedule_outbox").fetchone()[0] == 1
+
+
+def test_pre_outbox_message_is_recovered_as_pending(mes_db):
+    event_id = deliver_breakdown()["event_id"]
+    with sqlite3.connect(mes_db) as conn:
+        conn.execute("DROP TABLE mes_reschedule_outbox")
+    assert deliver_breakdown()["reschedule_intent_status"] == "PENDING"
+    pending = MESIntegrationService().list_pending_reschedule_intents()
+    assert [row["event_id"] for row in pending] == [event_id]
+    with sqlite3.connect(mes_db) as conn:
+        assert conn.execute("SELECT status FROM mes_reschedule_outbox").fetchone()[0] == "PENDING"
 
 
 def test_external_path_rejects_bad_identity_and_task_machine_mapping(mes_db):
