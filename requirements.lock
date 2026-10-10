@@ -8,6 +8,7 @@ click==8.5.0
 colorama==0.4.6
 contourpy==1.4.0
 cycler==0.12.1
+et-xmlfile==2.0.0
 fonttools==4.66.0
 formulaic==1.2.2
 h11==0.16.0
@@ -26,6 +27,7 @@ MarkupSafe==3.0.3
 matplotlib==3.11.2
 narwhals==2.26.0
 numpy==2.4.6
+openpyxl==3.1.5
 ortools==9.14.6206
 packaging==26.3
 pandas==3.0.5

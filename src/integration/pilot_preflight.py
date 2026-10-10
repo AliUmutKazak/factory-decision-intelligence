@@ -13,9 +13,13 @@ import hashlib
 import json
 import math
 from collections import defaultdict
-from datetime import datetime
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile
+
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 
 FILES = {
     "orders": ("order_id", "lot_id", "product_id", "quantity", "due_min"),
@@ -63,7 +67,7 @@ def _required(value: str | None, name: str) -> str:
     return result
 
 
-def _validate_row(kind: str, row: dict[str, str]) -> dict[str, Any]:
+def _validate_row(kind: str, row: dict[str, str | None]) -> dict[str, Any]:
     item: dict[str, Any] = {name: _required(row[name], name) for name in FILES[kind]}
     for name in ("quantity", "duration_min_per_unit"):
         if name in item:
@@ -79,31 +83,112 @@ def _validate_row(kind: str, row: dict[str, str]) -> dict[str, Any]:
     return item
 
 
-def _read_csv(path: Path, kind: str, reject: Any) -> list[dict[str, Any]]:
+def _column_mapping(kind: str, headers: list[str], configured: Any, reject: Any) -> dict[str, str] | None:
+    named = [name for name in headers if name]
+    if len(named) != len(set(named)):
+        reject(kind, None, "duplicate_columns", "column names must be unique")
+        return None
+    allowed = set(FILES[kind]) | ({"reported_min"} if kind == "actuals" else set())
+    if configured is None:
+        mapping = {name: name for name in FILES[kind]}
+        if kind == "actuals" and "reported_min" in headers:
+            mapping["reported_min"] = "reported_min"
+    elif not isinstance(configured, dict) or any(
+        key not in allowed or not isinstance(source, str) or not source.strip() for key, source in configured.items()
+    ):
+        reject(kind, None, "invalid_column_map", "use canonical field names mapped to nonempty source headers")
+        return None
+    else:
+        mapping = configured
+        if set(FILES[kind]) - mapping.keys() or len(set(mapping.values())) != len(mapping):
+            reject(kind, None, "invalid_column_map", "map every required field to a distinct source header")
+            return None
+    missing = set(mapping.values()) - set(headers)
+    if missing:
+        reject(kind, None, "missing_columns", ", ".join(sorted(missing)))
+        return None
+    return mapping
+
+
+def _append_row(
+    kind: str,
+    source: dict[str, str | None],
+    mapping: dict[str, str],
+    line: int,
+    rows: list[dict[str, Any]],
+    reject: Any,
+) -> None:
+    try:
+        canonical = {name: source[header] for name, header in mapping.items()}
+        item = _validate_row(kind, canonical)
+        if "reported_min" in canonical:
+            item["reported_min"] = _number(_required(canonical["reported_min"], "reported_min"))
+        item["_line"] = line
+        rows.append(item)
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        reject(kind, line, "invalid_value", str(exc))
+
+
+def _read_csv(path: Path, kind: str, configured: Any, reject: Any) -> tuple[list[dict[str, Any]], dict[str, str]]:
     rows = []
     with path.open(encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
         columns = reader.fieldnames or []
-        missing = set(FILES[kind]) - set(columns)
-        if missing:
-            reject(kind, None, "missing_columns", ", ".join(sorted(missing)))
-            return rows
-        if len(columns) != len(set(columns)):
-            reject(kind, None, "duplicate_columns", "column names must be unique")
-            return rows
+        if any(not column for column in columns):
+            reject(kind, None, "empty_column_name", "CSV headers must all be named")
+            return rows, {}
+        mapping = _column_mapping(kind, columns, configured, reject)
+        if mapping is None:
+            return rows, {}
         for line, row in enumerate(reader, start=2):
             if None in row:
                 reject(kind, line, "extra_columns", "more values than headers")
                 continue
-            try:
-                item = _validate_row(kind, row)
-                if kind == "actuals" and "reported_min" in columns:
-                    item["reported_min"] = _number(_required(row.get("reported_min"), "reported_min"))
-                item["_line"] = line
-                rows.append(item)
-            except (TypeError, ValueError, OverflowError) as exc:
-                reject(kind, line, "invalid_value", str(exc))
-    return rows
+            _append_row(kind, row, mapping, line, rows, reject)
+    return rows, mapping
+
+
+def _read_xlsx(
+    path: Path, kind: str, sheet_name: str, header_row: int, configured: Any, reject: Any
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    rows: list[dict[str, Any]] = []
+    workbook = load_workbook(path, read_only=True, data_only=False, keep_links=False)
+    try:
+        if sheet_name not in workbook.sheetnames:
+            reject(kind, None, "unknown_sheet", sheet_name)
+            return rows, {}
+        sheet = workbook[sheet_name]
+        header_cells = next(sheet.iter_rows(min_row=header_row, max_row=header_row), ())
+        if any(cell.data_type == "f" for cell in header_cells):
+            reject(kind, header_row, "formula_header", "formula column headers are unsupported")
+            return rows, {}
+        headers = [str(cell.value).strip() if cell.value is not None else "" for cell in header_cells]
+        mapping = _column_mapping(kind, headers, configured, reject)
+        if mapping is None:
+            return rows, {}
+        indices = {header: headers.index(header) for header in mapping.values()}
+        for line, cells in enumerate(sheet.iter_rows(min_row=header_row + 1), start=header_row + 1):
+            if all(cell.value is None for cell in cells):
+                continue
+            if any(
+                cell.value is not None
+                for index, cell in enumerate(cells)
+                if index >= len(headers) or not headers[index]
+            ):
+                reject(kind, line, "unheaded_column", "data appears below an empty header")
+                continue
+            selected = {name: cells[indices[name]] for name in mapping.values()}
+            if any(cell.data_type == "f" for cell in selected.values()):
+                reject(kind, line, "formula_cell", "mapped cells must contain values, not formulas")
+                continue
+            if any(isinstance(cell.value, (bool, date, time)) for cell in selected.values()):
+                reject(kind, line, "invalid_value", "boolean/date/time cells require explicit source conversion")
+                continue
+            source = {name: str(cell.value) if cell.value is not None else None for name, cell in selected.items()}
+            _append_row(kind, source, mapping, line, rows, reject)
+        return rows, mapping
+    finally:
+        workbook.close()
 
 
 def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
@@ -170,16 +255,40 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     data: dict[str, list[dict[str, Any]]] = {}
     evidence: dict[str, dict[str, Any]] = {}
     for kind in FILES:
-        relative = supplied.get(kind)
-        if relative is None:
+        entry = supplied.get(kind)
+        if entry is None:
             if kind in REQUIRED_FILES:
                 reject(kind, None, "missing_file", "required file is not listed")
             continue
+        if isinstance(entry, str):
+            spec = {"path": entry}
+        elif isinstance(entry, dict):
+            spec = entry
+        else:
+            reject(kind, None, "invalid_path", "file entry must be a path or file specification")
+            continue
+        if spec.keys() - {"path", "sheet", "header_row", "columns"}:
+            reject(kind, None, "invalid_file_spec", "unknown file specification field")
+            continue
+        relative = spec.get("path")
         if not isinstance(relative, str) or not relative.strip():
             reject(kind, None, "invalid_path", "file path must be a nonempty string")
             continue
-        if Path(relative).suffix.lower() != ".csv":
-            reject(kind, None, "unsupported_format", "preflight currently accepts CSV only")
+        suffix = Path(relative).suffix.lower()
+        if suffix not in {".csv", ".xlsx"}:
+            reject(kind, None, "unsupported_format", "preflight accepts UTF-8 CSV or XLSX")
+            continue
+        if suffix == ".xlsx":
+            sheet = spec.get("sheet")
+            header_row = spec.get("header_row", 1)
+            if not isinstance(sheet, str) or not sheet.strip():
+                reject(kind, None, "missing_sheet", "XLSX requires an explicit sheet name")
+                continue
+            if isinstance(header_row, bool) or not isinstance(header_row, int) or header_row < 1:
+                reject(kind, None, "invalid_header_row", "header_row must be a positive integer")
+                continue
+        elif "sheet" in spec or "header_row" in spec:
+            reject(kind, None, "invalid_file_spec", "sheet and header_row apply only to XLSX")
             continue
         path = (root / relative).resolve()
         if not path.is_relative_to(root):
@@ -188,11 +297,27 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         if not path.is_file():
             reject(kind, None, "missing_file", "listed file does not exist")
             continue
-        evidence[kind] = {"path": relative, "sha256": _sha256(path), "size_bytes": path.stat().st_size}
+        evidence[kind] = {
+            "path": relative,
+            "sha256": _sha256(path),
+            "size_bytes": path.stat().st_size,
+            "format": suffix[1:],
+        }
+        if suffix == ".xlsx":
+            evidence[kind]["sheet"] = sheet
+            evidence[kind]["header_row"] = header_row
         try:
-            data[kind] = _read_csv(path, kind, reject)
+            if suffix == ".csv":
+                data[kind], applied = _read_csv(path, kind, spec.get("columns"), reject)
+            else:
+                data[kind], applied = _read_xlsx(path, kind, sheet, header_row, spec.get("columns"), reject)
+            evidence[kind]["columns"] = applied
         except (UnicodeError, csv.Error) as exc:
             reject(kind, None, "invalid_csv", f"expected valid UTF-8 CSV: {exc}")
+            data[kind] = []
+        except (BadZipFile, InvalidFileException, OSError, ValueError) as exc:
+            code = "invalid_xlsx" if suffix == ".xlsx" else "invalid_csv"
+            reject(kind, None, code, f"cannot read {suffix[1:].upper()} file: {exc}")
             data[kind] = []
         evidence[kind]["parsed_rows"] = len(data[kind])
         if kind in REQUIRED_FILES and not data[kind]:
