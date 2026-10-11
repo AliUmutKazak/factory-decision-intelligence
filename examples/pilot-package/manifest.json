@@ -6,11 +6,11 @@
   "time_unit": "minute",
   "max_actual_reporting_lag_min": 30,
   "files": {
-    "orders": "orders.csv",
-    "machines": "machines.csv",
-    "routing": "routing.csv",
-    "shifts": "shifts.csv",
-    "current_plan": "current_plan.csv",
-    "actuals": "actuals.csv"
+    "orders": {"path": "orders.csv", "sha256": "9e32d7af27caf0a5b06a2eec33fd31f8adb2d73f194126554cc8768b4e9a0d55"},
+    "machines": {"path": "machines.csv", "sha256": "50d96b5238d134ba26b69b937f16835154d6ea7ade6882ffd42e607f0696aa5b"},
+    "routing": {"path": "routing.csv", "sha256": "08b61dae572487bc18d561dd3e73f53dce36f23c61ec62e2c1ee61d2bc940544"},
+    "shifts": {"path": "shifts.csv", "sha256": "c57df7e84e893f2bd21305d35bb5d05d6be1ab25f980252e2080fa7793683c19"},
+    "current_plan": {"path": "current_plan.csv", "sha256": "ce64418c66a1f873093250f907243bd8dd056dac5e49a8288960d6b4c07ba7f3"},
+    "actuals": {"path": "actuals.csv", "sha256": "c5679a5c4a9a8bba72883b37e5b7d411250798537137837aefe8dd0d01144fef"}
   }
 }

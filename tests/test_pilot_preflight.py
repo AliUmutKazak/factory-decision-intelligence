@@ -58,6 +58,13 @@ def test_preflight_accepts_small_labeled_case_without_runtime_writes(tmp_path):
     assert {path.name: sha256_file(path) for path in tmp_path.iterdir()} == before
 
 
+def test_committed_synthetic_pilot_example_has_matching_file_hashes():
+    root = Path(__file__).resolve().parents[1]
+    report = inspect_pilot_package(root / "examples/pilot-package/manifest.json")
+    assert report["status"] == "ACCEPTED"
+    assert all(item["hash_status"] == "VERIFIED" for item in report["files"].values())
+
+
 def test_preflight_reports_bad_rows_and_cross_file_references(tmp_path):
     manifest = package(tmp_path)
     orders = tmp_path / "orders.csv"
@@ -87,6 +94,49 @@ def test_preflight_rejects_untrusted_paths_and_unowned_customer_data(tmp_path):
     assert report["status"] == "REJECTED"
     codes = {issue["code"] for issue in report["rejections"]}
     assert {"path_outside_package", "missing_customer_authority"} <= codes
+
+
+def test_preflight_requires_nonblank_source_authority(tmp_path):
+    manifest = package(tmp_path)
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content.update(source_type="OPEN", source_ref="  ", usage_terms=["unspecified"])
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert {"invalid_provenance", "missing_open_provenance"} <= {issue["code"] for issue in report["rejections"]}
+    assert report["provenance"] == {}
+
+    content.update(source_type="CUSTOMER", data_owner="Factory", sharing_basis="   ")
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert "missing_customer_authority" in {issue["code"] for issue in report["rejections"]}
+    assert report["provenance"]["data_owner"] == "Factory"
+
+
+def test_preflight_verifies_declared_file_hash_before_parsing(tmp_path):
+    manifest = package(tmp_path)
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    expected = sha256_file(tmp_path / "orders.csv")
+    content["files"]["orders"] = {"path": "orders.csv", "sha256": expected.upper()}
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["files"]["orders"]["hash_status"] == "VERIFIED"
+    assert report["files"]["orders"]["expected_sha256"] == expected
+    assert report["files"]["machines"]["hash_status"] == "UNPINNED"
+
+    (tmp_path / "orders.csv").write_text(
+        "order_id,lot_id,product_id,quantity,due_min\nO1,L1,P1,11,480\n", encoding="utf-8"
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert report["files"]["orders"]["hash_status"] == "MISMATCH"
+    assert report["files"]["orders"]["parsed_rows"] == 0
+    assert "file_sha256_mismatch" in {issue["code"] for issue in report["rejections"]}
+
+    content["files"]["orders"]["sha256"] = None
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    assert "invalid_expected_sha256" in {issue["code"] for issue in inspect_pilot_package(manifest)["rejections"]}
 
 
 def test_preflight_rejects_invalid_manifest_and_missing_units(tmp_path):
