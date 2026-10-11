@@ -19,7 +19,7 @@ Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için
 - Pahalı API çözücü çağrılarının sınırsız eşzamanlı yürütülmesi.
 - Aynı yerel runtime'a bağlı panel/dispatcher çağrılarının API sınırını aşabilmesi; süreçler arası çözüm yuvası ve meşgul yanıtı eklendi.
 - Docker build bağlamına yerel `tmp/`, `output/`, PDF ve gizli anahtar dosyalarının girebilmesi.
-- [Referans pilot profilindeki](reference-pilot-profile.md) artık yanlış olan “Excel okumaz/eşleme yapmaz” ifadesi; G4-T ön kontrolü açık CSV/XLSX eşlemesini yapar, fakat hâlâ solver aktarımı yapmaz.
+- [Referans pilot profilindeki](reference-pilot-profile.md) artık yanlış olan “Excel okumaz/eşleme yapmaz” ifadesi; G4-T ön kontrolü açık CSV/XLSX eşlemesini yapar. Sonraki dar [tek vardiyalı dosya çözüm örneği](../examples/pilot-solve/README.md), yalnız tam sipariş ve boş WIP/actuals alt kümesini bellekte üretim çözücüsüne aktarır.
 - Main CI'de doğrulanmış sentetik run paketinin indirilebilir aday artifact ve SHA-256 kimliği için adım eklendi. Kanıt, yalnız CI başarılı olduğunda mevcuttur; Git etiketi veya container image digest'i sayılmaz.
 - Güncel ortamda yapılan [tekrarlı dış JSP deneyi](external-jsp-benchmark.md#11-ekim-2026-tekrarlı-denetim), küçük üç örnekte 3/3 uygun sonuç verdi; `ft10` 30 saniyede geçerli olsa da düz JSP karşılaştırma koşulunu 0/3 sağladı. Eski tek koşumun değeri güncel sonuç gibi sunulmaz; ham kod hash'i satır sonu farkından etkilenebildiği için bundan tek başına algoritma değişikliği çıkarılmaz.
 

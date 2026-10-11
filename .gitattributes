@@ -9,3 +9,5 @@ examples/g5-local-messages/** -text
 artifacts/research/g5-local-message-replay.json -text
 artifacts/research/jsp-repeat-matrix-2026-10-11.json -text
 examples/pilot-package/*.csv -text
+examples/pilot-solve/*.csv -text
+artifacts/research/g4-file-pilot-lab-solve-2026-10-11.json -text

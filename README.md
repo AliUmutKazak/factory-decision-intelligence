@@ -22,13 +22,14 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
 
-### İnceleyenler için üç doğrulanabilir sonuç
+### İnceleyenler için dört doğrulanabilir sonuç
 
 | Sonuç | Kanıt | Geçerlilik sınırı |
 |---|---|---|
 | Uçtan uca planlama ve mühürlü ACTIVE sürümü | `python main.py` ardından `python scripts/verify_active_run.py`; [referans manifesti](artifacts/reference/manifest.json) | Referans veri sentetiktir; müşteri planı değildir |
 | Dış çizelgeleme örneğinde optimum ve bağımsız fiziksel denetim | [OR-Library `ft06`: 55 birim, `OPTIMAL`](docs/external-jsp-benchmark.md) | Yalnız sabit makineli, düz statik JSP alt problemi |
 | Aynı fiziksel girdide politika karşılaştırması ve maliyet bileşenleri | [Ölçülmüş model demosu](artifacts/demo/business-case.md) ve [yeniden üretme adımları](docs/demo-and-customer-pilot.md) | Hesaplanan karşılaştırma; gerçekleşmiş tasarruf veya finansal ROI değil |
+| Dosya pilotu mevcut planı ile solver adayının dar kapsamlı kıyası | [Sentetik tek vardiyalı örnek](examples/pilot-solve/README.md) ve `python -m src.integration.pilot_file_solve examples/pilot-solve/manifest.json` | Bellekte, tam sipariş/boş WIP/fixed routing; müşteri veya üretim kabulü değil |
 
 ---
 

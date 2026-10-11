@@ -1,0 +1,15 @@
+{
+  "dataset_id": "FDI-LAB-SOLVE-01",
+  "source_type": "SYNTHETIC",
+  "origin": "2026-01-05T00:00:00+03:00",
+  "quantity_unit": "piece",
+  "baseline_quantity_basis": "FULL_ORDER",
+  "time_unit": "minute",
+  "files": {
+    "orders": {"path": "orders.csv", "sha256": "9e32d7af27caf0a5b06a2eec33fd31f8adb2d73f194126554cc8768b4e9a0d55"},
+    "machines": {"path": "machines.csv", "sha256": "50d96b5238d134ba26b69b937f16835154d6ea7ade6882ffd42e607f0696aa5b"},
+    "routing": {"path": "routing.csv", "sha256": "08b61dae572487bc18d561dd3e73f53dce36f23c61ec62e2c1ee61d2bc940544"},
+    "shifts": {"path": "shifts.csv", "sha256": "c57df7e84e893f2bd21305d35bb5d05d6be1ab25f980252e2080fa7793683c19"},
+    "current_plan": {"path": "current_plan.csv", "sha256": "ce64418c66a1f873093250f907243bd8dd056dac5e49a8288960d6b4c07ba7f3"}
+  }
+}
