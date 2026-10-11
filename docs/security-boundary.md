@@ -8,6 +8,7 @@ Durum: **Çalışılıyor**. Bu kayıt, `FDI_Nihai_Birlesik_Yol_Haritasi.pdf` G2
 |---|---|---|
 | `GET /health`, `GET /ready` | Sağlık ve hazır olma | Ağ sınırı; hassas ayrıntı vermeme |
 | `GET /api/v1/schedule/current`, `GET /api/v1/schedule/solver-metadata` | ACTIVE çizelgesi ve çözüm bilgisi | Laboratuvarda üç anahtardan biri; pilotta yetkili planlamacı/operasyon okuma |
+| `GET /api/v1/operations/status` | ACTIVE yayın yaşı ve bekleyen MES niyet sayısı | Laboratuvarda üç anahtardan biri; pilotta yetkili işletim/planlama okuma |
 | `GET /api/v1/schedule/audit-log`, `GET /api/v1/decisions` | Karar ve denetim geçmişi | Laboratuvarda üç anahtardan biri; pilotta yetkili denetim/planlama okuma |
 | `POST /api/v1/schedule/what-if/breakdown`, `POST /api/v1/schedule/what-if/hot-order` | Senaryo hesabı | Yalnız senaryo anahtarı; pilotta hız/kaynak sınırı ve kayıt |
 | `POST /api/v1/schedule/reschedule` | Yeniden çizelgeleme işlemi | Yalnız yeniden çizelgeleme anahtarı; pilotta insan onayı ve geri dönüş kuralı |

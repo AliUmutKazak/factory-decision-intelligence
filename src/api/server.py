@@ -2,6 +2,7 @@
 
 import sqlite3
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Any
@@ -77,6 +78,9 @@ def get_db() -> sqlite3.Connection:
             source.close()
         snapshot.row_factory = sqlite3.Row
         return snapshot
+    except (sqlite3.Error, OSError) as exc:
+        snapshot.close()
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable.") from exc
     except Exception:
         snapshot.close()
         raise
@@ -258,5 +262,52 @@ def get_active_run_decisions(_authorized: None = Depends(require_scope("read")))
     try:
         active_run_id = require_active_run_id(conn)
         return [entry.to_dict() for entry in DecisionLedger.read_by_run_id(conn, active_run_id)]
+    finally:
+        conn.close()
+
+
+@app.get("/api/v1/operations/status", tags=["Health & Monitoring"])
+def get_operations_status(
+    max_active_age_min: int = Query(1440, ge=1, le=43200),
+    _authorized: None = Depends(require_scope("read")),
+) -> dict[str, Any]:
+    """Report ACTIVE publication age without interpreting naive legacy timestamps."""
+    conn = get_db()
+    try:
+        run_id = require_active_run_id(conn)
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(pipeline_runs)")}
+        published = None
+        if "published_at_utc" in columns:
+            row = conn.execute("SELECT published_at_utc FROM pipeline_runs WHERE run_id = ?", (run_id,)).fetchone()
+            published = row[0] if row else None
+        age_seconds = None
+        state = "AGE_UNKNOWN"
+        if published:
+            try:
+                moment = datetime.fromisoformat(published)
+                if moment.tzinfo is not None:
+                    age_seconds = int((datetime.now(UTC) - moment.astimezone(UTC)).total_seconds())
+                    state = (
+                        "CLOCK_SKEW"
+                        if age_seconds < -60
+                        else "STALE_ACTIVE"
+                        if age_seconds > max_active_age_min * 60
+                        else "READY"
+                    )
+            except ValueError:
+                pass
+        pending_intents = None
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='mes_reschedule_outbox'").fetchone():
+            pending_intents = conn.execute(
+                "SELECT COUNT(*) FROM mes_reschedule_outbox WHERE status = 'PENDING'"
+            ).fetchone()[0]
+        return {
+            "status": state,
+            "run_id": run_id,
+            "published_at_utc": published,
+            "active_age_seconds": age_seconds,
+            "max_active_age_min": max_active_age_min,
+            "pending_mes_intents": pending_intents,
+        }
     finally:
         conn.close()

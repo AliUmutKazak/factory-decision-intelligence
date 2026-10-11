@@ -274,6 +274,7 @@ FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnterakt
 |---|---|---|---|
 | `GET` | `/health` | - | Servis canlılığı |
 | `GET` | `/ready` | - | ACTIVE sürüm ve solver metadata kontrolü; run_id döndürür |
+| `GET` | `/api/v1/operations/status` | `?max_active_age_min=1440` | Yetkili okuma anahtarıyla ACTIVE yayın yaşı, saat durumu ve bekleyen yerel MES niyetleri |
 | `GET` | `/api/v1/schedule/current` | - | SQLite üzerindeki aktif operasyonel çizelgeyi döndürür |
 | `POST` | `/api/v1/schedule/what-if/breakdown` | `{"machine_id": "M01", "start_min": 480, "duration_min": 60}` | Makine duruşunu simüle eder; gecikme ve sapma analizi sunar |
 | `POST` | `/api/v1/schedule/what-if/hot-order` | `{"order_id": "HOT_01", "product_id": "P01", "quantity": 25, "due_date_min": 2880, "priority_weight": 10}` | Acil siparişin mevcut çizelge üzerindeki etkisini hesaplar |

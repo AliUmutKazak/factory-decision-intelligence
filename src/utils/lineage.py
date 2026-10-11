@@ -4,7 +4,7 @@ import os
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.config import get_runtime_paths
@@ -69,9 +69,12 @@ def init_pipeline_runs_table(conn):
             git_sha TEXT,
             config_hash TEXT,
             data_source TEXT,
+            published_at_utc TEXT,
             status TEXT NOT NULL CHECK(status IN ('INITIALIZED', 'RUNNING', 'STAGING', 'VALIDATE', 'COMPLETED', 'ACTIVE', 'ARCHIVED', 'FAILED'))
         )
     """)
+    if "published_at_utc" not in {row[1] for row in cur.execute("PRAGMA table_info(pipeline_runs)")}:
+        cur.execute("ALTER TABLE pipeline_runs ADD COLUMN published_at_utc TEXT")
     # P1 Güvencesi: Tabloda aynı anda en fazla 1 adet ACTIVE kayıt olabilir!
     cur.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_pipeline_runs_unique_active
@@ -916,6 +919,9 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
                 f"[PROMOTION VIOLATION] Yalnızca COMPLETED koşumlar ACTIVE yapılabilir! Mevcut durum: '{curr}'"
             )
 
+        if "published_at_utc" not in {column[1] for column in cur.execute("PRAGMA table_info(pipeline_runs)")}:
+            cur.execute("ALTER TABLE pipeline_runs ADD COLUMN published_at_utc TEXT")
+
         # 1. Önceki ACTIVE koşumları ARCHIVED yap (böylece partial unique index bozulmaz)
         cur.execute(
             """
@@ -930,10 +936,10 @@ def promote_run_to_active(run_id: str, db_path: str = None) -> bool:
         cur.execute(
             """
             UPDATE pipeline_runs
-            SET status = 'ACTIVE'
+            SET status = 'ACTIVE', published_at_utc = ?
             WHERE run_id = ?
         """,
-            (run_id,),
+            (datetime.now(UTC).isoformat(), run_id),
         )
 
         conn.commit()
