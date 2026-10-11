@@ -90,7 +90,7 @@ flowchart TD
     subgraph layer4["Katman 4: Operasyonel Çizelgeleme / Operational CP-SAT"]
         E --> I["Constraint Programming Motoru - OR-Tools"]
         H --> I
-        I --> J["Sonlu Kapasiteli İş-Makine Eşleme"]
+        I --> J["Sabit Rotalı, Sonlu Kapasiteli İş-Makine Çizelgeleme"]
         I --> K["Sıra Bağımlı Hazırlık Süresi SDST Minimizasyonu"]
         I --> L["Vardiya, Mola ve Takvim Kısıtları"]
     end
@@ -137,7 +137,7 @@ Model; müşteri taleplerini karşılarken üretim maliyeti, stok tutma maliyeti
 * $c_{energy}$: Birim elektrik enerjisi fiyatı ($/kWh)
 * $co2_p$: Ürün $p$'nin üretimi kaynaklı karbon salımı ($kg\ CO_2/adet$)
 * $c_{carbon}$: Model içi karbon fiyatı varsayımı ($/kg\ CO_2$); uygulanmış vergi veya gerçekleşmiş maliyet değildir
-* $CO2_{cap,t}$: $t$ döneminde yasal olarak aşılamayacak azami karbon salımı tavanı ($kg$)
+* $CO2_{cap,t}$: $t$ dönemi için modelde varsayılan karbon senaryosu üst sınırı ($kg$); mevzuat limiti değildir
 
 #### Karar Değişkenleri (Decision Variables)
 * $X_{p,t} \ge 0$: $t$ döneminde üretilecek $p$ ürün hacmi
