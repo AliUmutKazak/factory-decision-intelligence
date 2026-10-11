@@ -27,7 +27,7 @@ jobs:
     - name: Install Core & Quality Tooling
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-linux.lock
         pip install ruff pytest
 
     - name: Ensure Directory Structure
@@ -37,7 +37,8 @@ jobs:
     - name: Audit Python dependency advisories
       run: |
         python -m pip install pip-audit==2.10.1
-        python -m pip_audit -r requirements.txt --strict
+        python -m pip_audit -r requirements-linux.lock --strict
+        python -m pip_audit -r requirements-windows.lock --strict
 
     - name: "Quality Gate 1: Static Code Analysis & Formatting (Ruff)"
       run: |

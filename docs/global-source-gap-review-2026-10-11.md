@@ -24,6 +24,7 @@ Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için
 - Güncel ortamda yapılan [tekrarlı dış JSP deneyi](external-jsp-benchmark.md#11-ekim-2026-tekrarlı-denetim), küçük üç örnekte 3/3 uygun sonuç verdi; `ft10` 30 saniyede geçerli olsa da düz JSP karşılaştırma koşulunu 0/3 sağladı. Eski tek koşumun değeri güncel sonuç gibi sunulmaz; ham kod hash'i satır sonu farkından etkilenebildiği için bundan tek başına algoritma değişikliği çıkarılmaz.
 - [60 saniyelik ek `ft10` matrisi](external-jsp-benchmark.md#aynı-gün-60-saniyelik-ft10-tekrar-deneyi) aynı problemde 3/3 bağımsız geçerli ve düz JSP ile karşılaştırılabilir 930 adayına ulaştı; tüm koşular `FEASIBLE` kaldı. [Özgün araştırma](https://pmc.ncbi.nlm.nih.gov/articles/PMC7571099/) 930'u bilinen optimum olarak listeler, ancak FDI'nin 30 saniyelik servis hedefi veya genel fabrika performansı bundan kanıtlanmaz.
 - [Bağımlılık taraması](dependency-security-2026-10-11.md) OR-Tools 9.14'ün getirdiği protobuf 6.31.1 danışma kaydını buldu; OR-Tools 9.15/protobuf 6.33.6 yükseltmesi ve CI `pip-audit` kapısı eklendi. Tarama dışındaki upstream protobuf JSON ayrıştırma sınırı açık risk olarak kaydedildi.
+- Kullanılmayan eski `requirements.lock` dosyasında savunmasız protobuf sürümü kalmıştı. Dosya kaldırıldı; Windows ve Linux x86_64 / Python 3.11 için ayrı çözümlenmiş kilitler kurulum, Docker ve CI'de kullanılacak şekilde bağlandı.
 
 ## Açık kalan fabrika öncesi teknik kararlar
 

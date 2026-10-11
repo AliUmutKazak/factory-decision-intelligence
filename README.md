@@ -321,16 +321,18 @@ Windows PowerShell:
 ```powershell
 python --version # 3.11.x olmalı
 python -m venv factory-env
-.\factory-env\Scripts\python.exe -m pip install -r requirements.txt
+.\factory-env\Scripts\python.exe -m pip install -r requirements-windows.lock
 ```
 
-Linux/macOS:
+Linux x86_64:
 
 ```bash
 python3.11 -m venv factory-env
 source factory-env/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-linux.lock # Linux x86_64
 ```
+
+macOS veya farklı mimaride `requirements.txt` üzerinden kurulum yapılır; bu platformlarda transitive lock doğrulaması bu sürümün CI kapsamına dahil değildir.
 
 Sonraki `python` komutlarında Windows'ta `.\factory-env\Scripts\python.exe` kullanın veya ortamı `.\factory-env\Scripts\Activate.ps1` ile etkinleştirin. PowerShell yürütme ilkesi etkinleştirmeyi engelliyorsa doğrudan `python.exe` yolu yeterlidir.
 
@@ -416,7 +418,9 @@ factory-decision-intelligence/
 ├── Dockerfile                  # Python 3.11-slim Docker imaj reçetesi
 ├── docker-compose.yml          # FastAPI ve Streamlit mikroservis orkestrasyonu
 ├── .dockerignore               # Docker imaj filtreleme kuralları
-├── requirements.txt            # Python bağımlılık listesi
+├── requirements.txt            # Doğrudan Python bağımlılıkları
+├── requirements-linux.lock     # Linux x86_64 / Python 3.11 tam çözüm
+├── requirements-windows.lock   # Windows x86_64 / Python 3.11 tam çözüm
 └── README.md                   # Kapsamlı sistem ve mimari dokümantasyonu
 ```
 
