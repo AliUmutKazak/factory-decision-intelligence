@@ -6,6 +6,7 @@ from unittest.mock import patch
 from streamlit.testing.v1 import AppTest
 
 from src.scheduling.what_if import WhatIfEngine
+from src.utils.solver_slot import SolverBusyError
 
 
 def test_hot_order_timeout_shows_warning_without_success(dashboard_lab_credentials):
@@ -29,4 +30,22 @@ def test_hot_order_timeout_shows_warning_without_success(dashboard_lab_credentia
     assert observed[0].priority_weight == 7
     assert not app.exception and not app.error
     assert any("ACTIVE plan değiştirilmedi" in warning.value for warning in app.warning)
+    assert not any("Acil sipariş başarıyla çizelgeye dahil edildi" in item.value for item in app.success)
+
+
+def test_hot_order_busy_shows_warning_without_success(dashboard_lab_credentials):
+    dashboard = Path(__file__).resolve().parents[1] / "dashboard" / "app.py"
+    app = AppTest.from_file(str(dashboard), default_timeout=60).run()
+    app.sidebar.text_input[0].set_value(dashboard_lab_credentials["scenario"]).run()
+    app.radio[0].set_value("🔥 Acil Sipariş Enjeksiyonu (Hot-Order)").run()
+
+    def busy(_engine, _injection):
+        raise SolverBusyError("private runtime path")
+
+    with patch.object(WhatIfEngine, "simulate_hot_order", busy):
+        app.button(key="FormSubmitter:hot_order_form-Acil Siparişi Çizelgeye Ekle").click().run()
+
+    assert not app.exception and not app.error
+    assert any("meşgul" in warning.value for warning in app.warning)
+    assert not any("private runtime path" in warning.value for warning in app.warning)
     assert not any("Acil sipariş başarıyla çizelgeye dahil edildi" in item.value for item in app.success)

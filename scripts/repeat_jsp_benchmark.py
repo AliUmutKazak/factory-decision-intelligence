@@ -33,6 +33,7 @@ def repeat_benchmark(source, *, source_sha256, reference_db, reference_sha256, i
                 "source_sha256": result["source_sha256"],
                 "reference_db_sha256": result["reference_db_sha256"],
                 "code_hashes": result["code_hashes"],
+                "code_hashes_normalized_lf": result["code_hashes_normalized_lf"],
                 "solver_version": result["solver_version"],
                 "random_seed": result["random_seed"],
                 "num_search_workers": result["num_search_workers"],

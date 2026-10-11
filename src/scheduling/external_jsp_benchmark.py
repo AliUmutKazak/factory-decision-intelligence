@@ -56,6 +56,12 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _source_sha256_lf(path: Path) -> str:
+    """Hash Python source with stable line endings across Git checkouts."""
+    raw = path.read_bytes()
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")).hexdigest()
+
+
 def run_orlibrary_fixed_jsp(
     source_path: str | Path,
     instance_name: str,
@@ -87,6 +93,7 @@ def run_orlibrary_fixed_jsp(
             "src/scheduling/external_jsp_benchmark.py",
         )
     }
+    code_hashes_normalized_lf = {name: _source_sha256_lf(code_root / name) for name in code_hashes}
     run_id = f"BENCH-ORLIB-{instance_name.upper()}"
     conn = sqlite3.connect(":memory:")
     try:
@@ -219,6 +226,7 @@ def run_orlibrary_fixed_jsp(
             "source_sha256": source_hash,
             "reference_db_sha256": reference_hash,
             "code_hashes": code_hashes,
+            "code_hashes_normalized_lf": code_hashes_normalized_lf,
             "source_unit": "abstract benchmark time unit",
             "model_unit_mapping": "one benchmark unit = one model minute; origin offset +480",
             "job_count": len(instance.jobs),

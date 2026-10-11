@@ -101,6 +101,20 @@ def test_solver_busy_rejects_request_without_invoking_solver(monkeypatch):
     assert not called
 
 
+def test_cross_process_solver_busy_maps_to_retryable_api_response(monkeypatch):
+    from src.utils.solver_slot import SolverBusyError
+
+    def busy(*args, **kwargs):
+        raise SolverBusyError("runtime path must stay private")
+
+    monkeypatch.setattr("src.api.server.WhatIfEngine.simulate_breakdown", busy)
+    payload = {"machine_id": "M01", "start_min": 480, "duration_min": 60, "reason": "Test"}
+    response = scenario_client.post("/api/v1/schedule/what-if/breakdown", json=payload)
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "SOLVER_BUSY"
+    assert "runtime path" not in response.text
+
+
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200

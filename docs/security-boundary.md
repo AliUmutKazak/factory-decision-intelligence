@@ -19,7 +19,7 @@ Laboratuvar anahtarları farklı rollerin negatif testlerini sağlar. Panel de v
 
 `FDI_API_READ_TOKEN`, `FDI_API_SCENARIO_TOKEN`, `FDI_API_RESCHEDULE_TOKEN` ortam değişkenlerini birbirinden farklı ve en az 32 karakterlik rastgele değerlerle ayarlayın. Eksik, kısa veya aynı değerlerden oluşan yapılandırma tüm veri erişimini kapatır (`503`). API çağrılarında `Authorization: Bearer <anahtar>` başlığını kullanın. Panelde anahtarı kenar çubuğundaki parola alanına girin. Okuma anahtarı yalnız okur; senaryo anahtarı okur ve what-if çalıştırır; yeniden çizelgeleme anahtarı okur ve ACTIVE değişikliği ister. Anahtarlar yalnız yerel geliştirme içindir; kaynak koduna veya Git'e eklenmez.
 
-API işleminde aynı anda en fazla bir çözücü çağrısı çalışır; diğer istek `429/SOLVER_BUSY` ve `Retry-After` alır. Bu sınır yalnız tek API süreci içindedir. Panel ayrı süreçte çözücü çalıştırabilir; çok işçili/çok sunuculu dağıtım, küresel kuyruk ve gerçek kullanıcı hız sınırı G7/pilot tasarımında ele alınmalıdır.
+API işleminde aynı anda en fazla bir çözücü çağrısı çalışır; diğer istek `429/SOLVER_BUSY` ve `Retry-After` alır. Ek olarak API, panel ve yerel MES dispatcher aynı DB yolundaki süreçler arası çözücü kilidini kullanır. Panel meşgul durumu kullanıcıya gösterir; hiçbiri bu durumda ACTIVE yayımlamaz. Bu tek hostlu laboratuvar sınırıdır; çok sunuculu dağıtım, küresel kuyruk ve gerçek kullanıcı hız sınırı G7/pilot tasarımında ele alınmalıdır.
 
 ## G2 uygulama ve kabul işleri
 

@@ -8,6 +8,7 @@ import pytest
 
 from src.integration.mes_reschedule_dispatcher import MESRescheduleDispatcher
 from src.integration.mes_service import MESIntegrationService
+from src.utils.solver_slot import SolverBusyError
 
 
 @pytest.fixture
@@ -179,6 +180,20 @@ def test_failed_solve_keeps_intent_pending(mes_db):
     assert len(MESIntegrationService().list_pending_reschedule_intents()) == 1
     with sqlite3.connect(mes_db) as conn:
         assert conn.execute("SELECT status FROM mes_reschedule_outbox").fetchone()[0] == "PENDING"
+        assert conn.execute("SELECT status FROM pipeline_runs WHERE run_id='RUN-A'").fetchone()[0] == "ACTIVE"
+
+
+def test_busy_solver_keeps_intent_pending(mes_db):
+    event_id = seed_breakdown(duration=45)
+
+    class BusyEngine(AuditedEngine):
+        def execute_reschedule(self, *, trigger, persist_audit):
+            raise SolverBusyError("another local solve")
+
+    result = MESRescheduleDispatcher(engine=BusyEngine(mes_db)).dispatch_one(event_id)
+    assert result == {"status": "SOLVER_BUSY", "event_id": event_id}
+    assert len(MESIntegrationService().list_pending_reschedule_intents()) == 1
+    with sqlite3.connect(mes_db) as conn:
         assert conn.execute("SELECT status FROM pipeline_runs WHERE run_id='RUN-A'").fetchone()[0] == "ACTIVE"
 
 

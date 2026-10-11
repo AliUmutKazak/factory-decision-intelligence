@@ -8,6 +8,7 @@ data/processed/*.csv
 !data/processed/.gitkeep
 runs/
 *.run.lock
+*.solver.lock
 /artifacts/runs/
 /data/reschedule_runs/
 

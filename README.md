@@ -270,6 +270,8 @@ FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnterakt
 
 `/health` ve `/ready` dışındaki uçlar [yerel erişim anahtarı](docs/security-boundary.md#yerel-kullanım) gerektirir. Swagger'daki **Authorize** alanına ilgili Bearer anahtarını girin.
 
+API, panel ve yerel MES dispatcher aynı runtime üzerinde aynı anda tek çözücü çalıştırır. Çakışan API çağrısı `429/SOLVER_BUSY` ve `Retry-After` döndürür; panel isteği meşgul uyarısı gösterir. Bu sınır tek hostlu laboratuvar kullanımına aittir.
+
 | Metot | Uç Nokta (Endpoint) | Parametre / Gövde (Payload) | Açıklama |
 |---|---|---|---|
 | `GET` | `/health` | - | Servis canlılığı |
