@@ -106,6 +106,42 @@ def test_reference_source_survives_run_retention(tmp_path, monkeypatch):
         assert {row[0] for row in conn.execute("SELECT run_id FROM pipeline_runs")} == {"REFERENCE", "LIVE"}
 
 
+def test_retention_uses_database_reference_instead_of_ambient_project(tmp_path, monkeypatch):
+    ambient = tmp_path / "ambient"
+    ambient_reference = ambient / "artifacts" / "reference"
+    ambient_reference.mkdir(parents=True)
+    (ambient_reference / "manifest.json").write_text(json.dumps({"run_id": "ORPHAN"}))
+    monkeypatch.setattr(cfg, "BASE_DIR", ambient)
+
+    project = tmp_path / "actual"
+    local_reference = project / "artifacts" / "reference"
+    local_reference.mkdir(parents=True)
+    (local_reference / "manifest.json").write_text(json.dumps({"run_id": "REFERENCE"}))
+    bundles = project / "artifacts" / "runs"
+    for run_id in ("ORPHAN", "REFERENCE", "LIVE"):
+        bundle = bundles / run_id
+        bundle.mkdir(parents=True)
+        (bundle / "manifest.json").write_text("{}")
+
+    db = project / "data" / "factory.db"
+    db.parent.mkdir()
+    with sqlite3.connect(db) as conn:
+        init_pipeline_runs_table(conn)
+        conn.executemany(
+            "INSERT INTO pipeline_runs(run_id, timestamp, status) VALUES (?, ?, ?)",
+            [
+                ("ORPHAN", "2026-01-01", "ARCHIVED"),
+                ("REFERENCE", "2026-01-02", "ARCHIVED"),
+                ("LIVE", "2026-01-03", "ACTIVE"),
+            ],
+        )
+
+    assert apply_run_retention_policy(keep_last_n=1, db_path=str(db)) == 1
+    with sqlite3.connect(db) as conn:
+        assert {row[0] for row in conn.execute("SELECT run_id FROM pipeline_runs")} == {"REFERENCE", "LIVE"}
+    assert {path.name for path in bundles.iterdir()} == {"REFERENCE", "LIVE"}
+
+
 def test_run_snapshot_excludes_other_run_data(tmp_path):
     source, target = tmp_path / "source.db", tmp_path / "snapshot.db"
     with sqlite3.connect(source) as conn:

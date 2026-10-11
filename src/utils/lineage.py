@@ -609,6 +609,13 @@ def apply_run_retention_policy(
     if not os.path.exists(active_db):
         return 0
 
+    # Retention always belongs to the database being pruned. A process-wide
+    # runtime base can point at a different project (for example during a
+    # staging run or a test with an external database).
+    db_directory = Path(active_db).resolve().parent
+    project_directory = db_directory.parent if db_directory.name == "data" else db_directory
+    target_artifacts = Path(artifacts_dir) if artifacts_dir else project_directory / "artifacts" / "runs"
+
     conn = get_db_connection(active_db)
     init_pipeline_runs_table(conn)
     cur = conn.cursor()
@@ -616,7 +623,7 @@ def apply_run_retention_policy(
     # A published reference is an independent durable checkpoint. Retention
     # may remove volatile runs, but must retain its source run and bundle.
     protected_ids = set(active_ids)
-    reference_manifest = Path(get_runtime_paths()["base_dir"]) / "artifacts" / "reference" / "manifest.json"
+    reference_manifest = project_directory / "artifacts" / "reference" / "manifest.json"
     if reference_manifest.exists():
         reference_run = json.loads(reference_manifest.read_text(encoding="utf-8")).get("run_id")
         if reference_run:
@@ -691,11 +698,6 @@ def apply_run_retention_policy(
     else:
         deleted_count = 0
 
-    # A caller operating on a separate database must never prune bundles in
-    # the application's canonical tree. Derive the default from that database.
-    db_directory = Path(active_db).resolve().parent
-    project_directory = db_directory.parent if db_directory.name == "data" else db_directory
-    target_artifacts = Path(artifacts_dir) if artifacts_dir else project_directory / "artifacts" / "runs"
     for old_run_id in old_runs:
         old_dir = target_artifacts / old_run_id
         if old_dir.exists() and old_dir.is_dir():
