@@ -256,6 +256,17 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     quantity_unit = quantity_value.strip() if isinstance(quantity_value, str) else ""
     if not quantity_unit:
         reject("manifest", None, "missing_quantity_unit", "quantity_unit is required")
+    baseline_quantity_basis = manifest.get("baseline_quantity_basis")
+    if "baseline_quantity_basis" in manifest and (
+        not isinstance(baseline_quantity_basis, str) or baseline_quantity_basis not in {"FULL_ORDER", "REMAINING_WIP"}
+    ):
+        reject(
+            "manifest",
+            None,
+            "invalid_baseline_quantity_basis",
+            "expected FULL_ORDER or REMAINING_WIP",
+        )
+        baseline_quantity_basis = None
     time_unit = str(manifest.get("time_unit", ""))
     if time_unit != "minute":
         reject("manifest", None, "invalid_time_unit", "time_unit must be minute")
@@ -447,6 +458,10 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
                 row["planned_qty"], lot_quantities[lot], rel_tol=0, abs_tol=1e-9
             ):
                 reject("current_plan", row["_line"], "planned_quantity_exceeds_order", lot)
+            if baseline_quantity_basis == "FULL_ORDER" and not math.isclose(
+                row["planned_qty"], lot_quantities[lot], rel_tol=0, abs_tol=1e-9
+            ):
+                reject("current_plan", row["_line"], "full_order_quantity_mismatch", lot)
             required_duration = row["planned_qty"] * route_duration[(product, op, machine)]
             planned_duration = row["end_min"] - row["start_min"]
             if planned_duration < required_duration and not math.isclose(
@@ -539,6 +554,39 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     else:
         timing_status = "ASSESSED"
 
+    if rejections:
+        baseline_metric_status = "PACKAGE_REJECTED"
+    elif baseline_quantity_basis is None:
+        baseline_metric_status = "NO_DECLARED_BASIS"
+    elif baseline_quantity_basis == "REMAINING_WIP":
+        baseline_metric_status = "UNASSESSED_REMAINING_WIP"
+    elif not expected_plan or missing_plan:
+        baseline_metric_status = "INCOMPLETE_PLAN"
+    elif duration_assessed != len(planned_rows):
+        baseline_metric_status = "UNKNOWN_PLANNED_QUANTITY"
+    else:
+        baseline_metric_status = "ASSESSED"
+    baseline_metrics: dict[str, Any] = {
+        "status": baseline_metric_status,
+        "quantity_basis": baseline_quantity_basis,
+        "lot_count": None,
+        "late_lots": None,
+        "total_tardiness_min": None,
+        "max_tardiness_min": None,
+        "last_completion_min": None,
+    }
+    if baseline_metric_status == "ASSESSED":
+        due_by_lot = {row["lot_id"]: row["due_min"] for row in data["orders"]}
+        completion_by_lot = {lot: max(row["end_min"] for row in rows) for lot, rows in planned_by_lot.items()}
+        tardiness = [max(0.0, completion_by_lot[lot] - due_by_lot[lot]) for lot in lots]
+        baseline_metrics.update(
+            lot_count=len(lots),
+            late_lots=sum(value > 0 for value in tardiness),
+            total_tardiness_min=sum(tardiness),
+            max_tardiness_min=max(tardiness),
+            last_completion_min=max(completion_by_lot.values()),
+        )
+
     return {
         "dataset_id": dataset_id,
         "source_type": source_type,
@@ -562,6 +610,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             "checked_operations": duration_assessed,
             "unassessed_operations": len(planned_rows) - duration_assessed,
         },
+        "baseline_plan_metrics": baseline_metrics,
         "actuals_timing": {
             "status": timing_status,
             "declared_max_reporting_lag_min": lag_limit,
