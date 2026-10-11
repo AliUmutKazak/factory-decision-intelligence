@@ -6,6 +6,8 @@ Kaynak: `FDI_Nihai_Birlesik_Yol_Haritasi.pdf`, v1.1, 7 Ekim 2026 (13 sayfa; SHA-
 
 Yeni [endüstriyel karar zekâsı araştırması](endustriyel-karar-zekasi-analizi-degerlendirmesi.md) G7/G8-T için etiketli sentetik olay çeşitliliğine katkı verdi. Gerçek makine telemetrisi gerektiren darboğaz/akış yöntemleri ve nedensel modeller, mevcut planlama çekirdeğinin tamamlanmış özelliği olarak kabul edilmedi.
 
+[Fabrika öncesi teknik kapsam kararı](prefactory-technical-closure.md), paylaşılabilir tek sunuculu POC için laboratuvarda bitirilen işleri ve fabrika kuralı/erişimi gerektiren açık kapıları toplar. PostgreSQL, vendor transport ve çok hostlu işletim bu sürümün varsayılan dağıtım kapsamı değildir; tasarım sınırları kayıtlıdır.
+
 ## Durum dili ve yürütme kuralı
 
 - **Bekliyor:** işe başlanmadı veya gerekli dış girdi yok.

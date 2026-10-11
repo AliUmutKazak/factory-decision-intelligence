@@ -20,6 +20,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.
 
+[Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
+
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
 
 ### İnceleyenler için dört doğrulanabilir sonuç
@@ -97,7 +99,7 @@ flowchart TD
         M --> O["Dinamik Rescheduler / Dondurulmuş Ufuk - Freeze Horizon"]
         N --> O
         O --> P["Çizelge Gerginliği - Nervousness Metrikleri"]
-        O --> Q["SHA-256 İmzalı Lineage & Audit Log"]
+        O --> Q["SHA-256 Özetli Lineage & Audit Log"]
     end
 
     subgraph layer6["Katman 6: Servis & Görsel Kokpit / Presentation & API"]
@@ -246,7 +248,7 @@ Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için 
 
 Yayınlanan yeniden çizelgeleme kararları audit tablosuna ve karar kütüğüne kaydedilir; bundle dosyalarının SHA-256 özetleri değişiklikleri tespit eder. Sandbox what-if işlemleri runtime verisini değiştirmez:
 * **Olay Kaydı:** Tetikleyici olay tipi (`BREAKDOWN`, `HOT_ORDER`, `PERIODIC`).
-* **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak mühürlenir.
+* **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak değişiklik denetimine bağlanır. Bu özet dijital imza veya yazma yetkisi ele geçirilmiş bir ortama karşı sahicilik kanıtı değildir.
 * **Denetim Tablosu:** SQLite `reschedule_audit_log` tablosunda saklanır ve `/api/v1/schedule/audit-log` üzerinden denetlenebilir.
 
 ---
