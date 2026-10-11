@@ -1,6 +1,6 @@
 # FDI'nin benzer teknik çalışmalara göre konumu
 
-**Tarih:** 8 Ekim 2026. Bu inceleme [birleşik yol haritasının](fdi-roadmap-execution.md) fabrika bağımsız hazırlığını önceliklendirmek içindir. Farklı problem ve veri kullanan araçlar arasında çözüm kalitesi, hız, satış veya saha başarısı sıralaması yapılmaz.
+**Tarih:** 8 Ekim 2026; 11 Ekim ek tarama: [Türkiye/dünya APS ve bilim denetimi](tr-global-science-market-audit-2026-10-11.md). Bu inceleme [birleşik yol haritasının](fdi-roadmap-execution.md) fabrika bağımsız hazırlığını önceliklendirmek içindir. Farklı problem ve veri kullanan araçlar arasında çözüm kalitesi, hız, satış veya saha başarısı sıralaması yapılmaz.
 
 ## İncelenen açık ve resmî örnekler
 

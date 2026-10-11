@@ -707,7 +707,8 @@ with tab_schedule:
 # TAB 5: ENERJİ & KARBON
 # =============================================================
 with tab_sustainability:
-    st.subheader("15 Dakikalık Tesis Yük Profili & GHG Karbon Analitiği")
+    st.subheader("15 Dakikalık Model Yük Profili ve Karbon Senaryosu")
+    st.caption("Simüle makine elektriği ve varsayılan forklift yakıtı; doğrulanmış tesis envanteri değildir.")
     # Madde 26: Sustainability tablolarını aktif run_id ile filtreleme (Active-run isolation)
     prof_df = get_table("energy_profile_15min", run_id=run_id_val)
     scen_df = get_table("carbon_price_scenarios", run_id=run_id_val)

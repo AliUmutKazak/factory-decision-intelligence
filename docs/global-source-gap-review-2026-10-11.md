@@ -1,6 +1,6 @@
 # Küresel kaynaklarla fabrika öncesi teknik denetim — 11 Ekim 2026
 
-Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için birincil standart, resmî teknik belge ve özgün araştırma kaynaklarını mevcut kod/kanıtla karşılaştırır. İncelenen kaynaklar dünyadaki tüm çalışmaların eksiksiz listesi değildir. Kaynakların önerileri FDI için otomatik uyumluluk veya saha kabulü oluşturmaz.
+Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için birincil standart, resmî teknik belge ve özgün araştırma kaynaklarını mevcut kod/kanıtla karşılaştırır. İncelenen kaynaklar dünyadaki tüm çalışmaların eksiksiz listesi değildir. Kaynakların önerileri FDI için otomatik uyumluluk veya saha kabulü oluşturmaz. Türkiye'deki çalışmalar, uzman yöntemleri ve ticari karşılaştırma [tamamlayıcı denetimde](tr-global-science-market-audit-2026-10-11.md) yer alır.
 
 | Kaynak / alan | FDI'de doğrulanan durum | Karar ve açık sınır |
 |---|---|---|
@@ -29,4 +29,4 @@ Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için
 
 ## Açık kalan fabrika öncesi teknik kararlar
 
-G3'te PostgreSQL çalışma zamanı ve canlı ACTIVE devralma yöntemi, G5-T'de gerçek worker/transport yerine laboratuvar dispatcher'ının işletim modeli, G6-T'de rework/WIP için proses varsayımı yapmadan temsil sınırı, G7'de çok hostlu yük ölçümü ve gerçek alarm bağlantısı, G8-T'de daha geniş eşit kısıtlı tekrarlı kıyas ve G0'da release kimliği henüz tam kanıtlanmadı. Bunlar fabrika verisi olmasa da tasarım/deney düzeyinde ilerletilebilir. G1, G4-G8 saha kabulü ve G9 sonrası gerçek pilot/finans sonuçları fabrika katılımı olmadan kapatılamaz.
+G0 için `v0.1.0-lab` etiketi, aynı main commit'inde başarılı kalite/Docker CI ve artifact digest'i artık vardır; [teknik kapatma kaydı](prefactory-technical-closure.md) bu kanıtı sınırlar. G3 PostgreSQL çalışma zamanı, G5 gerçek vendor transport, G6 proses özel WIP/rework, G7 çok hostlu işletim/gerçek alarm ve G8 gerçek müşteri karşılaştırması bu laboratuvar sürümünün dışında kalır. G1, G4-G8 saha kabulü ve G9 sonrası gerçek pilot/finans sonuçları fabrika katılımı olmadan kapatılamaz.
