@@ -18,7 +18,9 @@
 
 Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Proje sahibi katkı raporu](docs/proje-sahibi-katki-raporu.md), saha için gereken bilgi ve kararları pratik sırayla açıklar. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [run paketi geri yükleme provası](docs/bundle-restore-rehearsal.md) teknik kanıtlardır. [Yeni endüstriyel araştırmanın değerlendirmesi](docs/endustriyel-karar-zekasi-analizi-degerlendirmesi.md), [G7 sentetik vaka matrisi](docs/g7-hot-order-stress-matrix.md), [bağımsız takvim denetimi](docs/g7-calendar-candidate-audit.md) ve [malzeme zaman denetimi](docs/g7-material-release-audit.md) fabrika öncesi doğrulamanın kapsamını açıklar. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
 
-**Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API'de kimlik/rol denetimi bulunmadığı için servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
+[Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.
+
+**Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
 
 ### İnceleyenler için üç doğrulanabilir sonuç
 
@@ -266,6 +268,8 @@ Yayınlanan yeniden çizelgeleme kararları audit tablosuna ve karar kütüğün
 
 FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnteraktif Swagger arayüzüne `http://localhost:8000/docs` adresinden erişilebilir:
 
+`/health` ve `/ready` dışındaki uçlar [yerel erişim anahtarı](docs/security-boundary.md#yerel-kullanım) gerektirir. Swagger'daki **Authorize** alanına ilgili Bearer anahtarını girin.
+
 | Metot | Uç Nokta (Endpoint) | Parametre / Gövde (Payload) | Açıklama |
 |---|---|---|---|
 | `GET` | `/health` | - | Servis canlılığı |
@@ -367,6 +371,9 @@ Windows PowerShell:
 
 ```powershell
 $env:FACTORY_BUILD_GIT_SHA = git rev-parse HEAD
+$env:FDI_API_READ_TOKEN = python -c "import secrets; print(secrets.token_urlsafe(48))"
+$env:FDI_API_SCENARIO_TOKEN = python -c "import secrets; print(secrets.token_urlsafe(48))"
+$env:FDI_API_RESCHEDULE_TOKEN = python -c "import secrets; print(secrets.token_urlsafe(48))"
 docker compose up --build -d --wait --wait-timeout 240 api dashboard
 ```
 
@@ -374,6 +381,8 @@ docker compose up --build -d --wait --wait-timeout 240 api dashboard
 * **Streamlit Dashboard:** `http://localhost:8501`
 * **Hazır olma kontrolü:** `http://localhost:8000/ready`
 * **Durdurmak için:** `docker compose down`
+
+Panelin kenar çubuğuna bu oturum için uygun anahtarı girin. Anahtarlar yalnız bu PowerShell oturumunun ortamında kalır; aynı oturumdan başlatılan Compose servislerine aktarılır.
 
 `data/`, `reports/` ve `artifacts/runs/` kalıcı ve servisler arasında paylaşılan dizinlerdir. Mevcut ACTIVE bundle doğrulanamazsa başlangıç durur. Bilinçli yeni plan üretimi için `docker compose run --rm pipeline python scripts/bootstrap_runtime.py --refresh` çalıştırın. Temiz Docker başlangıcı ve yeniden başlatma CI içinde sınanır. Bu dağıtım tek sunuculu demo/POC içindir; üretim SaaS hazır olduğu iddia edilmez.
 

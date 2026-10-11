@@ -1,13 +1,16 @@
 """Factory Decision Intelligence REST API."""
 
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
+from threading import BoundedSemaphore
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from pydantic import BaseModel
 
+from src.api.lab_auth import require_scope
 from src.config import get_runtime_paths
 from src.contracts.decision_ledger import DecisionLedger
 from src.contracts.schemas import (
@@ -30,6 +33,21 @@ app = FastAPI(
     description=("Taktik LP, CP-SAT operasyonel çizelgeleme, what-if ve dinamik rescheduling servis katmanı"),
     version="1.0.0",
 )
+_solver_slots = BoundedSemaphore(value=1)
+
+
+def acquire_solver_slot() -> Iterator[None]:
+    """Bound the solver load of this local API process without queuing requests."""
+    if not _solver_slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"code": "SOLVER_BUSY", "message": "Çözücü meşgul; isteği tekrar deneyin."},
+            headers={"Retry-After": "1"},
+        )
+    try:
+        yield
+    finally:
+        _solver_slots.release()
 
 
 def _solver_timeout_error(exc: TimeoutError) -> HTTPException:
@@ -88,7 +106,7 @@ def readiness_check() -> dict[str, str]:
             raise RuntimeError("ACTIVE solver metadata is unavailable.")
         return {"status": "READY", "run_id": active}
     except (RuntimeError, sqlite3.Error) as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Runtime database is unavailable.") from exc
     finally:
         if conn is not None:
             conn.close()
@@ -97,6 +115,7 @@ def readiness_check() -> dict[str, str]:
 @app.get("/api/v1/schedule/current", tags=["Schedule Query"])
 def get_current_schedule(
     limit: int = Query(100, ge=1, le=1000),
+    _authorized: None = Depends(require_scope("read")),
 ) -> list[dict[str, Any]]:
     conn = get_db()
     try:
@@ -112,7 +131,7 @@ def get_current_schedule(
 
 
 @app.get("/api/v1/schedule/solver-metadata", tags=["Schedule Query"])
-def get_solver_metadata() -> dict[str, Any]:
+def get_solver_metadata(_authorized: None = Depends(require_scope("read"))) -> dict[str, Any]:
     conn = get_db()
     try:
         active_run_id = require_active_run_id(conn)
@@ -132,7 +151,11 @@ def get_solver_metadata() -> dict[str, Any]:
 
 
 @app.post("/api/v1/schedule/what-if/breakdown", tags=["What-If Scenarios"])
-def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
+def simulate_breakdown(
+    event: MachineBreakdownEvent,
+    _authorized: None = Depends(require_scope("scenario")),
+    _slot: None = Depends(acquire_solver_slot),
+) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()
         _, scenario_meta, report, scenario_df = engine.simulate_breakdown(event)
@@ -148,12 +171,16 @@ def simulate_breakdown(event: MachineBreakdownEvent) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"What-If arıza simülasyonu başarısız: {exc}",
+            detail="What-If arıza simülasyonu başarısız.",
         ) from exc
 
 
 @app.post("/api/v1/schedule/what-if/hot-order", tags=["What-If Scenarios"])
-def simulate_hot_order(injection: HotOrderInjection) -> dict[str, Any]:
+def simulate_hot_order(
+    injection: HotOrderInjection,
+    _authorized: None = Depends(require_scope("scenario")),
+    _slot: None = Depends(acquire_solver_slot),
+) -> dict[str, Any]:
     try:
         engine = WhatIfEngine()
         _, scenario_meta, report, scenario_df = engine.simulate_hot_order(injection)
@@ -169,13 +196,15 @@ def simulate_hot_order(injection: HotOrderInjection) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"What-If acil sipariş simülasyonu başarısız: {exc}",
+            detail="What-If acil sipariş simülasyonu başarısız.",
         ) from exc
 
 
 @app.post("/api/v1/schedule/reschedule", tags=["Dynamic Rescheduling"])
 def execute_dynamic_reschedule(
     request: DynamicRescheduleRequest,
+    _authorized: None = Depends(require_scope("reschedule")),
+    _slot: None = Depends(acquire_solver_slot),
 ) -> dict[str, Any]:
     try:
         rescheduler = DynamicRescheduler()
@@ -195,17 +224,18 @@ def execute_dynamic_reschedule(
     except TimeoutError as exc:
         raise _solver_timeout_error(exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=409, detail="Yeniden çizelgeleme isteği kabul edilmedi.") from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Dinamik yeniden çizelgeleme başarısız: {exc}",
+            detail="Dinamik yeniden çizelgeleme başarısız.",
         ) from exc
 
 
 @app.get("/api/v1/schedule/audit-log", tags=["Audit & Lineage"])
 def get_reschedule_audit_log(
     limit: int = Query(50, ge=1, le=500),
+    _authorized: None = Depends(require_scope("read")),
 ) -> list[dict[str, Any]]:
     conn = get_db()
     try:
@@ -223,7 +253,7 @@ def get_reschedule_audit_log(
 
 
 @app.get("/api/v1/decisions", tags=["Audit & Lineage"])
-def get_active_run_decisions() -> list[dict[str, Any]]:
+def get_active_run_decisions(_authorized: None = Depends(require_scope("read"))) -> list[dict[str, Any]]:
     conn = get_db()
     try:
         active_run_id = require_active_run_id(conn)

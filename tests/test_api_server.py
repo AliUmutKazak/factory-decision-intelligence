@@ -8,10 +8,97 @@ from contextlib import closing
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.lab_auth import lab_tokens_configured, token_allows
 from src.api.server import app
 from src.contracts.decision_ledger import DecisionLedger, DecisionLedgerEntry
 
-client = TestClient(app)
+READ_TOKEN = "r" * 48
+SCENARIO_TOKEN = "s" * 48
+RESCHEDULE_TOKEN = "w" * 48
+client = TestClient(app, headers={"Authorization": f"Bearer {RESCHEDULE_TOKEN}"})
+scenario_client = TestClient(app, headers={"Authorization": f"Bearer {SCENARIO_TOKEN}"})
+
+
+@pytest.fixture(autouse=True)
+def lab_credentials(monkeypatch):
+    monkeypatch.setenv("FDI_API_READ_TOKEN", READ_TOKEN)
+    monkeypatch.setenv("FDI_API_SCENARIO_TOKEN", SCENARIO_TOKEN)
+    monkeypatch.setenv("FDI_API_RESCHEDULE_TOKEN", RESCHEDULE_TOKEN)
+
+
+def test_api_rejects_unconfigured_and_weak_secrets(monkeypatch):
+    assert lab_tokens_configured()
+    monkeypatch.setenv("FDI_API_RESCHEDULE_TOKEN", "short")
+    assert not lab_tokens_configured()
+    assert client.get("/api/v1/schedule/current").status_code == 503
+    assert client.post("/api/v1/schedule/reschedule", json={}).status_code == 503
+
+
+def test_api_deny_by_default_and_separate_roles(monkeypatch):
+    called = []
+
+    def unexpected(*args, **kwargs):
+        called.append(True)
+        raise AssertionError("Unauthorized solver invocation")
+
+    monkeypatch.setattr("src.api.server.DynamicRescheduler.execute_reschedule", unexpected)
+    monkeypatch.setattr("src.api.server.WhatIfEngine.simulate_breakdown", unexpected)
+    anon = TestClient(app)
+    read = TestClient(app, headers={"Authorization": f"Bearer {READ_TOKEN}"})
+    scenario = TestClient(app, headers={"Authorization": f"Bearer {SCENARIO_TOKEN}"})
+    bad = TestClient(app, headers={"Authorization": "Bearer invalid"})
+    trigger = {
+        "trigger": {
+            "event_id": "DENY-1",
+            "current_time_min": 480,
+            "freeze_horizon_min": 60,
+            "delay_machine_id": "M01",
+            "delay_duration_min": 60,
+            "reason": "Unauthorized test",
+        }
+    }
+    breakdown = {"machine_id": "M01", "start_min": 480, "duration_min": 60, "reason": "Test"}
+    for visitor in (anon, read, scenario, bad):
+        assert visitor.post("/api/v1/schedule/reschedule", json=trigger).status_code == 401
+    for visitor in (anon, read, bad):
+        assert visitor.post("/api/v1/schedule/what-if/breakdown", json=breakdown).status_code == 401
+    assert anon.get("/api/v1/schedule/current").status_code == 401
+    assert read.get("/api/v1/schedule/current").status_code == 200
+    assert not token_allows(READ_TOKEN, "reschedule")
+    assert not called
+
+
+def test_api_does_not_expose_internal_exception_text(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("secret database path and customer identifier")
+
+    monkeypatch.setattr("src.api.server.WhatIfEngine.simulate_breakdown", fail)
+    payload = {"machine_id": "M01", "start_min": 480, "duration_min": 60, "reason": "Test"}
+    response = scenario_client.post("/api/v1/schedule/what-if/breakdown", json=payload)
+    assert response.status_code == 500
+    assert "secret" not in response.text
+
+
+def test_solver_busy_rejects_request_without_invoking_solver(monkeypatch):
+    from src.api import server
+
+    called = []
+
+    def unexpected(*args, **kwargs):
+        called.append(True)
+        raise AssertionError("solver should not run while busy")
+
+    monkeypatch.setattr(server.WhatIfEngine, "simulate_breakdown", unexpected)
+    payload = {"machine_id": "M01", "start_min": 480, "duration_min": 60, "reason": "Test"}
+    assert server._solver_slots.acquire(blocking=False)
+    try:
+        response = scenario_client.post("/api/v1/schedule/what-if/breakdown", json=payload)
+    finally:
+        server._solver_slots.release()
+    assert response.status_code == 429
+    assert response.json()["detail"]["code"] == "SOLVER_BUSY"
+    assert response.headers["Retry-After"] == "1"
+    assert not called
 
 
 def test_health_check():
@@ -103,7 +190,7 @@ def test_what_if_breakdown_endpoint():
         "duration_min": 120,
         "reason": "API Breakdown Test",
     }
-    response = client.post("/api/v1/schedule/what-if/breakdown", json=payload)
+    response = scenario_client.post("/api/v1/schedule/what-if/breakdown", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "SUCCESS"
@@ -118,7 +205,7 @@ def test_what_if_hot_order_endpoint():
         "due_date_min": 2880,
         "priority_weight": 5.0,
     }
-    response = client.post("/api/v1/schedule/what-if/hot-order", json=payload)
+    response = scenario_client.post("/api/v1/schedule/what-if/hot-order", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "SUCCESS"
@@ -165,7 +252,8 @@ def test_solver_timeout_is_explicit_and_retryable(monkeypatch, path, method, pay
         raise TimeoutError("solver exhausted")
 
     monkeypatch.setattr(method, timeout)
-    response = client.post(path, json=payload)
+    authorized_client = scenario_client if "/what-if/" in path else client
+    response = authorized_client.post(path, json=payload)
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "SOLVER_TIMEOUT"
 

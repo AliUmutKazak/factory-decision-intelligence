@@ -10,6 +10,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from src.api.lab_auth import lab_tokens_configured, token_allows
 from src.config import ECONOMIC_CONFIG, PLANNING_HORIZON_WEEKS, WEEKLY_HOURS_PER_MACHINE, get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
@@ -29,6 +30,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+if not lab_tokens_configured():
+    st.error("Yerel erişim anahtarları yapılandırılmadı; panel kapalı.")
+    st.stop()
+
+dashboard_token = st.sidebar.text_input("Erişim anahtarı", type="password")
+if not token_allows(dashboard_token, "read"):
+    st.info("Paneli açmak için yetkili erişim anahtarını girin.")
+    st.stop()
+
+may_simulate = token_allows(dashboard_token, "scenario")
+may_reschedule = token_allows(dashboard_token, "reschedule")
 
 
 class DashboardDataError(Exception):
@@ -917,9 +930,9 @@ with tab_mes:
                     step=15,
                 )
                 bd_reason = st.text_input("Arıza Nedeni:", value="Feeder Arızası")
-                run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)")
+                run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)", disabled=not may_simulate)
 
-            if run_bd_btn:
+            if run_bd_btn and may_simulate:
                 try:
                     with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
                         engine = WhatIfEngine()
@@ -968,9 +981,9 @@ with tab_mes:
                     value=5,
                     step=1,
                 )
-                run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle")
+                run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle", disabled=not may_simulate)
 
-            if run_ho_btn:
+            if run_ho_btn and may_simulate:
                 try:
                     with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
                         engine = WhatIfEngine()
@@ -1025,9 +1038,11 @@ with tab_mes:
                     value=120,
                     step=30,
                 )
-                run_resched_btn = st.form_submit_button("🔄 Freeze Horizon ile Yeniden Çizelgele")
+                run_resched_btn = st.form_submit_button(
+                    "🔄 Freeze Horizon ile Yeniden Çizelgele", disabled=not may_reschedule
+                )
 
-            if run_resched_btn:
+            if run_resched_btn and may_reschedule:
                 try:
                     with st.spinner("Freeze horizon donduruluyor ve çizelge yenileniyor..."):
                         rescheduler = DynamicRescheduler()

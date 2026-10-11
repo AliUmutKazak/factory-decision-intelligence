@@ -7,8 +7,8 @@ Docker Compose publishes the API and Streamlit ports on `127.0.0.1` only. Remote
 ## Reproduce the technical demo
 
 1. Install `requirements.txt`, run `python main.py`, then `python scripts/verify_active_run.py`.
-2. Start `uvicorn src.api.server:app --port 8000` and `streamlit run dashboard/app.py`. Alternatively use `docker compose up --build -d --wait`.
-3. Read `/ready` and `/api/v1/schedule/current`; verify their run IDs agree. Restart Compose and verify the same ACTIVE version remains.
+2. Generate three distinct random `FDI_API_READ_TOKEN`, `FDI_API_SCENARIO_TOKEN`, and `FDI_API_RESCHEDULE_TOKEN` values (at least 32 characters each) in the shell environment. Start `uvicorn src.api.server:app --port 8000` and `streamlit run dashboard/app.py`, or use `docker compose up --build -d --wait`. See the [local access guide](security-boundary.md#yerel-kullanım).
+3. Read `/ready` and, with `Authorization: Bearer <read token>`, `/api/v1/schedule/current`; verify their run IDs agree. Restart Compose and verify the same ACTIVE version remains.
 4. Record a MES disruption through the documented API. Verify the new run ID, prior frozen positions, reschedule audit, decision ledger, sealed bundle and ACTIVE promotion. A rejected local candidate must report its rejection reason and use full CP-SAT; a failed solve preserves ACTIVE.
 5. Open the scenario tab and explicitly compute the comparison. Its baseline ID identifies one immutable snapshot.
 6. Use the scheduling tab's explicit benchmark button, or export a reproducible case:
