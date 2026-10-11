@@ -13,8 +13,8 @@ ENV FACTORY_BUILD_GIT_SHA=${FACTORY_BUILD_GIT_SHA}
 LABEL org.opencontainers.image.revision=${FACTORY_BUILD_GIT_SHA}
 
 # Paket bagimliliklarini kopyala ve yukle
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-linux.lock .
+RUN pip install --no-cache-dir -r requirements-linux.lock
 
 # Proje kaynak kodunu kopyala
 COPY . .

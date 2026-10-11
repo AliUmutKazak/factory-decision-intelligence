@@ -22,6 +22,7 @@ from src.contracts.schemas import (
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
 from src.utils.db import get_active_run_id
+from src.utils.solver_slot import SolverBusyError
 
 
 class DynamicRescheduleRequest(BaseModel):
@@ -58,6 +59,14 @@ def _solver_timeout_error(exc: TimeoutError) -> HTTPException:
             "code": "SOLVER_TIMEOUT",
             "message": "Çözücü zaman sınırında geçerli bir plan bulamadı; işlem yeniden denenebilir.",
         },
+    )
+
+
+def _solver_busy_error(exc: SolverBusyError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={"code": "SOLVER_BUSY", "message": "Çözücü meşgul; isteği tekrar deneyin."},
+        headers={"Retry-After": "1"},
     )
 
 
@@ -172,6 +181,8 @@ def simulate_breakdown(
         }
     except TimeoutError as exc:
         raise _solver_timeout_error(exc) from exc
+    except SolverBusyError as exc:
+        raise _solver_busy_error(exc) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -197,6 +208,8 @@ def simulate_hot_order(
         }
     except TimeoutError as exc:
         raise _solver_timeout_error(exc) from exc
+    except SolverBusyError as exc:
+        raise _solver_busy_error(exc) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -227,6 +240,8 @@ def execute_dynamic_reschedule(
         }
     except TimeoutError as exc:
         raise _solver_timeout_error(exc) from exc
+    except SolverBusyError as exc:
+        raise _solver_busy_error(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=409, detail="Yeniden çizelgeleme isteği kabul edilmedi.") from exc
     except Exception as exc:

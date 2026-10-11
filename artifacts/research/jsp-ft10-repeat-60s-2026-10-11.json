@@ -1,0 +1,99 @@
+{
+  "status": "PASS",
+  "measured_at_utc": "2026-10-11T13:38:38.093178+00:00",
+  "environment": "Windows-10-10.0.26300-SP0",
+  "identity": {
+    "source_sha256": "7f36d103332f94cfdeb76358e40927a57cfa7a426ebeaabd4de666350c69f028",
+    "reference_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+    "code_hashes": {
+      "src/config.py": "d6a664187dd784bb9b19c2655883f0d6a515640456c6d41b14542bb7681655cf",
+      "src/scheduling/schedule_cpsat.py": "43e8b7066e3a1df437494aad932456f4c1507362d1b66ce9c1d5783b3a4cf351",
+      "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+      "src/scheduling/fjsp_reference.py": "0c9a3bed5d1fc9bfdefebd42b83828f4346f535bb3dfaa5676af8d652512d109",
+      "src/scheduling/external_jsp_benchmark.py": "610a8849e3333f8be80eacf324fbf425551f8a2be6cf86f77845cc3436100ee6"
+    },
+    "code_hashes_normalized_lf": {
+      "src/config.py": "3fc341c6055a2b6ef2883925676d2d3a54371cb34ede6a6ca50928cafbaa7779",
+      "src/scheduling/schedule_cpsat.py": "4e936aeaabdda5d86d360f5497cc5fe757394c5bf9b0fb8c87a2d9e294f29cff",
+      "src/scheduling/calendar_service.py": "9ed0648e560b43e7ef2e188eed185b81314c1a0d3426b291a3dd6ae8fc470288",
+      "src/scheduling/fjsp_reference.py": "da29e272564ff13753bc4ef174e064b9337a86e237b324cdc77814865a52785d",
+      "src/scheduling/external_jsp_benchmark.py": "ecbba93b2e996a37c4c598219d2e34674e62560f1381b98a4697eb35304e1db7"
+    },
+    "solver_version": "9.14.6206",
+    "random_seed": 42,
+    "num_search_workers": 1,
+    "objective_policy": "THROUGHPUT_MAX",
+    "objective_weights": {
+      "makespan": 100,
+      "setup": 0,
+      "tardiness": 0
+    }
+  },
+  "repeats_per_instance": 3,
+  "time_limit_seconds": 60.0,
+  "instances": [
+    {
+      "instance": "ft10",
+      "attempts": [
+        {
+          "solver_status": "FEASIBLE",
+          "proven_optimal": false,
+          "relative_makespan": 930,
+          "best_objective_bound": 130300.0,
+          "solver_wall_time_seconds": 60.0124,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "FEASIBLE",
+          "proven_optimal": false,
+          "relative_makespan": 930,
+          "best_objective_bound": 128800.0,
+          "solver_wall_time_seconds": 60.0062,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "FEASIBLE",
+          "proven_optimal": false,
+          "relative_makespan": 930,
+          "best_objective_bound": 128800.0,
+          "solver_wall_time_seconds": 60.0058,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        }
+      ],
+      "accepted_count": 3,
+      "solver_time_p50_seconds": 60.0062,
+      "solver_time_p95_seconds": 60.01178
+    }
+  ],
+  "scope": "REPEATED_LAB_STATIC_FIXED_MACHINE_JSP_ONLY_NO_CUSTOMER_KPI"
+}

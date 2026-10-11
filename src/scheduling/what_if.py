@@ -19,6 +19,7 @@ from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.utils.db import clone_run_inputs, get_active_run_id
+from src.utils.solver_slot import admitted_solver_call
 
 
 class NoCloseConnectionWrapper:
@@ -112,6 +113,7 @@ class WhatIfEngine:
             raise RuntimeError("ACTIVE baseline schedule is empty or has invalid task IDs")
         return metadata, schedule
 
+    @admitted_solver_call
     def simulate_breakdown(
         self,
         breakdown: MachineBreakdownEvent,
@@ -165,6 +167,7 @@ class WhatIfEngine:
         finally:
             mem_conn.close()
 
+    @admitted_solver_call
     def simulate_hot_order(
         self,
         hot_order: HotOrderInjection,

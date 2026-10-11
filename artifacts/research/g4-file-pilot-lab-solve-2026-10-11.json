@@ -1,0 +1,64 @@
+{
+  "dataset_id": "FDI-LAB-SOLVE-01",
+  "source_type": "SYNTHETIC",
+  "manifest_sha256": "7207fd46c0af4355b4fdc59d48427e9c47509f38acfc0c66d8f18d8be1bbc8b2",
+  "file_sha256": {
+    "orders": "9e32d7af27caf0a5b06a2eec33fd31f8adb2d73f194126554cc8768b4e9a0d55",
+    "machines": "50d96b5238d134ba26b69b937f16835154d6ea7ade6882ffd42e607f0696aa5b",
+    "routing": "08b61dae572487bc18d561dd3e73f53dce36f23c61ec62e2c1ee61d2bc940544",
+    "shifts": "c57df7e84e893f2bd21305d35bb5d05d6be1ab25f980252e2080fa7793683c19",
+    "current_plan": "ce64418c66a1f873093250f907243bd8dd056dac5e49a8288960d6b4c07ba7f3"
+  },
+  "preflight_status": "ACCEPTED",
+  "lab_model_assumptions": {
+    "setup": "ZERO",
+    "material": "NOT_MODELED",
+    "maintenance": "NONE",
+    "overtime": "NONE",
+    "execution_state": "NOT_STARTED"
+  },
+  "scope": "READ_ONLY_SINGLE_SHIFT_FIXED_ROUTE_LAB_NO_ACTIVE_PUBLICATION_NO_CUSTOMER_KPI",
+  "status": "ASSESSED",
+  "reasons": [],
+  "reference_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "code_hashes_normalized_lf": {
+    "src/integration/pilot_preflight.py": "5bc849c0f77563de9bb5d50d453eb2f5cb121655c9880a85fdaed54b22a494c0",
+    "src/integration/pilot_file_solve.py": "d6a70ee8b975660912a3457f8f04c4c1547d29bc48b2c535c6f20f7ce5599296",
+    "src/scheduling/schedule_cpsat.py": "4e936aeaabdda5d86d360f5497cc5fe757394c5bf9b0fb8c87a2d9e294f29cff",
+    "src/scheduling/calendar_service.py": "9ed0648e560b43e7ef2e188eed185b81314c1a0d3426b291a3dd6ae8fc470288",
+    "src/config.py": "3fc341c6055a2b6ef2883925676d2d3a54371cb34ede6a6ca50928cafbaa7779"
+  },
+  "solver_version": "9.14.6206",
+  "solver_time_limit_seconds": 5,
+  "model_origin_offset_min": 840,
+  "model_policy": "THROUGHPUT_MAX",
+  "baseline": {
+    "status": "ASSESSED",
+    "quantity_basis": "FULL_ORDER",
+    "lot_count": 1,
+    "late_lots": 0,
+    "total_tardiness_min": 0.0,
+    "max_tardiness_min": 0.0,
+    "last_completion_min": 80.0
+  },
+  "candidate": {
+    "status": "ASSESSED",
+    "solver_status": "OPTIMAL",
+    "proven_optimal_for_model": true,
+    "independent_check": "ACCEPTED",
+    "operation_count": 1,
+    "lot_count": 1,
+    "late_lots": 0,
+    "total_tardiness_min": 0,
+    "last_completion_min": 20,
+    "schedule": [
+      {
+        "lot_id": "EX-L1",
+        "operation_seq": 1,
+        "machine_id": "EX-M1",
+        "start_min": 0,
+        "end_min": 20
+      }
+    ]
+  }
+}

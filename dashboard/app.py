@@ -23,6 +23,7 @@ from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
 from src.utils.db import get_db_connection
 from src.utils.lineage import get_active_pipeline_run
+from src.utils.solver_slot import SolverBusyError, solver_slot
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -674,11 +675,14 @@ with tab_schedule:
         if st.button("Ortak kısıtlarla benchmark çalıştır", key="run_production_benchmark"):
             try:
                 with st.spinner("Altı politika aynı veri snapshot'ında çözülüyor..."):
-                    measured = production_benchmark(str(get_runtime_paths()["db_path"]))
+                    with solver_slot(get_runtime_paths()["db_path"]):
+                        measured = production_benchmark(str(get_runtime_paths()["db_path"]))
                 if measured["baseline_run_id"] != target_run_id:
                     st.warning("ACTIVE sürümü değişti; güncel sürümü görüntüleyip benchmark'ı tekrar çalıştırın.")
                 else:
                     st.session_state[benchmark_key] = measured
+            except SolverBusyError:
+                st.warning("Çözücü başka bir işlemde meşgul; benchmark daha sonra yeniden denenebilir.")
             except Exception as exc:
                 st.error(f"Benchmark üretilemedi: {exc}")
         if benchmark_key in st.session_state:
@@ -774,7 +778,8 @@ with tab_scenarios:
         if st.button("Senaryoları hesapla", key="compute_scenarios"):
             with st.spinner("Aktif plan için senaryolar hesaplanıyor..."):
                 engine = ScenarioEngine(db_path=str(get_runtime_paths()["db_path"]))
-                result = engine.run_all_scenarios()
+                with solver_slot(get_runtime_paths()["db_path"]):
+                    result = engine.run_all_scenarios()
                 if engine.baseline_run_id != run_id_val:
                     raise DashboardDataError("ACTIVE run değişti; sonuçları görmek için paneli yenileyin.")
                 st.session_state[cache_key] = result
@@ -822,6 +827,8 @@ with tab_scenarios:
         st.warning(
             "Senaryo matrisi zaman sınırında tamamlanamadı. Yeni sonuç gösterilmiyor; ACTIVE plan değiştirilmedi."
         )
+    except SolverBusyError:
+        st.warning("Çözücü başka bir işlemde meşgul; senaryo matrisi daha sonra yeniden denenebilir.")
     except Exception as e:
         st.error(f"Senaryo motoru hatası: {e}")
 
@@ -947,6 +954,8 @@ with tab_mes:
                     st.warning(
                         "Çözücü zaman sınırında geçerli bir arıza senaryosu bulamadı. ACTIVE plan değiştirilmedi."
                     )
+                except SolverBusyError:
+                    st.warning("Çözücü başka bir işlemde meşgul; kısa süre sonra yeniden deneyin.")
                 else:
                     st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
                     k1, k2, k3 = st.columns(3)
@@ -999,6 +1008,8 @@ with tab_mes:
                     st.warning(
                         "Çözücü zaman sınırında geçerli bir acil sipariş planı bulamadı. ACTIVE plan değiştirilmedi."
                     )
+                except SolverBusyError:
+                    st.warning("Çözücü başka bir işlemde meşgul; kısa süre sonra yeniden deneyin.")
                 else:
                     st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
                     k1, k2, k3 = st.columns(3)
@@ -1060,6 +1071,8 @@ with tab_mes:
                         )
                 except TimeoutError:
                     st.warning("Çözücü zaman sınırında geçerli bir yeni plan bulamadı. Önceki ACTIVE plan korunuyor.")
+                except SolverBusyError:
+                    st.warning("Çözücü başka bir işlemde meşgul; önceki ACTIVE plan korunuyor.")
                 else:
                     st.success("✅ Dinamik çizelgeleme ve denetim kaydı tamamlandı!")
                     n1, n2, n3 = st.columns(3)

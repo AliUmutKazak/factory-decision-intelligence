@@ -209,8 +209,8 @@ def _covered_by_shifts(start: float, end: float, windows: list[tuple[float, floa
     return False
 
 
-def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
-    """Return a JSON-ready report; no input file or runtime state is modified."""
+def _inspect_pilot_package(manifest_path: str | Path) -> tuple[dict[str, Any], dict[str, list[dict[str, Any]]]]:
+    """Return the public report and ephemeral canonical rows from one read."""
     manifest_path = Path(manifest_path).resolve()
     root = manifest_path.parent
     manifest_digest = _sha256(manifest_path)
@@ -225,7 +225,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             "files": {},
             "rejections": [{"file": "manifest", "line": None, "code": "invalid_manifest", "detail": str(exc)}],
             "scope": "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION",
-        }
+        }, {}
     rejections: list[dict[str, Any]] = []
 
     def reject(kind: str, line: int | None, code: str, detail: str) -> None:
@@ -344,11 +344,16 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         if not path.is_file():
             reject(kind, None, "missing_file", "listed file does not exist")
             continue
-        observed_digest = _sha256(path)
+        try:
+            observed_digest = _sha256(path)
+            size_bytes = path.stat().st_size
+        except OSError:
+            reject(kind, None, "unreadable_file", "listed file cannot be read")
+            continue
         evidence[kind] = {
             "path": relative,
             "sha256": observed_digest,
-            "size_bytes": path.stat().st_size,
+            "size_bytes": size_bytes,
             "format": suffix[1:],
             "hash_status": "UNPINNED" if expected_digest is None else "VERIFIED",
         }
@@ -554,6 +559,20 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     else:
         timing_status = "ASSESSED"
 
+    for kind, entry in evidence.items():
+        try:
+            still_same = entry["sha256"] == _sha256((root / entry["path"]).resolve())
+        except OSError:
+            still_same = False
+        if not still_same:
+            reject(kind, None, "file_changed_during_read", "source bytes changed during preflight")
+    try:
+        manifest_still_same = manifest_digest == _sha256(manifest_path)
+    except OSError:
+        manifest_still_same = False
+    if not manifest_still_same:
+        reject("manifest", None, "manifest_changed_during_read", "manifest bytes changed during preflight")
+
     if rejections:
         baseline_metric_status = "PACKAGE_REJECTED"
     elif baseline_quantity_basis is None:
@@ -587,12 +606,13 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
             last_completion_min=max(completion_by_lot.values()),
         )
 
-    return {
+    report = {
         "dataset_id": dataset_id,
         "source_type": source_type,
         "origin": origin,
         "quantity_unit": quantity_unit,
         "time_unit": time_unit,
+        "lab_model_assumptions": manifest.get("lab_model_assumptions"),
         "provenance": provenance,
         "manifest_sha256": manifest_digest,
         "files": evidence,
@@ -621,6 +641,13 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         "rejections": rejections,
         "scope": "FILE_PREFLIGHT_ONLY_NO_SOLVE_NO_PUBLICATION",
     }
+    return report, data
+
+
+def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
+    """Return a JSON-ready report; no input file or runtime state is modified."""
+    report, _ = _inspect_pilot_package(manifest_path)
+    return report
 
 
 def main() -> int:

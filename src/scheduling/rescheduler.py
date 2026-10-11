@@ -31,6 +31,7 @@ from src.scheduling.schedule_cpsat import get_initial_machine_states, run_cpsat_
 from src.scheduling.what_if import NoCloseConnectionWrapper
 from src.utils.db import get_active_run_id, migrate_solver_objective_contract
 from src.utils.runtime_lock import run_mutation_lock
+from src.utils.solver_slot import admitted_solver_call
 
 
 class DynamicRescheduler:
@@ -490,6 +491,7 @@ class DynamicRescheduler:
             )
         return triggers
 
+    @admitted_solver_call
     def execute_reschedule(
         self,
         trigger: RescheduleTriggerEvent,

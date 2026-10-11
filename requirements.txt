@@ -8,7 +8,8 @@ lightgbm==4.7.0
 statsmodels==0.15.0
 
 # Mathematical Optimization & Constraint Programming
-ortools==9.14.6206
+ortools==9.15.6755
+protobuf==6.33.6
 pulp==3.3.2
 
 # Web Interface, API & Visualization

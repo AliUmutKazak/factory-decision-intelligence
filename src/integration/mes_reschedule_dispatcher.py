@@ -10,6 +10,7 @@ from src.integration.mes_service import MESIntegrationService
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.utils.db import get_active_run_id, get_db_connection, resolve_db_path
 from src.utils.runtime_lock import run_mutation_lock
+from src.utils.solver_slot import SolverBusyError
 
 
 class MESRescheduleDispatcher:
@@ -127,7 +128,10 @@ class MESRescheduleDispatcher:
                 delay_duration_min=duration,
                 reason=f"MACHINE_DOWN: {reason or 'Unspecified outage'}",
             )
-            _, _, _, _, audit = self.engine.execute_reschedule(trigger=trigger, persist_audit=True)
+            try:
+                _, _, _, _, audit = self.engine.execute_reschedule(trigger=trigger, persist_audit=True)
+            except SolverBusyError:
+                return {"status": "SOLVER_BUSY", "event_id": event_id}
             service.ack_reschedule_intent(event_id, audit.audit_id)
             return {
                 "status": "DISPATCHED",

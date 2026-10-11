@@ -5,7 +5,17 @@ from pathlib import Path
 
 import pytest
 
-from src.scheduling.external_jsp_benchmark import run_orlibrary_fixed_jsp
+from src.scheduling.external_jsp_benchmark import _source_sha256_lf, run_orlibrary_fixed_jsp
+
+
+def test_source_hash_ignores_checkout_line_endings_only(tmp_path):
+    source = tmp_path / "solver.py"
+    source.write_bytes(b"a = 1\nprint(a)\n")
+    original = _source_sha256_lf(source)
+    source.write_bytes(b"a = 1\r\nprint(a)\r\n")
+    assert _source_sha256_lf(source) == original
+    source.write_bytes(b"a = 2\r\nprint(a)\r\n")
+    assert _source_sha256_lf(source) != original
 
 
 def test_fixed_jsp_uses_production_solver_and_independent_checker_without_disk_writes(tmp_path):
@@ -33,6 +43,7 @@ def test_fixed_jsp_uses_production_solver_and_independent_checker_without_disk_w
     assert all(report["neutrality_checks"].values())
     assert report["independent_check"]["status"] == "ACCEPTED"
     assert report["source_sha256"] == source_before
+    assert set(report["code_hashes_normalized_lf"]) == set(report["code_hashes"])
     assert report["reference_db_sha256"] == reference_before
     assert hashlib.sha256(source.read_bytes()).hexdigest() == source_before
     assert hashlib.sha256(reference.read_bytes()).hexdigest() == reference_before

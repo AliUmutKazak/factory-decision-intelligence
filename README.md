@@ -20,15 +20,18 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.
 
+[Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
+
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
 
-### İnceleyenler için üç doğrulanabilir sonuç
+### İnceleyenler için dört doğrulanabilir sonuç
 
 | Sonuç | Kanıt | Geçerlilik sınırı |
 |---|---|---|
 | Uçtan uca planlama ve mühürlü ACTIVE sürümü | `python main.py` ardından `python scripts/verify_active_run.py`; [referans manifesti](artifacts/reference/manifest.json) | Referans veri sentetiktir; müşteri planı değildir |
 | Dış çizelgeleme örneğinde optimum ve bağımsız fiziksel denetim | [OR-Library `ft06`: 55 birim, `OPTIMAL`](docs/external-jsp-benchmark.md) | Yalnız sabit makineli, düz statik JSP alt problemi |
 | Aynı fiziksel girdide politika karşılaştırması ve maliyet bileşenleri | [Ölçülmüş model demosu](artifacts/demo/business-case.md) ve [yeniden üretme adımları](docs/demo-and-customer-pilot.md) | Hesaplanan karşılaştırma; gerçekleşmiş tasarruf veya finansal ROI değil |
+| Dosya pilotu mevcut planı ile solver adayının dar kapsamlı kıyası | [Sentetik tek vardiyalı örnek](examples/pilot-solve/README.md) ve `python -m src.integration.pilot_file_solve examples/pilot-solve/manifest.json` | Bellekte, tam sipariş/boş WIP/fixed routing; müşteri veya üretim kabulü değil |
 
 ---
 
@@ -96,7 +99,7 @@ flowchart TD
         M --> O["Dinamik Rescheduler / Dondurulmuş Ufuk - Freeze Horizon"]
         N --> O
         O --> P["Çizelge Gerginliği - Nervousness Metrikleri"]
-        O --> Q["SHA-256 İmzalı Lineage & Audit Log"]
+        O --> Q["SHA-256 Özetli Lineage & Audit Log"]
     end
 
     subgraph layer6["Katman 6: Servis & Görsel Kokpit / Presentation & API"]
@@ -245,7 +248,7 @@ Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için 
 
 Yayınlanan yeniden çizelgeleme kararları audit tablosuna ve karar kütüğüne kaydedilir; bundle dosyalarının SHA-256 özetleri değişiklikleri tespit eder. Sandbox what-if işlemleri runtime verisini değiştirmez:
 * **Olay Kaydı:** Tetikleyici olay tipi (`BREAKDOWN`, `HOT_ORDER`, `PERIODIC`).
-* **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak mühürlenir.
+* **Veri Özeti (Cryptographic Hash):** Girdi ve çıktı çizelgeleri **SHA-256** özeti alınarak değişiklik denetimine bağlanır. Bu özet dijital imza veya yazma yetkisi ele geçirilmiş bir ortama karşı sahicilik kanıtı değildir.
 * **Denetim Tablosu:** SQLite `reschedule_audit_log` tablosunda saklanır ve `/api/v1/schedule/audit-log` üzerinden denetlenebilir.
 
 ---
@@ -269,6 +272,8 @@ Yayınlanan yeniden çizelgeleme kararları audit tablosuna ve karar kütüğün
 FastAPI backend servisi `http://localhost:8000` portunda yayın yapar. İnteraktif Swagger arayüzüne `http://localhost:8000/docs` adresinden erişilebilir:
 
 `/health` ve `/ready` dışındaki uçlar [yerel erişim anahtarı](docs/security-boundary.md#yerel-kullanım) gerektirir. Swagger'daki **Authorize** alanına ilgili Bearer anahtarını girin.
+
+API, panel ve yerel MES dispatcher aynı runtime üzerinde aynı anda tek çözücü çalıştırır. Çakışan API çağrısı `429/SOLVER_BUSY` ve `Retry-After` döndürür; panel isteği meşgul uyarısı gösterir. Bu sınır tek hostlu laboratuvar kullanımına aittir.
 
 | Metot | Uç Nokta (Endpoint) | Parametre / Gövde (Payload) | Açıklama |
 |---|---|---|---|
@@ -316,16 +321,18 @@ Windows PowerShell:
 ```powershell
 python --version # 3.11.x olmalı
 python -m venv factory-env
-.\factory-env\Scripts\python.exe -m pip install -r requirements.txt
+.\factory-env\Scripts\python.exe -m pip install -r requirements-windows.lock
 ```
 
-Linux/macOS:
+Linux x86_64:
 
 ```bash
 python3.11 -m venv factory-env
 source factory-env/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements-linux.lock # Linux x86_64
 ```
+
+macOS veya farklı mimaride `requirements.txt` üzerinden kurulum yapılır; bu platformlarda transitive lock doğrulaması bu sürümün CI kapsamına dahil değildir.
 
 Sonraki `python` komutlarında Windows'ta `.\factory-env\Scripts\python.exe` kullanın veya ortamı `.\factory-env\Scripts\Activate.ps1` ile etkinleştirin. PowerShell yürütme ilkesi etkinleştirmeyi engelliyorsa doğrudan `python.exe` yolu yeterlidir.
 
@@ -411,7 +418,9 @@ factory-decision-intelligence/
 ├── Dockerfile                  # Python 3.11-slim Docker imaj reçetesi
 ├── docker-compose.yml          # FastAPI ve Streamlit mikroservis orkestrasyonu
 ├── .dockerignore               # Docker imaj filtreleme kuralları
-├── requirements.txt            # Python bağımlılık listesi
+├── requirements.txt            # Doğrudan Python bağımlılıkları
+├── requirements-linux.lock     # Linux x86_64 / Python 3.11 tam çözüm
+├── requirements-windows.lock   # Windows x86_64 / Python 3.11 tam çözüm
 └── README.md                   # Kapsamlı sistem ve mimari dokümantasyonu
 ```
 
