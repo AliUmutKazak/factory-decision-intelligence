@@ -1,6 +1,6 @@
 # FDI paylaşım ve saha doğrulama sınırı
 
-**Durum:** 8 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Hedef, fabrika bağlantısı beklerken kodu ve kanıtlarını teknik olarak incelenebilir bir portföy sürümüne taşımaktır.
+**Durum:** 11 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Hedef, fabrika bağlantısı beklerken kodu ve kanıtlarını teknik olarak incelenebilir bir portföy sürümüne taşımaktır.
 
 ## Paylaşılabilir teknik sürüm için kabul listesi
 
@@ -11,7 +11,7 @@
 | Gösterim | Ölçülmüş sentetik benchmark ve [demo rehberi](demo-and-customer-pilot.md) var; eski ekran görüntüleri güncel commit kanıtı değildir | İzleyici örneği çalıştırabilir; sonuçlar veri türü ve solver sınırıyla birlikte okunur; kullanılacak görseller güncel sürümden alınır |
 | Güvenli kullanım | [G2 sınırı](security-boundary.md): API ve panel varsayılan kapalı; ayrık yerel erişim anahtarları var, Compose portları yerel adrese bağlı | Demo yalnız yerel/denetimli ortamda gösterilir; internetten API veya dashboard erişimi açılmaz |
 | Lisans ve kaynaklar | Proje kodu için kök `LICENSE` ve MESA şemaları için kendi lisans dosyası | README lisans beyanı gerçek dosyalara bağlanır; üçüncü taraf şemalar MIT kapsamı gibi sunulmaz |
-| Sürüm kaydı | G0'da tag, indirilebilir release artifact ve image digest kararı açık | G0 kabulünden önce sürüm numarası, commit, test/CI bağlantısı ve dağıtılacak dosyalar belirlenir |
+| Sürüm kaydı | Başarılı main CI, 30 gün tutulan run artifact'i ve digest'ini üretir; container image yayımlanmıyor | G0 teknik kanıtı için tag aynı başarılı main commit'ine bağlanır; sürüm numarası, commit, test/CI bağlantısı ve artifact kimliği belirtilir |
 
 Bu liste tamamlanınca kullanılacak ifade **“teknik olarak gösterilebilir karar destek POC”** olabilir. “Fabrikada doğrulandı”, “ERP/MES ile uyumlu”, “üretime hazır”, “tasarruf/ROI sağladı” ifadeleri için G1 ve ilgili G4–G11 saha kanıtları gerekir. Açık benchmark'ta çözülen sabit makineli alt problem, esnek atölye veya müşteri problemiyle eşdeğer gösterilmez.
 
