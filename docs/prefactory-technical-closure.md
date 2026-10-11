@@ -18,7 +18,7 @@ Bu kayıt, birleşik yol haritasının **paylaşılabilir tek sunuculu laboratuv
 1. **SQLite tek host:** Bu sürümün dosya pilotu ve yerel demo yükü için repository/restore sınırı test edilir. [PostgreSQL geçiş sözleşmesi](g3-postgresql-migration-design.md) hazırdır. Eşzamanlı çok hostlu kullanım veya saha IT mimarisi belirlenmeden ayrı bir PostgreSQL runtime yayımlanmaz; böyle bir kurulum bu sürümün desteklenen kapsamı değildir.
 2. **Dosya önce:** Müşteri test tenant'ı olmadan sahte ERP/MES transport ve ACK kanıtı üretilmez. Yerel dispatcher yalnız tekrar, sıra, durum ve geri kazanım semantiğini sınar. İlk görüşmede salt okunur dosya akışı teklif edilir.
 3. **Bilinmeyen proses kuralı reddedilir:** Başlamış/kısmi iş, WIP taşıma ve rework için fabrika semantiği yoksa dosya solver yoluna alınmaz. Desteklenmeyen olayın sessizce tam sipariş gibi çizelgelenmesi kabul edilmez.
-4. **Ölçüm dürüstlüğü:** `FEASIBLE` optimumluk değildir; 30 saniyelik `ft10` negatif sonucu korunur. Sentetik kıyas müşteri baz çizelgesi, gerçekleşmiş tasarruf veya ROI yerine geçmez.
+4. **Ölçüm dürüstlüğü:** `FEASIBLE` optimumluk değildir; 9.14'ün 30 saniyelik `ft10` negatif sonucu korunur ve 9.15 yeni sürüm için ayrıca ölçülür. Sentetik kıyas müşteri baz çizelgesi, gerçekleşmiş tasarruf veya ROI yerine geçmez.
 5. **Tek host işletim:** Yerel kilit ve `429/SOLVER_BUSY` bu dağıtımın eşzamanlılık sınırıdır. Çok host, kurumsal alarm/kimlik ve saha RTO/RPO ancak somut pilot mimarisiyle tasarlanır; bu sürüm internete açık üretim servisi olarak sunulmaz.
 
 ## Paylaşım kararı
