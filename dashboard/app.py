@@ -184,7 +184,7 @@ def determine_system_status(tables):
     return (
         "READY",
         "success",
-        "Tüm modeller (Tahmin, Planlama, Çizelgeleme, Sürdürülebilirlik) ve çözücüler tam mutabakatla hazır.",
+        "ACTIVE laboratuvar koşumunun veri bütünlüğü ve temel model kontrolleri geçti.",
     )
 
 
@@ -378,7 +378,7 @@ with tab_summary:
     q_col1, q_col2 = st.columns(2)
     with q_col1:
         st.info(
-            f"**Talep:** {PLANNING_HORIZON_WEEKS} haftalık ufukta 5 pilot ürün için toplam "
+            f"**Talep:** {PLANNING_HORIZON_WEEKS} haftalık ufukta referans ürünler için toplam "
             f"**{total_gross_demand:,} adet** brüt fabrika çekme talebi öngörüldü."
         )
         st.info(
@@ -391,13 +391,13 @@ with tab_summary:
             else 0
         )
         st.info(
-            f"**Tedarik Zinciri:** Zaman fazlı MRP-I, 4 hammadde için net ihtiyaçları belirledi; "
+            f"**Tedarik Zinciri:** Zaman fazlı MRP-I, hammaddeler için net ihtiyaçları belirledi; "
             f"temin süresi kısıtı nedeniyle **{past_due_count} sipariş için acil tedarik (EXPEDITE)** uyarısı üretildi."
         )
     with q_col2:
         st.info(
             "**Kısıt Bağlantısı (MRP → CP-SAT):** Tedarik riski taşıyan hammaddeye sahip lotların ilk operasyonu "
-            "480 dk serbest bırakma (release time) kısıtına bağlandı; operasyonlar malzeme tesliminden önce başlatılmadı."
+            "modeldeki serbest bırakma zamanı (release time) kısıtına bağlandı; operasyonlar bu zamandan önce başlatılmadı."
         )
         # 1. Taktik Seviye: LP Kısıt Bağlayıcılığı (Binding Machine)
         lp_bottleneck_machines = []
@@ -436,6 +436,9 @@ with tab_summary:
 # =============================================================
 with tab_forecast:
     st.subheader("28 Günlük Tahminler ve Model Kıyaslama (Benchmark)")
+    st.caption(
+        "P10/P90 ve önerilen güvenlik stoğu, kalibre edilmemiş RMSE tabanlı model varsayımlarıdır; hizmet düzeyi garantisi değildir."
+    )
 
     if forecast_df.empty:
         st.warning("Tahmin verisi (forecast_demand) bulunamadı.")
@@ -448,9 +451,12 @@ with tab_forecast:
                 st.dataframe(model_counts[["product_id", "model_used"]], use_container_width=True)
             lineage_view = get_table("forecast_model_lineage", run_id=run_id_val)
             if not lineage_view.empty and {"product_id", "selected_model"}.issubset(lineage_view.columns):
-                for model_name, group in lineage_view.groupby("selected_model"):
-                    sku_names = ", ".join(group["product_id"].astype(str).tolist())
-                    st.success(f"✓ **{sku_names}:** Rolling-origin WAPE karşılaştırmasında **{model_name}** seçildi.")
+                for _, row in lineage_view.iterrows():
+                    metric = "RMSE" if pd.isna(row.get("backtest_wape")) else "WAPE"
+                    st.success(
+                        f"✓ **{row['product_id']}:** Rolling-origin {metric} karşılaştırmasında "
+                        f"**{row['selected_model']}** seçildi."
+                    )
             else:
                 st.info("Model lineage kaydı bulunamadı; model kazananı sabit metinle gösterilmiyor.")
 
@@ -461,7 +467,7 @@ with tab_forecast:
                 y="forecast_demand",
                 color="product_id",
                 markers=True,
-                title="5 Pilot Ürün İçin Günlük Fabrika Çekme Talebi Tahmini",
+                title="Ürün Bazlı Günlük Talep Tahmini (Laboratuvar Verisi)",
                 labels={"forecast_date": "Tarih", "forecast_demand": "Tahmin Edilen Talep (Adet)"},
             )
             fig_fc.update_layout(hovermode="x unified")
