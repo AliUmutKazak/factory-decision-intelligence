@@ -605,7 +605,7 @@ def apply_run_retention_policy(
     if keep_last_n < 1:
         raise ValueError("keep_last_n en az 1 olmalıdır.")
 
-    active_db = db_path or str(get_runtime_paths()["db_path"])
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return 0
 
@@ -650,7 +650,6 @@ def apply_run_retention_policy(
             "mrp_plan",
             "production_schedule",
             "schedule_solver_metadata",
-            "schedule_model_context",
             "energy_kpis",
             "energy_profile_15min",
             "energy_machine_kpis",

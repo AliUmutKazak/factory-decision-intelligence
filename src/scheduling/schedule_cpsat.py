@@ -41,6 +41,7 @@ from src.contracts.schemas import (
     ScheduleTaskInput,
     SolverStatus,
 )
+from src.scheduling.calendar_service import MachineCalendarService
 from src.scheduling.maintenance import load_machine_maintenance_windows
 from src.utils.db import (
     get_db_connection,
@@ -188,8 +189,6 @@ def run_cpsat_scheduling(
     except Exception:
         weekly_machine_ot_budget_min = {}
         machine_ot_hours = {}
-
-    from src.scheduling.calendar_service import MachineCalendarService
 
     machine_daily_hours = MachineCalendarService.load_daily_hours(conn)
 
