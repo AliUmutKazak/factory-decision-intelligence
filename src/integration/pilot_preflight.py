@@ -12,6 +12,7 @@ import csv
 import hashlib
 import json
 import math
+import re
 from collections import defaultdict
 from datetime import date, datetime, time
 from pathlib import Path
@@ -230,17 +231,29 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
     def reject(kind: str, line: int | None, code: str, detail: str) -> None:
         rejections.append({"file": kind, "line": line, "code": code, "detail": detail})
 
-    dataset_id = str(manifest.get("dataset_id", "")).strip()
+    dataset_value = manifest.get("dataset_id")
+    dataset_id = dataset_value.strip() if isinstance(dataset_value, str) else ""
     if not dataset_id:
         reject("manifest", None, "missing_dataset_id", "dataset_id is required")
-    source_type = str(manifest.get("source_type", "")).upper()
+    source_value = manifest.get("source_type")
+    source_type = source_value.upper() if isinstance(source_value, str) else ""
     if source_type not in SOURCE_TYPES:
         reject("manifest", None, "invalid_source_type", "expected SYNTHETIC, OPEN or CUSTOMER")
-    if source_type == "OPEN" and not (manifest.get("source_ref") and manifest.get("usage_terms")):
+    provenance: dict[str, str] = {}
+    for key in ("source_ref", "usage_terms", "data_owner", "sharing_basis"):
+        if key not in manifest:
+            continue
+        value = manifest[key]
+        if not isinstance(value, str) or not value.strip():
+            reject("manifest", None, "invalid_provenance", f"{key} must be nonempty text")
+        else:
+            provenance[key] = value.strip()
+    if source_type == "OPEN" and not {"source_ref", "usage_terms"} <= provenance.keys():
         reject("manifest", None, "missing_open_provenance", "source_ref and usage_terms are required")
-    if source_type == "CUSTOMER" and not (manifest.get("data_owner") and manifest.get("sharing_basis")):
+    if source_type == "CUSTOMER" and not {"data_owner", "sharing_basis"} <= provenance.keys():
         reject("manifest", None, "missing_customer_authority", "data_owner and sharing_basis are required")
-    quantity_unit = str(manifest.get("quantity_unit", "")).strip()
+    quantity_value = manifest.get("quantity_unit")
+    quantity_unit = quantity_value.strip() if isinstance(quantity_value, str) else ""
     if not quantity_unit:
         reject("manifest", None, "missing_quantity_unit", "quantity_unit is required")
     time_unit = str(manifest.get("time_unit", ""))
@@ -284,8 +297,14 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         else:
             reject(kind, None, "invalid_path", "file entry must be a path or file specification")
             continue
-        if spec.keys() - {"path", "sheet", "header_row", "columns"}:
+        if spec.keys() - {"path", "sheet", "header_row", "columns", "sha256"}:
             reject(kind, None, "invalid_file_spec", "unknown file specification field")
+            continue
+        expected_digest = spec.get("sha256")
+        if "sha256" in spec and (
+            not isinstance(expected_digest, str) or re.fullmatch(r"[0-9a-fA-F]{64}", expected_digest) is None
+        ):
+            reject(kind, None, "invalid_expected_sha256", "sha256 must be a 64-character hexadecimal digest")
             continue
         relative = spec.get("path")
         if not isinstance(relative, str) or not relative.strip():
@@ -314,12 +333,22 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         if not path.is_file():
             reject(kind, None, "missing_file", "listed file does not exist")
             continue
+        observed_digest = _sha256(path)
         evidence[kind] = {
             "path": relative,
-            "sha256": _sha256(path),
+            "sha256": observed_digest,
             "size_bytes": path.stat().st_size,
             "format": suffix[1:],
+            "hash_status": "UNPINNED" if expected_digest is None else "VERIFIED",
         }
+        if expected_digest is not None:
+            evidence[kind]["expected_sha256"] = expected_digest.lower()
+            if observed_digest != expected_digest.lower():
+                evidence[kind]["hash_status"] = "MISMATCH"
+                evidence[kind]["parsed_rows"] = 0
+                reject(kind, None, "file_sha256_mismatch", "file bytes differ from declared sha256")
+                data[kind] = []
+                continue
         if suffix == ".xlsx":
             evidence[kind]["sheet"] = sheet
             evidence[kind]["header_row"] = header_row
@@ -516,11 +545,7 @@ def inspect_pilot_package(manifest_path: str | Path) -> dict[str, Any]:
         "origin": origin,
         "quantity_unit": quantity_unit,
         "time_unit": time_unit,
-        "provenance": {
-            key: str(manifest[key])
-            for key in ("source_ref", "usage_terms", "data_owner", "sharing_basis")
-            if key in manifest
-        },
+        "provenance": provenance,
         "manifest_sha256": manifest_digest,
         "files": evidence,
         "baseline_coverage": {
