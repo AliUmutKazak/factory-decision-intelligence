@@ -3,6 +3,7 @@
   "source_type": "SYNTHETIC",
   "origin": "2026-01-05T00:00:00+03:00",
   "quantity_unit": "piece",
+  "baseline_quantity_basis": "FULL_ORDER",
   "time_unit": "minute",
   "max_actual_reporting_lag_min": 30,
   "files": {

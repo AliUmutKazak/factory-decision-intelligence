@@ -63,6 +63,15 @@ def test_committed_synthetic_pilot_example_has_matching_file_hashes():
     report = inspect_pilot_package(root / "examples/pilot-package/manifest.json")
     assert report["status"] == "ACCEPTED"
     assert all(item["hash_status"] == "VERIFIED" for item in report["files"].values())
+    assert report["baseline_plan_metrics"] == {
+        "status": "ASSESSED",
+        "quantity_basis": "FULL_ORDER",
+        "lot_count": 1,
+        "late_lots": 0,
+        "total_tardiness_min": 0.0,
+        "max_tardiness_min": 0.0,
+        "last_completion_min": 80.0,
+    }
 
 
 def test_preflight_reports_bad_rows_and_cross_file_references(tmp_path):
@@ -306,6 +315,79 @@ def test_preflight_reports_partial_baseline_without_claiming_complete_comparison
         "missing_operations": 1,
         "missing_examples": [["L1", 2]],
     }
+
+
+def test_preflight_assesses_only_declared_full_order_baseline(tmp_path):
+    manifest = package(tmp_path)
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    assert inspect_pilot_package(manifest)["baseline_plan_metrics"]["status"] == "NO_DECLARED_BASIS"
+
+    content["baseline_quantity_basis"] = "FULL_ORDER"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    (tmp_path / "orders.csv").write_text(
+        "order_id,lot_id,product_id,quantity,due_min\nO1,L1,P1,10,75\nO2,L2,P1,10,120\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min,planned_qty\nL1,1,M1,60,80,10\nL2,1,M1,110,130,10\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["baseline_plan_metrics"] == {
+        "status": "ASSESSED",
+        "quantity_basis": "FULL_ORDER",
+        "lot_count": 2,
+        "late_lots": 2,
+        "total_tardiness_min": 15.0,
+        "max_tardiness_min": 10.0,
+        "last_completion_min": 130.0,
+    }
+
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min\nL1,1,M1,60,80\nL2,1,M1,110,130\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["baseline_plan_metrics"]["status"] == "UNKNOWN_PLANNED_QUANTITY"
+    assert report["baseline_plan_metrics"]["late_lots"] is None
+
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min,planned_qty\nL1,1,M1,60,80,10\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["baseline_plan_metrics"]["status"] == "INCOMPLETE_PLAN"
+    assert report["baseline_plan_metrics"]["total_tardiness_min"] is None
+
+
+def test_preflight_does_not_score_remaining_wip_as_full_order(tmp_path):
+    manifest = package(tmp_path)
+    content = json.loads(manifest.read_text(encoding="utf-8"))
+    content["baseline_quantity_basis"] = "REMAINING_WIP"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    (tmp_path / "current_plan.csv").write_text(
+        "lot_id,operation_seq,machine_id,start_min,end_min,planned_qty\nL1,1,M1,60,70,5\n",
+        encoding="utf-8",
+    )
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "ACCEPTED"
+    assert report["baseline_plan_metrics"]["status"] == "UNASSESSED_REMAINING_WIP"
+    assert report["baseline_plan_metrics"]["late_lots"] is None
+
+    content["baseline_quantity_basis"] = "FULL_ORDER"
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert report["status"] == "REJECTED"
+    assert "full_order_quantity_mismatch" in {issue["code"] for issue in report["rejections"]}
+    assert report["baseline_plan_metrics"]["status"] == "PACKAGE_REJECTED"
+
+    content["baseline_quantity_basis"] = ["FULL_ORDER"]
+    manifest.write_text(json.dumps(content), encoding="utf-8")
+    report = inspect_pilot_package(manifest)
+    assert "invalid_baseline_quantity_basis" in {issue["code"] for issue in report["rejections"]}
 
 
 def test_preflight_rejects_actual_quantity_above_order(tmp_path):
