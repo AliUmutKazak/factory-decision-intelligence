@@ -34,6 +34,11 @@ jobs:
       run: |
         mkdir -p data/processed reports artifacts/reference
 
+    - name: Audit Python dependency advisories
+      run: |
+        python -m pip install pip-audit==2.10.1
+        python -m pip_audit -r requirements.txt --strict
+
     - name: "Quality Gate 1: Static Code Analysis & Formatting (Ruff)"
       run: |
         ruff check src/ tests/ dashboard/ scripts/ main.py
