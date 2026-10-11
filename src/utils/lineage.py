@@ -605,7 +605,7 @@ def apply_run_retention_policy(
     if keep_last_n < 1:
         raise ValueError("keep_last_n en az 1 olmalıdır.")
 
-    active_db = db_path or str(get_runtime_paths()["db_path"])
+    active_db = db_path or os.environ.get("FACTORY_DB_PATH") or str(get_runtime_paths()["db_path"])
     if not os.path.exists(active_db):
         return 0
 
@@ -613,14 +613,6 @@ def apply_run_retention_policy(
     init_pipeline_runs_table(conn)
     cur = conn.cursor()
     active_ids = {row[0] for row in cur.execute("SELECT run_id FROM pipeline_runs WHERE status = 'ACTIVE'").fetchall()}
-    # A published reference is an independent durable checkpoint. Retention
-    # may remove volatile runs, but must retain its source run and bundle.
-    protected_ids = set(active_ids)
-    reference_manifest = Path(get_runtime_paths()["base_dir"]) / "artifacts" / "reference" / "manifest.json"
-    if reference_manifest.exists():
-        reference_run = json.loads(reference_manifest.read_text(encoding="utf-8")).get("run_id")
-        if reference_run:
-            protected_ids.add(str(reference_run))
     keep_non_active = max(0, keep_last_n - len(active_ids))
     old_runs = [
         row[0]
@@ -629,7 +621,6 @@ def apply_run_retention_policy(
             (keep_non_active,),
         ).fetchall()
     ]
-    old_runs = [run for run in old_runs if run not in protected_ids]
 
     if old_runs:
         placeholders = ",".join("?" for _ in old_runs)
@@ -643,7 +634,6 @@ def apply_run_retention_policy(
             "mrp_plan",
             "production_schedule",
             "schedule_solver_metadata",
-            "schedule_model_context",
             "energy_kpis",
             "energy_profile_15min",
             "energy_machine_kpis",
@@ -691,25 +681,13 @@ def apply_run_retention_policy(
     else:
         deleted_count = 0
 
-    # A caller operating on a separate database must never prune bundles in
-    # the application's canonical tree. Derive the default from that database.
-    db_directory = Path(active_db).resolve().parent
-    project_directory = db_directory.parent if db_directory.name == "data" else db_directory
-    target_artifacts = Path(artifacts_dir) if artifacts_dir else project_directory / "artifacts" / "runs"
+    target_artifacts = (
+        Path(artifacts_dir) if artifacts_dir else Path(get_runtime_paths()["base_dir"]) / "artifacts" / "runs"
+    )
     for old_run_id in old_runs:
         old_dir = target_artifacts / old_run_id
         if old_dir.exists() and old_dir.is_dir():
             shutil.rmtree(old_dir)
-
-    remaining_ids = {row[0] for row in cur.execute("SELECT run_id FROM pipeline_runs").fetchall()} | protected_ids
-    if target_artifacts.exists():
-        for directory in target_artifacts.iterdir():
-            if not directory.is_dir() or directory.name in remaining_ids or directory.name == "canonical":
-                continue
-            # Only completed snapshots have a manifest. A staging directory
-            # without a manifest may still be in flight and is left alone.
-            if (directory / "manifest.json").exists():
-                shutil.rmtree(directory)
 
     conn.close()
     return deleted_count
