@@ -122,7 +122,7 @@ def test_scan_pending_mes_events():
         conn.close()
 
 
-def test_local_repair_is_certified_and_persists_real_model_context():
+def test_local_repair_is_certified_and_persists_real_model_context(dashboard_lab_credentials):
     from src.scheduling.model_context import load_model_context
 
     engine = DynamicRescheduler()
@@ -150,6 +150,7 @@ def test_local_repair_is_certified_and_persists_real_model_context():
     from streamlit.testing.v1 import AppTest
 
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"), default_timeout=30).run()
+    app.sidebar.text_input[0].set_value(dashboard_lab_credentials["read"]).run()
     assert not app.exception
     assert not app.error
 

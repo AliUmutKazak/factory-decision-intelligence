@@ -10,7 +10,7 @@ import src.config as cfg
 from src.scenarios.scenario_engine import ScenarioEngine
 
 
-def test_dashboard_renders_active_plan_without_implicit_solves(tmp_path, monkeypatch):
+def test_dashboard_renders_active_plan_without_implicit_solves(tmp_path, monkeypatch, dashboard_lab_credentials):
     source = Path(__file__).resolve().parents[1] / "data" / "factory.db"
     target = tmp_path / "factory.db"
     shutil.copy2(source, target)
@@ -23,6 +23,7 @@ def test_dashboard_renders_active_plan_without_implicit_solves(tmp_path, monkeyp
 
     monkeypatch.setattr(ScenarioEngine, "run_all_scenarios", unexpected_solve)
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"), default_timeout=30).run()
+    app.sidebar.text_input[0].set_value(dashboard_lab_credentials["read"]).run()
     assert not app.exception
     assert not app.error
     assert any(button.key == "compute_scenarios" for button in app.button)

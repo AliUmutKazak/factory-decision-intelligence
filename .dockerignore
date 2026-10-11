@@ -10,8 +10,15 @@ factory-env/
 .ruff_cache/
 .git/
 .gitignore
+.env
+.env.*
+*.pem
+*.key
+*.pdf
 .vscode/
 tests/
+tmp/
+output/
 data/*.db
 data/processed/*.csv
 data/raw/*.csv

@@ -1,18 +1,25 @@
-# G2 güvenlik sınırı ve API yetki envanteri — taslak
+# G2 güvenlik sınırı ve API yetki envanteri
 
-Durum: **Çalışılıyor**. Bu kayıt, `FDI_Nihai_Birlesik_Yol_Haritasi.pdf` G2 için mevcut saldırı yüzeyini ve pilot öncesi gerekli kararları tanımlar. Mevcut API'de kimlik doğrulama ve rol denetimi bulunmadığından uygulama yetkili bir pilot ağına henüz açılmamalıdır. Docker Compose portları bu aşamada yalnız `127.0.0.1` üzerinde yayımlanır; doğrudan Uvicorn başlatma, başka Compose override'ları veya farklı ağ yapılandırmaları için aynı koruma otomatik olarak geçerli değildir.
+Durum: **Çalışılıyor**. Bu kayıt, `FDI_Nihai_Birlesik_Yol_Haritasi.pdf` G2 için mevcut saldırı yüzeyini ve pilot öncesi gerekli kararları tanımlar. API ve panel laboratuvar kullanımı için varsayılan olarak kapalıdır; üç ayrı uzun Bearer anahtarı yapılandırıldığında okuma, senaryo ve yeniden çizelgeleme yetkileri açılır. Docker Compose portları yalnız `127.0.0.1` üzerinde yayımlanır. Bu paylaşılan anahtar düzeni kişisel kimlik, tesis kapsamı, TLS veya pilot IT kabulünün yerini tutmaz; internete açılmamalıdır.
 
 ## Uç ve asgari yetki
 
 | Uç | Mevcut davranış | Pilot için önerilen rol/sınır |
 |---|---|---|
 | `GET /health`, `GET /ready` | Sağlık ve hazır olma | Ağ sınırı; hassas ayrıntı vermeme |
-| `GET /api/v1/schedule/current`, `GET /api/v1/schedule/solver-metadata` | ACTIVE çizelgesi ve çözüm bilgisi | Yetkili planlamacı/operasyon okuma |
-| `GET /api/v1/schedule/audit-log`, `GET /api/v1/decisions` | Karar ve denetim geçmişi | Yetkili denetim/planlama okuma; veri minimizasyonu |
-| `POST /api/v1/schedule/what-if/breakdown`, `POST /api/v1/schedule/what-if/hot-order` | Senaryo hesabı | Yetkili planlamacı; hız/kaynak sınırı ve kayıt |
-| `POST /api/v1/schedule/reschedule` | Yeniden çizelgeleme işlemi | Ayrı operasyon yetkisi; onay ve geri dönüş kuralı |
+| `GET /api/v1/schedule/current`, `GET /api/v1/schedule/solver-metadata` | ACTIVE çizelgesi ve çözüm bilgisi | Laboratuvarda üç anahtardan biri; pilotta yetkili planlamacı/operasyon okuma |
+| `GET /api/v1/operations/status` | ACTIVE yayın yaşı ve bekleyen MES niyet sayısı | Laboratuvarda üç anahtardan biri; pilotta yetkili işletim/planlama okuma |
+| `GET /api/v1/schedule/audit-log`, `GET /api/v1/decisions` | Karar ve denetim geçmişi | Laboratuvarda üç anahtardan biri; pilotta yetkili denetim/planlama okuma |
+| `POST /api/v1/schedule/what-if/breakdown`, `POST /api/v1/schedule/what-if/hot-order` | Senaryo hesabı | Yalnız senaryo anahtarı; pilotta hız/kaynak sınırı ve kayıt |
+| `POST /api/v1/schedule/reschedule` | Yeniden çizelgeleme işlemi | Yalnız yeniden çizelgeleme anahtarı; pilotta insan onayı ve geri dönüş kuralı |
 
-Bu roller uygulanmış bir politika değil, G1'de fabrika ve IT/MES ile kesinleşecek tasarımdır. Özellikle `POST` çağrısının sadece "JWT var" kontrolüyle açılması yeterli değildir; issuer, audience, süre, imza, rol ve ilgili tesis/hat kapsamı doğrulanmalıdır. Dashboard'un kullandığı aynı API yolunda da yetki zorunlu olmalıdır.
+Laboratuvar anahtarları farklı rollerin negatif testlerini sağlar. Panel de veri okuma ve doğrudan simülasyon/yeniden çizelgeleme öncesinde aynı yetkileri denetler. Bunlar kişi veya tesis kimliği taşımaz. G1'de fabrika ve IT/MES ile kesinleşecek pilot politikası için issuer, audience, süre, imza, rol ve ilgili tesis/hat kapsamı doğrulanmalıdır.
+
+## Yerel kullanım
+
+`FDI_API_READ_TOKEN`, `FDI_API_SCENARIO_TOKEN`, `FDI_API_RESCHEDULE_TOKEN` ortam değişkenlerini birbirinden farklı ve en az 32 karakterlik rastgele değerlerle ayarlayın. Eksik, kısa veya aynı değerlerden oluşan yapılandırma tüm veri erişimini kapatır (`503`). API çağrılarında `Authorization: Bearer <anahtar>` başlığını kullanın. Panelde anahtarı kenar çubuğundaki parola alanına girin. Okuma anahtarı yalnız okur; senaryo anahtarı okur ve what-if çalıştırır; yeniden çizelgeleme anahtarı okur ve ACTIVE değişikliği ister. Anahtarlar yalnız yerel geliştirme içindir; kaynak koduna veya Git'e eklenmez.
+
+API işleminde aynı anda en fazla bir çözücü çağrısı çalışır; diğer istek `429/SOLVER_BUSY` ve `Retry-After` alır. Bu sınır yalnız tek API süreci içindedir. Panel ayrı süreçte çözücü çalıştırabilir; çok işçili/çok sunuculu dağıtım, küresel kuyruk ve gerçek kullanıcı hız sınırı G7/pilot tasarımında ele alınmalıdır.
 
 ## G2 uygulama ve kabul işleri
 

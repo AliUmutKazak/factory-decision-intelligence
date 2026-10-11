@@ -36,4 +36,17 @@ Komut belirtilen hash'i zorunlu tutar. Mühürlü `artifacts/reference/factory.d
 
 `ft10` çizelgesi uygundur; 30 saniye içinde en iyilik kanıtlanmadı. JSON çıktısında model amaç değeri ve alt sınır ayrı kaydedilir. Kaynak dosyanın kendisi ve hiçbir müşteri verisi depoya eklenmedi.
 
+## 11 Ekim 2026 tekrarlı denetim
+
+Aynı kaynak SHA-256 ve mühürlü referans DB ile `ft06`, `la01`, `la02`, `ft10` üçer kez yeniden çalıştırıldı. Her koşuda 30 saniye sınırı, tek worker, sabit seed ve aynı politika kullanıldı. [Makinece okunabilir matris](../artifacts/research/jsp-repeat-matrix-2026-10-11.json) giriş/kod hash'lerini, her sonucu ve doğrusal ara değerli p50/p95 çözücü sürelerini içerir.
+
+| Örnek | Geçerli ve düz JSP ile karşılaştırılabilir koşum | Tekrarlı makespan | Yorum |
+|---|---:|---|---|
+| `ft06` | 3/3 | 55, 55, 55 | `OPTIMAL`; bağımsız denetim geçti. |
+| `la01` | 3/3 | 666, 666, 666 | `OPTIMAL`; bağımsız denetim geçti. |
+| `la02` | 3/3 | 655, 655, 655 | `OPTIMAL`; bağımsız denetim geçti. |
+| `ft10` | 0/3 | 1505, 1505, 1505 | `FEASIBLE` ve fiziksel olarak geçerli; ilk düzenli vardiyayı aştığı için **eşit düz JSP koşulu sağlanmadı**. |
+
+Önceki tek `ft10` koşumundaki 938 değeri farklı kod hash'leri üzerinde elde edilmiş tarihsel sonuçtur. Bu son üç koşum, güncel kodun 30 saniyede aynı kaliteyi güvenilir biçimde verdiğini doğrulamıyor. `ft10` için optimum/üstünlük iddiası çıkarılmaz; zaman sınırı, model takvimi ve aday kalitesi G7/G8-T açık riski olarak kalır. Negatif sonuç saklanır, kaynak veya önceki ölçüm geriye dönük değiştirilmez.
+
 Bu sonuç **yalnız eşitlenmiş düz statik JSP alt kümesi** için matematiksel uygunluk ve optimum kanıtıdır. FDI'nin gerçek fabrika takvimi, setup, malzeme, WIP, gerçek sipariş gelişleri, maliyet/enerji/karbon modeli veya müşteri tasarrufu bu deneyle doğrulanmış olmaz. Daha büyük dış örneklerde takvim bağlayıcı olursa `comparable_static_jsp_subset` yanlış döner; aynı problem olarak yüzde iyileşme raporlanmaz. Bu G8-T teknik kanıtı, G8 saha kabulünü kapatmaz.

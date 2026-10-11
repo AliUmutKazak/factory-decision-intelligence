@@ -9,3 +9,12 @@ Yalnız `MACHINE_DOWN` için dispatch yolu açıktır. Kimlikli MES olayı iste�
 Başarılı çizelgeleme sonrası audit ve yeni run doğrulanarak `ACKED` yazılır. Solver/promotion hatası niyeti `PENDING` bırakır. Yayın sonrası ACK öncesi kapanma, sonraki çağrıda audit üzerinden toparlanır. Tek veritabanı içindeki kilit eşzamanlı çağrıların aynı olayı iki kez solve etmesini engeller; farklı altyapılar, harici worker'lar ve vendor transport için uçtan uca exactly-once garantisi değildir.
 
 Sentetik testler: eksik duruş süresi, doğru trigger/audit/ACK aktarımı, yayın sonrası kesinti, stale baseline, görev sapması politikası, solver hatasında bekleme, çelişkili audit ve eşzamanlı iki çağrı. Bunlar gerçek saha kabulü değildir. G5 kapısı açık kalır.
+
+## Yerel tek olay işletimi
+
+```powershell
+python -m scripts.dispatch_mes_intent --db data/factory.db
+python -m scripts.dispatch_mes_intent --db data/factory.db --event-id 17 --execute
+```
+
+İlk komut mevcut outbox'ı salt okunur açıp bekleyen niyetleri listeler ve ACTIVE'i değiştirmez; tablo henüz yoksa `OUTBOX_UNAVAILABLE` döner, boş kuyruk varsaymaz. İkinci komut yalnız seçilen olayı açıkça işler; olayda kayıtlı duruş süresi yoksa `--outage-duration-min 45` gibi ölçülmüş bir süre verilmelidir. `--execute` olmadan `--event-id` tek başına da inceleme modundadır. Çalışma zamanı DB'si yoksa dosya oluşturulmaz. Bu komut yerel operatör aracıdır; otomatik worker, vendor taşıma katmanı veya üretim yetkilendirmesi değildir.
