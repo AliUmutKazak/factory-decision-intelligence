@@ -8,9 +8,10 @@ from streamlit.testing.v1 import AppTest
 from src.scheduling.what_if import WhatIfEngine
 
 
-def test_hot_order_timeout_shows_warning_without_success():
+def test_hot_order_timeout_shows_warning_without_success(dashboard_lab_credentials):
     dashboard = Path(__file__).resolve().parents[1] / "dashboard" / "app.py"
     app = AppTest.from_file(str(dashboard), default_timeout=60).run()
+    app.sidebar.text_input[0].set_value(dashboard_lab_credentials["scenario"]).run()
     app.radio[0].set_value("🔥 Acil Sipariş Enjeksiyonu (Hot-Order)").run()
     next(widget for widget in app.number_input if widget.label == "Sipariş Miktarı:").set_value(51)
     next(widget for widget in app.slider if widget.label == "Öncelik Ağırlığı:").set_value(7)

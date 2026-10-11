@@ -14,6 +14,16 @@ from src.energy.energy_analytics import compute_energy_analytics
 from src.utils.db import get_db_connection
 
 
+@pytest.fixture
+def dashboard_lab_credentials(monkeypatch):
+    """Open the test dashboard through its explicit local access boundary."""
+    tokens = {"read": "r" * 48, "scenario": "s" * 48, "reschedule": "w" * 48}
+    monkeypatch.setenv("FDI_API_READ_TOKEN", tokens["read"])
+    monkeypatch.setenv("FDI_API_SCENARIO_TOKEN", tokens["scenario"])
+    monkeypatch.setenv("FDI_API_RESCHEDULE_TOKEN", tokens["reschedule"])
+    return tokens
+
+
 @pytest.fixture(scope="session", autouse=True)
 def ensure_full_pipeline_database():
     """
