@@ -1,6 +1,6 @@
 """
 ===============================================================================
-CORPORATE CARBON ANALYTICS & GHG PROTOCOL ACCOUNTING ENGINE
+MODELED CARBON SCENARIOS — NOT A VERIFIED CORPORATE GHG INVENTORY
 ===============================================================================
 Metodolojik Kapsam ve Entegrasyon Mimarisi (Denetim Madde 24):
 Kurumsal karbon ayak izi hesaplaması üç ana fabrika veri katmanına dayanır:
@@ -60,7 +60,7 @@ def compute_carbon_analytics(run_id=None, db_path=None, processed_dir=None, repo
     total_units = int(energy_kpi["total_units_produced"])
     makespan_hours = float(energy_kpi.get("makespan_hours", 0.0))
 
-    # 1. Kapsam 1 Doğrudan Emisyonlar (GHG Protocol Scope 1: Lojistik / Forklift Tüketimi)
+    # 1. Modelled Scope 1 direct emissions (assumed forklift/logistics fuel use).
     # Madde 24: Activity Driver Modellemesi (Fallback Baseline: 85 L/hafta @ makespan scaling)
     # Gerçek sistem entegrasyonu: Forklift Hours / Trips / Material Moves / Fuel Transactions
     activity_driver_label = "SCHEDULE_SCALED_BASELINE (85 L/week fallback)"
@@ -102,14 +102,12 @@ def compute_carbon_analytics(run_id=None, db_path=None, processed_dir=None, repo
 
     # Rapor Çıktısı
     print("=" * 80)
-    print("            AŞAMA 7B: KURUMSAL KARBON ANALİTİĞİ (GHG PROTOCOL)            ")
+    print("            AŞAMA 7B: MODEL TABANLI KARBON SENARYOSU (ENVANTER DEĞİL)            ")
     print("=" * 80)
-    print(
-        f"Kapsam 1 Doğrudan Emisyonlar (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Dizel Lojistik - {actual_forklift_liters:.1f} L)"
-    )
+    print(f"Model Kapsam 1 (Scope 1) : {scope_1_tco2e:.3f} tCO2e (Varsayılan Dizel - {actual_forklift_liters:.1f} L)")
     print(f"  -> Activity Driver Modeli            : {activity_driver_label}")
-    print(f"Kapsam 2 Dolaylı Emisyonlar (Scope 2)   : {scope_2_tco2e:.3f} tCO2e (Şebeke Elektriği)")
-    print(f"Toplam Karbon Ayak İzi (Total tCO2e)   : {total_tco2e:.3f} tCO2e")
+    print(f"Model Kapsam 2 (Scope 2)   : {scope_2_tco2e:.3f} tCO2e (Şebeke faktörü varsayımı)")
+    print(f"Model Toplamı (Total tCO2e): {total_tco2e:.3f} tCO2e")
     print(f"Birim Karbon Yoğunluğu                 : {kgco2e_per_unit:.3f} kgCO2e / adet")
     print("-" * 80)
     print("MAKİNE BAZLI KAPSAM 2 KARBON DAĞILIMI:")

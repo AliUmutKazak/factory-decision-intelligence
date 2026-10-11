@@ -83,8 +83,10 @@ def extract_features_for_row(history_df, target_date):
 
 
 def evaluate_metrics(y_true, y_pred):
-    denom = np.sum(y_true)
-    wape = float(np.sum(np.abs(y_true - y_pred)) / denom) if denom > 0 else 0.0
+    denom = float(np.sum(y_true))
+    # WAPE has no denominator when the entire evaluation horizon has zero demand.
+    # Returning zero here would falsely reward a model that predicts positive demand.
+    wape = float(np.sum(np.abs(y_true - y_pred)) / denom) if denom > 0 else None
     rmse = float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
     bias = float(np.sum(y_pred - y_true))
     return wape, rmse, bias
@@ -158,7 +160,14 @@ def run_forecast_benchmark(run_id=None, db_path=None):
 
         num_folds = 4
         total_len = len(pdf)
+        min_history = num_folds * HORIZON_DAYS + 28
+        if total_len < min_history:
+            raise ValueError(
+                f"[FORECAST] {pid}: {num_folds} rolling-origin folds and 28-day lag "
+                f"need at least {min_history} observations; received {total_len}."
+            )
         candidate_models = ["Naive", "Seasonal Naive", "Moving Average", "Holt-Winters", "LightGBM"]
+        model_order = {name: index for index, name in enumerate(candidate_models)}
         cv_scores = {m: {"wape": [], "rmse": [], "bias": []} for m in candidate_models}
 
         fold_cutoffs = [total_len - (num_folds - f) * HORIZON_DAYS for f in range(num_folds)]
@@ -173,12 +182,21 @@ def run_forecast_benchmark(run_id=None, db_path=None):
 
         model_performance = {}
         for m_name in candidate_models:
-            avg_w = float(np.mean(cv_scores[m_name]["wape"]))
+            fold_wapes = cv_scores[m_name]["wape"]
+            avg_w = float(np.mean(fold_wapes)) if all(w is not None for w in fold_wapes) else None
             avg_r = float(np.mean(cv_scores[m_name]["rmse"]))
             avg_b = float(np.mean(cv_scores[m_name]["bias"]))
             model_performance[m_name] = (avg_w, avg_r, avg_b)
 
-        best_name = min(model_performance, key=lambda k: model_performance[k][0])
+        selection_metric = "RMSE" if any(w is None for w in cv_scores["Naive"]["wape"]) else "WAPE"
+        best_name = min(
+            model_performance,
+            key=lambda k: (
+                (model_performance[k][1], model_order[k])
+                if selection_metric == "RMSE"
+                else (model_performance[k][0], model_performance[k][1], model_order[k])
+            ),
+        )
         best_wape, best_rmse, best_bias = model_performance[best_name]
 
         for m_name, (w, r, b) in model_performance.items():
@@ -186,7 +204,7 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                 {
                     "SKU": pid,
                     "Model": m_name,
-                    "Backtest_WAPE": f"{w:.4f}",
+                    "Backtest_WAPE": f"{w:.4f}" if w is not None else "n/a (zero demand)",
                     "Backtest_RMSE": f"{r:.2f}",
                     "Backtest_Bias": f"{b:.1f}",
                     "Kazanan": "✓" if m_name == best_name else "",
@@ -261,12 +279,12 @@ def run_forecast_benchmark(run_id=None, db_path=None):
         competing_scores = {}
         for m, vals in model_performance.items():
             competing_scores[m] = {
-                "backtest_wape": round(vals[0], 4),
+                "backtest_wape": round(vals[0], 4) if vals[0] is not None else None,
                 "backtest_rmse": round(vals[1], 2),
                 "backtest_bias": round(vals[2], 2),
                 "fold_metrics": {
                     f"fold_{f_i + 1}": {
-                        "wape": round(cv_scores[m]["wape"][f_i], 4),
+                        "wape": round(cv_scores[m]["wape"][f_i], 4) if cv_scores[m]["wape"][f_i] is not None else None,
                         "rmse": round(cv_scores[m]["rmse"][f_i], 2),
                         "bias": round(cv_scores[m]["bias"][f_i], 2),
                     }
@@ -282,6 +300,7 @@ def run_forecast_benchmark(run_id=None, db_path=None):
             "cv_strategy": "rolling_origin_expanding_window",
             "folds": num_folds,
             "horizon_days": HORIZON_DAYS,
+            "selection_metric": selection_metric,
             "backtest_start": backtest_start_dt,
             "backtest_end": backtest_end_dt,
         }
@@ -300,6 +319,7 @@ def run_forecast_benchmark(run_id=None, db_path=None):
             model_params = dict(HOLT_WINTERS_DEFAULT_PARAMS)
         else:
             model_params = {**cv_spec, "model_family": best_name}
+        model_params["uncertainty_method"] = "normal_rmse_heuristic_uncalibrated"
 
         model_lineage_records.append(
             {
@@ -312,14 +332,19 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                 "training_end": str(pdf["order_date"].max())[:10],
                 "backtest_start": backtest_start_dt,
                 "backtest_end": backtest_end_dt,
-                "backtest_wape": round(float(best_wape), 4),
+                "backtest_wape": round(float(best_wape), 4) if best_wape is not None else None,
                 "backtest_rmse": round(float(best_rmse), 2),
                 "backtest_bias": round(float(best_bias), 2),
-                "validation_score_wape": round(float(best_wape), 4),
+                "validation_score_wape": round(float(best_wape), 4) if best_wape is not None else None,
                 "test_score_rmse": round(float(best_rmse), 2),
                 "hyperparameters": json.dumps(model_params),
                 "competing_models": json.dumps(competing_scores),
-                "selection_reason": f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f}).",
+                "selection_reason": (
+                    f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest "
+                    f"{selection_metric} ({best_rmse:.2f} RMSE; WAPE undefined on zero-demand fold)."
+                    if selection_metric == "RMSE"
+                    else f"Selected '{best_name}' via {num_folds}-fold rolling-origin backtest WAPE ({best_wape:.4f})."
+                ),
             }
         )
 
@@ -364,6 +389,7 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                 "feature_version": row.get("feature_version", FORECAST_FEATURE_VERSION),
                 "validation_score_wape": row.get("validation_score_wape"),
                 "test_score_rmse": row.get("test_score_rmse"),
+                "uncertainty_method": "normal_rmse_heuristic_uncalibrated",
             }
     else:
         for pid in ["P01", "P02", "P03", "P04", "P05"]:

@@ -20,6 +20,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.
 
+[Türkiye ve dünya bilim/pazar denetimi](docs/tr-global-science-market-audit-2026-10-11.md), akademik yöntemleri ve benzer APS ürünlerini FDI'nin gerçek kapsamıyla karşılaştırır. [Fabrika sunumu kanıt paketi](docs/factory-presentation-evidence-pack.md), gösterilebilir iddiaları, demo sırasını ve ilk görüşmede netleştirilecek kararları toplar.
+
 [Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
 
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
@@ -88,7 +90,7 @@ flowchart TD
     subgraph layer4["Katman 4: Operasyonel Çizelgeleme / Operational CP-SAT"]
         E --> I["Constraint Programming Motoru - OR-Tools"]
         H --> I
-        I --> J["Sonlu Kapasiteli İş-Makine Eşleme"]
+        I --> J["Sabit Rotalı, Sonlu Kapasiteli İş-Makine Çizelgeleme"]
         I --> K["Sıra Bağımlı Hazırlık Süresi SDST Minimizasyonu"]
         I --> L["Vardiya, Mola ve Takvim Kısıtları"]
     end
@@ -134,8 +136,8 @@ Model; müşteri taleplerini karşılarken üretim maliyeti, stok tutma maliyeti
 * $e_p$: Ürün $p$'nin birim üretiminde harcanan enerji (kWh/adet)
 * $c_{energy}$: Birim elektrik enerjisi fiyatı ($/kWh)
 * $co2_p$: Ürün $p$'nin üretimi kaynaklı karbon salımı ($kg\ CO_2/adet$)
-* $c_{carbon}$: Karbon emisyon vergi katsayısı ($/kg\ CO_2$)
-* $CO2_{cap,t}$: $t$ döneminde yasal olarak aşılamayacak azami karbon salımı tavanı ($kg$)
+* $c_{carbon}$: Model içi karbon fiyatı varsayımı ($/kg\ CO_2$); uygulanmış vergi veya gerçekleşmiş maliyet değildir
+* $CO2_{cap,t}$: $t$ dönemi için modelde varsayılan karbon senaryosu üst sınırı ($kg$); mevzuat limiti değildir
 
 #### Karar Değişkenleri (Decision Variables)
 * $X_{p,t} \ge 0$: $t$ döneminde üretilecek $p$ ürün hacmi

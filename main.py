@@ -88,7 +88,7 @@ def _run_end_to_end_pipeline(run_id):
         ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", lambda: run_mrp_engine(run_id=run_id)),
         ("Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)", lambda: solve_cpsat_schedule(run_id=run_id)),
         ("Aşama 7A: Enerji Analitiği & Yük Profili", lambda: compute_energy_analytics(run_id=run_id)),
-        ("Aşama 7B: Kurumsal Karbon Muhasebesi (GHG Protocol)", lambda: compute_carbon_analytics(run_id=run_id)),
+        ("Aşama 7B: Model Tabanlı Karbon Senaryosu", lambda: compute_carbon_analytics(run_id=run_id)),
     ]
 
     total_start = time.time()

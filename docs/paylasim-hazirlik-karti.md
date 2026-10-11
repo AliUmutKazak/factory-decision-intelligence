@@ -1,6 +1,6 @@
 # FDI paylaşım ve saha doğrulama sınırı
 
-**Durum:** 11 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Hedef, fabrika bağlantısı beklerken kodu ve kanıtlarını teknik olarak incelenebilir bir portföy sürümüne taşımaktır.
+**Durum:** 11 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. `v0.1.0-lab` için aynı commit üzerinde CI, Docker ve artifact digest'i elde edilmiştir; sonraki kod commit'inde kanıt tazelenir. [Türkiye/dünya denetimi](tr-global-science-market-audit-2026-10-11.md) ve [sunum paketi](factory-presentation-evidence-pack.md) iddia sınırını günceller.
 
 ## Paylaşılabilir teknik sürüm için kabul listesi
 
