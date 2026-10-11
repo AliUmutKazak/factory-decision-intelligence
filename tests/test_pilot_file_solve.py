@@ -62,6 +62,22 @@ def test_file_pilot_rejects_actuals_before_solver(monkeypatch):
     assert "actuals_or_wip_not_supported" in result["reasons"]
 
 
+def test_file_pilot_requires_explicit_model_assumptions(tmp_path, monkeypatch):
+    package = _package(tmp_path)
+    manifest_path = package / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("lab_model_assumptions")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("undeclared production assumptions must not reach solver")
+
+    monkeypatch.setattr("src.integration.pilot_file_solve.run_cpsat_scheduling", unexpected)
+    result = solve_pilot_file_package(manifest_path)
+    assert result["status"] == "UNSUPPORTED"
+    assert "explicit_zero_setup_and_no_wip_declaration_required" in result["reasons"]
+
+
 def test_file_pilot_rejects_calendar_it_cannot_map(tmp_path, monkeypatch):
     package = _package(tmp_path)
     _replace_csv(package, "shifts", "machine_id,start_min,end_min\nEX-M1,0,1500\n")

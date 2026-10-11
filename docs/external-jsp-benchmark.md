@@ -51,4 +51,10 @@ Aynı kaynak SHA-256 ve mühürlü referans DB ile `ft06`, `la01`, `la02`, `ft10
 
 Yeni kıyas raporları ham `code_hashes` yanında `code_hashes_normalized_lf` alanını da kaydeder. İkinci alan Python kaynak dosyalarının yalnız satır sonlarını LF'ye çevirip hash'ler; kaynak kodun diğer baytları değişirse hash yine değişir. Eski raporlarda bu alan bulunmadığından önceki koşumlara geriye dönük yeni kimlik atanmamıştır.
 
+## Aynı gün 60 saniyelik `ft10` tekrar deneyi
+
+30 saniyelik negatif sonucu silmeden, aynı kaynak SHA-256, mühürlü referans DB, tek worker, seed ve amaç politikasıyla yalnız `ft10` üç kez **60 saniye** sınırında yeniden çalıştırıldı. [Ham tekrar matrisi](../artifacts/research/jsp-ft10-repeat-60s-2026-10-11.json) her üç koşumda bağımsız denetimin `ACCEPTED`, düz JSP karşılaştırılabilirlik kontrolünün `true` ve makespan'in **930** olduğunu gösterir. Üçü de `FEASIBLE` döndü; 60 saniyede model optimumluğu kanıtı çıkmadı. Deneyin p50/p95 çözüm süreleri sırasıyla yaklaşık 60,006/60,012 saniyedir ve bütçeye dayanır. [Özgün araştırma karşılaştırma tablosu](https://pmc.ncbi.nlm.nih.gov/articles/PMC7571099/) `FT10` için 930'u bilinen optimum olarak listeler; bu dış bilgiyle sayısal eşleşme, bu üç koşumdaki çözücü durumunu `OPTIMAL` yapmaz.
+
+Sonuç: 30 saniyelik hizmet bütçesinde `ft10` aday kalitesi güvenilir değildir; 60 saniyede bu sabit makineli, hazırlıksız ve tek vardiya içine sığan alt problemde 3/3 geçerli 930 adayı bulunmuştur. Süre/kalite eğrisi başka makine, takvim, malzeme ve olay yüklerine taşınmaz. Üç tekrardan hız üstünlüğü veya gerçek fabrika SLO'su çıkarılmaz.
+
 Bu sonuç **yalnız eşitlenmiş düz statik JSP alt kümesi** için matematiksel uygunluk ve optimum kanıtıdır. FDI'nin gerçek fabrika takvimi, setup, malzeme, WIP, gerçek sipariş gelişleri, maliyet/enerji/karbon modeli veya müşteri tasarrufu bu deneyle doğrulanmış olmaz. Daha büyük dış örneklerde takvim bağlayıcı olursa `comparable_static_jsp_subset` yanlış döner; aynı problem olarak yüzde iyileşme raporlanmaz. Bu G8-T teknik kanıtı, G8 saha kabulünü kapatmaz.

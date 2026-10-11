@@ -22,6 +22,7 @@ Bu inceleme, FDI'nin birleşik yol haritasındaki fabrika öncesi kapsamı için
 - [Referans pilot profilindeki](reference-pilot-profile.md) artık yanlış olan “Excel okumaz/eşleme yapmaz” ifadesi; G4-T ön kontrolü açık CSV/XLSX eşlemesini yapar. Sonraki dar [tek vardiyalı dosya çözüm örneği](../examples/pilot-solve/README.md), yalnız tam sipariş ve boş WIP/actuals alt kümesini bellekte üretim çözücüsüne aktarır.
 - Main CI'de doğrulanmış sentetik run paketinin indirilebilir aday artifact ve SHA-256 kimliği için adım eklendi. Kanıt, yalnız CI başarılı olduğunda mevcuttur; Git etiketi veya container image digest'i sayılmaz.
 - Güncel ortamda yapılan [tekrarlı dış JSP deneyi](external-jsp-benchmark.md#11-ekim-2026-tekrarlı-denetim), küçük üç örnekte 3/3 uygun sonuç verdi; `ft10` 30 saniyede geçerli olsa da düz JSP karşılaştırma koşulunu 0/3 sağladı. Eski tek koşumun değeri güncel sonuç gibi sunulmaz; ham kod hash'i satır sonu farkından etkilenebildiği için bundan tek başına algoritma değişikliği çıkarılmaz.
+- [60 saniyelik ek `ft10` matrisi](external-jsp-benchmark.md#aynı-gün-60-saniyelik-ft10-tekrar-deneyi) aynı problemde 3/3 bağımsız geçerli ve düz JSP ile karşılaştırılabilir 930 adayına ulaştı; tüm koşular `FEASIBLE` kaldı. [Özgün araştırma](https://pmc.ncbi.nlm.nih.gov/articles/PMC7571099/) 930'u bilinen optimum olarak listeler, ancak FDI'nin 30 saniyelik servis hedefi veya genel fabrika performansı bundan kanıtlanmaz.
 
 ## Açık kalan fabrika öncesi teknik kararlar
 

@@ -612,6 +612,7 @@ def _inspect_pilot_package(manifest_path: str | Path) -> tuple[dict[str, Any], d
         "origin": origin,
         "quantity_unit": quantity_unit,
         "time_unit": time_unit,
+        "lab_model_assumptions": manifest.get("lab_model_assumptions"),
         "provenance": provenance,
         "manifest_sha256": manifest_digest,
         "files": evidence,

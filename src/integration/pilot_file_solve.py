@@ -39,6 +39,13 @@ _MASTER_TABLES = (
 )
 _RUN_TABLES = ("sku_production_plan", "mrp_plan", "machine_capacity_plan", "machine_state_snapshot")
 _RUN_ID = "LAB-FILE-PILOT"
+_MODEL_ASSUMPTIONS = {
+    "setup": "ZERO",
+    "material": "NOT_MODELED",
+    "maintenance": "NONE",
+    "overtime": "NONE",
+    "execution_state": "NOT_STARTED",
+}
 
 
 def _integer(value: float, name: str, *, positive: bool = False) -> int:
@@ -113,6 +120,7 @@ def solve_pilot_file_package(
         "manifest_sha256": preflight["manifest_sha256"],
         "file_sha256": {name: value["sha256"] for name, value in preflight["files"].items()},
         "preflight_status": preflight["status"],
+        "lab_model_assumptions": preflight.get("lab_model_assumptions"),
         "scope": "READ_ONLY_SINGLE_SHIFT_FIXED_ROUTE_LAB_NO_ACTIVE_PUBLICATION_NO_CUSTOMER_KPI",
     }
     reasons: list[str] = []
@@ -122,6 +130,8 @@ def solve_pilot_file_package(
         reasons.append("full_order_complete_baseline_required")
     if data.get("actuals"):
         reasons.append("actuals_or_wip_not_supported")
+    if preflight.get("lab_model_assumptions") != _MODEL_ASSUMPTIONS:
+        reasons.append("explicit_zero_setup_and_no_wip_declaration_required")
     shifts: dict[str, tuple[int, int]] = {}
     shift_pairs: set[tuple[int, int]] = set()
     for row in data.get("shifts", []):

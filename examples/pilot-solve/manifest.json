@@ -5,6 +5,13 @@
   "quantity_unit": "piece",
   "baseline_quantity_basis": "FULL_ORDER",
   "time_unit": "minute",
+  "lab_model_assumptions": {
+    "setup": "ZERO",
+    "material": "NOT_MODELED",
+    "maintenance": "NONE",
+    "overtime": "NONE",
+    "execution_state": "NOT_STARTED"
+  },
   "files": {
     "orders": {"path": "orders.csv", "sha256": "9e32d7af27caf0a5b06a2eec33fd31f8adb2d73f194126554cc8768b4e9a0d55"},
     "machines": {"path": "machines.csv", "sha256": "50d96b5238d134ba26b69b937f16835154d6ea7ade6882ffd42e607f0696aa5b"},
