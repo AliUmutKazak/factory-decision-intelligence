@@ -113,6 +113,8 @@ jobs:
         echo "FDI_API_READ_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
         echo "FDI_API_SCENARIO_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
         echo "FDI_API_RESCHEDULE_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+    - name: Prepare writable single-host bind mounts
+      run: mkdir -p data/processed reports artifacts/runs
     - name: Build and prepare a fresh runtime
       run: docker compose up --build -d --wait --wait-timeout 240 api dashboard
     - name: Verify services and ACTIVE lineage
