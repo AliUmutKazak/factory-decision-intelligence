@@ -1,6 +1,6 @@
 # Temiz klonda yerel laboratuvar demosu
 
-Bu akış `v0.1.2-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
+Bu akış `v0.1.3-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
 
 ## 1. Kod ve bağımlılıklar
 
@@ -9,9 +9,16 @@ PowerShell'de:
 ```powershell
 git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
 Set-Location factory-decision-intelligence
-git checkout v0.1.2-lab
+git checkout v0.1.3-lab
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-windows.lock
+```
+
+Windows'ta `py` başlatıcısı yoksa ve `uv` kuruluysa aynı Python 3.11 ortamı şu komutlarla kurulabilir:
+
+```powershell
+uv venv --python 3.11 .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements-windows.lock
 ```
 
 Linux x86_64 için `python3.11 -m venv .venv` ve `.venv/bin/python -m pip install -r requirements-linux.lock` kullanılır. Paket kurulumu internet gerektirir; tam sürümler lock dosyalarındadır. Kurulum başarısızsa çözüm üretmeye geçmeden Python sürümünü ve paket hata çıktısını kontrol edin.

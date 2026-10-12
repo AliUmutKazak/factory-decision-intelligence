@@ -6,6 +6,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
   quality-gate:
@@ -83,7 +84,7 @@ jobs:
 
     - name: Upload verified synthetic release candidate
       id: release_artifact
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
       uses: actions/upload-artifact@v4
       with:
         name: fdi-lab-candidate-${{ github.sha }}
@@ -94,7 +95,7 @@ jobs:
         retention-days: 30
 
     - name: Record release candidate identity
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
       run: |
         echo "Commit: ${{ github.sha }}" >> "$GITHUB_STEP_SUMMARY"
         echo "Artifact: ${{ steps.release_artifact.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
