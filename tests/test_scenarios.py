@@ -98,7 +98,10 @@ def test_scenario_zero_production(isolated_env, monkeypatch):
     """Sıfır üretim senaryosunda boş tablonun şemasının korunduğunu doğrular."""
     monkeypatch.setenv("USE_FIXTURE", "fixture_zero_production.csv")
 
-    prep_mod.run_preprocessing()
+    source = prep_mod.run_preprocessing()
+    assert source["path"] == str(isolated_env["data_dir"] / "fixtures" / "fixture_zero_production.csv")
+    assert source["data_class"] == "SYNTHETIC"
+    assert len(source["sha256"]) == 64
     db_mod.initialize_database(run_id="SCENARIO_TEST")
     fc_mod.run_forecast_benchmark(run_id="SCENARIO_TEST")
     plan_mod.run_planning_pipeline(run_id="SCENARIO_TEST")

@@ -12,7 +12,7 @@ Kaynak: kullanıcı tarafından sağlanan `FDI_Tum_Kalan_Isler_ve_Yol_Haritasi_v
 | A6 G8 kanıtı | [Son kodla JSP tekrarları](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm) ve [sentetik forecast geri testi](forecast-v012-lab-evidence.md) | `ft10` süre/kalite riski ve saha baseline'ı açık |
 | B1 G1-T | [Referans profil](reference-pilot-profile.md) varsayımlı | Fabrika KPI/sahip kabulü G1'de |
 | B2 G2-lab | Yerel ayrı roller, negatif testler, bağımlılık taraması; [Docker/secret-log CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38254780787) ayrıcalıksız kullanıcı ve anahtar sızıntısı kontrolünü geçti | IdP/TLS/IT kabulü sahada |
-| B3 G3 tek host | [Bundle/ACTIVE restore provası](g3-active-restore-rehearsal.md), izolasyon ve kilit kanıtı | Canlı RTO/RPO ve çok host ancak saha mimarisiyle |
+| B3 G3 tek host | [Yeni etiketle tekrar edilen Bundle/ACTIVE restore provası](g3-active-restore-rehearsal.md), izolasyon ve kilit kanıtı; tek yerel ölçüm 1,92 sn | Canlı RTO/RPO ve çok host ancak saha mimarisiyle |
 | B4 G4-T | [CSV/XLSX preflight](../examples/pilot-package/README.md) ve [dar solver alt kümesi](../examples/pilot-solve/README.md) | Müşteri mapping/birim/zaman izni ve gerçek veri bekler |
 | B5 G5-T | [Yerel kalıcı dispatcher](g5-reschedule-dispatcher.md) ve inbox/outbox replay | Vendor round-trip/ACK bekler |
 | B6 G6-T | [Sentetik execution replay](g6-synthetic-execution-replay.md) | Gerçek WIP/rework ve proses uzmanı kabulü bekler |
@@ -20,3 +20,5 @@ Kaynak: kullanıcı tarafından sağlanan `FDI_Tum_Kalan_Isler_ve_Yol_Haritasi_v
 | B8 G8-T | [JSP fizik kıyası](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm), [rolling-origin/Naive tahmin kıyası](forecast-v012-lab-evidence.md) ve maliyet-senaryo iddia sınırı | Gerçek plan, actuals ve finans kabulü G8/G11'de |
 
 Saha G1, G4-G8, G9-G12 için fabrika, yetkili veri sahibi, proses, IT/MES ve finans kanıtı hâlâ gereklidir. G13 ayrı karar olarak kapsam dışıdır. Bu listenin laboratuvar satırı “Kabul edildi” işareti vermez.
+
+Kaynak izinde düzeltme: yeni koşumlar dönüştürülmüş `factory_orders.csv` yerine adaptörün gerçekten okuduğu girdi dosyasını, SHA-256'sını ve veri sınıfını manifestte taşır. Girdi koşum sırasında değişirse mühürleme reddedilir. Panel ACTIVE run'ın mühürlü manifestindeki sınıfı her sekmede gösterir; eski veya eşleşmeyen manifestte sınıfı doğrulanmamış olarak işaretler. Bu değişiklik için başarılı main CI ve yeni sürüm etiketi ayrıca kaydedilecektir.

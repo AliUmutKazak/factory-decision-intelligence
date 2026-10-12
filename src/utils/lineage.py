@@ -716,7 +716,13 @@ def apply_run_retention_policy(
     return deleted_count
 
 
-def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: str = None) -> dict:
+def generate_run_manifest(
+    run_id: str,
+    db_path: str = None,
+    input_source_path: str = None,
+    input_data_class: str = "UNCLASSIFIED",
+    expected_input_sha256: str = None,
+) -> dict:
     """
     Denetim Madde 4 & Madde 18: Artifact & Input Lineage Manifest.
     - Pipeline çıktılarının (artifacts) SHA-256 ve boyutlarını mühürler.
@@ -799,8 +805,10 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
     # 2. Input Lineage & Environment Fingerprinting (Madde 18)
     # Fiilen boru hattında kullanılan girdi dosyasını (actual input source) tespit et
     actual_input_path = None
-    if input_source_path and Path(input_source_path).exists():
+    if input_source_path:
         actual_input_path = Path(input_source_path)
+        if not actual_input_path.is_file():
+            raise FileNotFoundError(f"Koşumun gerçek girdi dosyası bulunamadı: {actual_input_path}")
     elif "USE_FIXTURE" in os.environ:
         fixture_name = os.environ.get("USE_FIXTURE")
         if not fixture_name.endswith(".csv"):
@@ -814,8 +822,14 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
         actual_input_path = root_dir / "data" / "fixtures" / "demand_fixture.csv"
 
     input_dataset_info = {}
+    from src.utils.source_provenance import DATA_CLASSES
+
+    if input_data_class not in DATA_CLASSES:
+        raise ValueError(f"Geçersiz veri sınıfı: {input_data_class}")
     if actual_input_path and actual_input_path.exists():
         inp_sha, inp_size = compute_sha256(actual_input_path)
+        if expected_input_sha256 and inp_sha != expected_input_sha256:
+            raise ValueError("Gerçek girdi dosyası ön işleme sonrasında değişti")
         input_dataset_info = {
             "path": str(actual_input_path.relative_to(root_dir))
             if root_dir in actual_input_path.parents
@@ -824,6 +838,7 @@ def generate_run_manifest(run_id: str, db_path: str = None, input_source_path: s
             "size_bytes": inp_size,
             "adapter": "KaggleRetailDemandAdapter",
             "mapping_version": "canonical-v1",
+            "data_class": input_data_class,
         }
 
     inputs_lineage = {
