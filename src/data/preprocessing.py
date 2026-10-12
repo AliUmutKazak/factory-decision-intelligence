@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from src.config import RAW_DATA_DIR, get_runtime_paths
+from src.utils.source_provenance import sha256_file
 
 
 class DemandSourceAdapter(ABC):
@@ -177,7 +178,10 @@ def run_preprocessing():
     # CI/Test ortamında esneklik istenirse ALLOW_UNMAPPED çevre değişkeniyle açılabilir, varsayılan False'tur.
     allow_unmapped_env = os.environ.get("ALLOW_UNMAPPED", "False").lower() in ("true", "1", "yes")
     adapter = KaggleRetailDemandAdapter(allow_unmapped=allow_unmapped_env)
+    input_sha256 = sha256_file(data_source)
     factory_demand = adapter.adapt(data_source)
+    if sha256_file(data_source) != input_sha256:
+        raise ValueError("Gerçek girdi dosyası adaptör okuması sırasında değişti")
 
     # 1. Tarih kolonunu order_date olarak standartlaştır
     date_col = "order_date" if "order_date" in factory_demand.columns else "date"
@@ -218,3 +222,9 @@ def run_preprocessing():
         f"Tarih Aralığı                     : {factory_demand['order_date'].min()} -> {factory_demand['order_date'].max()}"
     )
     print("=" * 65)
+    # Downstream lineage must use the original input, not factory_orders.csv.
+    return {
+        "path": str(data_source),
+        "data_class": "SYNTHETIC" if data_source == fixture_path else "UNCLASSIFIED",
+        "sha256": input_sha256,
+    }

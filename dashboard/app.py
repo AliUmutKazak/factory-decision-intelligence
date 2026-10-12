@@ -24,6 +24,7 @@ from src.scheduling.what_if import WhatIfEngine
 from src.utils.db import get_db_connection
 from src.utils.lineage import get_active_pipeline_run
 from src.utils.solver_slot import SolverBusyError, solver_slot
+from src.utils.source_provenance import read_run_source
 
 st.set_page_config(
     page_title="Factory Decision Intelligence Platform",
@@ -212,6 +213,20 @@ git_sha_val = active_run.get("git_sha", "N/A")
 cfg_hash_val = active_run.get("config_hash", "N/A")
 trigger_src = active_run.get("trigger_source", "N/A")
 data_src_val = active_run.get("data_source", "N/A")
+data_class, manifest_source = read_run_source(
+    PROJECT_ROOT / "artifacts" / "runs" / run_id_val / "reports" / "run_manifest.json",
+    run_id_val,
+)
+data_label = {
+    "SYNTHETIC": "SENTETİK DEMO VERİSİ",
+    "OPEN": "AÇIK VERİ BENCHMARKI",
+    "CUSTOMER": "MÜŞTERİ VERİSİ",
+    "UNCLASSIFIED": "VERİ SINIFI DOĞRULANAMADI",
+}[data_class]
+if data_class == "UNCLASSIFIED":
+    st.warning(f"⚠️ {data_label} | Run: {run_id_val}. Kaynak sınıfı mühürlü manifestte doğrulanamadı.")
+else:
+    st.info(f"{data_label} | Run: {run_id_val} | Kaynak: {manifest_source}")
 
 target_run_id = run_id_val if run_id_val != "N/A" else None
 
@@ -314,6 +329,7 @@ tab_summary, tab_forecast, tab_plan, tab_schedule, tab_sustainability, tab_scena
 # TAB 1: YÖNETİCİ ÖZETİ
 # =============================================================
 with tab_summary:
+    st.caption(data_label)
     st.subheader("Bütünleşik Karar Akışı Göstergeleri")
 
     total_gross_demand = (
@@ -435,6 +451,7 @@ with tab_summary:
 # TAB 2: TALEP TAHMİNİ
 # =============================================================
 with tab_forecast:
+    st.caption(data_label)
     st.subheader("28 Günlük Tahminler ve Model Kıyaslama (Benchmark)")
     st.caption(
         "P10/P90 ve önerilen güvenlik stoğu, kalibre edilmemiş RMSE tabanlı model varsayımlarıdır; hizmet düzeyi garantisi değildir."
@@ -477,6 +494,7 @@ with tab_forecast:
 # TAB 3: TAKTİK PLANLAMA & MRP
 # =============================================================
 with tab_plan:
+    st.caption(data_label)
     st.subheader("Hiyerarşik Taktik Planlama & Zaman Fazlı MRP")
 
     if agg_df.empty or sku_df.empty:
@@ -550,6 +568,7 @@ with tab_plan:
 # TAB 4: ÇİZELGELEME GANTT
 # =============================================================
 with tab_schedule:
+    st.caption(data_label)
     st.subheader("OR-Tools CP-SAT Çizelgesi & Darboğaz Analizi")
 
     # ---------------------------------------------------------
@@ -713,6 +732,7 @@ with tab_schedule:
 # TAB 5: ENERJİ & KARBON
 # =============================================================
 with tab_sustainability:
+    st.caption(data_label)
     st.subheader("15 Dakikalık Model Yük Profili ve Karbon Senaryosu")
     st.caption("Simüle makine elektriği ve varsayılan forklift yakıtı; doğrulanmış tesis envanteri değildir.")
     # Madde 26: Sustainability tablolarını aktif run_id ile filtreleme (Active-run isolation)
@@ -772,6 +792,7 @@ with tab_sustainability:
 # 6. SEKME: ÇOK AMAÇLI SENARYO & KARAR DESTEK MATRİSİ
 # =========================================================
 with tab_scenarios:
+    st.caption(data_label)
     st.subheader("🎯 Çok Amaçlı Senaryo & Karar Destek Matrisi (Trade-Off Engine)")
     st.markdown(
         "Farklı makro ve operasyonel şokların (**Talep Artışı, Tezgâh Arızası, Enerji Tarifesi Şoku vb.**) "
@@ -843,6 +864,7 @@ with tab_scenarios:
 # 7. SEKME: MES CANLI YÜRÜTME & KAPALI ÇEVRİM KARAR DESTEĞİ
 # =============================================================
 with tab_mes:
+    st.caption(data_label)
     st.subheader("🏭 MES Sahadan Geribildirim & Dinamik Yeniden Çizelgeleme Kokpiti")
     st.markdown(
         "Bu panel, ERP/MES katmanından gelen fiili üretim verilerini ve sahadaki arıza/gecikme olaylarını izler. "

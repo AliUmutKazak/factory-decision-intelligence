@@ -92,12 +92,15 @@ def _run_end_to_end_pipeline(run_id):
     ]
 
     total_start = time.time()
+    source_info = None
 
     try:
         for stage_name, stage_func in stages:
             print(f">>> [{stages.index((stage_name, stage_func)) + 1}/8] {stage_name} başlatılıyor...")
             s_start = time.time()
-            stage_func()
+            stage_result = stage_func()
+            if stage_name.startswith("Aşama 1:"):
+                source_info = stage_result
             s_elapsed = time.time() - s_start
             print(f">>> [OK] {stage_name} tamamlandı ({s_elapsed:.2f} sn).\n")
 
@@ -139,16 +142,29 @@ def _run_end_to_end_pipeline(run_id):
             pass
 
         # Metadata kaydı (Sadece metadata alanlarını günceller, status değiştirmez)
+        if not isinstance(source_info, dict) or not all(
+            source_info.get(field) for field in ("path", "data_class", "sha256")
+        ):
+            raise ValueError("Ön işleme gerçek girdi kaynağını ve veri sınıfını bildirmedi")
+        source_path = Path(source_info["path"])
+        try:
+            source_ref = str(source_path.resolve().relative_to(base_dir.resolve()))
+        except ValueError:
+            source_ref = str(source_path)
         record_pipeline_run_metadata(
             run_id=run_id,
             orders_count=actual_orders_count,
-            data_source="data/processed/factory_orders.csv",
+            data_source=source_ref,
             db_path=str(staging_db),
         )
 
         # Artifact Manifest Mühürleme (Dosyaların hash'leri ve parmak izi çıkarılır)
         manifest = generate_run_manifest(
-            run_id=run_id, db_path=str(staging_db), input_source_path=str(staging_processed / "factory_orders.csv")
+            run_id=run_id,
+            db_path=str(staging_db),
+            input_source_path=str(source_path),
+            input_data_class=source_info["data_class"],
+            expected_input_sha256=source_info["sha256"],
         )
         print(
             f"[AUDIT] Artifact Manifest mühürlendi -> reports/run_manifest.json ({manifest['total_artifacts']} dosya)"

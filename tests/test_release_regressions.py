@@ -244,7 +244,13 @@ def test_sealing_failure_preserves_active_database_and_caches(tmp_path, monkeypa
             "compute_carbon_analytics",
             "validate_pipeline_run",
         ):
-            stack.enter_context(patch(f"main.{function}"))
+            mocked = stack.enter_context(patch(f"main.{function}"))
+            if function == "run_preprocessing":
+                mocked.return_value = {
+                    "path": str(tmp_path / "source.csv"),
+                    "data_class": "SYNTHETIC",
+                    "sha256": "test-source-hash",
+                }
         stack.enter_context(patch("main.generate_run_manifest", return_value={"total_artifacts": 0}))
         stack.enter_context(patch("main.seal_run_bundle", side_effect=RuntimeError("seal failure")))
         with pytest.raises(RuntimeError, match="seal failure"):
