@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir -r requirements-linux.lock
 
 # Proje kaynak kodunu kopyala
 COPY --chown=fdi:fdi . .
+RUN mkdir -p /app/runs /app/staging && chown -R fdi:fdi /app
 USER fdi
 
 # Varsayilan portlar (FastAPI: 8000, Streamlit: 8501)
