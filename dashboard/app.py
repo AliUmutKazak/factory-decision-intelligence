@@ -228,6 +228,14 @@ if data_class == "UNCLASSIFIED":
 else:
     st.info(f"{data_label} | Run: {run_id_val} | Kaynak: {manifest_source}")
 
+
+def label_plot(fig):
+    """Keep the source class visible when a Plotly chart is exported alone."""
+    original_title = fig.layout.title.text or ""
+    fig.update_layout(title_text=f"{original_title} | {data_label}" if original_title else data_label)
+    return fig
+
+
 target_run_id = run_id_val if run_id_val != "N/A" else None
 
 # --- 2. Veri Setlerini Aktif Run ID'ye Göre Çek ---
@@ -488,7 +496,7 @@ with tab_forecast:
                 labels={"forecast_date": "Tarih", "forecast_demand": "Tahmin Edilen Talep (Adet)"},
             )
             fig_fc.update_layout(hovermode="x unified")
-            st.plotly_chart(fig_fc, use_container_width=True)
+            st.plotly_chart(label_plot(fig_fc), use_container_width=True)
 
 # =============================================================
 # TAB 3: TAKTİK PLANLAMA & MRP
@@ -513,7 +521,7 @@ with tab_plan:
                 labels={"value": "Koli (Batches)", "period_week": "Hafta", "variable": "Metrik"},
                 title="Aile Bazlı Talep ve Üretim Dengesi",
             )
-            st.plotly_chart(fig_agg, use_container_width=True)
+            st.plotly_chart(label_plot(fig_agg), use_container_width=True)
 
         with col_p2:
             st.markdown("**1. Hafta SKU Üretim Hedefleri:**")
@@ -667,7 +675,7 @@ with tab_schedule:
 
         fig_gantt.update_layout(xaxis_title="Simülasyon Zamanı (Saat)", yaxis_title="Tezgâh")
         fig_gantt.update_yaxes(autorange="reversed")
-        st.plotly_chart(fig_gantt, use_container_width=True)
+        st.plotly_chart(label_plot(fig_gantt), use_container_width=True)
 
         sched_cols = [
             c
@@ -757,7 +765,7 @@ with tab_sustainability:
             )
             fig_load.add_hline(y=peak_kw, line_dash="dash", line_color="red", annotation_text=f"Peak: {peak_kw:.1f} kW")
             fig_load.add_hline(y=avg_kw, line_dash="dot", line_color="green", annotation_text=f"Avg: {avg_kw:.1f} kW")
-            st.plotly_chart(fig_load, use_container_width=True)
+            st.plotly_chart(label_plot(fig_load), use_container_width=True)
 
             if not mach_carb_df.empty and "scope_2_tco2e" in mach_carb_df.columns:
                 st.markdown("**Tezgâh Bazlı Kapsam 2 Emisyon Payı:**")
@@ -768,7 +776,7 @@ with tab_sustainability:
                     title="Makine Bazlı Karbon Salımı Dağılımı",
                     hole=0.4,
                 )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                st.plotly_chart(label_plot(fig_pie), use_container_width=True)
 
         with col_s2:
             st.markdown("### 💶 Dahili Karbon Fiyat Simülatörü (Internal Carbon Pricing)")
