@@ -101,7 +101,7 @@
   ],
   "lab_packages": [
     {"id": "G1-T", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/reference-pilot-profile.md"], "open_risk": "No customer KPI or site acceptance"},
-    {"id": "G2-lab", "status": "Çalışılıyor", "source_ids": [], "evidence": ["docs/security-boundary.md", "docs/dependency-security-2026-10-11.md"], "open_risk": "Complete local secret/log/container review; site identity remains external"},
+    {"id": "G2-lab", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/security-boundary.md", "docs/dependency-security-2026-10-11.md"], "code_commit": "492e13c772c7206a368087664138ed2c76e3fefb", "ci_run_id": 38251690447, "ci_docker_smoke": "success", "open_risk": "Site identity, TLS/network and IT acceptance remain external"},
     {"id": "G3-tek-host", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md"], "open_risk": "No live site RTO/RPO"},
     {"id": "G4-T", "status": "Kanıt hazır", "source_ids": ["pilot_package", "pilot_solve"], "evidence": ["examples/pilot-package/README.md", "examples/pilot-solve/README.md"], "open_risk": "No customer mapping or actuals acceptance"},
     {"id": "G5-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "open_risk": "No vendor endpoint or ACK"},
