@@ -17,6 +17,8 @@ jobs:
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
@@ -39,6 +41,9 @@ jobs:
         python -m pip install pip-audit==2.10.1
         python -m pip_audit -r requirements-linux.lock --strict
         python -m pip_audit -r requirements-windows.lock --strict
+
+    - name: Verify release and gate evidence inventory
+      run: python scripts/verify_evidence_register.py
 
     - name: "Quality Gate 1: Static Code Analysis & Formatting (Ruff)"
       run: |
@@ -108,10 +113,14 @@ jobs:
         echo "FDI_API_READ_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
         echo "FDI_API_SCENARIO_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
         echo "FDI_API_RESCHEDULE_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+    - name: Prepare writable single-host bind mounts
+      run: mkdir -p data/processed reports artifacts/runs
     - name: Build and prepare a fresh runtime
       run: docker compose up --build -d --wait --wait-timeout 240 api dashboard
     - name: Verify services and ACTIVE lineage
       run: |
+        test "$(docker compose exec -T api id -u)" != 0
+        test "$(docker compose exec -T dashboard id -u)" != 0
         curl --fail http://localhost:8501/_stcore/health
         curl --fail http://localhost:8000/ready > /tmp/ready-before.json
         docker compose exec -T api python scripts/verify_active_run.py
@@ -143,7 +152,25 @@ jobs:
         docker compose exec -T api python scripts/verify_active_run.py
     - name: Container logs
       if: always()
-      run: docker compose logs --no-color
+      run: |
+        docker compose logs --no-color > /tmp/fdi-compose.log
+        python - <<'PY'
+        import os
+        from pathlib import Path
+
+        logs = Path('/tmp/fdi-compose.log').read_text(errors='replace')
+        secrets = {
+            name: os.environ.get(name, '')
+            for name in ('FDI_API_READ_TOKEN', 'FDI_API_SCENARIO_TOKEN', 'FDI_API_RESCHEDULE_TOKEN')
+        }
+        leaked = [name for name, value in secrets.items() if value and value in logs]
+        for value in secrets.values():
+            if value:
+                logs = logs.replace(value, '[REDACTED]')
+        print(logs)
+        if leaked:
+            raise SystemExit('Access key appeared in container logs: ' + ', '.join(leaked))
+        PY
     - name: Stop containers
       if: always()
       run: docker compose down

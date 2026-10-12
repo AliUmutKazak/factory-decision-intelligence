@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-10-12",
+  "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
+  "latest_verified_release": {
+    "tag": "v0.1.2-lab",
+    "commit": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
+    "ci_run_id": 38158404770,
+    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38158404770",
+    "test_count": 339,
+    "quality_gate": "success",
+    "docker_smoke": "success",
+    "artifact_name": "fdi-lab-candidate-631719c0a24e724a552ae716e4d6c08d09a6d9f9",
+    "artifact_sha256": "76e5368752c3a0ab374442b143cea7a1b7c58e050307edf84ece5e67884f9ae3",
+    "artifact_retention_days": 30
+  },
+  "sources": {
+    "reference_db": {
+      "path": "artifacts/reference/factory.db",
+      "sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+      "sha256_mode": "byte_exact",
+      "data_class": "synthetic_reference",
+      "run_id": "RUN-20261006-00a0d3"
+    },
+    "pilot_package": {
+      "path": "examples/pilot-package/manifest.json",
+      "sha256": "62d4f3e26ba5f85f029ab845b1731222c2293f0870f3505cfda1d557f15b131e",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_file_package"
+    },
+    "pilot_solve": {
+      "path": "examples/pilot-solve/manifest.json",
+      "sha256": "7207fd46c0af4355b4fdc59d48427e9c47509f38acfc0c66d8f18d8be1bbc8b2",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_file_package"
+    },
+    "jsp_915_30s": {
+      "path": "artifacts/research/jsp-repeat-ortools915-30s-2026-10-11.json",
+      "sha256": "76443a3b6eccb5da4793db2af617f2bac726c36b0b9ce0803e33eb2cf1f86ddb",
+      "sha256_mode": "normalized_lf",
+      "data_class": "open_or_library_benchmark"
+    },
+    "jsp_915_60s": {
+      "path": "artifacts/research/jsp-repeat-ortools915-ft10-60s-2026-10-11.json",
+      "sha256": "cd8e778aec11fa3a43eb2eb19f0237b2565f882ca6deaee033d8f9984d9d00e0",
+      "sha256_mode": "normalized_lf",
+      "data_class": "open_or_library_benchmark"
+    },
+    "jsp_v012_30s": {
+      "path": "artifacts/research/jsp-repeat-v012-30s-2026-10-12.json",
+      "sha256": "005ef36578e44819b87f82f98d9c344d7ba7b5066e47c2d4882ce59d053644fc",
+      "sha256_mode": "normalized_lf",
+      "data_class": "open_or_library_benchmark"
+    },
+    "jsp_v012_60s": {
+      "path": "artifacts/research/jsp-repeat-v012-ft10-60s-2026-10-12.json",
+      "sha256": "1e256d195d85e8ab0d1ea86ae0275ba2f444e4f6f3328f7c941ecf9bdc0bb6a9",
+      "sha256_mode": "normalized_lf",
+      "data_class": "open_or_library_benchmark"
+    },
+    "g7_reference_v012": {
+      "path": "artifacts/research/g7-reference-load-v012-2026-10-12.json",
+      "sha256": "0fec6d1adc7e7f5a8a77f8983fe715c07717e783d9f035058997343ddd7f079b",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference"
+    },
+    "g7_hot_order_v012": {
+      "path": "artifacts/research/g7-hot-order-stress-v012-2026-10-12.json",
+      "sha256": "0fd363bcc810c61d8845351acdfec9e280cf032e08a12354f72fab02b4851932",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference"
+    },
+    "g7_timeout_v012": {
+      "path": "artifacts/research/g7-timeout-negative-control-v012-2026-10-12.json",
+      "sha256": "940d154e372bbc9ef613269cead67f7888fdd364155e0783dd7ce849af1da238",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_negative_control"
+    },
+    "forecast_v012": {
+      "path": "artifacts/research/forecast-v012-lab-2026-10-12.json",
+      "sha256": "09e9641a10b73248291acfa55f56e4912285b32c0e3392084ef0dfacc9520680",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_demand_fixture"
+    }
+  },
+  "gates": [
+    {"id": "G0", "status": "Kanıt hazır", "evidence_date": "2026-10-11", "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md"], "result": "v0.1.2-lab tag, 339 tests and Docker smoke at one main commit", "open_risk": "Any later source commit needs its own CI, artifact and tag", "decision_owner_role": "project owner", "accepted_by": null},
+    {"id": "G1", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Pilot charter template prepared", "open_risk": "No site, scope, KPI owner or signed baseline", "decision_owner_role": "pilot sponsor, planner and IT/MES", "accepted_by": null},
+    {"id": "G2", "status": "Çalışılıyor", "evidence_date": "2026-10-11", "source_ids": [], "evidence": ["docs/security-boundary.md"], "result": "Local fail-closed roles and negative access checks", "open_risk": "Site IdP, TLS, network and IT security acceptance", "decision_owner_role": "site IT/security", "accepted_by": null},
+    {"id": "G3", "status": "Çalışılıyor", "evidence_date": "2026-10-11", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md"], "result": "Single-host immutable bundle and temporary restore rehearsal", "open_risk": "Live recovery, RTO/RPO and any justified multi-host migration", "decision_owner_role": "site IT/operations", "accepted_by": null},
+    {"id": "G4", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md"], "result": "Only synthetic file intake is available", "open_risk": "Authorized customer dataset, mapping and data-owner acceptance", "decision_owner_role": "site data owner", "accepted_by": null},
+    {"id": "G5", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "result": "Local durable message replay and dispatch", "open_risk": "Vendor tenant, transport and round-trip ACK", "decision_owner_role": "site IT/MES", "accepted_by": null},
+    {"id": "G6", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/g6-synthetic-execution-replay.md"], "result": "Synthetic partial-production replay", "open_risk": "Real started work, WIP, scrap, rework and resource rules", "decision_owner_role": "site process expert", "accepted_by": null},
+    {"id": "G7", "status": "Çalışılıyor", "evidence_date": "2026-10-12", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012"], "evidence": ["docs/g7-v012-lab-envelope.md"], "result": "Local timing, controlled timeout and ACTIVE preservation evidence", "open_risk": "Site workload, SLO, alerts and operations acceptance", "decision_owner_role": "site operations", "accepted_by": null},
+    {"id": "G8", "status": "Bekliyor", "evidence_date": null, "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md"], "result": "Independent fixed-machine benchmark and synthetic rolling-origin forecast only", "open_risk": "Real same-snapshot planner baseline, forecast and physical/cost acceptance", "decision_owner_role": "site planner and KPI owner", "accepted_by": null},
+    {"id": "G9", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Shadow pilot design only", "open_risk": "Representative cycles, human decisions and actuals", "decision_owner_role": "pilot sponsor and planner", "accepted_by": null},
+    {"id": "G10", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Fail-safe laboratory runtime only", "open_risk": "G9 acceptance, controlled operation and rollback", "decision_owner_role": "site operations and IT", "accepted_by": null},
+    {"id": "G11", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Modeled business case only", "open_risk": "Applied decisions, actuals and finance-reconciled net benefit", "decision_owner_role": "site finance", "accepted_by": null},
+    {"id": "G12", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md"], "result": "Single-site POC architecture only", "open_risk": "Second-site repeatability and support cost", "decision_owner_role": "product owner", "accepted_by": null},
+    {"id": "G13", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md"], "result": "Out of current scope", "open_risk": "Separate risk, business case and OT acceptance", "decision_owner_role": "site and product owner", "accepted_by": null}
+  ],
+  "lab_packages": [
+    {"id": "G1-T", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/reference-pilot-profile.md"], "open_risk": "No customer KPI or site acceptance"},
+    {"id": "G2-lab", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/security-boundary.md", "docs/dependency-security-2026-10-11.md"], "code_commit": "492e13c772c7206a368087664138ed2c76e3fefb", "ci_run_id": 38251690447, "ci_docker_smoke": "success", "open_risk": "Site identity, TLS/network and IT acceptance remain external"},
+    {"id": "G3-tek-host", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md"], "open_risk": "No live site RTO/RPO"},
+    {"id": "G4-T", "status": "Kanıt hazır", "source_ids": ["pilot_package", "pilot_solve"], "evidence": ["examples/pilot-package/README.md", "examples/pilot-solve/README.md"], "open_risk": "No customer mapping or actuals acceptance"},
+    {"id": "G5-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "open_risk": "No vendor endpoint or ACK"},
+    {"id": "G6-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g6-synthetic-execution-replay.md"], "open_risk": "No site WIP/rework semantics"},
+    {"id": "G7-lab", "status": "Kanıt hazır", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012"], "evidence": ["docs/g7-v012-lab-envelope.md"], "open_risk": "Small chosen sample; no customer load, alarm threshold or SLO"},
+    {"id": "G8-T", "status": "Kanıt hazır", "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md"], "open_risk": "ft10 30-second quality varies; no general solver superiority or customer KPI"}
+  ]
+}

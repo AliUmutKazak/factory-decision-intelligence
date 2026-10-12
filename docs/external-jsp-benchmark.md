@@ -64,3 +64,16 @@ Bu sonuç **yalnız eşitlenmiş düz statik JSP alt kümesi** için matematikse
 Bağımlılık güvenliği nedeniyle çözücü 9.14.6206'dan 9.15.6755'e yükseltildikten sonra aynı kaynak/referans hash'i, sabit seed, tek worker ve aynı normalleştirilmiş Python kod hash'leriyle ölçüm tekrarlandı. [30 saniyelik ham matris](../artifacts/research/jsp-repeat-ortools915-30s-2026-10-11.json) dört örneğin her birinde 3/3 bağımsız geçerli ve düz JSP ile karşılaştırılabilir aday verdi. `ft06` 55, `la01` 666, `la02` 655 değerlerinde üçer kez `OPTIMAL` kaldı. `ft10` 938, 938, 930 değerlerini üretti; üçünde de yalnız `FEASIBLE` durumu vardı. `ft10` p50/p95 çözüm süresi yaklaşık 30,003/30,037 saniyedir. [60 saniyelik yeni ham matris](../artifacts/research/jsp-repeat-ortools915-ft10-60s-2026-10-11.json) `ft10` için 3/3 geçerli, karşılaştırılabilir 930 adayı verdi; üç solver durumu yine `FEASIBLE`, p50/p95 yaklaşık 60,011/60,017 saniyedir.
 
 9.14'ün 30 saniyelik **0/3** negatif kaydı tarihsel olarak korunur. 9.15'in **3/3** sonucu bu sürümün ölçülen koşullarında iyileşmedir; süre sınırına dayanan çözüm kalitesi tek üçlü deneyle güvenilir bir servis seviyesi veya sürümler arası genel performans üstünlüğü kanıtı değildir. 30 saniyede optimum 930 yalnız bir tekrarda bulundu; 60 saniyede üç tekrarda bulundu, fakat solver optimumluğu kanıtlamadı. Diğer fabrika kısıtları ve müşteri planları için ayrı deney gerekir.
+
+## `v0.1.2-lab` koduyla 12 Ekim yeniden ölçüm
+
+Önceki 9.15 matrislerinden sonra `src/config.py` ve `src/scheduling/schedule_cpsat.py` değiştiği için eski ölçümün kod hash'i yayımlanan `v0.1.2-lab` ile eşleşmiyordu. Bu nedenle aynı OR-Library kaynak SHA-256'sı, mühürlü referans DB, OR-Tools 9.15.6755, tek worker, sabit seed ve `THROUGHPUT_MAX` politikasıyla [30 saniyelik dört örnek matrisi](../artifacts/research/jsp-repeat-v012-30s-2026-10-12.json) yeniden üretildi. Matrisin normalleştirilmiş kod hash'leri yayımlanan commit'in kaynak dosyalarıyla eşleşir; test ortamı ve her adayın bağımsız denetimi JSON içinde kayıtlıdır.
+
+| Örnek | Bağımsız kabul / tekrar | Makespan | Solver durumu | p50 / p95 solver süresi |
+|---|---:|---|---|---:|
+| `ft06` | 3/3 | 55, 55, 55 | 3× `OPTIMAL` | 0,183 / 0,245 sn |
+| `la01` | 3/3 | 666, 666, 666 | 3× `OPTIMAL` | 0,220 / 0,223 sn |
+| `la02` | 3/3 | 655, 655, 655 | 3× `OPTIMAL` | 2,828 / 2,888 sn |
+| `ft10` | 3/3 | 938, 938, 938 | 3× `FEASIBLE` | 30,021 / 30,026 sn |
+
+`ft10` için aynı kod ve kaynakla [60 saniyelik üç tekrar](../artifacts/research/jsp-repeat-v012-ft10-60s-2026-10-12.json) 3/3 bağımsız geçerli ve karşılaştırılabilir **930** adayına ulaştı; üçü de yine `FEASIBLE` ve p50/p95 60,012/60,081 saniyedir. 30 saniyede 930'a erişilememesi süre/kalite riskini teyit eder. Eski 9.15 koşusundaki 938/938/930 sonucu değiştirilmez; deneme ve kod kimliği farkı olmadan bu sonuçlar birleştirilmez. Az tekrarın p95 değeri saha SLO'su veya rakip üstünlüğü değildir. Referans run, müşteri planı, WIP, gerçek vardiya, malzeme, gerçek maliyet ve üretim kabulü hâlâ ayrı kanıt ister.

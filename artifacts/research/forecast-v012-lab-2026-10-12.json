@@ -1,0 +1,297 @@
+{
+  "status": "PASS",
+  "scope": "SYNTHETIC_ROLLING_ORIGIN_BACKTEST_NO_CUSTOMER_ACCURACY",
+  "measured_at_utc": "2026-10-12T12:42:23.655252+00:00",
+  "code_commit": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
+  "forecast_code_sha256_normalized_lf": "36d65b2bac23d42ab75f94c49edeb927f6b77a4947ecfcc240569ac2ce1b7e9a",
+  "fixture_sha256_normalized_lf": "1df96565675322d028f505beb048ee124c9e52685a96c041fed97b235e625000",
+  "lineage_sha256": "a156f8a6d50367d3cce6d105b8412acb00de2e21f3fa0de01b99dc7551bee6d3",
+  "metadata_sha256": "4eb27efb0fca30c8f0a6f3f00eeffa1dee26a53d6388c2b593dee647f1d6457b",
+  "run_id": "RUN-20261012-7cf0e6",
+  "model_version": "v3.1-zero-demand-metric",
+  "data_class": "SYNTHETIC",
+  "fold_count": 4,
+  "uncertainty_method": "normal_rmse_heuristic_uncalibrated",
+  "products": [
+    {
+      "product_id": "P01",
+      "selected_model": "Holt-Winters",
+      "selection_metric": "WAPE",
+      "backtest_start": "2017-09-11",
+      "backtest_end": "2017-12-31",
+      "selected_wape": 0.0363,
+      "selected_rmse": 8.5,
+      "selected_bias": -131.74,
+      "naive_wape": 0.0508,
+      "naive_rmse": 11.46,
+      "selected_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0268,
+          "rmse": 5.87,
+          "bias": -43.3
+        },
+        "fold_2": {
+          "wape": 0.0374,
+          "rmse": 9.4,
+          "bias": -115.38
+        },
+        "fold_3": {
+          "wape": 0.0519,
+          "rmse": 10.99,
+          "bias": -243.45
+        },
+        "fold_4": {
+          "wape": 0.0293,
+          "rmse": 7.74,
+          "bias": -124.84
+        }
+      },
+      "naive_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0704,
+          "rmse": 13.72,
+          "bias": 350.0
+        },
+        "fold_2": {
+          "wape": 0.0401,
+          "rmse": 9.73,
+          "bias": -142.0
+        },
+        "fold_3": {
+          "wape": 0.0378,
+          "rmse": 8.43,
+          "bias": -139.0
+        },
+        "fold_4": {
+          "wape": 0.055,
+          "rmse": 13.96,
+          "bias": -315.0
+        }
+      }
+    },
+    {
+      "product_id": "P02",
+      "selected_model": "Holt-Winters",
+      "selection_metric": "WAPE",
+      "backtest_start": "2017-09-11",
+      "backtest_end": "2017-12-31",
+      "selected_wape": 0.0133,
+      "selected_rmse": 8.56,
+      "selected_bias": -109.44,
+      "naive_wape": 0.0153,
+      "naive_rmse": 9.99,
+      "selected_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0113,
+          "rmse": 7.48,
+          "bias": 46.49
+        },
+        "fold_2": {
+          "wape": 0.0198,
+          "rmse": 12.08,
+          "bias": -268.03
+        },
+        "fold_3": {
+          "wape": 0.0124,
+          "rmse": 7.9,
+          "bias": -173.44
+        },
+        "fold_4": {
+          "wape": 0.0097,
+          "rmse": 6.77,
+          "bias": -42.77
+        }
+      },
+      "naive_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0249,
+          "rmse": 14.92,
+          "bias": 362.0
+        },
+        "fold_2": {
+          "wape": 0.0102,
+          "rmse": 6.96,
+          "bias": -8.0
+        },
+        "fold_3": {
+          "wape": 0.0135,
+          "rmse": 9.12,
+          "bias": -186.0
+        },
+        "fold_4": {
+          "wape": 0.0125,
+          "rmse": 8.96,
+          "bias": -148.0
+        }
+      }
+    },
+    {
+      "product_id": "P03",
+      "selected_model": "Holt-Winters",
+      "selection_metric": "WAPE",
+      "backtest_start": "2017-09-11",
+      "backtest_end": "2017-12-31",
+      "selected_wape": 0.0185,
+      "selected_rmse": 7.83,
+      "selected_bias": -95.77,
+      "naive_wape": 0.0207,
+      "naive_rmse": 8.7,
+      "selected_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0268,
+          "rmse": 11.13,
+          "bias": -187.64
+        },
+        "fold_2": {
+          "wape": 0.0159,
+          "rmse": 6.84,
+          "bias": -49.88
+        },
+        "fold_3": {
+          "wape": 0.0121,
+          "rmse": 5.03,
+          "bias": 18.08
+        },
+        "fold_4": {
+          "wape": 0.0191,
+          "rmse": 8.32,
+          "bias": -163.63
+        }
+      },
+      "naive_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0185,
+          "rmse": 7.89,
+          "bias": -69.0
+        },
+        "fold_2": {
+          "wape": 0.0189,
+          "rmse": 7.94,
+          "bias": -97.0
+        },
+        "fold_3": {
+          "wape": 0.0216,
+          "rmse": 8.43,
+          "bias": -156.0
+        },
+        "fold_4": {
+          "wape": 0.0239,
+          "rmse": 10.53,
+          "bias": -176.0
+        }
+      }
+    },
+    {
+      "product_id": "P04",
+      "selected_model": "Holt-Winters",
+      "selection_metric": "WAPE",
+      "backtest_start": "2017-09-11",
+      "backtest_end": "2017-12-31",
+      "selected_wape": 0.0371,
+      "selected_rmse": 8.28,
+      "selected_bias": -115.76,
+      "naive_wape": 0.0447,
+      "naive_rmse": 10.02,
+      "selected_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0481,
+          "rmse": 10.19,
+          "bias": -203.86
+        },
+        "fold_2": {
+          "wape": 0.0328,
+          "rmse": 6.75,
+          "bias": -50.18
+        },
+        "fold_3": {
+          "wape": 0.04,
+          "rmse": 8.85,
+          "bias": -158.16
+        },
+        "fold_4": {
+          "wape": 0.0275,
+          "rmse": 7.33,
+          "bias": -50.83
+        }
+      },
+      "naive_fold_metrics": {
+        "fold_1": {
+          "wape": 0.028,
+          "rmse": 6.61,
+          "bias": -33.0
+        },
+        "fold_2": {
+          "wape": 0.0493,
+          "rmse": 9.7,
+          "bias": -204.0
+        },
+        "fold_3": {
+          "wape": 0.0368,
+          "rmse": 7.97,
+          "bias": -65.0
+        },
+        "fold_4": {
+          "wape": 0.0646,
+          "rmse": 15.79,
+          "bias": -358.0
+        }
+      }
+    },
+    {
+      "product_id": "P05",
+      "selected_model": "Naive",
+      "selection_metric": "WAPE",
+      "backtest_start": "2017-09-11",
+      "backtest_end": "2017-12-31",
+      "selected_wape": 0.0464,
+      "selected_rmse": 8.33,
+      "selected_bias": -23.5,
+      "naive_wape": 0.0464,
+      "naive_rmse": 8.33,
+      "selected_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0395,
+          "rmse": 5.9,
+          "bias": -39.0
+        },
+        "fold_2": {
+          "wape": 0.0555,
+          "rmse": 9.19,
+          "bias": 130.0
+        },
+        "fold_3": {
+          "wape": 0.0399,
+          "rmse": 7.96,
+          "bias": -36.0
+        },
+        "fold_4": {
+          "wape": 0.0508,
+          "rmse": 10.25,
+          "bias": -149.0
+        }
+      },
+      "naive_fold_metrics": {
+        "fold_1": {
+          "wape": 0.0395,
+          "rmse": 5.9,
+          "bias": -39.0
+        },
+        "fold_2": {
+          "wape": 0.0555,
+          "rmse": 9.19,
+          "bias": 130.0
+        },
+        "fold_3": {
+          "wape": 0.0399,
+          "rmse": 7.96,
+          "bias": -36.0
+        },
+        "fold_4": {
+          "wape": 0.0508,
+          "rmse": 10.25,
+          "bias": -149.0
+        }
+      }
+    }
+  ]
+}

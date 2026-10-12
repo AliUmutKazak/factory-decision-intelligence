@@ -10,5 +10,8 @@ artifacts/research/g5-local-message-replay.json -text
 artifacts/research/jsp-repeat-matrix-2026-10-11.json -text
 examples/pilot-package/*.csv -text
 examples/pilot-solve/*.csv -text
+examples/pilot-package/*.json -text
+examples/pilot-solve/*.json -text
+examples/g7-hot-order-stress-cases.json -text
 artifacts/research/g4-file-pilot-lab-solve-2026-10-11.json -text
 artifacts/research/jsp-ft10-repeat-60s-2026-10-11.json -text
