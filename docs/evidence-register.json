@@ -3,15 +3,15 @@
   "as_of": "2026-10-12",
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
-    "tag": "v0.1.3-lab",
-    "commit": "d260e42fbd6e7ff7767572de6f784c79d5db3896",
-    "ci_run_id": 38254780787,
-    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38254780787",
-    "test_count": 339,
+    "tag": "v0.1.4-lab",
+    "commit": "37d402d849f1d5a4ae455dec80b4da0b1cbadea7",
+    "ci_run_id": 38268272543,
+    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38268272543",
+    "test_count": 342,
     "quality_gate": "success",
     "docker_smoke": "success",
-    "artifact_name": "fdi-lab-candidate-d260e42fbd6e7ff7767572de6f784c79d5db3896",
-    "artifact_sha256": "e73a6f76ffff917543b265e97fe4f2848834a443c407e5c2ecd55def0f28bbaa",
+    "artifact_name": "fdi-lab-candidate-37d402d849f1d5a4ae455dec80b4da0b1cbadea7",
+    "artifact_sha256": "62f0bfa2b54b029ff084e785f598090c42cbffcfa159fb94f263001a99653f76",
     "artifact_retention_days": 30
   },
   "sources": {
@@ -84,7 +84,7 @@
     }
   },
   "gates": [
-    {"id": "G0", "status": "Kanıt hazır", "evidence_date": "2026-10-12", "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md", "docs/clean-demo-v013-2026-10-12.md"], "result": "v0.1.3-lab tag, 339 tests, Docker smoke and clean-clone demo", "open_risk": "Any later source commit needs its own CI, artifact and tag", "decision_owner_role": "project owner", "accepted_by": null},
+    {"id": "G0", "status": "Kanıt hazır", "evidence_date": "2026-10-12", "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md", "docs/clean-demo-v014-2026-10-12.md"], "result": "v0.1.4-lab tag, 342 tests, Docker smoke and clean-clone demo", "open_risk": "Any later source commit needs its own CI, artifact and tag", "decision_owner_role": "project owner", "accepted_by": null},
     {"id": "G1", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Pilot charter template prepared", "open_risk": "No site, scope, KPI owner or signed baseline", "decision_owner_role": "pilot sponsor, planner and IT/MES", "accepted_by": null},
     {"id": "G2", "status": "Çalışılıyor", "evidence_date": "2026-10-11", "source_ids": [], "evidence": ["docs/security-boundary.md"], "result": "Local fail-closed roles and negative access checks", "open_risk": "Site IdP, TLS, network and IT security acceptance", "decision_owner_role": "site IT/security", "accepted_by": null},
     {"id": "G3", "status": "Çalışılıyor", "evidence_date": "2026-10-12", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md"], "result": "Single-host immutable bundle and temporary restore rehearsal repeated on v0.1.3-lab", "open_risk": "Live recovery, RTO/RPO and any justified multi-host migration", "decision_owner_role": "site IT/operations", "accepted_by": null},
@@ -101,7 +101,7 @@
   ],
   "lab_packages": [
     {"id": "G1-T", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/reference-pilot-profile.md"], "open_risk": "No customer KPI or site acceptance"},
-    {"id": "G2-lab", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/security-boundary.md", "docs/dependency-security-2026-10-11.md"], "code_commit": "d260e42fbd6e7ff7767572de6f784c79d5db3896", "ci_run_id": 38254780787, "ci_docker_smoke": "success", "open_risk": "Site identity, TLS/network and IT acceptance remain external"},
+    {"id": "G2-lab", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/security-boundary.md", "docs/dependency-security-2026-10-11.md"], "code_commit": "37d402d849f1d5a4ae455dec80b4da0b1cbadea7", "ci_run_id": 38268272543, "ci_docker_smoke": "success", "open_risk": "Site identity, TLS/network and IT acceptance remain external"},
     {"id": "G3-tek-host", "status": "Kanıt hazır", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md"], "open_risk": "No live site RTO/RPO"},
     {"id": "G4-T", "status": "Kanıt hazır", "source_ids": ["pilot_package", "pilot_solve"], "evidence": ["examples/pilot-package/README.md", "examples/pilot-solve/README.md"], "open_risk": "No customer mapping or actuals acceptance"},
     {"id": "G5-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "open_risk": "No vendor endpoint or ACK"},

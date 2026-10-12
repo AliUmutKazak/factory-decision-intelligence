@@ -4,6 +4,8 @@
 
 12 Ekim 2026'da `v0.1.3-lab` temiz klonundaki yeni `RUN-20261012-87c7e5` ACTIVE sürümüyle prova tekrarlandı: snapshot ve geri açılan kopyada bütünlük `ok`, tek ACTIVE, çizelge ve solver metadata, kaynak ve geri açılmış bundle hash doğrulaması `PASS`. Kaynak bundle manifest SHA-256 `7894e252312e081dcca3f503a5418ae66d6d80065b07fcca8012e5077d84d1f4`; bu tek yerel komutun duvar süresi 1,92 saniye. Aynı ortamda `tests/test_active_restore_rehearsal.py` iki testi ve `tests/test_runtime_lock_processes.py`/`tests/test_solver_slot.py` üç testi geçti. Bu süre canlı kurtarma taahhüdü veya RTO/RPO ölçümü değildir.
 
+Aynı gün `37d402d849f1d5a4ae455dec80b4da0b1cbadea7` main commit'inin temiz klonunda `RUN-20261012-fa560a` ACTIVE sürümü geçici olarak geri açıldı; bütünlük ve bundle doğrulaması `PASS`, bundle manifest SHA-256 `12ba8308ac546d09e1533b8d35bbdf6f511f963958e6d77108e1697f95f3d9d7`. Kaynak ve sınır [temiz demo kaydında](clean-demo-v014-2026-10-12.md) yer alır.
+
 ```powershell
 python -m src.utils.active_restore_rehearsal data/factory.db artifacts/runs
 ```
