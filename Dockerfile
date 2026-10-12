@@ -12,12 +12,17 @@ ARG FACTORY_BUILD_GIT_SHA=UNKNOWN
 ENV FACTORY_BUILD_GIT_SHA=${FACTORY_BUILD_GIT_SHA}
 LABEL org.opencontainers.image.revision=${FACTORY_BUILD_GIT_SHA}
 
+# GitHub runner's bind-mounted runtime directories use UID 1001. Keep the
+# demo services unprivileged after installing system and Python packages.
+RUN groupadd --gid 1001 fdi && useradd --uid 1001 --gid fdi --create-home fdi
+
 # Paket bagimliliklarini kopyala ve yukle
 COPY requirements-linux.lock .
 RUN pip install --no-cache-dir -r requirements-linux.lock
 
 # Proje kaynak kodunu kopyala
-COPY . .
+COPY --chown=fdi:fdi . .
+USER fdi
 
 # Varsayilan portlar (FastAPI: 8000, Streamlit: 8501)
 EXPOSE 8000 8501

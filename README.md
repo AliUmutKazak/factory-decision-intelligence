@@ -16,6 +16,10 @@
 
 ## Yol haritası ve kanıt durumu
 
+**Son doğrulanmış laboratuvar etiketi:** [`v0.1.2-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.2-lab), commit `631719c0a24e724a552ae716e4d6c08d09a6d9f9`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38158404770) 339 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz.
+
+**Hızlı inceleme:** [Temiz kurulum ve yerel demo](docs/quickstart-lab.md) · [dar sentetik dosya pilotu](examples/pilot-solve/README.md) · [sunulabilir iddialar](docs/factory-presentation-evidence-pack.md). Harici veri veya canlı ERP/MES erişimi gerektirmez.
+
 Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Proje sahibi katkı raporu](docs/proje-sahibi-katki-raporu.md), saha için gereken bilgi ve kararları pratik sırayla açıklar. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [run paketi geri yükleme provası](docs/bundle-restore-rehearsal.md) teknik kanıtlardır. [Yeni endüstriyel araştırmanın değerlendirmesi](docs/endustriyel-karar-zekasi-analizi-degerlendirmesi.md), [G7 sentetik vaka matrisi](docs/g7-hot-order-stress-matrix.md), [bağımsız takvim denetimi](docs/g7-calendar-candidate-audit.md) ve [malzeme zaman denetimi](docs/g7-material-release-audit.md) fabrika öncesi doğrulamanın kapsamını açıklar. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
 
 [Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.

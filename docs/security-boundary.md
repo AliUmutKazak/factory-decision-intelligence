@@ -1,6 +1,6 @@
 # G2 güvenlik sınırı ve API yetki envanteri
 
-Durum: **Çalışılıyor**. Bu kayıt, `FDI_Nihai_Birlesik_Yol_Haritasi.pdf` G2 için mevcut saldırı yüzeyini ve pilot öncesi gerekli kararları tanımlar. API ve panel laboratuvar kullanımı için varsayılan olarak kapalıdır; üç ayrı uzun Bearer anahtarı yapılandırıldığında okuma, senaryo ve yeniden çizelgeleme yetkileri açılır. Docker Compose portları yalnız `127.0.0.1` üzerinde yayımlanır. Bu paylaşılan anahtar düzeni kişisel kimlik, tesis kapsamı, TLS veya pilot IT kabulünün yerini tutmaz; internete açılmamalıdır.
+Durum: **Çalışılıyor**. Bu kayıt, `FDI_Nihai_Birlesik_Yol_Haritasi.pdf` G2 için mevcut saldırı yüzeyini ve pilot öncesi gerekli kararları tanımlar. API ve panel laboratuvar kullanımı için varsayılan olarak kapalıdır; üç ayrı uzun Bearer anahtarı yapılandırıldığında okuma, senaryo ve yeniden çizelgeleme yetkileri açılır. Docker Compose portları yalnız `127.0.0.1` üzerinde yayımlanır. Laboratuvar image'ı UID 1001 ile ayrıcalıksız çalışır; Docker CI bu kullanıcıyı doğrular. Bind-mount dizinlerinin yerel yazma izni kurulumda kontrol edilmelidir. Bu paylaşılan anahtar düzeni kişisel kimlik, tesis kapsamı, TLS veya pilot IT kabulünün yerini tutmaz; internete açılmamalıdır.
 
 ## Uç ve asgari yetki
 

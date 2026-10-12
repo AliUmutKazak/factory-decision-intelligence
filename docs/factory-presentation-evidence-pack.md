@@ -1,6 +1,6 @@
 # FDI fabrika görüşmesi için kanıt ve anlatım paketi
 
-**Sürüm bağlamı:** 11 Ekim 2026. Görüşme öncesi bu kaydı paylaşılacak commit/tag ve CI koşumuyla yeniden eşleştir. Bilimsel ve pazar dayanağı: [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
+**Sürüm bağlamı:** 12 Ekim 2026; son doğrulanmış sürüm `v0.1.2-lab`, commit `631719c0a24e724a552ae716e4d6c08d09a6d9f9`, [CI 38158404770](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38158404770). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
 
 ## 30 saniyelik tanım
 
@@ -12,7 +12,7 @@
 2. **Girdi ve sınır (1 dk):** Demo veri sınıfını “sentetik” veya “açık benchmark” diye göster. Sabit makine, tek ortak vardiya, tam sipariş ve boş WIP/actuals sınırını açıkça söyle.
 3. **Karar (3 dk):** [Demo komutları](demo-and-customer-pilot.md) ile aynı snapshot için mevcut plan ve solver adayını; feasible/optimal durumunu, termin, takvim, setup, enerji ve plan kararlılığı raporlarını göster.
 4. **İnsan kontrolü (1 dk):** FDI öneri üretir; üretim emri otomatik göndermez. Planlamacı kabul/ret ve gerekçeyi yönetir.
-5. **Kanıt (2 dk):** Aynı commit'teki test/CI, mühürlü run artifact'i, [dış sabit makine benchmark'ı](external-jsp-benchmark.md) ve [dosya pilotu örneği](../examples/pilot-solve/README.md) açılır. `FEASIBLE` ile `OPTIMAL` ayrılır.
+5. **Kanıt (2 dk):** Aynı commit'teki test/CI, mühürlü run artifact'i, [son kodla dış sabit makine benchmark'ı](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm), [tahmin geri testi](forecast-v012-lab-evidence.md) ve [dosya pilotu örneği](../examples/pilot-solve/README.md) açılır. `FEASIBLE` ile `OPTIMAL` ayrılır.
 6. **İlk pilot isteği (2 dk):** Tek hat/ürün ailesi, tek karar sahibi ve okuma amaçlı CSV/XLSX ile G1/G4–G8 kapsamı birlikte belirlenir. Gerçek veri izni gelmeden tasarruf/ROI sözü verilmez.
 
 ## İddia sicili
@@ -22,7 +22,7 @@
 | “Tek sunuculu, tekrar üretilebilir laboratuvar POC” | Release tag/commit + aynı commit CI kalite/Docker ve artifact digest; [paylaşım kartı](paylasim-hazirlik-karti.md) | Üretim servisi veya çok tesisli güvenilirlik kabulü |
 | “Açık/sentetik örneklerde fiziksel çizelge denetimi var” | [OR-Library bağımsız audit](external-jsp-benchmark.md); solver statüsü ve zaman sınırı | Rakip APS'den hızlı/iyi veya genel FJSP ispatı |
 | “Aynı model girdisinde plan politikaları karşılaştırılabilir” | [Business case demo](../artifacts/demo/business-case.md), aynı snapshot ve maliyet varsayımları | Müşteri tasarrufu, nakit fayda veya pozitif ROI |
-| “Tahmin modelleri zaman sıralı backtest ile seçilir” | `forecast_model_lineage`, fold bazlı WAPE/RMSE/bias; sıfır talepte WAPE `NULL` ve RMSE seçimi | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |
+| “Tahmin modelleri zaman sıralı backtest ile seçilir” | [Son sürüm sentetik tahmin kanıtı](forecast-v012-lab-evidence.md): dört fold, WAPE/RMSE/bias ve Naive kıyası; sıfır talepte WAPE `NULL` ve RMSE seçimi ayrı negatif testte | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |
 | “Enerji/karbon model senaryosu hesaplanır” | Simüle kWh, varsayılan yakıt/şebeke katsayısı ve model girdileri | GHG Protocol uyumlu kurumsal envanter, gerçek karbon azaltımı |
 | “Dar dosya pilotu teknik olarak denenebilir” | [CSV/XLSX ön kontrolü](../examples/pilot-package/README.md) ve [bellek içi çözüm](../examples/pilot-solve/README.md) | ERP/MES entegrasyonu, her proses tipi için hazır solver |
 

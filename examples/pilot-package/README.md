@@ -2,6 +2,12 @@
 
 Bu paket yalnız laboratuvar ön incelemesidir. Gerçek müşteri veya vendor verisi içermez. `manifest.json` kaynağı, zaman başlangıcını ve dosyaları tanımlar. Dakika alanları, zaman dilimi yazılı `origin` anına göredir. Miktar birimi bu örnekte **adet**, işlem süresi **dakika/adet** kabul edilmiştir; gerçek pilotta birim sözleşmesi ayrıca onaylanır.
 
+## Gerçek dosya gelirse veri işleme sınırı
+
+Bu depoya müşteri ham dosyası, gerçek kimlik eşlemesi, erişim anahtarı veya gerçek satırları içeren reject raporu eklenmez. Veri sahibi önce salt okunur kullanım amacı, yetkili alıcı, paylaşım yolu, saklama süresi ve silme sorumlusunu [pilot sözleşmesinde](../../docs/pilot-charter.md) kararlaştırır. İzin verilirse müşteri paketi depo dışında, erişimi sınırlı bir dizinde işlenir; kaynak dosya ve ön kontrol raporu aynı veri sınıfında korunur. Anonimleştirme gerekiyorsa sipariş/lot/ürün/makine kimlikleri **tutarlı** takma kimliklere çevrilir, zaman kaydırmasının sıra ve termin farklarını değiştirmediği doğrulanır; dönüşüm tablosu depoya girmez. Ön kontrolün bitmesi, veriyi saklama veya yayımlama izni vermez. Kararlaştırılan saklama süresi dolunca kaynak kopya, dönüşüm tablosu ve kimlik içerebilen raporlar veri sahibinin kuralına göre silinir; silme kaydı tutulur.
+
+Örnek paket yalnız `SYNTHETIC` sınıfındadır. Kabul ve ret adımları aşağıdaki komutla tekrar üretilebilir; gerçek veri yokken müşteri verisi veya anonimleştirilmiş saha örneği diye sunulmaz.
+
 Proje kökünden çalıştırma:
 
 ```powershell

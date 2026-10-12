@@ -1,0 +1,103 @@
+{
+  "scope": "LAB_SYNTHETIC_HOT_ORDER_REPLAY_NO_CUSTOMER_SLO",
+  "measured_at_utc": "2026-10-12T12:37:07.800716+00:00",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "staging_rule": "copy sealed COMPLETED run; mark only temporary copy ACTIVE",
+  "git_sha": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
+  "code_hashes": {
+    "src/scheduling/hot_order_load_probe.py": "c94b4076c7ea162bf2d8a5386988583b96751409a31bf79d9540b198f7be24d1",
+    "src/scheduling/hot_order_schedule_audit.py": "9535b79cac6b43b3e06aebdc9daf03d3a7b6a78d232055213bfc83417960ab83",
+    "src/scheduling/what_if.py": "3eaae1eb09b04f790a6d704c3ed6246e786f77858494eab8f2039a861da8b5f6",
+    "src/scheduling/schedule_cpsat.py": "26125869f94bdf065a431e9f5774717155131608f173c741f87777b6806c7064",
+    "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0"
+  },
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python_version": "3.14.7",
+  "ortools_version": "9.15.6755",
+  "hot_order": {
+    "order_id": "G7-RUSH-P01-51",
+    "product_id": "P01",
+    "quantity": 51,
+    "due_date_min": 1200,
+    "priority_weight": 20
+  },
+  "baseline_limit_seconds": null,
+  "baseline_source": "ACTIVE_SNAPSHOT",
+  "scenario_dispatch_rule": "EDD",
+  "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+  "scenario_limit_seconds": 0.001,
+  "repeats": 3,
+  "attempts": [
+    {
+      "number": 1,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "NO_ACCEPTED_SOLUTION",
+      "scenario_solver_wall_seconds": null,
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_proven_optimal_within_scope": null,
+      "replay_wall_seconds": 0.1681,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (0.001s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "staged_active_unchanged": true
+    },
+    {
+      "number": 2,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "NO_ACCEPTED_SOLUTION",
+      "scenario_solver_wall_seconds": null,
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_proven_optimal_within_scope": null,
+      "replay_wall_seconds": 0.1358,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (0.001s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "staged_active_unchanged": true
+    },
+    {
+      "number": 3,
+      "baseline_status": "FEASIBLE",
+      "baseline_solver_wall_seconds": null,
+      "baseline_original_solver_wall_seconds": 30.0029,
+      "scenario_status": "NO_ACCEPTED_SOLUTION",
+      "scenario_solver_wall_seconds": null,
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_proven_optimal_within_scope": null,
+      "replay_wall_seconds": 0.1969,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (0.001s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "staged_active_unchanged": true
+    }
+  ],
+  "summary": {
+    "scenario_status_counts": {
+      "NO_ACCEPTED_SOLUTION": 3
+    },
+    "scenario_accepted_count": 0,
+    "baseline_failure_count": 0,
+    "scenario_failure_count": 3,
+    "audit_failure_count": 0,
+    "baseline_timeout_count": 0,
+    "scenario_timeout_count": 3,
+    "replay_wall_p50_seconds": 0.1681,
+    "replay_wall_p95_seconds": 0.194,
+    "accepted_scenario_solver_wall_p50_seconds": null,
+    "accepted_scenario_solver_wall_p95_seconds": null,
+    "percentile_method": "linear interpolation over sorted samples"
+  }
+}
