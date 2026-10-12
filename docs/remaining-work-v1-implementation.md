@@ -1,6 +1,6 @@
 # 12 Ekim kalan işler raporu - uygulama izi
 
-Kaynak: kullanıcı tarafından sağlanan `FDI_Tum_Kalan_Isler_ve_Yol_Haritasi_v1.0.pdf`, 10 sayfa, SHA-256 `82f08be89442d0a4ae8cba01f6058625d03041356e30348c3068a6237fb7c248`. Bu tablo raporun A1-A6/B1-B8 işlerini repo kanıtına bağlar; [G0-G13 kabul durumunun tek kayıt yeri](evidence-register.json) ve saha karar sahipleri değişmez. Kaynak PDF depoya kopyalanmadı. Durum bu branştaki işlere aittir; henüz main CI onayı veya yeni sürüm etiketi anlamına gelmez.
+Kaynak: kullanıcı tarafından sağlanan `FDI_Tum_Kalan_Isler_ve_Yol_Haritasi_v1.0.pdf`, 10 sayfa, SHA-256 `82f08be89442d0a4ae8cba01f6058625d03041356e30348c3068a6237fb7c248`. Bu tablo raporun A1-A6/B1-B8 işlerini repo kanıtına bağlar; [G0-G13 kabul durumunun tek kayıt yeri](evidence-register.json) ve saha karar sahipleri değişmez. Kaynak PDF depoya kopyalanmadı. Yeni kaynak sürümü için başarılı main CI, artifakt kimliği ve aynı commit'e bağlı etiket ayrı kaydedilir.
 
 | İş | Depodaki sonuç | Kalan sınır |
 |---|---|---|
