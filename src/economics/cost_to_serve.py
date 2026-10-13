@@ -5,6 +5,7 @@ tek bir üretim ekonomisi amaç fonksiyonunda konsolide eder.
 """
 
 from dataclasses import dataclass, field
+from math import isfinite
 from typing import Any
 
 import pandas as pd
@@ -216,6 +217,7 @@ class TDABCVarianceResult:
     actual_cost: float
     variance: float
     primary_reason: str
+    reported_downtime_hours: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -226,6 +228,8 @@ class TDABCVarianceResult:
             "actual_cost": round(self.actual_cost, 2),
             "variance": round(self.variance, 2),
             "primary_reason": self.primary_reason,
+            "reported_downtime_hours": round(self.reported_downtime_hours, 2),
+            "capacity_cost_rate_per_hour": round(self.capacity_cost_rate_per_hour, 2),
         }
 
 
@@ -237,20 +241,28 @@ def compute_tdabc_variance(
     capacity_cost_rate_per_hour: float,
     downtime_hours: float = 0.0,
 ) -> TDABCVarianceResult:
-    """Time-Driven Activity-Based Costing (TDABC) runtime variance calculator (Madde 33)."""
+    """Model runtime cost variance; elapsed time alone does not establish a cause or cash saving."""
+    for name, value in (
+        ("planned_runtime_hours", planned_runtime_hours),
+        ("actual_runtime_hours", actual_runtime_hours),
+        ("capacity_cost_rate_per_hour", capacity_cost_rate_per_hour),
+        ("downtime_hours", downtime_hours),
+    ):
+        if not isfinite(value) or value < 0:
+            raise ValueError(f"{name} must be finite and nonnegative.")
+
     planned_cost = planned_runtime_hours * capacity_cost_rate_per_hour
     actual_cost = actual_runtime_hours * capacity_cost_rate_per_hour
+    if not isfinite(planned_cost) or not isfinite(actual_cost):
+        raise ValueError("Modeled runtime costs must be finite.")
     variance = actual_cost - planned_cost
 
     if variance > 0.01:
-        if downtime_hours > 0.0:
-            primary_reason = f"downtime ({round(downtime_hours, 2)} hrs)"
-        else:
-            primary_reason = "speed_loss / micro_stops"
+        primary_reason = "unattributed_runtime_overrun"
     elif variance < -0.01:
-        primary_reason = "efficiency_gain"
+        primary_reason = "unattributed_runtime_underrun"
     else:
-        primary_reason = "on_target"
+        primary_reason = "no_material_runtime_variance"
 
     return TDABCVarianceResult(
         order_id=order_id,
@@ -261,4 +273,5 @@ def compute_tdabc_variance(
         actual_cost=actual_cost,
         variance=variance,
         primary_reason=primary_reason,
+        reported_downtime_hours=downtime_hours,
     )
