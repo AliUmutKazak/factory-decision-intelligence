@@ -56,6 +56,18 @@ Bu tablo fonksiyon ve kanıt farkını gösterir; lisans, fiyat, hız, ürün ka
 | [PyJobShop](https://pyjobshop.org/stable/) | Açık kaynak çizelgeleme kitaplığı, FJSP ve çoklu kaynak ortamları. | FDI'nin tek makine rotası genel FJSP değildir. Paylaşımda teknik kapsam farkı yazılır. |
 | [Timefold Task Scheduling](https://docs.timefold.ai/job-scheduling/latest/user-guide/use-cases) | Makine/operatör, değişim süresi, ortak takım ve olayda yeniden planlama dokümantasyonu. | FDI'de bu kısıtların hepsi yok; ileride saha kuralı gerektiren ihtiyaç havuzu olarak tutulur. |
 
+### 14 Ekim ek kontrolü: 2.0-ALPHA rakip tablosu
+
+Kullanıcının sağladığı 2.0-ALPHA strateji PDF'sindeki rakip zayıflıkları, ortak problem/veri/ölçüm veya fiyat teklifi olmadan kesin gerçek olarak yazılamaz. Aşağıdaki üretici sayfaları yalnız **beyan edilen kapsamı** gösterir; maliyet, kurulum süresi ve FDI ile performans karşılaştırması için kanıt değildir.
+
+| Çözüm ve birincil kaynak | Üreticinin anlattığı kapsam | FDI açısından düzeltme |
+|---|---|---|
+| [Cosmo Tech Supply Chain](https://cosmotech.com/solutions/cosmo-tech-supply-chain/) ve [ürün portalı](https://portal.cosmotech.com/) | Tedarik zinciri simülasyonu/optimizasyonu; portal API, web uygulaması ve dağıtım belgeleri de listeler. | “Yalnız eski mimari, çok pahalı, altı aydan uzun kurulum” genellemesi için burada bağımsız fiyat/süre kanıtı yok. FDI'nin küçük dosya pilotu ayrı kapsamdır. |
+| [Aspen Mtell](https://home.aspentech.com/en/products/apm/aspen-mtell) ve [AspenTech üretim portföyü](https://home.aspentech.com/-/media/aspentech/home/resources/white-papers/pdfs/fy25/q3/isw_wp_specialty-chemicals-manufacturing_v4.pdf) | Mtell varlık sağlığı ve kestirimci bakım ürünüdür; AspenTech ayrıca Plant Scheduler gibi planlama araçlarını tanıtır. | Tek bakım ürününden tüm satıcının ayrık çizelgelemede yetersizliği çıkmaz. FDI ile eş problemli bağımsız kıyas yok. |
+| [Doruk ProMANAGE](https://dorukotomasyon.com/EN/Products/ProMANAGE.aspx) | Üretim operasyonları, planlama, kalite ve bakım yönetimi anlatılır. | “Yalnız veri toplar, ileri karar desteği yoktur” sonucu üretici kapsamıyla uyumsuzdur; çözücü algoritması/kalitesi ayrıca incelenmeden üstünlük söylenmez. |
+| [Canias ERP MRP](https://canias.com/en/caniaserp-modules-2/mrp/) | Sipariş, hazırlık, makine ve işçilik sürelerine dayanan planlama/çizelgeleme alanları belirtilir. | “Yalnız sonsuz kapasite Gantt, matematiksel çözücü içermez” iddiası bu sayfadan doğrulanmaz. Kullanılan yöntem ve aynı veriyle performans bilinmiyor. |
+| [Logo Netsis ileri üretim planlama](https://cdn.logo.com.tr/files/logocomtr/Uploads/Documents/logo-netsis-3-enterprise-tan%C4%B1t%C4%B1m-bro%C5%9F%C3%BCr%C3%BC-tr.pdf) ve [Siemens yeşil çizelgeleme](https://static.sw.cdn.siemens.com/siemens-disw-assets/public/4i8zpmsc8c5pG0i5NzyK38/en-US/siemens-sw-greening-production-how-aps-minimizes-co2-footprint-white-paper.pdf) | Logo alternatif rota/setup ve yeniden çizelgeleme; Siemens enerji/CO₂ etkili çizelgeleme yaklaşımı anlatır. | “Yerli APS basit” ve “rakiplerde karbon yok” ifadeleri kullanılmaz. Satıcı raporu FDI ile eşit koşullu başarı kanıtı değildir. |
+
 ## Açıklar, bu turdaki değişiklik ve karar
 
 | Öncelik | Bulgu | Yapılan / yapılacak karar | Kapı |

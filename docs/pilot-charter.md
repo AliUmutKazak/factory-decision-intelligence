@@ -49,4 +49,4 @@ Fabrikanın fiilî planı ana karşılaştırmadır. FDI ve fiilî plan aynı bi
 - İlk veri snapshot'ı ve gerçek plan örneği: **bekliyor**.
 - G1 kabul tarihi, kabul veren kişiler ve karar kaydı: **bekliyor**.
 
-G1 tamamlandıktan sonra G2-G8 işlerinin eşikleri ve eforu bu kayıt üzerinden yeniden hesaplanır. Bu taslağın varlığı G1'in geçtiği anlamına gelmez.
+G1 tamamlandıktan sonra G2-G8 işlerinin eşikleri ve eforu bu kayıt üzerinden yeniden hesaplanır. [Problem keşfi rehberi](problem-discovery-guide.md) görüşmede toplanacak soruları, [ölçüm protokolü](pilot-measurement-protocol.md) ise aynı bilgi anındaki plan ve actuals kayıt sırasını tanımlar. Bu taslakların varlığı G1'in geçtiği anlamına gelmez.

@@ -26,6 +26,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Türkiye ve dünya bilim/pazar denetimi](docs/tr-global-science-market-audit-2026-10-11.md), akademik yöntemleri ve benzer APS ürünlerini FDI'nin gerçek kapsamıyla karşılaştırır. [Fabrika sunumu kanıt paketi](docs/factory-presentation-evidence-pack.md), gösterilebilir iddiaları, demo sırasını ve ilk görüşmede netleştirilecek kararları toplar.
 
+[14 Ekim stratejik rapor kararı](docs/validated-strategy-2026-10-14.md), kaynaklandırılmamış SaaS, AI ve tasarruf vaatlerini ayıklayıp mevcut POC kapsamını korur. [Problem keşfi rehberi](docs/problem-discovery-guide.md) ve [dar pilot ölçüm protokolü](docs/pilot-measurement-protocol.md) görüşme ve saha karşılaştırması için hazırlanmış şablonlardır; henüz müşteri bulgusu veya saha kabulü değildir.
+
 [Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
 
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
