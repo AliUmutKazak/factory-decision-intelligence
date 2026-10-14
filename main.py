@@ -36,6 +36,8 @@ from src.utils.lineage import (
 from src.utils.run_bundle import export_run_database, seal_run_bundle, verify_run_bundle
 from src.utils.runtime_lock import run_mutation_lock
 
+LAB_PIPELINE_SOLVE_LIMIT_SECONDS = 120.0
+
 
 def run_end_to_end_pipeline():
     base = Path.cwd() if (Path.cwd() / "data").exists() else Path(__file__).resolve().parent
@@ -86,7 +88,10 @@ def _run_end_to_end_pipeline(run_id):
         ("Aşama 3: ML Talep Tahmini (LightGBM)", lambda: run_forecast_benchmark(run_id=run_id)),
         ("Aşama 4: Hiyerarşik Taktik Planlama & SKU Ayrıştırma", lambda: run_planning_pipeline(run_id=run_id)),
         ("Aşama 5: Malzeme İhtiyaç Planlaması (MRP-I)", lambda: run_mrp_engine(run_id=run_id)),
-        ("Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)", lambda: solve_cpsat_schedule(run_id=run_id)),
+        (
+            "Aşama 6: Detaylı Çizelgeleme (Google OR-Tools CP-SAT)",
+            lambda: solve_cpsat_schedule(run_id=run_id, time_limit_seconds=LAB_PIPELINE_SOLVE_LIMIT_SECONDS),
+        ),
         ("Aşama 7A: Enerji Analitiği & Yük Profili", lambda: compute_energy_analytics(run_id=run_id)),
         ("Aşama 7B: Model Tabanlı Karbon Senaryosu", lambda: compute_carbon_analytics(run_id=run_id)),
     ]
