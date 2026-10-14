@@ -18,9 +18,17 @@
 
 Factory Decision Intelligence (FDI), üretim planı ve makine çizelgelemesi için **tek sunuculu bir karar destek laboratuvarı prototipidir**. Gösterilen sonuçlar sentetik veya açık benchmark verisidir; henüz fabrika, müşteri verisi, ERP/MES bağlantısı ya da saha faydası doğrulaması yoktur.
 
-![FDI synthetic demo dashboard showing planning indicators](docs/screenshots/01_executive_summary.png)
+![FDI dashboard summary from the current synthetic demo run](docs/screenshots/01_executive_summary.png)
 
-*Ekran görüntüsü sentetik demo verisi kullanır; gerçek bir fabrikanın sonucu değildir.*
+*Güncel uygulama görünümü; temiz sentetik demo koşumu, gerçek fabrika verisi değildir.*
+
+<details>
+<summary>Güncel CP-SAT çizelgesi ve operasyon ekranı</summary>
+
+![Current CP-SAT Gantt chart and schedule table from the synthetic demo](docs/screenshots/03_detailed_schedule_gantt.png)
+
+*Koşum: `RUN-20261014-aea139`. CP-SAT sonucu `FEASIBLE`; optimumluk kanıtı değildir.*
+</details>
 
 [Kurulum ve demo](docs/quickstart-lab.md) · [Sentetik dosya pilotu](examples/pilot-solve/README.md) · [Teknik kapsam ve kabul sınırı](docs/prefactory-technical-closure.md)
 
