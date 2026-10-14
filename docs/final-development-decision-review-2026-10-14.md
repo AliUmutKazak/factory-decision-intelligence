@@ -8,9 +8,11 @@ Rapordaki ana karar uygundur: FDI bugün **tek sunuculu, sentetik/açık veride 
 
 Raporun sayfa 3, 6 ve 8'indeki `v0.1.4-lab` ve “main CI/artifact bekleniyor” bilgisi artık tarihsel. `v0.1.6-lab`, `f3350772...` commit'i için [main CI 38497838377](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38497838377) 344 test, Docker başlangıç/yeniden başlatma ve sentetik artifact kanıtı verdi. [Temiz Windows klon provası](clean-demo-v016-2026-10-14.md) uçtan uca ACTIVE ve dar dosya örneklerini doğruladı. Bu kanıt **o commit'e** aittir; daha yeni kod otomatik olarak aynı sürüm kabulünü devralmaz.
 
+Bu incelemeden sonra panel düzeltmesini içeren `v0.1.7-lab` (`a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4`) ayrıca doğrulandı: [main CI 38556658542](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542) 344 test ve Docker işlerinde başarılı; [yeni temiz klon provası](clean-demo-v017-2026-10-14.md) ACTIVE ve dar dosya akışını geçti. Güncel kimlik [kanıt envanterindedir](evidence-register.json).
+
 | Rapordaki öneri | Nesnel sonuç | Bu turdaki karar |
 |---|---|---|
-| P0 sürüm kanıtı ve temiz demo | `v0.1.6-lab` için tamam | Yeniden aynı işi yapma; yeni kod için CI ayrı izlenir. |
+| P0 sürüm kanıtı ve temiz demo | `v0.1.7-lab` için tamam | Sonraki kaynak kodu için CI ve temiz demo ayrı izlenir. |
 | Solver status, amaç, bound ve gap görünürlüğü | Alanlar backend ve API'de vardı, panelin ana çizelge bölümünde amaç/bound/gap görünmüyordu. | Panelde ACTIVE run'a bağlı “Çözücü kanıtı ve sınırı” görünümü eklendi. `FEASIBLE` optimum diye sunulmaz; boşluk yalnız model amacı içindir. |
 | Problem keşfi, dar dosya sözleşmesi, güvenli yerel demo | Rehber, ön kontrol, sınırlar ve localhost güvenliği kayıtlı | Yeni müşteri bulgusu varmış gibi yazma. Görüşme ve saha kabulü açık kalır. |
 | İnsan onayı | Laboratuvar `reschedule` anahtarı isteği başlatır ve başarılı adayı doğrudan ACTIVE yapar. Ayrı aday inceleme/kabul adımı mevcut değildir. | Panel ve kullanım belgelerinde bu durum açık gösterilir. G9/G10 için gerçek planlamacı kabulü ayrı tasarlanır; bugünkü token kullanımına “saha insan onayı” denmez. |

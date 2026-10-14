@@ -3,15 +3,15 @@
   "as_of": "2026-10-14",
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
-    "tag": "v0.1.6-lab",
-    "commit": "f3350772b92a398599a50b1d258262aeb756627b",
-    "ci_run_id": 38497838377,
-    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38497838377",
+    "tag": "v0.1.7-lab",
+    "commit": "a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4",
+    "ci_run_id": 38556658542,
+    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542",
     "test_count": 344,
     "quality_gate": "success",
     "docker_smoke": "success",
-    "artifact_name": "fdi-lab-candidate-f3350772b92a398599a50b1d258262aeb756627b",
-    "artifact_sha256": "9df932d620bcd2065112835e901dfe6c080d517a95ab47b47af754371e1ca53d",
+    "artifact_name": "fdi-lab-candidate-a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4",
+    "artifact_sha256": "577307dda7a727898a6d846d63af43828621d8aad8da72e3b847faf05eadcc74",
     "artifact_retention_days": 30
   },
   "sources": {
@@ -84,7 +84,7 @@
     }
   },
   "gates": [
-    {"id": "G0", "status": "Kanıt hazır", "evidence_date": "2026-10-14", "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md", "docs/clean-demo-v016-2026-10-14.md"], "result": "v0.1.6-lab tag, 344 tests, Docker smoke and clean-clone demo", "open_risk": "Any later source commit needs its own CI, artifact and tag", "decision_owner_role": "project owner", "accepted_by": null},
+    {"id": "G0", "status": "Kanıt hazır", "evidence_date": "2026-10-14", "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md", "docs/clean-demo-v017-2026-10-14.md"], "result": "v0.1.7-lab tag, 344 tests, Docker smoke and clean-clone demo", "open_risk": "Any later source commit needs its own CI, artifact and tag", "decision_owner_role": "project owner", "accepted_by": null},
     {"id": "G1", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md", "docs/problem-discovery-guide.md", "docs/pilot-measurement-protocol.md"], "result": "Pilot charter, discovery and measurement templates prepared; no interviews or site acceptance", "open_risk": "No site, scope, KPI owner or signed baseline", "decision_owner_role": "pilot sponsor, planner and IT/MES", "accepted_by": null},
     {"id": "G2", "status": "Çalışılıyor", "evidence_date": "2026-10-11", "source_ids": [], "evidence": ["docs/security-boundary.md"], "result": "Local fail-closed roles and negative access checks", "open_risk": "Site IdP, TLS, network and IT security acceptance", "decision_owner_role": "site IT/security", "accepted_by": null},
     {"id": "G3", "status": "Çalışılıyor", "evidence_date": "2026-10-12", "source_ids": ["reference_db"], "evidence": ["docs/g3-active-restore-rehearsal.md", "docs/clean-demo-v014-2026-10-12.md"], "result": "Single-host immutable bundle and temporary restore rehearsal repeated on v0.1.4-lab", "open_risk": "Live recovery, RTO/RPO and any justified multi-host migration", "decision_owner_role": "site IT/operations", "accepted_by": null},
