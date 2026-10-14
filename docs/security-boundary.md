@@ -15,6 +15,8 @@ Durum: **G2 saha kapısı çalışılıyor; G2-lab kanıtı hazır**. Bu kayıt,
 
 Laboratuvar anahtarları farklı rollerin negatif testlerini sağlar. Panel de veri okuma ve doğrudan simülasyon/yeniden çizelgeleme öncesinde aynı yetkileri denetler. Bunlar kişi veya tesis kimliği taşımaz. G1'de fabrika ve IT/MES ile kesinleşecek pilot politikası için issuer, audience, süre, imza, rol ve ilgili tesis/hat kapsamı doğrulanmalıdır.
 
+`reschedule` yetkisi laboratuvar ortamında çözücü başarılıysa yeni sürümü doğrudan ACTIVE yapar. Bu akışta planlamacının adayı inceleyip kabul/ret verdiği ayrı bir adım yoktur; yerel token sahipliği kişi bazlı onay kanıtı değildir. G9/G10 saha akışında adayın incelenmesi, kabul/ret gerekçesi ve yayımlama yetkisi ayrı tasarlanıp test edilmelidir.
+
 ## Yerel kullanım
 
 `FDI_API_READ_TOKEN`, `FDI_API_SCENARIO_TOKEN`, `FDI_API_RESCHEDULE_TOKEN` ortam değişkenlerini birbirinden farklı ve en az 32 karakterlik rastgele değerlerle ayarlayın. Eksik, kısa veya aynı değerlerden oluşan yapılandırma tüm veri erişimini kapatır (`503`). API çağrılarında `Authorization: Bearer <anahtar>` başlığını kullanın. Panelde anahtarı kenar çubuğundaki parola alanına girin. Okuma anahtarı yalnız okur; senaryo anahtarı okur ve what-if çalıştırır; yeniden çizelgeleme anahtarı okur ve ACTIVE değişikliği ister. Anahtarlar yalnız yerel geliştirme içindir; kaynak koduna veya Git'e eklenmez.
