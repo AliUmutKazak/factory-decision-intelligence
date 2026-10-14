@@ -16,7 +16,7 @@
 
 ## Yol haritası ve kanıt durumu
 
-**Son doğrulanmış laboratuvar etiketi:** [`v0.1.6-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.6-lab), commit `f3350772b92a398599a50b1d258262aeb756627b`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38497838377) 344 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz.
+**Son doğrulanmış laboratuvar etiketi:** [`v0.1.7-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.7-lab), commit `a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542) 344 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. [Temiz Windows klon provası](docs/clean-demo-v017-2026-10-14.md) ayrıca tamamlandı. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz.
 
 **Hızlı inceleme:** [Temiz kurulum ve yerel demo](docs/quickstart-lab.md) · [dar sentetik dosya pilotu](examples/pilot-solve/README.md) · [sunulabilir iddialar](docs/factory-presentation-evidence-pack.md). Harici veri veya canlı ERP/MES erişimi gerektirmez.
 
