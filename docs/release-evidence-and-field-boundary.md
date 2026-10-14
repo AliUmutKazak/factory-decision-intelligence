@@ -1,4 +1,4 @@
-# FDI paylaşım ve saha doğrulama sınırı
+# Sürüm kanıtı ve saha kabul sınırı
 
 **Durum:** 14 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Son doğrulanmış sürüm `v0.1.7-lab` (`a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4`); aynı commit'teki [CI 38556658542](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542) 344 test ve Docker işlerinde başarılıdır. Artifakt SHA-256 değeri [G0 kaydında](fdi-roadmap-execution.md#g0-g13-kapı-matrisi) tutulur. Sonraki kaynak commit'i bu sürüm kanıtını devralmaz. [Türkiye/dünya denetimi](tr-global-science-market-audit-2026-10-11.md) ve [sunum paketi](factory-presentation-evidence-pack.md) iddia sınırını günceller.
 
@@ -22,4 +22,4 @@ Bu liste tamamlanınca kullanılacak ifade **“teknik olarak gösterilebilir ka
 3. **G9:** FDI önerisi ile insan kararını ve uygulanmış planı actuals'a bağlayan gölge gözlemi yap; üretim sistemine otomatik talimat gönderme.
 4. **G10–G11:** Yalnız kabul edilen kapsamda kontrollü işletim, geri dönüş ve finans tarafından uzlaştırılmış gerçekleşmiş faydayı ölç.
 
-Fabrika bağlantısı olmaması kodu, CI'ı, bağımsız kıyası veya demo açıklığını geliştirmeyi durdurmaz. Fabrika arayışı [fabrika bağımsız teknik hazırlıkların](benzer-projeler-teknik-konum.md) sonrasına bırakılır. Paylaşım sırasında erken ilgi gelirse kaydedilir; ilgi başlı başına pilot kabulü sayılmaz. G1 görüşmesinde gerçek tesis, kapsam ve izinler ayrıca kararlaştırılır. [Proje sahibi katkı raporu](proje-sahibi-katki-raporu.md) o görüşmede toplanacak bilgiyi listeler.
+Fabrika bağlantısı olmaması kodu, CI'ı, bağımsız kıyası veya demo açıklığını geliştirmeyi durdurmaz. Fabrika arayışı [fabrika bağımsız teknik hazırlıkların](scheduler-scope-comparison.md) sonrasına bırakılır. Paylaşım sırasında erken ilgi gelirse kaydedilir; ilgi başlı başına pilot kabulü sayılmaz. G1 görüşmesinde gerçek tesis, kapsam ve izinler ayrıca kararlaştırılır. [problem keşfi rehberi](problem-discovery-guide.md) ilk görüşmede sorulacak bilgileri listeler.

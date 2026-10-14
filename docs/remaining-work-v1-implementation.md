@@ -4,9 +4,9 @@ Kaynak: kullanıcı tarafından sağlanan `FDI_Tum_Kalan_Isler_ve_Yol_Haritasi_v
 
 | İş | Depodaki sonuç | Kalan sınır |
 |---|---|---|
-| A1 sürüm uyuşmazlığı | [G0 matrisi](fdi-roadmap-execution.md#g0-g13-kapı-matrisi) ve paylaşım kartı `v0.1.4-lab` commit/CI/digest'ine bağlandı; eski etiketler tarihsel kaldı | Sonraki kaynak commit'i için ayrı CI/tag gerekir |
+| A1 sürüm uyuşmazlığı | [G0 matrisi](fdi-roadmap-execution.md#g0-g13-kapı-matrisi) ve [sürüm kanıtı kaydı](release-evidence-and-field-boundary.md) `v0.1.4-lab` commit/CI/digest'ini belgeledi; eski etiketler tarihsel kaldı | Sonraki kaynak commit'i için ayrı CI/tag gerekir |
 | A2 tek kanıt envanteri | [JSON kayıt](evidence-register.json) ve CI'da [uyuşmazlık denetimi](../scripts/verify_evidence_register.py) | Saha kabulünde gerçek sahip/imza sonradan girilir |
-| A3 paylaşım metni | README, [sunum iddia sicili](factory-presentation-evidence-pack.md), [kamuya açık metin taslağı](public-share-copy.md) güncel etikete bağlandı | Dış gönderim yapılmadı; yeni tag olursa metin güncellenir |
+| A3 paylaşım metni | README, [sunum iddia sicili](factory-presentation-evidence-pack.md) güncel etikete bağlandı | Dış gönderim yapılmadı; yeni tag olursa metin güncellenir |
 | A4 temiz demo | [Yeni commit'in klon provası](clean-demo-v014-2026-10-12.md) pipeline, ACTIVE, girdi izi, panel ve dosya örneklerini; [v0.1.4-lab main CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38268272543) ayrıcalıksız kullanıcı, temiz başlangıç ve restart'ı geçti | Gerçek pilot kurulumunda saha IT kabulü gerekir |
 | A5 pilot dosya paketi | [Sentetik örnek, kaynak/hash/ret ve veri işleme sınırı](../examples/pilot-package/README.md) var | Gerçek saklama süresi, izin ve anonimleştirme kararı G1/G4'te |
 | A6 G8 kanıtı | [Son kodla JSP tekrarları](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm) ve [sentetik forecast geri testi](forecast-v012-lab-evidence.md) | `ft10` süre/kalite riski ve saha baseline'ı açık |

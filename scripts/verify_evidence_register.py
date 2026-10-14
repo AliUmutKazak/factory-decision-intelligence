@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REGISTER = ROOT / "docs/evidence-register.json"
 ROADMAP = ROOT / "docs/fdi-roadmap-execution.md"
-SHARE_CARD = ROOT / "docs/paylasim-hazirlik-karti.md"
+RELEASE_BOUNDARY = ROOT / "docs/release-evidence-and-field-boundary.md"
 GATE_ROW = re.compile(r"^\| (G\d{1,2}) [^|]*\| ([^|]*)\|", re.MULTILINE)
 
 
@@ -80,8 +80,8 @@ def verify() -> None:
         if rows[gate["id"]].strip() != gate["status"]:
             raise ValueError(f"Roadmap status disagrees with register: {gate['id']}")
 
-    share_card = SHARE_CARD.read_text(encoding="utf-8")
-    for content, label in [(roadmap, "roadmap"), (share_card, "share card")]:
+    release_boundary = RELEASE_BOUNDARY.read_text(encoding="utf-8")
+    for content, label in [(roadmap, "roadmap"), (release_boundary, "release boundary")]:
         if release["tag"] not in content or str(release["ci_run_id"]) not in content:
             raise ValueError(f"Current release evidence missing from {label}")
     if release["artifact_sha256"] not in roadmap:

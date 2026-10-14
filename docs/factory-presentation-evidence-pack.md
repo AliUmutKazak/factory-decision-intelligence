@@ -19,7 +19,7 @@
 
 | Sunulabilir ifade | Gösterilecek kanıt | Söylenmeyecek sonuç |
 |---|---|---|
-| “Tek sunuculu, tekrar üretilebilir laboratuvar POC” | Release tag/commit + aynı commit CI kalite/Docker ve artifact digest; [paylaşım kartı](paylasim-hazirlik-karti.md) | Üretim servisi veya çok tesisli güvenilirlik kabulü |
+| “Tek sunuculu, tekrar üretilebilir laboratuvar POC” | Release tag/commit + aynı commit CI kalite/Docker ve artifact digest; [sürüm kanıtı ve saha kabul sınırı](release-evidence-and-field-boundary.md) | Üretim servisi veya çok tesisli güvenilirlik kabulü |
 | “Açık/sentetik örneklerde fiziksel çizelge denetimi var” | [OR-Library bağımsız audit](external-jsp-benchmark.md); solver statüsü ve zaman sınırı | Rakip APS'den hızlı/iyi veya genel FJSP ispatı |
 | “Aynı model girdisinde plan politikaları karşılaştırılabilir” | [Business case demo](../artifacts/demo/business-case.md), aynı snapshot ve maliyet varsayımları | Müşteri tasarrufu, nakit fayda veya pozitif ROI |
 | “Tahmin modelleri zaman sıralı backtest ile seçilir” | [Son sürüm sentetik tahmin kanıtı](forecast-v012-lab-evidence.md): dört fold, WAPE/RMSE/bias ve Naive kıyası; sıfır talepte WAPE `NULL` ve RMSE seçimi ayrı negatif testte | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |

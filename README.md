@@ -7,10 +7,22 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![OR-Tools](https://img.shields.io/badge/Google%20OR--Tools-CP--SAT-EA4335?style=flat&logo=google&logoColor=white)](https://developers.google.com/optimization)
 [![PuLP](https://img.shields.io/badge/PuLP-LP%20Optimization-4B8BBE?style=flat)](https://coin-or.github.io/pulp/)
-[![CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg?event=pull_request)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
+[![CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
 [![Code Quality](https://img.shields.io/badge/Linter-Ruff%20Clean-black?style=flat)](https://beta.ruff.rs/docs/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## Project overview / Proje özeti
+
+Factory Decision Intelligence (FDI), üretim planı ve makine çizelgelemesi için **tek sunuculu bir karar destek laboratuvarı prototipidir**. Gösterilen sonuçlar sentetik veya açık benchmark verisidir; henüz fabrika, müşteri verisi, ERP/MES bağlantısı ya da saha faydası doğrulaması yoktur.
+
+![FDI synthetic demo dashboard showing planning indicators](docs/screenshots/01_executive_summary.png)
+
+*Ekran görüntüsü sentetik demo verisi kullanır; gerçek bir fabrikanın sonucu değildir.*
+
+[Kurulum ve demo](docs/quickstart-lab.md) · [Sentetik dosya pilotu](examples/pilot-solve/README.md) · [Teknik kapsam ve kabul sınırı](docs/prefactory-technical-closure.md)
 
 ---
 
@@ -20,7 +32,7 @@
 
 **Hızlı inceleme:** [Temiz kurulum ve yerel demo](docs/quickstart-lab.md) · [dar sentetik dosya pilotu](examples/pilot-solve/README.md) · [sunulabilir iddialar](docs/factory-presentation-evidence-pack.md). Harici veri veya canlı ERP/MES erişimi gerektirmez.
 
-Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Proje sahibi katkı raporu](docs/proje-sahibi-katki-raporu.md), saha için gereken bilgi ve kararları pratik sırayla açıklar. [Saha erişimi araştırmasının değerlendirmesi](docs/saha-erisim-raporu-degerlendirmesi.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [run paketi geri yükleme provası](docs/bundle-restore-rehearsal.md) teknik kanıtlardır. [Yeni endüstriyel araştırmanın değerlendirmesi](docs/endustriyel-karar-zekasi-analizi-degerlendirmesi.md), [G7 sentetik vaka matrisi](docs/g7-hot-order-stress-matrix.md), [bağımsız takvim denetimi](docs/g7-calendar-candidate-audit.md) ve [malzeme zaman denetimi](docs/g7-material-release-audit.md) fabrika öncesi doğrulamanın kapsamını açıklar. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
+Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygulama kaydında](docs/fdi-roadmap-execution.md) tutulur. [Açık benchmark ve veri sınırları](docs/benchmark-data-boundary-review.md), [sabit makineli dış çizelgeleme deneyi](docs/external-jsp-benchmark.md), [açık ambalaj verisi profili](docs/open-packaging-data-profile.md) ve [run paketi geri yükleme provası](docs/bundle-restore-rehearsal.md) teknik kanıtlardır. [Sentetik veri ve karar kapsamı](docs/synthetic-data-and-decision-scope.md), [G7 sentetik vaka matrisi](docs/g7-hot-order-stress-matrix.md), [bağımsız takvim denetimi](docs/g7-calendar-candidate-audit.md) ve [malzeme zaman denetimi](docs/g7-material-release-audit.md) fabrika öncesi doğrulamanın kapsamını açıklar. Laboratuvar sonuçları pilot fabrika onayı veya gerçekleşmiş müşteri faydası olarak değerlendirilmez.
 
 [Küresel kaynaklarla 11 Ekim teknik boşluk denetimi](docs/global-source-gap-review-2026-10-11.md), güvenlik, standart, çözücü ve veri platformu kararlarını birincil kaynaklara bağlar.
 
@@ -34,7 +46,7 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
 
-**Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
+**Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Sürüm kanıtı ve saha kabul sınırı](docs/release-evidence-and-field-boundary.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.
 
 ### İnceleyenler için dört doğrulanabilir sonuç
 

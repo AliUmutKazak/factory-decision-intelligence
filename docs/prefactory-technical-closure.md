@@ -23,6 +23,6 @@ Bu kayıt, birleşik yol haritasının **paylaşılabilir tek sunuculu laboratuv
 
 ## Paylaşım kararı
 
-Paylaşılabilir ifade: **“Tek sunuculu, sentetik/açık veride tekrar üretilebilir endüstriyel karar destek POC'si; sınırlı salt okunur dosya pilotu hazırlığı var.”** Teknik sürüm için aynı commit üzerinde tam CI, Docker temiz başlangıç/yeniden başlatma ve doğrulanmış run artifact kimliği gerekir. Sürüm etiketi bu kanıtın alındığı main commit'ine bağlanır. [Paylaşım kartı](paylasim-hazirlik-karti.md) gösterim kontrol listesidir.
+Paylaşılabilir ifade: **“Tek sunuculu, sentetik/açık veride tekrar üretilebilir endüstriyel karar destek POC'si; sınırlı salt okunur dosya pilotu hazırlığı var.”** Teknik sürüm için aynı commit üzerinde tam CI, Docker temiz başlangıç/yeniden başlatma ve doğrulanmış run artifact kimliği gerekir. Sürüm etiketi bu kanıtın alındığı main commit'ine bağlanır. [Paylaşım kartı](release-evidence-and-field-boundary.md) gösterim kontrol listesidir.
 
 Fabrika bulunduğunda G1 kapsam/KPI/rol onayı, G4–G8 gerçek veri ve vendor deneyi, G9 gölge gözlem, G10 kontrollü işletim, G11 finans uzlaştırması ve G12 ikinci tesis kanıtı ayrı yapılır. Bu işleri laboratuvar sonucuyla tamamlandı olarak işaretlemeyiz.

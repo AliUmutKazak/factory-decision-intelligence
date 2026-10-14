@@ -1,4 +1,4 @@
-# FDI'nin benzer teknik çalışmalara göre konumu
+# Çizelgeleme kapsamı ve teknik karşılaştırma
 
 **Tarih:** 8 Ekim 2026; 11 Ekim ek tarama: [Türkiye/dünya APS ve bilim denetimi](tr-global-science-market-audit-2026-10-11.md). Bu inceleme [birleşik yol haritasının](fdi-roadmap-execution.md) fabrika bağımsız hazırlığını önceliklendirmek içindir. Farklı problem ve veri kullanan araçlar arasında çözüm kalitesi, hız, satış veya saha başarısı sıralaması yapılmaz.
 
@@ -25,4 +25,4 @@
 4. **G4-T/G5-T/G6-T veri ve olay:** Kanonik CSV ön kontrolünden açık ret/eşleme raporuna ilerle; kaynak/hesaplanan/varsayım alanlarını ayır. Yerel tekrarlı/geç mesaj ve küçük kesinti/kısmi üretim örneklerini sınayarak veri kaybı veya iki kez sayım riskini araştır.
 5. **G2/G3 sınırı:** Yerel demo erişimi ve secret sınırını koru; geri yükleme/run izolasyonu ile eşzamanlı yayın tasarımını güçlendir. Kimlik sağlayıcısı, vendor taşıması ve canlı RTO/RPO sahaya göre belirlenecek; bunları varsayımla kabul etme.
 
-Bu sıra, [paylaşım hazırlık kartındaki](paylasim-hazirlik-karti.md) teknik POC hedefini ve PDF'nin G0-G13 kabul kapılarını korur. **Fabrika bulma/arama işi bu fabrika bağımsız teknik hazırlıkların sonrasındadır.** Erken gelen ilgi kaydedilebilir; gerçek pilot kapsamı, veri izni ve kabulü ancak ilgili tesisle G1'de kararlaştırılır. Bu yaklaşım G9-G12 saha aşamalarını ortadan kaldırmaz.
+Bu sıra, [paylaşım hazırlık kartındaki](release-evidence-and-field-boundary.md) teknik POC hedefini ve PDF'nin G0-G13 kabul kapılarını korur. **Fabrika bulma/arama işi bu fabrika bağımsız teknik hazırlıkların sonrasındadır.** Erken gelen ilgi kaydedilebilir; gerçek pilot kapsamı, veri izni ve kabulü ancak ilgili tesisle G1'de kararlaştırılır. Bu yaklaşım G9-G12 saha aşamalarını ortadan kaldırmaz.

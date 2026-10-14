@@ -1,4 +1,4 @@
-# Saha erişimi araştırması: FDI için karar kaydı
+# Açık benchmark ve veri sınırları: teknik karar kaydı
 
 Kaynak: `FDI_Saha_Erisimi_Bilimsel_Degerlendirme.pdf`, v1.0, 8 Ekim 2026, 11 sayfa, SHA-256 `0e5f974d2b9c214cfcf7f4ff02db39c31de345041c24aee69e7289d6a5065a58`. Bu kayıt, [birleşik yol haritasının](fdi-roadmap-execution.md) G4-T ve G8-T teknik hazırlığını ayrıntılandırır; G0-G13 saha kabul kapılarını değiştirmez.
 

@@ -1,4 +1,4 @@
-# Endüstriyel karar zekâsı araştırması: FDI için karar kaydı
+# Sentetik veri ve karar kapsamı: teknik karar kaydı
 
 Kaynak: `Endüstriyel Karar Zekası Analizi.pdf`, 13 sayfa; SHA-256 `9b5274aa8a41ba59e41e7224ad03a94587f525a356b5f5fa0d747c40c687c7f8`. Değerlendirme: 8 Ekim 2026. Bu araştırma [birleşik yol haritasına](fdi-roadmap-execution.md) yardımcı fikirler sunar; PDF'deki öneriler G0-G13 kapılarını değiştiren talimat veya fabrika kabulü değildir.
 

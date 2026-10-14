@@ -1,6 +1,6 @@
 # G7-T: etiketli sentetik acil sipariş stres matrisi
 
-**Tarih:** 8 Ekim 2026. [Endüstriyel karar zekâsı araştırmasının değerlendirmesi](endustriyel-karar-zekasi-analizi-degerlendirmesi.md), tek sentetik olayın tekrarını farklı ve açıkça etiketli girdilerle genişletmeyi önerir. Bu deney mevcut acil sipariş çözümü ve [bağımsız çekirdek uygunluk denetimini](g7-independent-candidate-audit.md) kullanır. Mühürlü referans DB'yi değiştirmeden her deneme için geçici `ACTIVE` kopyası kurar.
+**Tarih:** 8 Ekim 2026. [Endüstriyel karar zekâsı araştırmasının değerlendirmesi](synthetic-data-and-decision-scope.md), tek sentetik olayın tekrarını farklı ve açıkça etiketli girdilerle genişletmeyi önerir. Bu deney mevcut acil sipariş çözümü ve [bağımsız çekirdek uygunluk denetimini](g7-independent-candidate-audit.md) kullanır. Mühürlü referans DB'yi değiştirmeden her deneme için geçici `ACTIVE` kopyası kurar.
 
 ## Yöntem ve tekrarlama
 

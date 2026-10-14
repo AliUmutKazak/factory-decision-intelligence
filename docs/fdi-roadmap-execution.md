@@ -4,9 +4,9 @@ Kaynak: `FDI_Nihai_Birlesik_Yol_Haritasi.pdf`, v1.1, 7 Ekim 2026 (13 sayfa; SHA-
 
 12 Ekim tarihli 10 sayfalık kalan işler raporu (SHA-256 `82f08be89442d0a4ae8cba01f6058625d03041356e30348c3068a6237fb7c248`) A1-A6/B1-B8 iş sırasını güncelledi; [uygulama izi](remaining-work-v1-implementation.md) mevcut repo kanıtına bağlar. Bu rapor G0-G13 saha kabulünü otomatik değiştirmez.
 
-8 Ekim 2026 tarihli saha erişimi araştırması [ayrı karar kaydında](saha-erisim-raporu-degerlendirmesi.md) değerlendirildi. Dış FJSP örneği ve bağımsız çizelge denetimi G8-T'ye yardımcı teknik işlerdir; birleşik yol haritasının saha kapılarını kapatmaz.
+8 Ekim 2026 tarihli saha erişimi araştırması [ayrı karar kaydında](benchmark-data-boundary-review.md) değerlendirildi. Dış FJSP örneği ve bağımsız çizelge denetimi G8-T'ye yardımcı teknik işlerdir; birleşik yol haritasının saha kapılarını kapatmaz.
 
-Yeni [endüstriyel karar zekâsı araştırması](endustriyel-karar-zekasi-analizi-degerlendirmesi.md) G7/G8-T için etiketli sentetik olay çeşitliliğine katkı verdi. Gerçek makine telemetrisi gerektiren darboğaz/akış yöntemleri ve nedensel modeller, mevcut planlama çekirdeğinin tamamlanmış özelliği olarak kabul edilmedi.
+Yeni [endüstriyel karar zekâsı araştırması](synthetic-data-and-decision-scope.md) G7/G8-T için etiketli sentetik olay çeşitliliğine katkı verdi. Gerçek makine telemetrisi gerektiren darboğaz/akış yöntemleri ve nedensel modeller, mevcut planlama çekirdeğinin tamamlanmış özelliği olarak kabul edilmedi.
 
 14 Ekim tarihli [stratejik rapor karar kaydı](validated-strategy-2026-10-14.md), ayrı 2.0-ALPHA metindeki kanıtsız pazar, evrensel adaptör, her zaman optimum, SaaS ve ROI iddialarını paylaşım kapsamından çıkarır. [Problem keşfi rehberi](problem-discovery-guide.md) ve [pilot ölçüm protokolü](pilot-measurement-protocol.md) görüşme öncesi hazırlıktır; görüşme yapılmış veya G1/G8 kabul edilmiş sayılmaz. Fabrika arayışı proje sahibinin tercih ettiği gibi teknik hazırlıktan sonraki aşamada kalır.
 
@@ -31,7 +31,7 @@ Yeni [endüstriyel karar zekâsı araştırması](endustriyel-karar-zekasi-anali
 
 Her kayıt için kapı/görev kimliği, sorumlu, commit/run/dataset kimliği, ölçüm tarihi, kapsam, sonuç, açık risk, artifact bağlantısı ve kabul veren rol tutulur. Kaynak kod, veri, vendor profili veya ölçüm kapsamı değişirse etkilenen kanıt yeniden değerlendirilir. Takvim dolması kapıyı geçirmez.
 
-Fabrika bağımsız teknik sıra: **G0 sürüm → G1-T referans profil → G2/G3 teknik sınırları → G4-T veri hazırlığı ve G5-T mesajlaşma → G6-T üretim semantiği ve G7 işletim → G8-T bağımsız kıyas → paylaşılabilir teknik POC ve dar kapsamlı dosya pilotu teklifi**. Fabrika arayışı bu işlerin ön şartı değildir; proje sahibinin tercihine göre teknik hazırlık ve paylaşım olgunlaştıktan sonraki aşamadır. Erken gelen ilgi kaydedilebilir, fakat saha kapısı varsayımla kapanmaz. Fabrika anlaşmasından sonra G1, G4-G8 saha kabulü, G9 gölge pilot, G10 kontrollü üretim, G11 ekonomik kabul ve G12 ikinci tesis kurulumu izlenir. G13 ayrı yatırım kararıdır. Bağımsız tasarım işleri uygun bağımlılıklar altında paralel ilerleyebilir. [Benzer projelerle teknik konum](benzer-projeler-teknik-konum.md) bu sıranın gerekçesini açıklar.
+Fabrika bağımsız teknik sıra: **G0 sürüm → G1-T referans profil → G2/G3 teknik sınırları → G4-T veri hazırlığı ve G5-T mesajlaşma → G6-T üretim semantiği ve G7 işletim → G8-T bağımsız kıyas → paylaşılabilir teknik POC ve dar kapsamlı dosya pilotu teklifi**. Fabrika arayışı bu işlerin ön şartı değildir; proje sahibinin tercihine göre teknik hazırlık ve paylaşım olgunlaştıktan sonraki aşamadır. Erken gelen ilgi kaydedilebilir, fakat saha kapısı varsayımla kapanmaz. Fabrika anlaşmasından sonra G1, G4-G8 saha kabulü, G9 gölge pilot, G10 kontrollü üretim, G11 ekonomik kabul ve G12 ikinci tesis kurulumu izlenir. G13 ayrı yatırım kararıdır. Bağımsız tasarım işleri uygun bağımlılıklar altında paralel ilerleyebilir. [Benzer projelerle teknik konum](scheduler-scope-comparison.md) bu sıranın gerekçesini açıklar.
 
 ## Güncel teknik dayanak (11 Ekim 2026; önceki kayıtlar korunur)
 
@@ -116,7 +116,7 @@ Veri kaynağı türü her kayıt için **gerçek müşteri / açık benchmark / 
 
 ## Açık dış girdiler ve karar sahipleri
 
-Proje sahibinin katkı sırası ve kısa yanıt şablonu: [proje sahibi katkı ve karar raporu](proje-sahibi-katki-raporu.md).
+İlk görüşme ve veri keşfi için [problem keşfi rehberi](problem-discovery-guide.md) ile [pilot sözleşmesi](pilot-charter.md) kullanılır.
 
 1. Pilot fabrika, hat, ürün ailesi, planlama sahibi ve kabul verecek kişiler (şu anda pilot fabrika yok).
 2. ERP/MES vendor'ı, test tenant/endpoint, transport ve actuals kaynağı (şu anda test erişimi yok).
