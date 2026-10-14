@@ -1,6 +1,6 @@
 # FDI fabrika görüşmesi için kanıt ve anlatım paketi
 
-**Sürüm bağlamı:** 12 Ekim 2026; son doğrulanmış sürüm `v0.1.4-lab`, commit `37d402d849f1d5a4ae455dec80b4da0b1cbadea7`, [CI 38268272543](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38268272543). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
+**Sürüm bağlamı:** 14 Ekim 2026; son doğrulanmış sürüm `v0.1.6-lab`, commit `f3350772b92a398599a50b1d258262aeb756627b`, [CI 38497838377](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38497838377). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
 
 ## 30 saniyelik tanım
 

@@ -1,13 +1,13 @@
 # FDI paylaşım ve saha doğrulama sınırı
 
-**Durum:** 12 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Son doğrulanmış sürüm `v0.1.4-lab` (`37d402d849f1d5a4ae455dec80b4da0b1cbadea7`); aynı commit'teki [CI 38268272543](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38268272543) 342 test ve Docker işlerinde başarılıdır. Artifakt SHA-256 değeri [G0 kaydında](fdi-roadmap-execution.md#g0-g13-kapı-matrisi) tutulur. Sonraki kaynak commit'i bu sürüm kanıtını devralmaz. [Türkiye/dünya denetimi](tr-global-science-market-audit-2026-10-11.md) ve [sunum paketi](factory-presentation-evidence-pack.md) iddia sınırını günceller.
+**Durum:** 14 Ekim 2026. Bu kart, [G0–G13 uygulama kaydındaki](fdi-roadmap-execution.md) kabul kapılarını değiştirmez. Son doğrulanmış sürüm `v0.1.6-lab` (`f3350772b92a398599a50b1d258262aeb756627b`); aynı commit'teki [CI 38497838377](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38497838377) 344 test ve Docker işlerinde başarılıdır. Artifakt SHA-256 değeri [G0 kaydında](fdi-roadmap-execution.md#g0-g13-kapı-matrisi) tutulur. Sonraki kaynak commit'i bu sürüm kanıtını devralmaz. [Türkiye/dünya denetimi](tr-global-science-market-audit-2026-10-11.md) ve [sunum paketi](factory-presentation-evidence-pack.md) iddia sınırını günceller.
 
 ## Paylaşılabilir teknik sürüm için kabul listesi
 
 | Kontrol | Bugünkü kanıt veya açık iş | Kabul ölçüsü |
 |---|---|---|
 | Açık ürün tanımı | README, demo ve yol haritası POC sınırını anlatıyor | İlk sayfada amaç, tek sunuculu kapsam, sentetik/açık veri ve yapılmamış saha kabulü görünür |
-| Tekrarlanabilirlik | `v0.1.4-lab` main CI'ında kalite/test ve Docker başlangıç/yeniden başlatma başarılı; [aynı commit'in temiz klon provasında](clean-demo-v014-2026-10-12.md) uçtan uca run, ACTIVE doğrulama ve iki sentetik dosya örneği geçti | Paylaşılacak **aynı commit** üzerinde iki CI işi başarılı; temiz klonda kurulum ve `verify_active_run.py` başarılı |
+| Tekrarlanabilirlik | `v0.1.6-lab` main CI'ında kalite/test ve Docker başlangıç/yeniden başlatma başarılı; [aynı commit'in temiz klon provasında](clean-demo-v016-2026-10-14.md) uçtan uca run, ACTIVE doğrulama ve iki sentetik dosya örneği geçti | Paylaşılacak **aynı commit** üzerinde iki CI işi başarılı; temiz klonda kurulum ve `verify_active_run.py` başarılı |
 | Gösterim | Ölçülmüş sentetik benchmark ve [demo rehberi](demo-and-customer-pilot.md) var; eski ekran görüntüleri güncel commit kanıtı değildir | İzleyici örneği çalıştırabilir; sonuçlar veri türü ve solver sınırıyla birlikte okunur; kullanılacak görseller güncel sürümden alınır |
 | Güvenli kullanım | [G2 sınırı](security-boundary.md): API ve panel varsayılan kapalı; ayrık yerel erişim anahtarları var, Compose portları yerel adrese bağlı | Demo yalnız yerel/denetimli ortamda gösterilir; internetten API veya dashboard erişimi açılmaz |
 | Lisans ve kaynaklar | Proje kodu için kök `LICENSE` ve MESA şemaları için kendi lisans dosyası | README lisans beyanı gerçek dosyalara bağlanır; üçüncü taraf şemalar MIT kapsamı gibi sunulmaz |

@@ -1,6 +1,6 @@
 # Temiz klonda yerel laboratuvar demosu
 
-Bu akış `v0.1.4-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
+Bu akış `v0.1.6-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
 
 ## 1. Kod ve bağımlılıklar
 
@@ -9,7 +9,7 @@ PowerShell'de:
 ```powershell
 git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
 Set-Location factory-decision-intelligence
-git checkout v0.1.4-lab
+git checkout v0.1.6-lab
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-windows.lock
 ```
@@ -33,6 +33,8 @@ Linux x86_64 için `python3.11 -m venv .venv` ve `.venv/bin/python -m pip instal
 ```
 
 `verify_active_run.py` başarısızsa önceki ACTIVE veya raporu geçerli diye paylaşmayın. Dosya örneği **sentetik**, tek ortak vardiyalı, sabit makineli ve tam siparişlidir; `pilot_preflight`/`pilot_file_solve` fabrika sistemine yazmaz. Komut çıktısında kabul/ret, run kimliği, solver statüsü ve fizik denetimi ayrı okunur. `FEASIBLE` optimumluk kanıtı değildir.
+
+`main.py` laboratuvar akışı için 120 saniyelik çizelgeleme bütçesi kullanır; çözücünün genel 30 saniyelik varsayılanı ve API sınırı değişmez. Daha yavaş makinelerde demo birkaç dakika sürebilir. Süre dolarsa `UNKNOWN` başarısız sonuçtur; ACTIVE korunur ve yeniden deneme ayrıca değerlendirilir.
 
 ## 3. Yerel API ve panel
 

@@ -4,7 +4,7 @@ Bu kayıt, kullanıcının sağladığı altı sayfalık `FDI_Stratejik_Rapor_Ob
 
 ## Karar ve bugünkü kapsam
 
-FDI, tek sunuculu, insan denetimli **üretim karar destek laboratuvar POC'si** olarak kalır. Son doğrulanmış kod etiketi `v0.1.4-lab`; commit, CI, test sayısı ve artifakt kimliği [G0 kaydındadır](evidence-register.json). [Temiz klon provası](clean-demo-v014-2026-10-12.md), sentetik veri ve dar dosya örneğini gösterir. Bir fabrika, temsilî müşteri verisi veya ERP/MES test erişimi henüz yoktur. Bu nedenle herhangi bir saha kapısı, müşteri faydası veya ticari talep doğrulanmış sayılmaz.
+FDI, tek sunuculu, insan denetimli **üretim karar destek laboratuvar POC'si** olarak kalır. Son doğrulanmış kod etiketi `v0.1.6-lab`; commit, CI, test sayısı ve artifakt kimliği [G0 kaydındadır](evidence-register.json). [Temiz klon provası](clean-demo-v016-2026-10-14.md), sentetik veri ve dar dosya örneğini gösterir. Bir fabrika, temsilî müşteri verisi veya ERP/MES test erişimi henüz yoktur. Bu nedenle herhangi bir saha kapısı, müşteri faydası veya ticari talep doğrulanmış sayılmaz.
 
 14 Ekim incelemesinin yararlı kısmı: matematiksel karar motorunu korumak, veri ve karar izini sürdürmek, sentetik olumsuz vakaları sınamak, kullanıcı problemini öğrenmek ve sahada kademeli doğrulama yapmak. [Önceki araştırma kararı](endustriyel-karar-zekasi-analizi-degerlendirmesi.md) ile [Türkiye/dünya denetimi](tr-global-science-market-audit-2026-10-11.md) bu yaklaşımın mevcut kanıtını ve sınırlarını zaten kaydeder.
 
@@ -24,7 +24,7 @@ FDI, tek sunuculu, insan denetimli **üretim karar destek laboratuvar POC'si** o
 
 ## Uygulama sırası ve çıkış ölçüsü
 
-1. **Strateji ve paylaşım:** Bu karar kaydı, [sunum iddia sicili](factory-presentation-evidence-pack.md), [kamuya açık metin](public-share-copy.md), `v0.1.4-lab` temiz demo ve veri sınıfı aynı kapsamı anlatır. 2.0-ALPHA PDF bir satış belgesi olarak kullanılmaz.
+1. **Strateji ve paylaşım:** Bu karar kaydı, [sunum iddia sicili](factory-presentation-evidence-pack.md), [kamuya açık metin](public-share-copy.md), `v0.1.6-lab` temiz demo ve veri sınıfı aynı kapsamı anlatır. 2.0-ALPHA PDF bir satış belgesi olarak kullanılmaz.
 2. **Problem keşfine hazırlık:** [Rol bazlı görüşme rehberi](problem-discovery-guide.md) hazırdır. Görüşme yapılmış veya müşteri ihtiyacı doğrulanmış sayılmaz. Temas ve dış iletişim bu teknik paketten ayrı bir kullanıcı kararıdır.
 3. **Dar pilot ölçümü:** [Ölçüm protokolü](pilot-measurement-protocol.md) aynı bilgi anındaki mevcut planı, aday çözümü, bağımsız fizik kontrolünü, insan kararını ve daha sonra actuals'ı ayırır. G1'de saha sahibi metrikleri ve eşikleri kabul edene kadar şablondur.
 4. **Saha ve ürünleşme:** Tesis bulununca [G1 sözleşmesi](pilot-charter.md), G2–G8 saha kanıtı, sonra G9 gölge gözlem, G10 kontrollü kullanım, G11 finans ve G12 ikinci tesis sırasıyla değerlendirilir. LLM, çok kiracılı SaaS, otomatik OT komutu ve geniş adaptör kütüphanesi mevcut hedefin teslimatı değildir.
