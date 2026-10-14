@@ -30,3 +30,5 @@ FDI, tek sunuculu, insan denetimli **üretim karar destek laboratuvar POC'si** o
 4. **Saha ve ürünleşme:** Tesis bulununca [G1 sözleşmesi](pilot-charter.md), G2–G8 saha kanıtı, sonra G9 gölge gözlem, G10 kontrollü kullanım, G11 finans ve G12 ikinci tesis sırasıyla değerlendirilir. LLM, çok kiracılı SaaS, otomatik OT komutu ve geniş adaptör kütüphanesi mevcut hedefin teslimatı değildir.
 
 Bu kayıt pazar büyüklüğü, talep, fiyat veya üstünlük ispatı değildir. Mevcut kodun laboratuvar sonuçları saha geçerliliğine aktarılmaz.
+
+Sonraki [metodolojik savunma raporu değerlendirmesi](methodological-defense-review-2026-10-14.md), edge/B2MML, 30 saniyelik gap ve TDABC/gölge pilot başlıklarını aynı kanıt sınırına bağlar; yeni bir saha kabulü veya ticari vaat oluşturmaz.

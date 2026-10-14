@@ -28,6 +28,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [14 Ekim stratejik rapor kararı](docs/validated-strategy-2026-10-14.md), kaynaklandırılmamış SaaS, AI ve tasarruf vaatlerini ayıklayıp mevcut POC kapsamını korur. [Problem keşfi rehberi](docs/problem-discovery-guide.md) ve [dar pilot ölçüm protokolü](docs/pilot-measurement-protocol.md) görüşme ve saha karşılaştırması için hazırlanmış şablonlardır; henüz müşteri bulgusu veya saha kabulü değildir.
 
+[Metodolojik savunma raporu değerlendirmesi](docs/methodological-defense-review-2026-10-14.md), edge/B2MML, çözücü boşluğu ve TDABC iddialarının mevcut kanıt sınırını kaydeder; gölge gözlemi gerçekleşmiş etki deneyinden ayırır.
+
 [Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
 
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Paylaşım hazırlık kartı](docs/paylasim-hazirlik-karti.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.

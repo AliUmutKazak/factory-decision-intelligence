@@ -14,6 +14,8 @@ Tesis/hat/ürün ailesi, karar çevrimi ve ufuk; mevcut planın sahibi; planlama
 4. **İnsan kararı:** Öneri, kabul/ret/kısmi kabul/override, gerekçe, onaylayan rol ve gerçekten uygulanmış plan ayrı kaydedilir. Gölge mod üretim sistemine komut göndermez.
 5. **Actuals:** Yetkili MES/iş kayıtlarından gerçekleşen başlangıç/bitiş, miktar, duruş, hurda/rework ve maliyet/enerji kaynakları sonradan bağlanır. Eksik actuals açıkça işaretlenir; uygulanmayan önerinin model farkı gerçekleşmiş fayda değildir.
 
+Tarihsel veriyi yeniden oynatmak **çevrimdışı kıyas**, aynı zamanda önerileri göstermeden çalıştırmak **gölge gözlem**dir. İkisinde de FDI önerisinin uygulanmış sonucu yoktur; bunlar A/B testi veya nedensel tasarruf kanıtı diye adlandırılmaz. G10'da gerçekten uygulanan sınırlı bir değişikliğin etkisi incelenecekse karşılaştırma birimi, seçimi, eşzamanlı kontrolü, güvenlik/durdurma kuralı ve dış etkiler G1/G9 sahipleriyle önceden tasarlanır. Bir aylık süre veya belirli örnek sayısı veri görülmeden yeterli ilan edilmez.
+
 ## 3. Metrik kartı
 
 Her metrik için formül, pay/payda, birim, zaman penceresi, kapsam, veri kaynağı, eksik veri davranışı ve kabul sahibi G1'de doldurulur. [ISO 22400-1 KPI çerçevesi](https://www.iso.org/standard/56847.html) ortak disiplin için referanstır; FDI'ye sertifika vermez.
@@ -25,6 +27,8 @@ Her metrik için formül, pay/payda, birim, zaman penceresi, kapsam, veri kayna�
 | Süre ve güvenilirlik | Solve p50/p95, `UNKNOWN`/timeout, fallback, ACTIVE yaşı ve veri gecikmesi | Sahada kabul edilen SLO ve destek maliyeti |
 | Enerji ve maliyet | Varsayımlı kWh, tarife, setup, fazla mesai ve ceza bileşenleri ayrı model senaryosu | Sayaç ve bordro/muhasebe ile uzlaştırılmış gerçekleşen gider |
 | Net fayda | Karar öncesi yalnız senaryo farkı; ROI yazılmaz | G11'de uygulanmış kararın onaylı brüt faydası eksi entegrasyon, işletim, destek ve diğer ek maliyetler |
+
+TDABC tarzı süre maliyet farkı yalnız **model sonucu**dur. Finans sahibinin pratik kapasiteyi, kapasite maliyet oranını ve kaçınılabilir/sabit maliyet ayrımını doğrulaması; plan/actuals, fiilî enerji sözleşmesi, fazla mesai, WIP, kalite ve destek giderleriyle mutabakat kurması gerekir. Daha az hesaplanan makine dakikası veya darboğaz zamanı otomatik nakit girişi değildir. [Metodolojik rapor kararı](methodological-defense-review-2026-10-14.md) bu ayrımın gerekçesini kaydeder.
 
 ## 4. Geçerlilik ve karar
 

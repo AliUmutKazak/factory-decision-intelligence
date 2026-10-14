@@ -41,3 +41,5 @@ Sunum tablosuna konan her KPI veya grafik için **veri türü**, **snapshot/run 
 7. Kabul/ret/override kaydı, gölge gözlem süresi ve durdurma koşulu.
 
 Bu yanıtlar gelene kadar ürünün [G1 pilot sözleşmesi](pilot-charter.md) taslaktır. İlk görüşmenin amacı [problem keşfi rehberiyle](problem-discovery-guide.md) sahadan öğrenmek ve [ölçüm protokolüne](pilot-measurement-protocol.md) uygun dar bir çevrimdışı kıyas kurmaktır. G9 gölge pilotu ve G10–G11 saha/finans kabulü daha sonraki ayrı kararlardır.
+
+[Metodolojik savunma raporu değerlendirmesindeki](methodological-defense-review-2026-10-14.md) edge-first, sabit %2,4 gap ve kuruş bazında kazanç içeren “resmî ifade” bu iddia sicilini aşar; sunum metni olarak kullanılmaz. Gölge gözlem A/B testi olarak tanıtılmaz.
