@@ -173,7 +173,9 @@ def test_rejected_local_candidate_falls_back_to_authoritative_solver(monkeypatch
         RescheduleTriggerEvent(
             event_id="LOCAL-FALLBACK",
             current_time_min=0,
-            freeze_horizon_min=100000,
+            # Keep work movable: an outage after a fully frozen plan can make
+            # this fallback scenario infeasible for reasons outside this test.
+            freeze_horizon_min=0,
             delay_machine_id="M01",
             delay_duration_min=1,
         ),
