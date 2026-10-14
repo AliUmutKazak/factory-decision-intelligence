@@ -616,6 +616,25 @@ with tab_schedule:
     c_make.metric("Makespan", makespan_val)
     c_setup.metric("Toplam Setup", setup_val)
     c_tard.metric("Toplam Gecikme", tard_val, delta="0 Gecikme" if tard_val == "0 dk" else None)
+    if not solver_meta_df.empty:
+        with st.expander("Çözücü kanıtı ve sınırı"):
+            units = str(meta_row.get("objective_units", "weighted_minutes"))
+            display_units = "ağırlıklı dk" if units == "weighted_minutes" else units
+            proof_columns = st.columns(3)
+            for column, label, field, suffix in (
+                (proof_columns[0], "Amaç değeri", "objective_value", display_units),
+                (proof_columns[1], "Alt sınır", "best_objective_bound", display_units),
+                (proof_columns[2], "Bağıl boşluk", "optimality_gap_pct", "%"),
+            ):
+                value = pd.to_numeric(meta_row.get(field), errors="coerce")
+                column.metric(label, f"{value:,.2f} {suffix}" if pd.notna(value) else "Bilinmiyor")
+            st.caption(
+                f"ACTIVE run: {run_id_val} · Hedef politikası: {meta_row.get('objective_policy', 'Bilinmiyor')} "
+                f"· Süre sınırı: {meta_row.get('time_limit_seconds', 'Bilinmiyor')} sn. "
+                "Alt sınır ve boşluk yalnız belirtilen model amacı içindir; makespan, gecikme veya tasarruf garantisi değildir."
+            )
+            if status_str == "FEASIBLE":
+                st.warning("Geçerli bir plan bulundu; küresel optimum kanıtlanmadı.")
     st.divider()
 
     if sched_df.empty:
@@ -1066,7 +1085,10 @@ with tab_mes:
 
         else:
             with st.form("dynamic_resched_form"):
-                st.caption("Mevcut zamana kadar başlamış/bitmiş işler kilitlenir; kalan plan yeniden kurulur.")
+                st.caption(
+                    "Laboratuvar işlemi: başlamış/bitmiş işler kilitlenir, kalan plan yeniden kurulur "
+                    "ve doğrulanırsa yeni sürüm doğrudan ACTIVE olur. Ayrı aday inceleme/onay adımı yoktur."
+                )
                 curr_t = st.number_input(
                     "Şu Anki Fabrika Zamanı (Dakika):",
                     min_value=0,
@@ -1087,7 +1109,7 @@ with tab_mes:
                     step=30,
                 )
                 run_resched_btn = st.form_submit_button(
-                    "🔄 Freeze Horizon ile Yeniden Çizelgele", disabled=not may_reschedule
+                    "🔄 Yeniden çizelgele ve ACTIVE yayımla", disabled=not may_reschedule
                 )
 
             if run_resched_btn and may_reschedule:
