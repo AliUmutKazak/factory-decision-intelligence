@@ -32,6 +32,8 @@ Factory Decision Intelligence (FDI), üretim planı ve makine çizelgelemesi iç
 
 [Kurulum ve demo](docs/quickstart-lab.md) · [Sentetik dosya pilotu](examples/pilot-solve/README.md) · [Teknik kapsam ve kabul sınırı](docs/prefactory-technical-closure.md)
 
+[Uluslararası ürün ve bilimsel yöntem denetimi](docs/global-evidence-audit-2026-10-15.md), tahmin testi ayrımını ve kapsam sınırlarını kaydeder. Son doğrulanmış laboratuvar etiketi aşağıdaki `v0.1.7-lab` sürümüdür; yeni tahmin protokolü bu etiketin parçası değildir.
+
 ---
 
 ## Yol haritası ve kanıt durumu

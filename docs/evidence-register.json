@@ -48,12 +48,14 @@
     },
     "jsp_v012_30s": {
       "path": "artifacts/research/jsp-repeat-v012-30s-2026-10-12.json",
+      "code_commit": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
       "sha256": "005ef36578e44819b87f82f98d9c344d7ba7b5066e47c2d4882ce59d053644fc",
       "sha256_mode": "normalized_lf",
       "data_class": "open_or_library_benchmark"
     },
     "jsp_v012_60s": {
       "path": "artifacts/research/jsp-repeat-v012-ft10-60s-2026-10-12.json",
+      "code_commit": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
       "sha256": "1e256d195d85e8ab0d1ea86ae0275ba2f444e4f6f3328f7c941ecf9bdc0bb6a9",
       "sha256_mode": "normalized_lf",
       "data_class": "open_or_library_benchmark"
@@ -78,6 +80,7 @@
     },
     "forecast_v012": {
       "path": "artifacts/research/forecast-v012-lab-2026-10-12.json",
+      "code_commit": "631719c0a24e724a552ae716e4d6c08d09a6d9f9",
       "sha256": "09e9641a10b73248291acfa55f56e4912285b32c0e3392084ef0dfacc9520680",
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_demand_fixture"

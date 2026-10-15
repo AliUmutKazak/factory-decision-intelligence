@@ -2,6 +2,8 @@
 
 **Tarih:** 11 Ekim 2026. **Kapsam:** Fabrika sunumundan önce, elimizdeki tek sunuculu laboratuvar POC'sinin bilimsel ve ürünsel sınırlarını denetlemek. Bu kayıt bir sistematik literatür incelemesi veya dünyadaki bütün yayın/ürünlerin eksiksiz dizini değildir. Standart yayımlanmış olması FDI'nin o standarda uygunluk sertifikası aldığı anlamına gelmez; makale yayımlanmış olması FDI yönteminin sahada doğrulandığı anlamına gelmez.
 
+15 Ekim'deki [uluslararası ürün/yöntem denetimi](global-evidence-audit-2026-10-15.md), tahmin model seçimi ile bağımsız son pencere testinin ayrılmasını ele alır. Bu kayıt ve 12 Ekim'deki [v0.1.2 tarihsel tahmin ölçümü](forecast-v012-lab-evidence.md) yeni protokole göre geriye dönük değiştirilmez.
+
 ## Tarama ve kanıt kuralı
 
 - Türkiye: Bakanlık ve TÜBİTAK birincil yayınları, üniversite/dergi özgün makaleleri, Türkiye'de geliştirilen ürünlerin kendi teknik sayfaları.

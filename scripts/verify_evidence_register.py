@@ -22,6 +22,13 @@ def _repo_file(name: str) -> Path:
     return path
 
 
+def _historical_code(name: str, commit: str) -> bytes:
+    _repo_file(name)
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError(f"Invalid historical code commit: {commit}")
+    return subprocess.check_output(["git", "show", f"{commit}:{name}"], cwd=ROOT).replace(b"\r\n", b"\n")
+
+
 def verify() -> None:
     inventory = json.loads(REGISTER.read_text(encoding="utf-8"))
     if inventory["schema_version"] != 1:
@@ -47,17 +54,21 @@ def verify() -> None:
             raise ValueError(f"Source hash changed: {source_id}")
 
     for source_id in ("jsp_v012_30s", "jsp_v012_60s"):
-        report = json.loads(_repo_file(inventory["sources"][source_id]["path"]).read_text(encoding="utf-8"))
+        source = inventory["sources"][source_id]
+        report = json.loads(_repo_file(source["path"]).read_text(encoding="utf-8"))
         if report["identity"]["solver_version"] != "9.15.6755":
             raise ValueError(f"Unexpected solver version in {source_id}")
         for name, expected in report["identity"]["code_hashes_normalized_lf"].items():
-            normalized = _repo_file(name).read_bytes().replace(b"\r\n", b"\n")
+            normalized = _historical_code(name, source["code_commit"])
             if hashlib.sha256(normalized).hexdigest() != expected:
-                raise ValueError(f"Benchmark code changed since {source_id}: {name}")
-    forecast = json.loads(_repo_file(inventory["sources"]["forecast_v012"]["path"]).read_text(encoding="utf-8"))
-    forecast_code = _repo_file("src/forecasting/train_forecast.py").read_bytes().replace(b"\r\n", b"\n")
+                raise ValueError(f"Historical benchmark code disagrees with {source_id}: {name}")
+    forecast_source = inventory["sources"]["forecast_v012"]
+    forecast = json.loads(_repo_file(forecast_source["path"]).read_text(encoding="utf-8"))
+    if forecast["code_commit"] != forecast_source["code_commit"]:
+        raise ValueError("Forecast evidence commit disagrees with register")
+    forecast_code = _historical_code("src/forecasting/train_forecast.py", forecast_source["code_commit"])
     if hashlib.sha256(forecast_code).hexdigest() != forecast["forecast_code_sha256_normalized_lf"]:
-        raise ValueError("Forecast code changed since forecast_v012")
+        raise ValueError("Historical forecast code disagrees with forecast_v012")
 
     gates = inventory["gates"]
     expected_ids = {f"G{index}" for index in range(14)}
