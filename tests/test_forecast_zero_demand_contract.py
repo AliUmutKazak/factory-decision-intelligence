@@ -15,6 +15,17 @@ def test_wape_is_undefined_when_actual_horizon_is_zero():
     assert bias == 2
 
 
+def test_failed_holt_winters_fit_is_not_scored_as_holt_winters(monkeypatch):
+    def fail_fit(*_args, **_kwargs):
+        raise ValueError("failed fit")
+
+    monkeypatch.setattr(forecast, "ExponentialSmoothing", fail_fit)
+    train = pd.DataFrame({"demand": [1] * 28})
+    test = pd.DataFrame({"demand": [1] * 28})
+    with pytest.raises(forecast.ForecastCandidateUnavailable, match="Holt-Winters fit failed"):
+        forecast.evaluate_fold_model("Holt-Winters", train, test, 28)
+
+
 def test_short_history_fails_before_publishing_forecast(tmp_path, monkeypatch):
     history = pd.DataFrame(
         {
@@ -53,7 +64,10 @@ def test_all_zero_demand_uses_rmse_and_keeps_json_finite(tmp_path, monkeypatch):
     assert row[0] == "Naive"
     assert row[1] is None
     assert "RMSE" in row[2]
-    assert json.loads(row[3])["Naive"]["backtest_wape"] is None
+    competitors = json.loads(row[3])
+    assert competitors["Naive"]["backtest_wape"] is None
+    assert competitors["LightGBM"]["status"] == "EXCLUDED_SELECTION"
+    assert "lag-complete" in competitors["LightGBM"]["failure_reason"]
     assert json.loads(row[4])["uncertainty_method"] == "normal_rmse_heuristic_uncalibrated"
     assert json.loads(row[4])["holdout_wape"] is None
     assert row[5] == 0.0

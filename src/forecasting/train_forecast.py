@@ -18,6 +18,10 @@ HORIZON_DAYS = FORECAST_HORIZON_DAYS
 LGBM_NUM_BOOST_ROUND = 100
 
 
+class ForecastCandidateUnavailable(ValueError):
+    """A candidate could not be fitted at one chronological origin."""
+
+
 def load_factory_demand(db_path=None, run_id=None):
     active_db_path = db_path or get_runtime_paths()["db_path"]
     conn = get_db_connection(active_db_path)
@@ -107,13 +111,12 @@ def evaluate_fold_model(model_name, train_df, test_df, horizon):
                 train_df["demand"].astype(float), trend="add", seasonal="add", seasonal_periods=7
             ).fit()
             pred = np.maximum(0, hw.forecast(horizon).values)
-        except Exception:
-            pred = np.repeat(train_df["demand"].mean(), horizon)
+        except Exception as exc:
+            raise ForecastCandidateUnavailable("Holt-Winters fit failed") from exc
     elif model_name == "LightGBM":
         train_matrix = build_training_matrix(train_df)
         if len(train_matrix) < 20:
-            pred = np.repeat(train_df["demand"].iloc[-7:].mean(), horizon)
-            return evaluate_metrics(y_test, pred)
+            raise ForecastCandidateUnavailable("LightGBM needs at least 20 lag-complete training rows")
         feature_cols = [c for c in train_matrix.columns if c != "demand"]
         lgb_train = lgb.Dataset(train_matrix[feature_cols], label=train_matrix["demand"])
         params = {
@@ -169,14 +172,19 @@ def run_forecast_benchmark(run_id=None, db_path=None):
             )
         candidate_models = ["Naive", "Seasonal Naive", "Moving Average", "Holt-Winters", "LightGBM"]
         model_order = {name: index for index, name in enumerate(candidate_models)}
-        cv_scores = {m: {"wape": [], "rmse": [], "bias": []} for m in candidate_models}
+        cv_scores = {m: {"wape": [], "rmse": [], "bias": [], "failure": None} for m in candidate_models}
 
         fold_cutoffs = [total_len - (num_folds - f) * HORIZON_DAYS for f in range(num_folds)]
         for f_idx, cutoff in enumerate(fold_cutoffs):
             train_sub = pdf.iloc[:cutoff].copy().reset_index(drop=True)
             test_sub = pdf.iloc[cutoff : cutoff + HORIZON_DAYS].copy().reset_index(drop=True)
             for m_name in candidate_models:
-                w, r, b = evaluate_fold_model(m_name, train_sub, test_sub, HORIZON_DAYS)
+                try:
+                    w, r, b = evaluate_fold_model(m_name, train_sub, test_sub, HORIZON_DAYS)
+                except ForecastCandidateUnavailable as exc:
+                    if cv_scores[m_name]["failure"] is None:
+                        cv_scores[m_name]["failure"] = f"fold_{f_idx + 1}: {exc}"
+                    w, r, b = None, None, None
                 cv_scores[m_name]["wape"].append(w)
                 cv_scores[m_name]["rmse"].append(r)
                 cv_scores[m_name]["bias"].append(b)
@@ -185,6 +193,8 @@ def run_forecast_benchmark(run_id=None, db_path=None):
         # the same folds used for selection as a "test" would bias that estimate.
         model_performance = {}
         for m_name in candidate_models:
+            if any(r is None for r in cv_scores[m_name]["rmse"][:selection_folds]):
+                continue
             fold_wapes = cv_scores[m_name]["wape"][:selection_folds]
             avg_w = float(np.mean(fold_wapes)) if all(w is not None for w in fold_wapes) else None
             avg_r = float(np.mean(cv_scores[m_name]["rmse"][:selection_folds]))
@@ -204,16 +214,27 @@ def run_forecast_benchmark(run_id=None, db_path=None):
         holdout_wape = cv_scores[best_name]["wape"][-1]
         holdout_rmse = cv_scores[best_name]["rmse"][-1]
         holdout_bias = cv_scores[best_name]["bias"][-1]
+        if holdout_rmse is None:
+            raise ValueError(f"[FORECAST] {pid}: selected model {best_name} has no valid holdout evaluation")
 
-        for m_name, (w, r, b) in model_performance.items():
+        for m_name in candidate_models:
+            w, r, b = model_performance.get(m_name, (None, None, None))
+            candidate_holdout = cv_scores[m_name]["rmse"][-1]
             benchmark_summary.append(
                 {
                     "SKU": pid,
                     "Model": m_name,
-                    "Selection_WAPE": f"{w:.4f}" if w is not None else "n/a (zero demand)",
-                    "Selection_RMSE": f"{r:.2f}",
-                    "Selection_Bias": f"{b:.1f}",
-                    "Holdout_RMSE": f"{cv_scores[m_name]['rmse'][-1]:.2f}",
+                    "Selection_WAPE": f"{w:.4f}" if w is not None else "n/a",
+                    "Selection_RMSE": f"{r:.2f}" if r is not None else "n/a",
+                    "Selection_Bias": f"{b:.1f}" if b is not None else "n/a",
+                    "Holdout_RMSE": f"{candidate_holdout:.2f}" if candidate_holdout is not None else "n/a",
+                    "Status": (
+                        "EXCLUDED_SELECTION"
+                        if r is None
+                        else "HOLDOUT_UNAVAILABLE"
+                        if candidate_holdout is None
+                        else "EVALUATED"
+                    ),
                     "Kazanan": "✓" if m_name == best_name else "",
                 }
             )
@@ -284,20 +305,30 @@ def run_forecast_benchmark(run_id=None, db_path=None):
             )
 
         competing_scores = {}
-        for m, vals in model_performance.items():
+        for m in candidate_models:
+            vals = model_performance.get(m)
+            candidate_holdout = cv_scores[m]["rmse"][-1]
             competing_scores[m] = {
-                "backtest_wape": round(vals[0], 4) if vals[0] is not None else None,
-                "backtest_rmse": round(vals[1], 2),
-                "backtest_bias": round(vals[2], 2),
+                "status": (
+                    "EXCLUDED_SELECTION"
+                    if vals is None
+                    else "HOLDOUT_UNAVAILABLE"
+                    if candidate_holdout is None
+                    else "EVALUATED"
+                ),
+                "failure_reason": cv_scores[m]["failure"],
+                "backtest_wape": round(vals[0], 4) if vals is not None and vals[0] is not None else None,
+                "backtest_rmse": round(vals[1], 2) if vals is not None else None,
+                "backtest_bias": round(vals[2], 2) if vals is not None else None,
                 "holdout_wape": (round(cv_scores[m]["wape"][-1], 4) if cv_scores[m]["wape"][-1] is not None else None),
-                "holdout_rmse": round(cv_scores[m]["rmse"][-1], 2),
-                "holdout_bias": round(cv_scores[m]["bias"][-1], 2),
+                "holdout_rmse": round(candidate_holdout, 2) if candidate_holdout is not None else None,
+                "holdout_bias": round(cv_scores[m]["bias"][-1], 2) if cv_scores[m]["bias"][-1] is not None else None,
                 "fold_metrics": {
                     f"fold_{f_i + 1}": {
                         "role": "selection" if f_i < selection_folds else "holdout",
                         "wape": round(cv_scores[m]["wape"][f_i], 4) if cv_scores[m]["wape"][f_i] is not None else None,
-                        "rmse": round(cv_scores[m]["rmse"][f_i], 2),
-                        "bias": round(cv_scores[m]["bias"][f_i], 2),
+                        "rmse": round(cv_scores[m]["rmse"][f_i], 2) if cv_scores[m]["rmse"][f_i] is not None else None,
+                        "bias": round(cv_scores[m]["bias"][f_i], 2) if cv_scores[m]["bias"][f_i] is not None else None,
                     }
                     for f_i in range(num_folds)
                 },
