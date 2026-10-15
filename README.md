@@ -18,27 +18,27 @@
 
 Factory Decision Intelligence (FDI), üretim planı ve makine çizelgelemesi için **tek sunuculu bir karar destek laboratuvarı prototipidir**. Gösterilen sonuçlar sentetik veya açık benchmark verisidir; henüz fabrika, müşteri verisi, ERP/MES bağlantısı ya da saha faydası doğrulaması yoktur.
 
-![FDI dashboard summary from the current synthetic demo run](docs/screenshots/01_executive_summary.png)
+![FDI dashboard summary from the 14 October synthetic demo run](docs/screenshots/01_executive_summary.png)
 
-*Güncel uygulama görünümü; temiz sentetik demo koşumu, gerçek fabrika verisi değildir.*
+*14 Ekim sentetik demo ekranı; gerçek fabrika verisi veya sonraki kod sürümünün performans ölçümü değildir.*
 
 <details>
-<summary>Güncel CP-SAT çizelgesi ve operasyon ekranı</summary>
+<summary>14 Ekim CP-SAT çizelgesi ve operasyon ekranı</summary>
 
-![Current CP-SAT Gantt chart and schedule table from the synthetic demo](docs/screenshots/03_detailed_schedule_gantt.png)
+![CP-SAT Gantt chart and schedule table from the 14 October synthetic demo](docs/screenshots/03_detailed_schedule_gantt.png)
 
 *Koşum: `RUN-20261014-aea139`. CP-SAT sonucu `FEASIBLE`; optimumluk kanıtı değildir.*
 </details>
 
 [Kurulum ve demo](docs/quickstart-lab.md) · [Sentetik dosya pilotu](examples/pilot-solve/README.md) · [Teknik kapsam ve kabul sınırı](docs/prefactory-technical-closure.md)
 
-[Uluslararası ürün ve bilimsel yöntem denetimi](docs/global-evidence-audit-2026-10-15.md), tahmin testi ayrımını ve kapsam sınırlarını kaydeder. Son doğrulanmış laboratuvar etiketi aşağıdaki `v0.1.7-lab` sürümüdür; yeni tahmin protokolü bu etiketin parçası değildir.
+[Uluslararası ürün ve bilimsel yöntem denetimi](docs/global-evidence-audit-2026-10-15.md), tahmin modeli seçimi ile ayrı test penceresini ve kapsam sınırlarını kaydeder.
 
 ---
 
 ## Yol haritası ve kanıt durumu
 
-**Son doğrulanmış laboratuvar etiketi:** [`v0.1.7-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.7-lab), commit `a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542) 344 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. [Temiz Windows klon provası](docs/clean-demo-v017-2026-10-14.md) ayrıca tamamlandı. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz.
+**Son doğrulanmış laboratuvar etiketi:** [`v0.1.8-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.8-lab), commit `3a0345e6ac5db15fb509d33e7bf30464a24f6b55`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38761630031) 346 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. [Temiz Windows klon provası](docs/clean-demo-v018-2026-10-15.md) ayrıca tamamlandı. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz.
 
 **Hızlı inceleme:** [Temiz kurulum ve yerel demo](docs/quickstart-lab.md) · [dar sentetik dosya pilotu](examples/pilot-solve/README.md) · [sunulabilir iddialar](docs/factory-presentation-evidence-pack.md). Harici veri veya canlı ERP/MES erişimi gerektirmez.
 

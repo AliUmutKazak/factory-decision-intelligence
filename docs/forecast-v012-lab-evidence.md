@@ -1,6 +1,8 @@
-# G8-T: son sürüm koduyla sentetik tahmin geri testi
+# G8-T: v0.1.2 koduyla tarihsel sentetik tahmin geri testi
 
 `v0.1.2-lab` etiketi temiz klonda 12 Ekim 2026'da yeniden çalıştırıldı. Uçtan uca run `RUN-20261012-7cf0e6` ACTIVE olarak doğrulandı. [Makinece okunabilir özet](../artifacts/research/forecast-v012-lab-2026-10-12.json), sentetik talep fixture'ı SHA-256 `1df96565675322d028f505beb048ee124c9e52685a96c041fed97b235e625000`, `train_forecast.py` normalleştirilmiş kod hash'i, ham lineage/metadata hash'leri, dört rolling-origin fold ve basit Naive kıyasını birlikte saklar. Ürün dönemi 2017'dir; koşum tarihi müşteri güncelliği anlamına gelmez.
+
+Bu rapor tarihsel `v0.1.2-lab` protokolünündür: dört foldun tamamı seçimde kullanıldığından `test_score_rmse` bağımsız test değildir. Güncel seçim/holdout ayrımı ve sentetik ölçümü [15 Ekim yöntem denetiminde](global-evidence-audit-2026-10-15.md) kayıtlıdır.
 
 | Ürün | Seçilen model | Seçilen WAPE | Naive WAPE | Seçilen RMSE |
 |---|---|---:|---:|---:|

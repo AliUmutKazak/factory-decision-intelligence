@@ -19,6 +19,7 @@ Durum: **Bekliyor**. Proje sahibi 7 Ekim 2026'da henüz pilot fabrika, temsilî 
 ERP ve MES için vendor/sürüm, test tenant, endpoint/transport, sözleşme ve irtibat kişisi kaydedilecek. Aşağıdaki her alanın yetkili kaynağı, birimi, kimlik eşlemesi ve gecikme beklentisi yazılacak:
 
 - Sipariş, lot, ürün ve öncelik; miktar/birim, due date ve planlama anında bilinen değişiklikler.
+- Satıştan talep tahmini değerlendirilecekse günlük stok bulunurluğu/tükenme dönemleri ve varsa karşılanamayan siparişler; satışın gerçek talebe vekil olarak kullanılma sınırı.
 - Çok seviyeli BOM, routing/operasyon sırası, alternatif makine, işlem ve setup süreleri.
 - Vardiya, mola, bakım, stok, açık satın alma, lead time ve MOQ; fiziksel gerekiyorsa operatör/kalıp/aparat ve WIP sınırları.
 - MES actuals: planlandı, başladı, kısmen tamamlandı, kesildi, devam etti, tamamlandı; hurda ve rework ayrı. Her olayda lot/operasyon kimliği, olay zamanı, miktar ve kaynak bulunacak.
@@ -31,7 +32,7 @@ Her satır için **eşik, dönem, kapsam, pay/payda, veri kaynağı, sorumlu ve 
 
 | KPI | Ölçüm kararı / kabul sahibi |
 |---|---|
-| Forecast SKU/aile WAPE, bias ve drift | Rolling-origin dönemleri, basit baseline, seyrek/sıfır talep yorumu — veri sahibi + planlamacı |
+| Forecast SKU/aile WAPE, bias ve drift | Model seçimi ve ayrı kronolojik holdout, basit baseline, seyrek/sıfır talep ve stok tükenmesinde satışın sansürlenmesi yorumu — veri sahibi + planlamacı |
 | Fiziksel plan doğruluğu | Makine/kaynak çakışması, routing, malzeme, vardiya, freeze: kabul edilen planda sıfır ihlal — proses uzmanı |
 | Solver işletimi | p50/p95 süre, timeout/infeasible/fallback oranı ve çözüm statüsü — platform + planlamacı |
 | Hizmet | API/job hatası, ACTIVE yaşı, actuals gecikmesi, alarm tepki süresi — IT/MES |

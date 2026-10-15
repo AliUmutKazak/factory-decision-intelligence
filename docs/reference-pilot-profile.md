@@ -8,7 +8,7 @@ Durum: **Teknik taslak**, 7 Ekim 2026. Kaynak: `FDI_Nihai_Birlesik_Yol_Haritasi.
 |---|---|---|
 | Üretim tipi | Çok operasyonlu, parti bazlı ayrık üretim örneği; 5 ürün (`P01`-`P05`), 2 aile, 3 makine (`M01`-`M03`) | Gerçek ürün ailesi, hat ve proses |
 | Master data | Mühürlü `artifacts/reference/factory.db` içinde 13 routing ve 8 BOM satırı | Gerçek operasyon, alternatif makine, malzeme ve birim eşlemesi |
-| Talep | `data/fixtures/demand_fixture.csv`: `date,store,item,sales`; 2017-01-01–2017-12-31. Referans DB'de 1.825 ürün-gün sipariş satırı | Gerçek sipariş/lot, due date, değişiklik geçmişi ve talep dönemi |
+| Talep | `data/fixtures/demand_fixture.csv`: `date,store,item,sales`; 2017-01-01–2017-12-31. Referans DB'de 1.825 ürün-gün sipariş satırı. `sales` laboratuvarda talep vekilidir | Gerçek sipariş/lot, due date, değişiklik geçmişi, stok bulunurluğu/tükenmesi ve talep dönemi |
 | Planlama ufku | Kod varsayımı: 4 haftalık taktik plan, 28 günlük forecast | Planlama çevrimi, ufuk ve freeze sınırı |
 | Kapasite | Kod varsayımı: haftada 6 gün, günde 2×8 saat; 25 adetlik referans parti | Gerçek vardiya, mola, bakım, setup, operatör ve kalıp/aparat |
 | Çizelge | Mühürlü referansta 31 operasyon satırı; CP-SAT varsayılan sınır 30 sn, 1 worker, seed 42 | Pilot solve hizmet hedefi ve eşzamanlı yük |
@@ -34,7 +34,7 @@ Canlı bağlantı gerektirmeyen ilk değerlendirmede fabrika, tek hat/ürün ail
 
 **Mevcut uygulama sınırı:** `CustomerFileAdapter` CSV sipariş ve MES actuals nesnelerine dönüştürür. G4-T `pilot_preflight` sipariş, makine, routing, vardiya, mevcut plan ve isteğe bağlı actuals içeren UTF-8 CSV veya açıkça eşlenmiş XLSX paketini **salt okuyarak** ön kontrolden geçirir; örnek `examples/pilot-package/` altındadır. Kaynak dosya hash'i ve sütun/sayfa eşlemesi kaydedilir. Üretim çekirdeği ürün/operasyon başına tek makine kullandığından alternatif makine rotaları ön kontrolde açıkça reddedilir. `actuals` her lot/operasyon için tek toplu satır alır; kısmi üretim ve kesinti/devam olay dizisi G6-T işidir. Ayrı [tek vardiyalı sentetik dosya örneği](../examples/pilot-solve/README.md), tam sipariş ve boş actuals alt kümesinde bellekte üretim solver'ına aktarılır. Müşteri kimlik/birim/zaman dönüşümü ve daha geniş takvim/WIP/alternatif kaynak aktarımı gerçek kaynak profiliyle açıkça kararlaştırılmalıdır.
 
-BOM ve stok verilmezse MRP karşılaştırması yapılmaz. Yeterli tarihsel talep yoksa forecast başarısı iddia edilmez. Mevcut fabrika planı olmadan çizelgeleme faydası, actuals ve finans mutabakatı olmadan gerçekleşmiş nakit fayda açıklanmaz. Bu dosya pilotu G4/G8 için veri ve kıyas kanıtı oluşturabilir; G5 vendor entegrasyonunu kapatmaz.
+BOM ve stok verilmezse MRP karşılaştırması yapılmaz. Yeterli tarihsel talep yoksa forecast başarısı iddia edilmez. Satış serisi stok tükenmesinde gerçek talebi eksik gösterebilir; bulunurluk veya sipariş kayıtları olmadan `sales` yalnız talep vekilidir ve stok politikası başarısı iddia edilmez ([Sachs & Minner, 2014](https://www.sciencedirect.com/science/article/pii/S092552731300203X)). Mevcut fabrika planı olmadan çizelgeleme faydası, actuals ve finans mutabakatı olmadan gerçekleşmiş nakit fayda açıklanmaz. Bu dosya pilotu G4/G8 için veri ve kıyas kanıtı oluşturabilir; G5 vendor entegrasyonunu kapatmaz.
 
 ## G1'e geçişte değişecekler
 
