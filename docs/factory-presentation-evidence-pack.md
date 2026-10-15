@@ -1,6 +1,6 @@
 # FDI fabrika görüşmesi için kanıt ve anlatım paketi
 
-**Sürüm bağlamı:** 14 Ekim 2026; son doğrulanmış sürüm `v0.1.7-lab`, commit `a6cbe65f3bae4fe4972ec7faed3e64db0d4e69b4`, [CI 38556658542](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38556658542). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
+**Sürüm bağlamı:** 15 Ekim 2026; son doğrulanmış sürüm `v0.1.8-lab`, commit `3a0345e6ac5db15fb509d33e7bf30464a24f6b55`, [CI 38761630031](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38761630031). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [güncel uluslararası denetim](global-evidence-audit-2026-10-15.md) ve [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
 
 ## 30 saniyelik tanım
 
@@ -11,8 +11,8 @@
 1. **Problem (1 dk):** Sipariş/termin, kapasite, malzeme ve makine takviminin birbirine bağlı olduğu tek bir karar anını tarif et; müşterinin gerçek kuralını bildiğimizi varsayma.
 2. **Girdi ve sınır (1 dk):** Demo veri sınıfını “sentetik” veya “açık benchmark” diye göster. Sabit makine, tek ortak vardiya, tam sipariş ve boş WIP/actuals sınırını açıkça söyle.
 3. **Karar (3 dk):** [Demo komutları](demo-and-customer-pilot.md) ile aynı snapshot için mevcut plan ve solver adayını; feasible/optimal durumunu, termin, takvim, setup, enerji ve plan kararlılığı raporlarını göster.
-4. **İnsan kontrolü (1 dk):** FDI öneri üretir; üretim emri otomatik göndermez. Planlamacı kabul/ret ve gerekçeyi yönetir.
-5. **Kanıt (2 dk):** Aynı commit'teki test/CI, mühürlü run artifact'i, [son kodla dış sabit makine benchmark'ı](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm), [tahmin geri testi](forecast-v012-lab-evidence.md) ve [dosya pilotu örneği](../examples/pilot-solve/README.md) açılır. `FEASIBLE` ile `OPTIMAL` ayrılır.
+4. **İnsan kontrolü (1 dk):** Dosya pilotu öneri üretir ve üretim emri göndermez. Laboratuvar `reschedule` çağrısı ise başarılı adayı doğrudan ACTIVE yapar; ayrı planlamacı kabul/ret kapısı uygulanmamıştır. Sahada böyle bir kapı G9/G10 kapsamında tasarlanıp kabul edilmelidir.
+5. **Kanıt (2 dk):** Güncel sürümün aynı commit'teki test/CI ve mühürlü run artifact'i, [temiz klon provası](clean-demo-v018-2026-10-15.md) ve [ayrı holdout'lu sentetik tahmin incelemesi](global-evidence-audit-2026-10-15.md) açılır. [Sabit makineli dış benchmark](external-jsp-benchmark.md#v012-lab-koduyla-12-ekim-yeniden-ölçüm) 12 Ekim kaynak sürümünün tarihsel deneyidir; güncel commit sonucu diye sunulmaz. [Dosya pilotu örneği](../examples/pilot-solve/README.md) ayrıca gösterilebilir. `FEASIBLE` ile `OPTIMAL` ayrılır.
 6. **İlk pilot isteği (2 dk):** Tek hat/ürün ailesi, tek karar sahibi ve okuma amaçlı CSV/XLSX ile G1/G4–G8 kapsamı birlikte belirlenir. Gerçek veri izni gelmeden tasarruf/ROI sözü verilmez.
 
 ## İddia sicili
@@ -22,7 +22,7 @@
 | “Tek sunuculu, tekrar üretilebilir laboratuvar POC” | Release tag/commit + aynı commit CI kalite/Docker ve artifact digest; [sürüm kanıtı ve saha kabul sınırı](release-evidence-and-field-boundary.md) | Üretim servisi veya çok tesisli güvenilirlik kabulü |
 | “Açık/sentetik örneklerde fiziksel çizelge denetimi var” | [OR-Library bağımsız audit](external-jsp-benchmark.md); solver statüsü ve zaman sınırı | Rakip APS'den hızlı/iyi veya genel FJSP ispatı |
 | “Aynı model girdisinde plan politikaları karşılaştırılabilir” | [Business case demo](../artifacts/demo/business-case.md), aynı snapshot ve maliyet varsayımları | Müşteri tasarrufu, nakit fayda veya pozitif ROI |
-| “Tahmin modelleri zaman sıralı backtest ile seçilir” | [Son sürüm sentetik tahmin kanıtı](forecast-v012-lab-evidence.md): dört fold, WAPE/RMSE/bias ve Naive kıyası; sıfır talepte WAPE `NULL` ve RMSE seçimi ayrı negatif testte | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |
+| “Tahmin modelleri zaman sıralı backtest ile seçilir” | [15 Ekim yöntem ve sentetik koşum kaydı](global-evidence-audit-2026-10-15.md): ilk üç fold seçim, son fold ayrı holdout; WAPE/RMSE/bias ve Naive kıyası. [12 Ekim geri testi](forecast-v012-lab-evidence.md) tarihsel eski protokoldür | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |
 | “Enerji/karbon model senaryosu hesaplanır” | Simüle kWh, varsayılan yakıt/şebeke katsayısı ve model girdileri | GHG Protocol uyumlu kurumsal envanter, gerçek karbon azaltımı |
 | “Dar dosya pilotu teknik olarak denenebilir” | [CSV/XLSX ön kontrolü](../examples/pilot-package/README.md) ve [bellek içi çözüm](../examples/pilot-solve/README.md) | ERP/MES entegrasyonu, her proses tipi için hazır solver |
 

@@ -7,6 +7,7 @@ Bu kayıt, birleşik yol haritasının **paylaşılabilir tek sunuculu laboratuv
 | Alan | Tekrarlanabilir kanıt | Kapsam |
 |---|---|---|
 | Uçtan uca karar zinciri | `python main.py`, `python scripts/verify_active_run.py`, tam pytest/CI | Sentetik referans; forecast → LP → MRP → CP-SAT → karar/audit/analitik |
+| Tahmin değerlendirmesi | [Üç seçim penceresi ve ayrı son holdout](global-evidence-audit-2026-10-15.md), [temiz klon provası](clean-demo-v018-2026-10-15.md) | Sentetik satış vekili; müşteri talebi, kalibre belirsizlik aralığı veya stok politikası başarısı değil |
 | Güvenli ACTIVE sürümü | Değişmez run bundle, hash doğrulaması, atomik yayın, yedek/restore provası, hata testleri | Tek host SQLite; gerçek tesis felaket kurtarma hedefi değil |
 | Dış fizik kıyası | [OR-Library sabit makineli JSP](external-jsp-benchmark.md) ve bağımsız aday denetimi | Küçük örnekler optimum; `ft10` süre/kalite sınırı görünür |
 | Dosya değerlendirme yolu | [CSV/XLSX ön kontrolü](../examples/pilot-package/README.md) ve [dar solver aktarımı](../examples/pilot-solve/README.md) | Tam sipariş, tek ortak vardiya, sabit makine, actuals/WIP yok; bellekte, salt okunur |
