@@ -141,7 +141,7 @@ PLANNING_HORIZON_WEEKS = 4  # 4 haftalık taktik planlama ufku
 FORECAST_HORIZON_DAYS = PLANNING_HORIZON_WEEKS * 7  # 28 günlük günlük tahmin ufku
 
 # --- Demand Forecast & Governance Configuration ---
-FORECAST_MODEL_VERSION = os.getenv("FORECAST_MODEL_VERSION", "v3.1-zero-demand-metric")
+FORECAST_MODEL_VERSION = os.getenv("FORECAST_MODEL_VERSION", "v3.2-chronological-holdout")
 FORECAST_FEATURE_VERSION = os.getenv("FORECAST_FEATURE_VERSION", "v1.2-lag-calendar")
 
 # Holt-Winters Varsayılan Hiperparametreleri
