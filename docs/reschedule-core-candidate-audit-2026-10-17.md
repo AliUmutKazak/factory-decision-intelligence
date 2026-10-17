@@ -1,0 +1,7 @@
+# Yeniden çizelgeleme adayı: bağımsız çekirdek zaman denetimi
+
+**17 Ekim 2026.** `ACTIVE` yayını öncesindeki ayrı [aday denetçisi](../src/scheduling/reschedule_candidate_audit.py) şu sözleşmeleri yeniden kurar: aynı görev kümesi ve girdi kimliği, sabit makine/duration, dondurulmuş pozisyonlar, FLEXIBLE sınırları, işlem süresi ve malzeme serbest bırakma zamanı, setup aralığı, tek makinede setup+işlem çakışmaması ve aynı lotun operasyon sırası. Pzt–Cmt değişken/istisnalı günlük takvimler, bugünkü sabit günlük saat modeline uymazsa reddedilir. Denetçi üretim çözücüsünün kısıt kurucusunu çağırmaz.
+
+Bu denetim tam bir ikinci çizelgeleyici değildir. Setup süresini changeover tablosundan yeniden hesaplamaz; bakım/arıza pencereleri, haftalık OT ve malzeme miktarları bu modülde bağımsız yeniden doğrulanmaz. Aday önce üretim CP-SAT modeliyle doğrulanır; ayrı denetçi yukarıdaki kritik sözleşmeleri ikinci kez kontrol eder. Saha takvimi, gerçek MES actuals'ı ve fabrika kabulü henüz yoktur.
+
+Doğrulama: 6 doğrudan denetçi testi içinde makine çakışması, hatalı setup aralığı, rota öncüllüğü ve değiştirilen görev kimliği reddedildi. Mühürlü sentetik referansın geçici `ACTIVE` kopyasında iki gerçek orkestratör provası `persist_audit=False` ile geçti: tüm görevleri donduran yerel sertifika (`31/31`, sıfır hareket) ve M01 üzerinde 180 dakika gecikme olayı (`31/31`, 28 hareket, `CPSAT_REOPTIMIZATION`). Kalıcı `ACTIVE` kaydı değiştirilmedi. Bunlar laboratuvar kapsamlı yazılım kontrolleridir; saha verisiyle performans veya güvenilirlik kanıtı değildir.

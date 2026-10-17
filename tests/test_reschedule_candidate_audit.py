@@ -28,27 +28,51 @@ def _schedules():
         [
             {
                 "task_id": "FROZEN",
+                "lot_id": "LOT-FROZEN",
+                "product_id": "P01",
                 "machine_id": "M01",
+                "operation_seq": 1,
                 "start_min": 500,
                 "end_min": 540,
+                "duration_min": 40,
+                "release_time_min": 0,
+                "setup_before_min": 0,
+                "setup_start_min": 500,
+                "setup_end_min": 500,
                 "schedule_state": "FREE",
                 "freeze_until_min": 0,
                 "execution_status": "SCHEDULED",
             },
             {
                 "task_id": "FLEX",
+                "lot_id": "LOT-FLEX",
+                "product_id": "P01",
                 "machine_id": "M01",
+                "operation_seq": 1,
                 "start_min": 600,
                 "end_min": 640,
+                "duration_min": 40,
+                "release_time_min": 0,
+                "setup_before_min": 0,
+                "setup_start_min": 600,
+                "setup_end_min": 600,
                 "schedule_state": "FREE",
                 "freeze_until_min": 0,
                 "execution_status": "SCHEDULED",
             },
             {
                 "task_id": "OUTSIDE",
+                "lot_id": "LOT-OUTSIDE",
+                "product_id": "P01",
                 "machine_id": "M01",
+                "operation_seq": 1,
                 "start_min": 900,
                 "end_min": 940,
+                "duration_min": 40,
+                "release_time_min": 0,
+                "setup_before_min": 0,
+                "setup_start_min": 900,
+                "setup_end_min": 900,
                 "schedule_state": "FREE",
                 "freeze_until_min": 0,
                 "execution_status": "SCHEDULED",
@@ -61,6 +85,8 @@ def _schedules():
     candidate.loc[candidate.task_id == "FLEX", "schedule_state"] = "FLEXIBLE"
     candidate.loc[candidate.task_id == "FLEX", "start_min"] = 580
     candidate.loc[candidate.task_id == "FLEX", "end_min"] = 620
+    candidate.loc[candidate.task_id == "FLEX", "setup_start_min"] = 580
+    candidate.loc[candidate.task_id == "FLEX", "setup_end_min"] = 580
     return baseline, candidate
 
 
@@ -123,3 +149,43 @@ def test_independent_audit_rejects_sunday_hours_that_change_model_daily_average(
         conn.close()
     assert result["status"] == "REJECTED"
     assert any(item["code"] == "SUNDAY_HOURS_AFFECT_DAILY_AVERAGE" for item in result["issues"])
+
+
+def test_independent_audit_rejects_machine_overlap_and_invalid_setup():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        candidate.loc[candidate.task_id == "OUTSIDE", ["start_min", "end_min", "setup_start_min", "setup_end_min"]] = [
+            530,
+            570,
+            530,
+            530,
+        ]
+        candidate.loc[candidate.task_id == "FLEX", "setup_before_min"] = 10
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "MACHINE_OCCUPANCY_OVERLAP" in codes
+    assert "INVALID_SETUP_INTERVAL" in codes
+
+
+def test_independent_audit_rejects_route_precedence_and_input_change():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        baseline.loc[baseline.task_id == "FLEX", ["lot_id", "operation_seq", "machine_id"]] = ["LOT-FROZEN", 2, "M02"]
+        candidate.loc[candidate.task_id == "FLEX", ["lot_id", "operation_seq", "machine_id"]] = ["LOT-FROZEN", 2, "M02"]
+        candidate.loc[candidate.task_id == "FLEX", ["start_min", "end_min", "setup_start_min", "setup_end_min"]] = [
+            530,
+            570,
+            530,
+            530,
+        ]
+        candidate.loc[candidate.task_id == "OUTSIDE", "product_id"] = "P02"
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "ROUTE_PRECEDENCE" in codes
+    assert "TASK_INPUT_CHANGED" in codes
