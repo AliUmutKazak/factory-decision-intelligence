@@ -61,7 +61,9 @@ def run_mrp_engine(run_id=None, db_path=None, processed_dir=None):
         unit_cost = float(mat_info["unit_cost"])
 
         mat_gross = gross_df[gross_df["material_id"] == mid]
-        # Simplified deterministic MRP approximation: gross requirement dispersion across planning horizon
+        # Legacy planning buffer from four planned weekly totals. This is not
+        # demand forecast error, a calibrated cycle-service target, or a
+        # lead-time demand quantile. Keep behaviour until validated replacement.
         sigma_w = mat_gross["gross_requirement"].std() if len(mat_gross) > 1 else 100.0
         safety_stock = int(round(MRP_SERVICE_LEVEL_Z * sigma_w * np.sqrt(lead_time_weeks)))
 
@@ -108,6 +110,7 @@ def run_mrp_engine(run_id=None, db_path=None, processed_dir=None):
                     "material_name": mat_info["material_name"],
                     "gross_req": round(gross_req, 1),
                     "safety_stock": safety_stock,
+                    "safety_stock_method": "planned_requirement_dispersion_heuristic_uncalibrated",
                     "projected_avail": round(current_inv, 1),
                     "net_req": round(net_req, 1),
                     "planned_receipt": planned_receipt,

@@ -6,7 +6,7 @@ Bu platformdaki Malzeme Ihtiyac Planlamasi modulu, **MRP-I Analitik Planlama Mot
 ### Kapsam Dahilinde Olan Analitik Unsurlar (Current Analytical Scope):
 - Hiyerarsik taktik plan ciktilarindan (SKU Disaggregation) uretilen haftalik brut ihtiyaclar (Gross Requirements).
 - Cok seviyeli urun agaci patlatma (BOM Explosion).
-- Guvenlik stogu (Safety Stock) esikleri ve baslangic stok projeksiyonu (Projected Available Balance).
+- Planli haftalik brut ihtiyacin 4 haftalik dagilimi ve tedarik suresiyle hesaplanan **kalibre edilmemis malzeme tamponu** (`safety_stock`, `safety_stock_method`) ve baslangic stok projeksiyonu. Bu hesap tahmin hatasina dayanmaz; %95 servis seviyesi kaniti degildir.
 - Asgari siparis partisi (MOQ / Lot Sizing) optimizasyonu.
 - Temin suresi faz kaydirmasi (Lead Time Offsetting) ve geciken siparisler icin acil tedarik uyarilari (EXPEDITE flags).
 
@@ -50,13 +50,14 @@ Endustriyel planlama ve cizelgeleme asamalarinda olusan kavram karmasasini onlem
 
 Sistemin uretim gercekciligi icin modelleme iki ayrik ufuk (horizon) uzerinde kurgulanmistir:
 
-1. **Model Dogrulama & Backtest Ufku (Evaluation Horizon):**
-   - Gecmis veri setinin son 28 gunluk dilimini kapsar.
-   - Modeller (Naive, Seasonal Naive, Moving Average, Holt-Winters, LightGBM) bu gecmis pencere uzerinde WAPE, RMSE ve Bias metriklerine gore test edilir.
-   - En dusuk WAPE degerine ulasan model o SKU icin kazanan (champion) model secilir.
+1. **Model Secimi & Dokunulmamis Son Pencere (Evaluation Horizon):**
+   - 28'er gunluk dort ileri zamanli pencerenin ilk ucu model secimi, sonuncusu secime katilmayan holdout degerlendirmesidir.
+   - Modeller (Naive, Seasonal Naive, Moving Average, Holt-Winters, LightGBM) ilk uc pencerede WAPE, RMSE ve bias ile karsilastirilir. WAPE tanimsizsa secim RMSE ile yapilir.
+   - Son pencerenin sonucu kazanan modeli yeniden secmez; raporlanan `test_score_rmse` o pencereye aittir.
 2. **Ileriye Donuk Uretim Ufku (Production Forecast Horizon):**
    - Kazanan model, verinin son gununden itibaren ileriye dogru 28 gunluk operasyonel talep projeksiyonunu uretir.
    - Taktik agregasyon (LP) ve malzeme planlamasi (MRP) yalnizca bu ileri projeksiyon serisi uzerinden calisir; backtest tahminleri uretim planina karistirilmaz.
+   - `demand_p10/p90` gunluk secim RMSE'sinden turetilmis kalibre edilmemis gosterim araliklaridir; her satir `interval_method` ve `interval_calibrated=false` tasir. Bunlardan servis hedefi veya malzeme guvenlik stogu cikarilmaz. Yeni kosumlarda `recommended_safety_stock` uretilmez; eski muhurlu artefaktlar tarihsel semalarinda kalir.
 
 ## 8. Sürdürülebilirlik & Sera Gazı Modelleme Sınırları (GHG Scope 1 & 2 System Boundaries)
 

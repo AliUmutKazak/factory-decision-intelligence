@@ -70,6 +70,8 @@ def run_orlibrary_fixed_jsp(
     reference_db_path: str | Path,
     time_limit_seconds: float = 30.0,
     expected_reference_sha256: str = SEALED_REFERENCE_SHA256,
+    num_workers: int | None = None,
+    random_seed: int | None = None,
 ) -> dict[str, Any]:
     """Solve one fixed-machine instance and independently check its schedule."""
     source_path, reference_db_path = Path(source_path).resolve(), Path(reference_db_path).resolve()
@@ -185,6 +187,8 @@ def run_orlibrary_fixed_jsp(
                 task_override=pd.DataFrame(tasks),
                 policy="THROUGHPUT_MAX",
                 time_limit_seconds=time_limit_seconds,
+                experimental_num_workers=num_workers,
+                experimental_random_seed=random_seed,
             )
         schedule = pd.read_sql(
             "SELECT * FROM production_schedule WHERE run_id = ? ORDER BY task_id", conn, params=(run_id,)
@@ -271,6 +275,8 @@ def main() -> int:
         default=Path(__file__).resolve().parents[2] / "artifacts/reference/factory.db",
     )
     parser.add_argument("--time-limit", type=float, default=30.0)
+    parser.add_argument("--num-workers", type=int)
+    parser.add_argument("--random-seed", type=int)
     parser.add_argument("--reference-sha256", default=SEALED_REFERENCE_SHA256)
     args = parser.parse_args()
     report = run_orlibrary_fixed_jsp(
@@ -280,6 +286,8 @@ def main() -> int:
         reference_db_path=args.reference_db,
         time_limit_seconds=args.time_limit,
         expected_reference_sha256=args.reference_sha256,
+        num_workers=args.num_workers,
+        random_seed=args.random_seed,
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if report["comparable_static_jsp_subset"] else 2

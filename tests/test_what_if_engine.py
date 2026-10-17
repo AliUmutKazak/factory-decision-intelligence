@@ -254,4 +254,7 @@ def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db,
     assert schedule["task_id"].is_unique
     assert (schedule["parent_lot_id"] == "HOT_P01").any()
     assert sha256_file(reference_active_db) == before
-    assert "MUTABAKAT: %100" in capsys.readouterr().out
+    audit_output = capsys.readouterr().out
+    assert "MİKTAR MUTABAKATI" in audit_output
+    assert "Hafta 1 son operasyon bitişi:" in audit_output
+    assert "Bu değerler fiili üretim veya teslimat değildir." in audit_output

@@ -50,6 +50,8 @@ def probe_reference_load(
     repeats: int = 5,
     time_limit_seconds: float = 5.0,
     expected_sha256: str | None = None,
+    experimental_num_workers: int | None = None,
+    experimental_random_seed: int | None = None,
 ) -> dict[str, Any]:
     """Measure identical CP-SAT attempts without changing the source DB."""
     path = Path(db_path).resolve()
@@ -78,6 +80,8 @@ def probe_reference_load(
                 baseline_run_id=baseline_run_id,
                 rules=("CP-SAT",),
                 time_limit_seconds=time_limit_seconds,
+                experimental_num_workers=experimental_num_workers,
+                experimental_random_seed=experimental_random_seed,
             )
         elapsed = perf_counter() - started
         if len(result["cases"]) != 1 or result["cases"][0]["Method"] != "CP-SAT":
@@ -97,6 +101,7 @@ def probe_reference_load(
                 "attempt_wall_seconds": round(elapsed, 4),
                 "solver_wall_seconds": case.get("Solve Time (s)"),
                 "reason": case.get("Reason"),
+                "solver_metadata": case.get("solver_metadata"),
             }
         )
 
@@ -119,6 +124,8 @@ def probe_reference_load(
         "python_version": platform.python_version(),
         "policy": "CP-SAT BALANCED via production_benchmark",
         "time_limit_seconds": time_limit_seconds,
+        "experimental_num_workers": experimental_num_workers,
+        "experimental_random_seed": experimental_random_seed,
         "repeats": repeats,
         "attempts": attempts,
         "summary": {
@@ -141,6 +148,8 @@ def main() -> int:
     parser.add_argument("--expected-sha256")
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--time-limit", type=float, default=5.0)
+    parser.add_argument("--num-workers", type=int)
+    parser.add_argument("--random-seed", type=int)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = probe_reference_load(
@@ -149,6 +158,8 @@ def main() -> int:
         repeats=args.repeats,
         time_limit_seconds=args.time_limit,
         expected_sha256=args.expected_sha256,
+        experimental_num_workers=args.num_workers,
+        experimental_random_seed=args.random_seed,
     )
     rendered = json.dumps(report, indent=2, ensure_ascii=True) + "\n"
     if args.output:

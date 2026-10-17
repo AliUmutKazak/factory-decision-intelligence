@@ -1,0 +1,46 @@
+{
+  "scope": "SYNTHETIC_PLANNED_SCHEDULE_NOT_ACTUALS",
+  "run_id": "RUN-20261006-00a0d3",
+  "week_end_min": 10080,
+  "planned_units": 8400,
+  "scheduled_to_finish_by_week_end_units": 6100,
+  "scheduled_after_week_end_units": 2300,
+  "scheduled_completion_share": 0.7261904761904762,
+  "by_product": [
+    {
+      "product_id": "P02",
+      "family_id": "FAM_A",
+      "planned_units": 3100,
+      "scheduled_to_finish_by_week_end_units": 3000,
+      "scheduled_after_week_end_units": 100
+    },
+    {
+      "product_id": "P01",
+      "family_id": "FAM_A",
+      "planned_units": 1175,
+      "scheduled_to_finish_by_week_end_units": 1175,
+      "scheduled_after_week_end_units": 0
+    },
+    {
+      "product_id": "P03",
+      "family_id": "FAM_A",
+      "planned_units": 1925,
+      "scheduled_to_finish_by_week_end_units": 1925,
+      "scheduled_after_week_end_units": 0
+    },
+    {
+      "product_id": "P04",
+      "family_id": "FAM_B",
+      "planned_units": 1250,
+      "scheduled_to_finish_by_week_end_units": 0,
+      "scheduled_after_week_end_units": 1250
+    },
+    {
+      "product_id": "P05",
+      "family_id": "FAM_B",
+      "planned_units": 950,
+      "scheduled_to_finish_by_week_end_units": 0,
+      "scheduled_after_week_end_units": 950
+    }
+  ]
+}

@@ -54,6 +54,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Nihai gelişim raporunun güncel kanıtla değerlendirmesi](docs/final-development-decision-review-2026-10-14.md), rapordaki tarihsel sürüm bilgisini düzeltir ve global yöntem/ürün kaynaklarıyla doğrulanan küçük iyileştirmeyi kaydeder. Yerel yeniden çizelgeleme çağrısı doğrulanan adayı doğrudan ACTIVE yapar; ayrı aday onayı veya saha planlamacısı kabulü henüz yoktur.
 
+[17 Ekim bilimsel raporunun bağımsız denetimi](docs/scientific-review-2026-10-17.md), çözücü/benchmark deneyini, tahmin–MRP stok ayrımını ve LP hedefi–çizelgelenen bitiş farkını kaynakları ve sınırlarıyla kaydeder.
+
 [Fabrika öncesi teknik kapsam ve teslim ölçüsü](docs/prefactory-technical-closure.md), bu sürümde yapılanları ve saha katılımı gerektiren kabul sınırını toplar.
 
 **Paylaşım durumu:** Bu depo tek sunuculu bir karar destek POC'sidir. Referans/demo verisi sentetik veya açık benchmark kaynaklıdır; gerçek pilot fabrika, müşteri verisi ve ERP/MES test erişimi henüz yoktur. API ve panel varsayılan olarak kapalıdır; [yerel erişim anahtarları](docs/security-boundary.md#yerel-kullanım) yalnız laboratuvar demosu içindir. Servisi internete açmayın; Docker Compose yalnız yerel adrese bağlanır. [Sürüm kanıtı ve saha kabul sınırı](docs/release-evidence-and-field-boundary.md), teknik gösterim ile daha sonra gerekecek saha kabulünü ayırır.

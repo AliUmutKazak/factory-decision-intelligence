@@ -98,6 +98,8 @@ def run_cpsat_scheduling(
     flexible_task_windows=None,
     time_limit_seconds: float | None = None,
     economic_config=None,
+    experimental_num_workers: int | None = None,
+    experimental_random_seed: int | None = None,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
@@ -112,6 +114,10 @@ def run_cpsat_scheduling(
     limit = float(CPSAT_TIME_LIMIT_SECONDS if time_limit_seconds is None else time_limit_seconds)
     if limit <= 0:
         raise ValueError("Scheduling time limit must be positive.")
+    workers = int(CPSAT_NUM_SEARCH_WORKERS if experimental_num_workers is None else experimental_num_workers)
+    seed = int(CPSAT_RANDOM_SEED if experimental_random_seed is None else experimental_random_seed)
+    if workers < 1 or seed < 0:
+        raise ValueError("Solver workers must be positive and random seed must be nonnegative.")
     if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
         raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
     conn = connection if connection is not None else get_db_connection(active_db_path)
@@ -472,8 +478,8 @@ def run_cpsat_scheduling(
             else "weighted_minutes",
             objective_policy=str(policy),
             best_objective_bound=0.0,
-            random_seed=int(CPSAT_RANDOM_SEED),
-            num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
+            random_seed=seed,
+            num_search_workers=workers,
             time_limit_seconds=float(CPSAT_TIME_LIMIT_SECONDS),
             makespan_min=0,
             total_setup_min=0,
@@ -511,7 +517,7 @@ def run_cpsat_scheduling(
     ScheduleInputPayload(
         tasks=input_task_contracts,
         time_limit_seconds=limit,
-        random_seed=int(CPSAT_RANDOM_SEED),
+        random_seed=seed,
     )
 
     # -------------------------------------------------------------
@@ -960,8 +966,8 @@ def run_cpsat_scheduling(
         print(f"[WARM-START] Sezgisel başlangıç ipucu üretilirken atlandı: {e}")
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = limit
-    solver.parameters.num_search_workers = int(CPSAT_NUM_SEARCH_WORKERS)
-    solver.parameters.random_seed = int(CPSAT_RANDOM_SEED)
+    solver.parameters.num_workers = workers
+    solver.parameters.random_seed = seed
 
     if hierarchical and tardiness_terms:
         # -------------------------------------------------------------
@@ -1272,8 +1278,8 @@ def run_cpsat_scheduling(
         objective_units=str((economic_config or cfg.ECONOMIC_CONFIG).currency) if monetary else "weighted_minutes",
         objective_policy=str(policy),
         best_objective_bound=float(round(best_bound, 4)) if best_bound is not None else None,
-        random_seed=int(CPSAT_RANDOM_SEED),
-        num_search_workers=int(CPSAT_NUM_SEARCH_WORKERS),
+        random_seed=seed,
+        num_search_workers=workers,
         time_limit_seconds=limit,
         makespan_min=int(solver.Value(makespan)),
         total_setup_min=int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
@@ -1300,10 +1306,10 @@ def run_cpsat_scheduling(
         "best_bound_min": None if monetary else best_bound,
         "optimality_gap_pct": round(optimality_gap, 4) if optimality_gap is not None else None,
         "solve_time_seconds": round(float(solver.WallTime()), 4),
-        "configured_num_search_workers": int(CPSAT_NUM_SEARCH_WORKERS),
-        "effective_num_search_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
-        "num_workers": int(getattr(solver.parameters, "num_search_workers", CPSAT_NUM_SEARCH_WORKERS)),
-        "random_seed": int(CPSAT_RANDOM_SEED),
+        "configured_num_search_workers": workers,
+        "effective_num_search_workers": int(solver.parameters.num_workers),
+        "num_workers": int(solver.parameters.num_workers),
+        "random_seed": seed,
         "max_time_in_seconds": float(getattr(solver.parameters, "max_time_in_seconds", 0.0)),
         "tasks_scheduled": len(sched_df),
         "total_scheduled_units": int(sched_df.loc[sched_df["operation_seq"] == 1, "production_units"].sum())
@@ -1441,7 +1447,19 @@ def run_cpsat_scheduling(
     print("\n--- SKU Plan ve Çizelge Mutabakatı (Audit) ---")
     print(merged_audit.to_string(index=False))
     if (merged_audit["diff"] == 0).all():
-        print("✓ MUTABAKAT: %100 Eşleşti. Tüm planlanan SKU parti adetleri tam olarak çizelgelendi.")
+        print("✓ MİKTAR MUTABAKATI: Tüm planlanan SKU adetleri çizelge ufkuna yerleştirildi.")
+        final_operations = (
+            sched_df.sort_values("operation_seq").groupby(["parent_lot_id", "sub_lot_index"], sort=False).tail(1)
+        )
+        week_one_finished = int(
+            final_operations.loc[final_operations["end_min"] <= 7 * 24 * 60, "production_units"].sum()
+        )
+        planned_week_one = int(planned_summary["planned_units"].sum())
+        print(
+            f"  Hafta 1 son operasyon bitişi: {week_one_finished}/{planned_week_one} adet; "
+            f"sonraki haftaya sarkan: {planned_week_one - week_one_finished} adet."
+        )
+        print("  Bu değerler fiili üretim veya teslimat değildir.")
     else:
         print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
 

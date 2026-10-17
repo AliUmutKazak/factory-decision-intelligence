@@ -1,0 +1,142 @@
+{
+  "scope": "SYNTHETIC_REFERENCE_SOLVER_PROBE_NO_FACTORY_SLO",
+  "identity": {
+    "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+    "source_run_id": "RUN-20261006-00a0d3",
+    "input_hash": "3b661b07be4b97c3b5d9385789efb111cccf50217b41dcd6c27f0788169070cd",
+    "code_hashes": {
+      "src/config.py": "6cbc39f4e74f7d1253a143217aeb2653b2713cae7eec62b087f31ca8468a8980",
+      "src/scheduling/schedule_cpsat.py": "53159d637dda31189ca97f5f4ebac497444a40b81fe7718ba2f2734920742890",
+      "src/scheduling/dispatch.py": "5a00e736e364dae4efcdffcdfec1f8b0cdc83f0162f31ae5e8b34d99a6b61dd9",
+      "src/scheduling/production_benchmark.py": "5042768d5f634ec983f0790ae718f2a1fef57cc4079877805baae0a3b267ccbe",
+      "src/scheduling/monetary_objective.py": "c69e89df13a026a749ad539d4a497e38115f7b1bcbd2ca72b71ef6eefe67a273",
+      "src/scheduling/model_context.py": "4fd6b94ff13c68e030c758cb41c207d505632b25065a6b435ff996ca7af7a958",
+      "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+      "src/scheduling/analytics_schema.py": "46fe7798a034c7f11db0b0f00b1bf73e5bd8f7bd9f55ebbc1cd5b011a83b0dee",
+      "src/scheduling/maintenance.py": "e3308288f6108faf4ae07b071e78dbf3c8aed3659bcb02c229784b21c8d54c09",
+      "src/economics/schedule_cost.py": "0e3a19276b52c70dc7519e8396477b707a37aabd8fcca1ddb8b63319fb3eeba4",
+      "src/economics/cost_to_serve.py": "0e66bcb92cd91f4adbee36c95093226084cdb505e299cca097da8bf55bc646ee",
+      "src/contracts/schemas.py": "2f88e84e9b1a0d86b6cd91a5d255369737311efbe2b9bbd9b03222d929daaad0",
+      "src/utils/db.py": "9caf99fc2016e6558c84835fbdee436d4ef1b094b9c1fb036f70ae2ebb07ba89"
+    },
+    "ortools_version": "9.15.6755",
+    "platform": "Windows-11-10.0.26300-SP0"
+  },
+  "cases": [
+    {
+      "workers": 1,
+      "seed": 42,
+      "time_limit_seconds": 10.0,
+      "status": "FEASIBLE",
+      "objective_value": 1327445.0,
+      "best_objective_bound": 907350.0,
+      "solver_wall_seconds": 10.0096,
+      "reason": null
+    },
+    {
+      "workers": 1,
+      "seed": 73,
+      "time_limit_seconds": 10.0,
+      "status": "FEASIBLE",
+      "objective_value": 1305225.0,
+      "best_objective_bound": 865550.0,
+      "solver_wall_seconds": 10.0035,
+      "reason": null
+    },
+    {
+      "workers": 4,
+      "seed": 42,
+      "time_limit_seconds": 10.0,
+      "status": "FEASIBLE",
+      "objective_value": 1365425.0,
+      "best_objective_bound": 1071350.0,
+      "solver_wall_seconds": 10.0158,
+      "reason": null
+    },
+    {
+      "workers": 4,
+      "seed": 73,
+      "time_limit_seconds": 10.0,
+      "status": "FEASIBLE",
+      "objective_value": 1365425.0,
+      "best_objective_bound": 980800.0,
+      "solver_wall_seconds": 10.0149,
+      "reason": null
+    },
+    {
+      "workers": 1,
+      "seed": 42,
+      "time_limit_seconds": 30.0,
+      "status": "FEASIBLE",
+      "objective_value": 1327445.0,
+      "best_objective_bound": 907450.0,
+      "solver_wall_seconds": 30.007,
+      "reason": null
+    },
+    {
+      "workers": 4,
+      "seed": 42,
+      "time_limit_seconds": 30.0,
+      "status": "FEASIBLE",
+      "objective_value": 1184975.0,
+      "best_objective_bound": 1077400.0,
+      "solver_wall_seconds": 30.0383,
+      "reason": null
+    }
+  ],
+  "summary": [
+    {
+      "time_limit_seconds": 10.0,
+      "workers": 1,
+      "attempts": 2,
+      "accepted": 2,
+      "raw_objectives": [
+        1327445.0,
+        1305225.0
+      ],
+      "raw_bounds": [
+        907350.0,
+        865550.0
+      ]
+    },
+    {
+      "time_limit_seconds": 10.0,
+      "workers": 4,
+      "attempts": 2,
+      "accepted": 2,
+      "raw_objectives": [
+        1365425.0,
+        1365425.0
+      ],
+      "raw_bounds": [
+        1071350.0,
+        980800.0
+      ]
+    },
+    {
+      "time_limit_seconds": 30.0,
+      "workers": 1,
+      "attempts": 1,
+      "accepted": 1,
+      "raw_objectives": [
+        1327445.0
+      ],
+      "raw_bounds": [
+        907450.0
+      ]
+    },
+    {
+      "time_limit_seconds": 30.0,
+      "workers": 4,
+      "attempts": 1,
+      "accepted": 1,
+      "raw_objectives": [
+        1184975.0
+      ],
+      "raw_bounds": [
+        1077400.0
+      ]
+    }
+  ],
+  "note": "Small sample; no worker setting is certified or selected. No independent candidate audit in this probe."
+}

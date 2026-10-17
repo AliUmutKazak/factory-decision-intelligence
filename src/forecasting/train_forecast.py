@@ -280,10 +280,10 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                 )
             future_preds = np.array(future_preds_list)
 
-        # 12. Madde: CV RMSE uzerinden belirsizlik ve dinamik Safety Stock
+        # Display-only daily uncertainty heuristic. Selection-fold RMSE is not
+        # a calibrated predictive quantile or a lead-time material stock level.
         sigma_uncertainty = float(best_rmse) if best_rmse > 0 else float(np.std(pdf["demand"]))
         z_90 = 1.282
-        safety_stock_val = int(round(z_90 * sigma_uncertainty))
 
         for d, q in zip(future_dates, future_preds):
             p50_val = int(round(max(0, q)))
@@ -299,7 +299,8 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                     "demand_p50": p50_val,
                     "demand_p90": p90_val,
                     "forecast_uncertainty_sigma": round(sigma_uncertainty, 2),
-                    "recommended_safety_stock": safety_stock_val,
+                    "interval_method": "normal_rmse_heuristic_uncalibrated",
+                    "interval_calibrated": False,
                     "model_used": best_name,
                 }
             )
