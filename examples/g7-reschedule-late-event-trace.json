@@ -1,0 +1,18 @@
+[
+  {
+    "event_id": "TRACE-LATE-M02-001",
+    "current_time_min": 5500,
+    "freeze_horizon_min": 120,
+    "delay_machine_id": "M02",
+    "delay_duration_min": 90,
+    "reason": "Synthetic M02 interruption in later planning horizon"
+  },
+  {
+    "event_id": "TRACE-LATE-M01-002",
+    "current_time_min": 8000,
+    "freeze_horizon_min": 120,
+    "delay_machine_id": "M01",
+    "delay_duration_min": 120,
+    "reason": "Synthetic M01 interruption after late M02 event"
+  }
+]

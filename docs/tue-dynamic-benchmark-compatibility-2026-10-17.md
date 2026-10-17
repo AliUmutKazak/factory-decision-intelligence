@@ -25,6 +25,8 @@ FDI için yararlı sonraki deney, yayımlanmış online-FJSP örneğini “kopya
 
 Protokolün ilk, **tek olaylı** eşlenik yöntemi [sentetik G7 kıyasında](g7-paired-hot-order-methods-2026-10-17.md) uygulandı. Üç vaka × üç tohum × dört yöntem aynı mühürlü bazla ve eşit çözücü sınırıyla ölçüldü; uygunluk ve kararlılık raporlandı. Ardışık olaylar, zaman 0'dan sonraki bilgi kesimi, arıza ve freeze ufku içeren tam dinamik iz matrisi henüz uygulanmadı. Deney, FDI için gerçek fabrika faydası veya ürün üstünlüğü kanıtı değildir. Bu sınırlar ve karar, [17 Ekim küresel/Türkiye denetimine](global-turkey-product-science-audit-2026-10-17.md) işlendi.
 
+**18 Ekim güncellemesi:** [Üç sentetik iki olay dizisinde FULL/EDD kıyası](g7-paired-reschedule-traces-2026-10-18.md) arıza, olay zamanı ve freeze ufkunu kısmen kapsar. Çoklu tohum, temsilî olay dağılımı, gerçek actuals ve TU/e ile aynı problem ailesinde kıyas hâlâ yoktur.
+
 ## Kaynaklar
 
 - Reijnen, R. ve ark. (2026). “Job shop scheduling benchmark: environments and instances for learning and non-learning methods.” *Annals of Mathematics and Artificial Intelligence*. [DOI](https://doi.org/10.1007/s10472-026-10007-3), [yayınevi kaydı ve makale](https://link.springer.com/article/10.1007/s10472-026-10007-3).
