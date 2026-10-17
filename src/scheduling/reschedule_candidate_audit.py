@@ -79,6 +79,13 @@ def _audit_supported_calendar_shape(conn: sqlite3.Connection, issue: Any) -> Non
             signatures.append((shift, start, end, valid_hours, exception, available))
         if signatures and any(signature != signatures[0] for signature in signatures[1:]):
             issue("VARIABLE_DAILY_CALENDAR", machine)
+        sunday_rows = by_machine_day.get((machine, 6), [])
+        if len(sunday_rows) > 1:
+            issue("UNSUPPORTED_SUNDAY_CALENDAR", f"{machine} has {len(sunday_rows)} Sunday calendar rows")
+        elif len(sunday_rows) == 1 and sunday_rows[0][5] == 1 and signatures:
+            sunday_hours = _number(sunday_rows[0][3])
+            if sunday_hours is None or abs(sunday_hours - signatures[0][3]) > 1e-9:
+                issue("SUNDAY_HOURS_AFFECT_DAILY_AVERAGE", machine)
 
 
 def audit_reschedule_candidate(

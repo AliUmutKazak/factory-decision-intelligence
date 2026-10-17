@@ -112,3 +112,14 @@ def test_independent_audit_rejects_variable_per_day_calendar_until_supported():
         conn.close()
     assert result["status"] == "REJECTED"
     assert any(item["code"] in {"UNSUPPORTED_DAILY_CALENDAR", "VARIABLE_DAILY_CALENDAR"} for item in result["issues"])
+
+
+def test_independent_audit_rejects_sunday_hours_that_change_model_daily_average():
+    conn = _calendar_connection(variable_day=6)
+    try:
+        baseline, candidate = _schedules()
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert result["status"] == "REJECTED"
+    assert any(item["code"] == "SUNDAY_HOURS_AFFECT_DAILY_AVERAGE" for item in result["issues"])
