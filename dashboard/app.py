@@ -18,6 +18,7 @@ from src.contracts.schemas import (
     RescheduleTriggerEvent,
 )
 from src.integration.mes_service import MESIntegrationService
+from src.planning.plan_schedule_consistency import compare_week_one
 from src.scheduling.production_benchmark import production_benchmark
 from src.scheduling.rescheduler import DynamicRescheduler
 from src.scheduling.what_if import WhatIfEngine
@@ -579,6 +580,25 @@ with tab_plan:
 with tab_schedule:
     st.caption(data_label)
     st.subheader("OR-Tools CP-SAT Çizelgesi & Darboğaz Analizi")
+
+    if not sku_df.empty and not sched_df.empty:
+        try:
+            week_one = compare_week_one(sku_df, sched_df)
+        except ValueError as exc:
+            st.error(f"Hafta 1 plan–çizelge mutabakatı doğrulanamadı: {exc}")
+        else:
+            planned = week_one["planned_units"]
+            by_end = week_one["scheduled_to_finish_by_week_end_units"]
+            later = week_one["scheduled_after_week_end_units"]
+            col_target, col_finished, col_later = st.columns(3)
+            col_target.metric("Hafta 1 plan hedefi", f"{planned:,} adet")
+            col_finished.metric("Hafta 1 sonuna kadar çizelgelenen bitiş", f"{by_end:,} adet")
+            col_later.metric("Sonraki haftaya sarkan", f"{later:,} adet")
+            st.caption("Son operasyonun bitiş zamanı esas alınır; bunlar gerçekleşmiş üretim adetleri değildir.")
+            if later:
+                st.warning("Taktik plandaki tüm adetler çizelgede bulunuyor, ancak hepsi ilk hafta içinde bitmiyor.")
+            with st.expander("Ürün bazında plan–çizelge farkı"):
+                st.dataframe(pd.DataFrame(week_one["by_product"]), use_container_width=True)
 
     # ---------------------------------------------------------
     # Faz 4 - Çözücü Metadatası & Çok Amaçlı Metrik Kartları

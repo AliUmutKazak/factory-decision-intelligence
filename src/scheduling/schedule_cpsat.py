@@ -1447,7 +1447,19 @@ def run_cpsat_scheduling(
     print("\n--- SKU Plan ve Çizelge Mutabakatı (Audit) ---")
     print(merged_audit.to_string(index=False))
     if (merged_audit["diff"] == 0).all():
-        print("✓ MUTABAKAT: %100 Eşleşti. Tüm planlanan SKU parti adetleri tam olarak çizelgelendi.")
+        print("✓ MİKTAR MUTABAKATI: Tüm planlanan SKU adetleri çizelge ufkuna yerleştirildi.")
+        final_operations = (
+            sched_df.sort_values("operation_seq").groupby(["parent_lot_id", "sub_lot_index"], sort=False).tail(1)
+        )
+        week_one_finished = int(
+            final_operations.loc[final_operations["end_min"] <= 7 * 24 * 60, "production_units"].sum()
+        )
+        planned_week_one = int(planned_summary["planned_units"].sum())
+        print(
+            f"  Hafta 1 son operasyon bitişi: {week_one_finished}/{planned_week_one} adet; "
+            f"sonraki haftaya sarkan: {planned_week_one - week_one_finished} adet."
+        )
+        print("  Bu değerler fiili üretim veya teslimat değildir.")
     else:
         print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
 
