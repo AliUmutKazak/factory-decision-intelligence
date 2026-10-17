@@ -12,9 +12,16 @@ from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.utils.db import clone_run_inputs, get_active_run_id
 
 
-def test_experimental_deadline_cannot_write_runtime_outputs():
-    with pytest.raises(ValueError, match="isolated non-persistent"):
+def test_experimental_deadline_requires_in_memory_connection(tmp_path):
+    with pytest.raises(ValueError, match="isolated in-memory"):
         run_cpsat_scheduling(experimental_completion_deadline_min=10080)
+    with sqlite3.connect(tmp_path / "disk.db") as conn:
+        with pytest.raises(ValueError, match="isolated in-memory"):
+            run_cpsat_scheduling(
+                experimental_completion_deadline_min=10080,
+                persist_outputs=False,
+                connection=conn,
+            )
 
 
 @pytest.mark.parametrize("objective,bound,gap", [(100.0, 0.0, 100.0), (0.0, 0.0, 0.0), (100.0, None, None)])

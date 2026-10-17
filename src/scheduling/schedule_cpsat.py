@@ -120,10 +120,12 @@ def run_cpsat_scheduling(
     if workers < 1 or seed < 0:
         raise ValueError("Solver workers must be positive and random seed must be nonnegative.")
     if experimental_completion_deadline_min is not None:
-        if persist_outputs:
-            raise ValueError("Experimental completion deadline requires isolated non-persistent scheduling.")
+        if persist_outputs or connection is None:
+            raise ValueError("Experimental completion deadline requires an isolated in-memory connection.")
         if experimental_completion_deadline_min <= 0:
             raise ValueError("Experimental completion deadline must be positive.")
+        if any(row[2] for row in connection.execute("PRAGMA database_list").fetchall()):
+            raise ValueError("Experimental completion deadline requires an isolated in-memory connection.")
     if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
         raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
     conn = connection if connection is not None else get_db_connection(active_db_path)
