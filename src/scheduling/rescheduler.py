@@ -7,6 +7,7 @@ import json
 import shutil
 import sqlite3
 import uuid
+from contextlib import closing
 from pathlib import Path
 from time import perf_counter
 
@@ -305,7 +306,7 @@ class DynamicRescheduler:
         processed_dir.mkdir(parents=True, exist_ok=True)
         reports_dir.mkdir(parents=True, exist_ok=True)
 
-        with sqlite3.connect(self.disk_db_path) as conn:
+        with closing(sqlite3.connect(self.disk_db_path)) as conn:
             for table_name, filename in self.ARTIFACT_TABLES.items():
                 if not self._table_exists(conn, table_name):
                     continue
@@ -747,7 +748,7 @@ class DynamicRescheduler:
             if created_version:
                 from src.utils.lineage import update_pipeline_run_status
 
-                with sqlite3.connect(self.disk_db_path) as failure_conn:
+                with closing(sqlite3.connect(self.disk_db_path)) as failure_conn:
                     row = failure_conn.execute(
                         "SELECT status FROM pipeline_runs WHERE run_id = ?", (new_run_id,)
                     ).fetchone()
