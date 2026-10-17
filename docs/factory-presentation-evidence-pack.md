@@ -2,6 +2,8 @@
 
 **Sürüm bağlamı:** 15 Ekim 2026; son doğrulanmış sürüm `v0.1.8-lab`, commit `3a0345e6ac5db15fb509d33e7bf30464a24f6b55`, [CI 38761630031](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/38761630031). Yeni commit veya demo görseli kullanılırsa kanıtı yeniden eşleştir. Bilimsel ve pazar dayanağı: [güncel uluslararası denetim](global-evidence-audit-2026-10-15.md) ve [Türkiye/dünya kaynak denetimi](tr-global-science-market-audit-2026-10-11.md). Kapı durumu: [G0–G13 kayıtları](fdi-roadmap-execution.md).
 
+**17 Ekim ana dal ek denetimi:** `77a5f13809730513a81557183454b1a5afd7d757` için [CI başarılıdır](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39037061869). [Mühürlü sentetik referansta](plan-schedule-gap-audit-2026-10-17.md) ilk hafta LP hedefi 8.400 adet, hafta bitiminde son operasyonu tamamlanan miktar 6.100 adettir; 2.300 adet sonraya sarkar. Sert ilk hafta bitiş koşulu aynı modelde `INFEASIBLE` çıktı. Bu bulguyu gizleme veya gerçekleşmiş fabrika performansı gibi sunma. Temiz Windows klon provası hâlâ `v0.1.8-lab` sürümüne aittir.
+
 ## 30 saniyelik tanım
 
 “FDI, üretim talebi, kapasite, malzeme ve sabit makineli operasyon sırasını tek bir izlenebilir karar akışında birleştiren laboratuvar karar destek prototipidir. Plan değiştiğinde öneriyi, mevcut plana etkisini ve model varsayımlarını gösterir. Şu ana kadarki sonuçlar sentetik/açık veridedir. İlk tesis incelemesi, canlı sisteme yazmadan, dar kapsamlı dosyalarla mevcut planla aynı koşulda karşılaştırma olarak tasarlanır.”
@@ -22,6 +24,7 @@
 | “Tek sunuculu, tekrar üretilebilir laboratuvar POC” | Release tag/commit + aynı commit CI kalite/Docker ve artifact digest; [sürüm kanıtı ve saha kabul sınırı](release-evidence-and-field-boundary.md) | Üretim servisi veya çok tesisli güvenilirlik kabulü |
 | “Açık/sentetik örneklerde fiziksel çizelge denetimi var” | [OR-Library bağımsız audit](external-jsp-benchmark.md); solver statüsü ve zaman sınırı | Rakip APS'den hızlı/iyi veya genel FJSP ispatı |
 | “Aynı model girdisinde plan politikaları karşılaştırılabilir” | [Business case demo](../artifacts/demo/business-case.md), aynı snapshot ve maliyet varsayımları | Müşteri tasarrufu, nakit fayda veya pozitif ROI |
+| “LP miktar hedefi ile ilk hafta fiziksel bitiş ayrı ölçülür” | [17 Ekim referans denetimi](plan-schedule-gap-audit-2026-10-17.md): 8.400 hedef, 6.100 zamanında tamamlanan, 2.300 sonraya sarkan; sert teslim fizibilitesi deneyi | `%100 miktar mutabakatı`nı `%100 zamanında teslim` veya gerçek tesis kapasitesi diye yorumlamak |
 | “Tahmin modelleri zaman sıralı backtest ile seçilir” | [15 Ekim yöntem ve sentetik koşum kaydı](global-evidence-audit-2026-10-15.md): ilk üç fold seçim, son fold ayrı holdout; WAPE/RMSE/bias ve Naive kıyası. [12 Ekim geri testi](forecast-v012-lab-evidence.md) tarihsel eski protokoldür | P10/P90'nın kalibre %80 aralığı, safety stock'un %90 servis garantisi veya gerçek müşteri doğruluğu |
 | “Enerji/karbon model senaryosu hesaplanır” | Simüle kWh, varsayılan yakıt/şebeke katsayısı ve model girdileri | GHG Protocol uyumlu kurumsal envanter, gerçek karbon azaltımı |
 | “Dar dosya pilotu teknik olarak denenebilir” | [CSV/XLSX ön kontrolü](../examples/pilot-package/README.md) ve [bellek içi çözüm](../examples/pilot-solve/README.md) | ERP/MES entegrasyonu, her proses tipi için hazır solver |
