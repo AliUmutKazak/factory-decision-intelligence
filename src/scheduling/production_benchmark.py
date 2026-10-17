@@ -31,6 +31,7 @@ def production_benchmark(
     baseline_run_id=None,
     experimental_num_workers: int | None = None,
     experimental_random_seed: int | None = None,
+    experimental_completion_deadline_min: int | None = None,
 ):
     path = Path(db_path or get_runtime_paths()["db_path"])
     if not path.is_file():
@@ -125,6 +126,7 @@ def production_benchmark(
                     time_limit_seconds=time_limit_seconds,
                     experimental_num_workers=experimental_num_workers,
                     experimental_random_seed=experimental_random_seed,
+                    experimental_completion_deadline_min=experimental_completion_deadline_min,
                 )
                 result = pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?", private, params=(case_run,))
                 metrics = SchedulingBenchmarkSuite.reported_schedule_metrics(result)
