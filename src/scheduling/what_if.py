@@ -176,6 +176,8 @@ class WhatIfEngine:
         scenario_time_limit_seconds: float | None = None,
         reuse_active_baseline: bool = False,
         scenario_dispatch_rule: str | None = None,
+        experimental_scenario_seed: int | None = None,
+        experimental_scenario_workers: int | None = None,
     ) -> tuple[
         ScheduleSolverMetadata,
         ScheduleSolverMetadata,
@@ -254,6 +256,8 @@ class WhatIfEngine:
                 time_limit_seconds=scenario_time_limit_seconds,
                 reference_schedule=reference_schedule,
                 dispatch_rule=scenario_dispatch_rule,
+                experimental_random_seed=experimental_scenario_seed,
+                experimental_num_workers=experimental_scenario_workers,
             )
 
             scenario_sched = pd.read_sql(
