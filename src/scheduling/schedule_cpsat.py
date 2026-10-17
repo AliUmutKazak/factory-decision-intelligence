@@ -100,6 +100,7 @@ def run_cpsat_scheduling(
     economic_config=None,
     experimental_num_workers: int | None = None,
     experimental_random_seed: int | None = None,
+    experimental_completion_deadline_min: int | None = None,
 ):
     print("--- 4. CP-SAT Detaylı Çizelgeleme (Sıra Bağımlı Komşu Setup & MRP Kısıtları) ---")
     runtime = get_runtime_paths()
@@ -118,6 +119,11 @@ def run_cpsat_scheduling(
     seed = int(CPSAT_RANDOM_SEED if experimental_random_seed is None else experimental_random_seed)
     if workers < 1 or seed < 0:
         raise ValueError("Solver workers must be positive and random seed must be nonnegative.")
+    if experimental_completion_deadline_min is not None:
+        if persist_outputs:
+            raise ValueError("Experimental completion deadline requires isolated non-persistent scheduling.")
+        if experimental_completion_deadline_min <= 0:
+            raise ValueError("Experimental completion deadline must be positive.")
     if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
         raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
     conn = connection if connection is not None else get_db_connection(active_db_path)
@@ -562,6 +568,10 @@ def run_cpsat_scheduling(
         if mid not in machine_to_tasks:
             machine_to_tasks[mid] = []
         machine_to_tasks[mid].append(tid)
+
+    if experimental_completion_deadline_min is not None:
+        for task in all_tasks.values():
+            model.Add(task["end"] <= experimental_completion_deadline_min)
 
     # P0-3: Freeze horizon is a solver-level hard constraint.
     # The solver may optimize every non-frozen task, but frozen task start/end
