@@ -1,0 +1,18 @@
+[
+  {
+    "event_id": "TRACE-MODERATE-M01-001",
+    "current_time_min": 800,
+    "freeze_horizon_min": 90,
+    "delay_machine_id": "M01",
+    "delay_duration_min": 60,
+    "reason": "Synthetic moderate M01 interruption"
+  },
+  {
+    "event_id": "TRACE-MODERATE-M02-002",
+    "current_time_min": 2500,
+    "freeze_horizon_min": 90,
+    "delay_machine_id": "M02",
+    "delay_duration_min": 45,
+    "reason": "Synthetic moderate M02 interruption after first publication"
+  }
+]

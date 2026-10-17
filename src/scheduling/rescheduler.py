@@ -499,15 +499,21 @@ class DynamicRescheduler:
         trigger: RescheduleTriggerEvent,
         new_run_id: str | None = None,
         persist_audit: bool = True,
+        experimental_dispatch_rule: str | None = None,
     ):
+        if experimental_dispatch_rule is not None and (
+            experimental_dispatch_rule not in {"FIFO", "EDD", "SPT", "Greedy"} or trigger.allow_local_repair
+        ):
+            raise ValueError("Experimental dispatch requires a known rule and full solver path.")
         with run_mutation_lock(self.disk_db_path):
-            return self._execute_reschedule(trigger, new_run_id, persist_audit)
+            return self._execute_reschedule(trigger, new_run_id, persist_audit, experimental_dispatch_rule)
 
     def _execute_reschedule(
         self,
         trigger: RescheduleTriggerEvent,
         new_run_id: str | None = None,
         persist_audit: bool = True,
+        experimental_dispatch_rule: str | None = None,
     ):
         disk_conn = sqlite3.connect(self.disk_db_path)
         created_version = False
@@ -588,6 +594,7 @@ class DynamicRescheduler:
                     reference_schedule=baseline_sched,
                     task_override=baseline_sched,
                     flexible_task_windows=flexible,
+                    dispatch_rule=experimental_dispatch_rule,
                 )
                 if trigger.allow_local_repair:
                     repair_started = perf_counter()

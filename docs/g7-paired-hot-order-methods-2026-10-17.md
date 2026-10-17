@@ -28,3 +28,5 @@ python -m src.scheduling.hot_order_method_comparison --db artifacts/reference/fa
 ## Kalan sınır
 
 Bu ilk adım **tek acil siparişin zaman 0'da gelişini** ölçer; ardışık sipariş/arıza izleri, freeze ufku ve karar anında gelecek olay bilgisinin kesilmesi henüz karşılaştırmalı benchmark'a bağlanmadı. FULL için daha uzun eşit bütçe ve farklı yükler de değerlendirilmeden kalite üstünlüğü iddia edilemez. Mevcut baseline'ların sabit makine sırası kısıtı, sahadaki planlayıcı davranışının doğrulanmış temsili değildir. Gerçek fabrika kısıtları, saatlik olay frekansı, planlayıcı kabulü ve teslim/finans actuals'ı bu sonuçtan çıkarılamaz.
+
+Ardışık makine kesintileri ve freeze ufku için sonradan [ayrı üç izlik eşlenik deney](g7-paired-reschedule-traces-2026-10-18.md) yapıldı; bu tek olaylı acil sipariş kaydının kapsamı değişmez.

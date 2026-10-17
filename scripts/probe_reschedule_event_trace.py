@@ -41,12 +41,24 @@ def _load_events(path: Path) -> list[RescheduleTriggerEvent]:
     return events
 
 
-def probe(reference_db: Path, expected_sha256: str, baseline_run_id: str, events_path: Path) -> dict:
+def probe(
+    reference_db: Path,
+    expected_sha256: str,
+    baseline_run_id: str,
+    events_path: Path,
+    *,
+    force_full_solver: bool = False,
+    dispatch_rule: str | None = None,
+) -> dict:
     reference_db = reference_db.resolve()
     events_path = events_path.resolve()
     reference_hash = _sha256(reference_db)
     if reference_hash != expected_sha256.lower():
         raise ValueError("sealed reference database SHA-256 mismatch")
+    if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
+        raise ValueError("unknown experimental dispatch rule")
+    if dispatch_rule is not None and not force_full_solver:
+        raise ValueError("dispatch comparison requires the full solver for every event")
     events = _load_events(events_path)
     repo_root = Path(__file__).resolve().parents[1]
     code_files = (
@@ -84,11 +96,16 @@ def probe(reference_db: Path, expected_sha256: str, baseline_run_id: str, events
         ):
             engine = DynamicRescheduler(str(db_path))
             for index, event in enumerate(events, start=1):
+                if force_full_solver:
+                    event = event.model_copy(update={"allow_local_repair": False})
                 run_id = f"TRACE-{index:02d}"
                 started = perf_counter()
                 try:
                     _, schedule, metadata, stability, audit = engine.execute_reschedule(
-                        event, new_run_id=run_id, persist_audit=True
+                        event,
+                        new_run_id=run_id,
+                        persist_audit=True,
+                        experimental_dispatch_rule=dispatch_rule,
                     )
                     with closing(sqlite3.connect(db_path)) as conn:
                         active = conn.execute("SELECT run_id FROM pipeline_runs WHERE status='ACTIVE'").fetchall()
@@ -129,6 +146,8 @@ def probe(reference_db: Path, expected_sha256: str, baseline_run_id: str, events
         raise RuntimeError("sealed reference changed during trace replay")
     return {
         "experiment_type": "single-policy chronological synthetic reschedule trace",
+        "full_solver_only": force_full_solver,
+        "dispatch_rule": dispatch_rule or "FULL",
         "source_db": str(reference_db),
         "source_db_sha256": reference_hash,
         "code_sha256": code_sha256,
@@ -150,8 +169,17 @@ def main() -> None:
     parser.add_argument("--baseline-run-id", required=True)
     parser.add_argument("--events", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--full-solver", action="store_true")
+    parser.add_argument("--dispatch-rule", choices=["FIFO", "EDD", "SPT", "Greedy"])
     args = parser.parse_args()
-    report = probe(args.db, args.sha256, args.baseline_run_id, args.events)
+    report = probe(
+        args.db,
+        args.sha256,
+        args.baseline_run_id,
+        args.events,
+        force_full_solver=args.full_solver,
+        dispatch_rule=args.dispatch_rule,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"completed_all_events": report["completed_all_events"], "output": str(args.output)}))
