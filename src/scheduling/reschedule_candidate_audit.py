@@ -1,4 +1,4 @@
-"""Independent, fail-closed checks for reschedule commitments and calendar shape.
+"""Independent, fail-closed checks for reschedule commitments and core physics.
 
 This module intentionally does not import the solver or its constraint builder.
 It checks the published candidate against the baseline and raw calendar inputs.
@@ -16,9 +16,17 @@ from src.contracts.schemas import RescheduleTriggerEvent
 
 _REQUIRED = {
     "task_id",
+    "lot_id",
+    "product_id",
     "machine_id",
+    "operation_seq",
     "start_min",
     "end_min",
+    "duration_min",
+    "release_time_min",
+    "setup_before_min",
+    "setup_start_min",
+    "setup_end_min",
     "schedule_state",
     "freeze_until_min",
     "execution_status",
@@ -88,6 +96,62 @@ def _audit_supported_calendar_shape(conn: sqlite3.Connection, issue: Any) -> Non
                 issue("SUNDAY_HOURS_AFFECT_DAILY_AVERAGE", machine)
 
 
+def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
+    """Rebuild task timing, route order and machine occupancy from candidate rows."""
+    by_machine: dict[str, list[tuple[float, float, str]]] = {}
+    by_lot: dict[str, list[tuple[float, float, float, str]]] = {}
+    for raw in candidate.to_dict("records"):
+        task_id = str(raw["task_id"])
+        values = {
+            key: _number(raw[key])
+            for key in (
+                "operation_seq",
+                "start_min",
+                "end_min",
+                "duration_min",
+                "release_time_min",
+                "setup_before_min",
+                "setup_start_min",
+                "setup_end_min",
+            )
+        }
+        if any(value is None for value in values.values()):
+            issue("NONNUMERIC_INTERVAL", task_id)
+            continue
+        start = values["start_min"]
+        end = values["end_min"]
+        duration = values["duration_min"]
+        release = values["release_time_min"]
+        setup = values["setup_before_min"]
+        setup_start = values["setup_start_min"]
+        setup_end = values["setup_end_min"]
+        if start < 0 or duration <= 0 or abs(end - start - duration) > 1e-6 or start < release:
+            issue("INVALID_TASK_TIMING", task_id)
+        if setup < 0 or setup_start < 0 or abs(setup_end - start) > 1e-6 or abs(start - setup_start - setup) > 1e-6:
+            issue("INVALID_SETUP_INTERVAL", task_id)
+        if values["operation_seq"] < 0 or not values["operation_seq"].is_integer():
+            issue("INVALID_OPERATION_SEQUENCE", task_id)
+        by_machine.setdefault(str(raw["machine_id"]), []).append((setup_start, end, task_id))
+        by_lot.setdefault(str(raw["lot_id"]), []).append((values["operation_seq"], start, end, task_id))
+
+    for machine, operations in by_machine.items():
+        previous_end = None
+        for occupied_start, end, task_id in sorted(operations):
+            if previous_end is not None and occupied_start < previous_end - 1e-6:
+                issue("MACHINE_OCCUPANCY_OVERLAP", f"{machine}: {task_id}")
+            previous_end = end if previous_end is None else max(previous_end, end)
+    for lot, operations in by_lot.items():
+        previous_end = None
+        previous_sequence = None
+        for sequence, start, end, task_id in sorted(operations):
+            if previous_sequence is not None and sequence == previous_sequence:
+                issue("DUPLICATE_ROUTE_OPERATION", f"{lot}: {sequence}")
+            if previous_end is not None and start < previous_end - 1e-6:
+                issue("ROUTE_PRECEDENCE", f"{lot}: {task_id}")
+            previous_end = end
+            previous_sequence = sequence
+
+
 def audit_reschedule_candidate(
     conn: sqlite3.Connection,
     baseline: pd.DataFrame,
@@ -95,7 +159,7 @@ def audit_reschedule_candidate(
     trigger: RescheduleTriggerEvent,
     completed_tasks: set[Any] | None = None,
 ) -> dict[str, Any]:
-    """Check task identity, frozen commitments, FLEXIBLE bounds, and calendar support."""
+    """Check identity, commitments, core intervals, and supported calendar shape."""
     issues: list[dict[str, str]] = []
 
     def issue(code: str, detail: str) -> None:
@@ -106,11 +170,18 @@ def audit_reschedule_candidate(
         if missing:
             issue("MISSING_COLUMNS", f"{name}: {', '.join(sorted(missing))}")
     if issues:
-        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CALENDAR", "issues": issues}
+        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
 
     if baseline.empty or candidate.empty:
         issue("EMPTY_SCHEDULE", "baseline or candidate has no operations")
-        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CALENDAR", "issues": issues}
+        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
+
+    for name, frame in (("baseline", baseline), ("candidate", candidate)):
+        for column in ("task_id", "lot_id", "product_id", "machine_id"):
+            if frame[column].isna().any() or frame[column].astype(str).str.strip().eq("").any():
+                issue("INVALID_IDENTIFIER", f"{name}: {column}")
+    if issues:
+        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
 
     base = baseline.copy()
     new = candidate.copy()
@@ -144,6 +215,13 @@ def audit_reschedule_candidate(
             continue
         if str(current["machine_id"]) != str(old["machine_id"]):
             issue("ROUTING_CHANGED", task_id)
+        if any(str(current[column]) != str(old[column]) for column in ("lot_id", "product_id")) or any(
+            _number(current[column]) is None
+            or _number(old[column]) is None
+            or abs(_number(current[column]) - _number(old[column])) > 1e-6
+            for column in ("operation_seq", "release_time_min")
+        ):
+            issue("TASK_INPUT_CHANGED", task_id)
         if abs((end - start) - (old_end - old_start)) > 1e-6:
             issue("DURATION_CHANGED", task_id)
 
@@ -181,10 +259,11 @@ def audit_reschedule_candidate(
             if str(current["schedule_state"]) != "FLEXIBLE":
                 issue("FLEXIBLE_STATE_MISSING", task_id)
 
+    _audit_core_intervals(new, issue)
     _audit_supported_calendar_shape(conn, issue)
     return {
         "status": "ACCEPTED" if not issues else "REJECTED",
-        "scope": "RESCHEDULE_FREEZE_FLEX_CALENDAR",
+        "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR",
         "task_count": len(new),
         "issues": issues,
     }
