@@ -4,6 +4,8 @@
 
 **17 Ekim ana dal ek denetimi:** `77a5f13809730513a81557183454b1a5afd7d757` için [CI başarılıdır](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39037061869). [Mühürlü sentetik referansta](plan-schedule-gap-audit-2026-10-17.md) ilk hafta LP hedefi 8.400 adet, hafta bitiminde son operasyonu tamamlanan miktar 6.100 adettir; 2.300 adet sonraya sarkar. Sert ilk hafta bitiş koşulu aynı modelde `INFEASIBLE` çıktı. Bu bulguyu gizleme veya gerçekleşmiş fabrika performansı gibi sunma. Temiz Windows klon provası hâlâ `v0.1.8-lab` sürümüne aittir.
 
+Küresel/Türkiye APS ve bilimsel kaynak karşılaştırması için [17 Ekim ürün/bilim boşluk denetimine](global-turkey-product-science-audit-2026-10-17.md) bak. Bu taramadaki ticari ürün özellikleri üretici beyanıdır; eşit veri ve kısıtlarda bağımsız performans kıyası değildir.
+
 ## 30 saniyelik tanım
 
 “FDI, üretim talebi, kapasite, malzeme ve sabit makineli operasyon sırasını tek bir izlenebilir karar akışında birleştiren laboratuvar karar destek prototipidir. Plan değiştiğinde öneriyi, mevcut plana etkisini ve model varsayımlarını gösterir. Şu ana kadarki sonuçlar sentetik/açık veridedir. İlk tesis incelemesi, canlı sisteme yazmadan, dar kapsamlı dosyalarla mevcut planla aynı koşulda karşılaştırma olarak tasarlanır.”
