@@ -50,6 +50,8 @@ Projenin PDF ile kararlaştırılan G0-G13 ilerlemesi ve açık kapıları [uygu
 
 [Türkiye ve dünya bilim/pazar denetimi](docs/tr-global-science-market-audit-2026-10-11.md), akademik yöntemleri ve benzer APS ürünlerini FDI'nin gerçek kapsamıyla karşılaştırır. [Fabrika sunumu kanıt paketi](docs/factory-presentation-evidence-pack.md), gösterilebilir iddiaları, demo sırasını ve ilk görüşmede netleştirilecek kararları toplar.
 
+[17 Ekim 2026 küresel/Türkiye ürün ve bilim boşluk denetimi](docs/global-turkey-product-science-audit-2026-10-17.md), Siemens, SAP, Asprova, Logo Netsis ve Türkiye'de sunulan APS örneklerini; ISA-95/IEC 62264, ISO 22400, OT güvenliği ve üretim çizelgeleme araştırmalarıyla karşılaştırır. Ürün beyanlarını bağımsız performans kanıtı olarak kullanmaz ve hangi açıkların saha erişimine bağlı olduğunu belirtir.
+
 [14 Ekim stratejik rapor kararı](docs/validated-strategy-2026-10-14.md), kaynaklandırılmamış SaaS, AI ve tasarruf vaatlerini ayıklayıp mevcut POC kapsamını korur. [Problem keşfi rehberi](docs/problem-discovery-guide.md) ve [dar pilot ölçüm protokolü](docs/pilot-measurement-protocol.md) görüşme ve saha karşılaştırması için hazırlanmış şablonlardır; henüz müşteri bulgusu veya saha kabulü değildir.
 
 [Metodolojik savunma raporu değerlendirmesi](docs/methodological-defense-review-2026-10-14.md), edge/B2MML, çözücü boşluğu ve TDABC iddialarının mevcut kanıt sınırını kaydeder; gölge gözlemi gerçekleşmiş etki deneyinden ayırır.
