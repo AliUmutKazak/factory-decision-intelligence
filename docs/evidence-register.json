@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "as_of": "2026-10-15",
+  "as_of": "2026-10-17",
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
     "tag": "v0.1.8-lab",
@@ -84,6 +84,24 @@
       "sha256": "09e9641a10b73248291acfa55f56e4912285b32c0e3392084ef0dfacc9520680",
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_demand_fixture"
+    },
+    "scientific_ft10_worker_probe": {
+      "path": "artifacts/research/scientific-worker-ft10-2026-10-17.json",
+      "sha256": "6f92ca2ff3600985a4112d0bbb67c14367203bc8f37389f9a808878a0bbd814f",
+      "sha256_mode": "normalized_lf",
+      "data_class": "open_or_library_benchmark"
+    },
+    "scientific_reference_worker_probe": {
+      "path": "artifacts/research/scientific-reference-workers-2026-10-17.json",
+      "sha256": "8743412a707af54efa54300f865bc1443fa6a8db62d0a40e483994d1bd83504f",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference"
+    },
+    "plan_schedule_consistency_probe": {
+      "path": "artifacts/research/plan-schedule-consistency-2026-10-17.json",
+      "sha256": "22cdd9989c6b206381e011798716a22468c67c80776d729ed6709999afc6e2ff",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference"
     }
   },
   "gates": [
@@ -110,6 +128,7 @@
     {"id": "G5-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "open_risk": "No vendor endpoint or ACK"},
     {"id": "G6-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g6-synthetic-execution-replay.md"], "open_risk": "No site WIP/rework semantics"},
     {"id": "G7-lab", "status": "Kanıt hazır", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012"], "evidence": ["docs/g7-v012-lab-envelope.md"], "open_risk": "Small chosen sample; no customer load, alarm threshold or SLO"},
-    {"id": "G8-T", "status": "Kanıt hazır", "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md", "docs/global-evidence-audit-2026-10-15.md", "docs/clean-demo-v018-2026-10-15.md"], "open_risk": "ft10 30-second quality varies; one synthetic holdout does not establish customer forecast accuracy or general solver superiority"}
+    {"id": "G8-T", "status": "Kanıt hazır", "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md", "docs/global-evidence-audit-2026-10-15.md", "docs/clean-demo-v018-2026-10-15.md"], "open_risk": "ft10 30-second quality varies; one synthetic holdout does not establish customer forecast accuracy or general solver superiority"},
+    {"id": "SCI-20261017-lab", "status": "Ön ölçüm", "source_ids": ["scientific_ft10_worker_probe", "scientific_reference_worker_probe", "plan_schedule_consistency_probe"], "evidence": ["docs/scientific-review-2026-10-17.md"], "open_risk": "Preliminary worker matrix, no site workload or calibrated inventory service level; this source commit needs its own CI"}
   ]
 }

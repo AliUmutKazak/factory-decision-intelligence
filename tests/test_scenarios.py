@@ -137,6 +137,7 @@ def test_scenario_expedite_flags(isolated_env, monkeypatch):
 
     expedites = mrp[mrp["action_message"].str.contains("EXPEDITE", na=False)]
     assert len(expedites) > 0
+    assert set(mrp["safety_stock_method"]) == {"planned_requirement_dispersion_heuristic_uncalibrated"}
 
 
 def test_scenario_normal_e2e_reconciliation(isolated_env, monkeypatch):

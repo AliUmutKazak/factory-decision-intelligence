@@ -72,6 +72,9 @@ def test_all_zero_demand_uses_rmse_and_keeps_json_finite(tmp_path, monkeypatch):
     assert json.loads(row[4])["holdout_wape"] is None
     assert row[5] == 0.0
     assert (result["forecast_demand"] == 0).all()
+    assert "recommended_safety_stock" not in result.columns
+    assert set(result["interval_calibrated"]) == {False}
+    assert set(result["interval_method"]) == {"normal_rmse_heuristic_uncalibrated"}
 
 
 def test_final_window_does_not_select_forecast_model(tmp_path, monkeypatch):

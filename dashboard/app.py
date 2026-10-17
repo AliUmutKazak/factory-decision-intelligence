@@ -462,7 +462,8 @@ with tab_forecast:
     st.caption(data_label)
     st.subheader("28 Günlük Tahminler ve Model Kıyaslama (Benchmark)")
     st.caption(
-        "P10/P90 ve önerilen güvenlik stoğu, kalibre edilmemiş RMSE tabanlı model varsayımlarıdır; hizmet düzeyi garantisi değildir."
+        "P10/P90 günlük RMSE'den türetilen kalibre edilmemiş gösterim aralıklarıdır. "
+        "MRP'deki malzeme tamponu ayrıca hesaplanır; ikisi de hizmet düzeyi garantisi değildir."
     )
 
     if forecast_df.empty:

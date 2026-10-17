@@ -133,7 +133,7 @@ CARBON_PRICE_SCENARIOS_EUR = [
 ]  # Dahili karbon fiyat senaryoları (€/tCO2e - Internal Carbon Pricing)
 
 # 4. Malzeme & Envanter Planlama Parametreleri (MRP-I)
-MRP_SERVICE_LEVEL_Z = 1.65  # %95 Çevrim Servis Seviyesi Emniyet Faktörü
+MRP_SERVICE_LEVEL_Z = 1.65  # Legacy planning-buffer multiplier; 95% service is NOT calibrated.
 INITIAL_INVENTORY = {"RAW_STEEL_A": 4500.0, "RAW_STEEL_B": 8000.0, "RAW_ALLOY_ROD": 6000.0, "COATING_POWDER": 600.0}
 
 # 5. Talep Tahminleme & Taktik Planlama Ufku
@@ -168,7 +168,7 @@ PRODUCTION_BATCH_SIZE = 25  # Referans parti büyüklüğü (adet)
 ENABLE_LOT_STREAMING = True  # Dev partileri alt transfer lotlarına bölerek overlap sağla
 MAX_SUB_LOT_BATCHES = 40  # Bir alt transfer lotunun alabileceği maksimum batch sayısı
 CPSAT_TIME_LIMIT_SECONDS = 30.0  # Çözücü zaman limiti (sn)
-CPSAT_NUM_SEARCH_WORKERS = 1  # Stable deterministic search; parallel portfolio crashed in regression runs.
+CPSAT_NUM_SEARCH_WORKERS = 1  # Conservative default; worker experiments are isolated and must be measured.
 CPSAT_RANDOM_SEED = 42  # Tekrarlanabilirlik tohum değeri
 
 

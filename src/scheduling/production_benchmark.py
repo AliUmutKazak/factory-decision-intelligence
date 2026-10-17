@@ -29,6 +29,8 @@ def production_benchmark(
     rules=("CP-SAT", "FIFO", "EDD", "SPT", "Greedy", "COST_OPTIMIZED"),
     time_limit_seconds=None,
     baseline_run_id=None,
+    experimental_num_workers: int | None = None,
+    experimental_random_seed: int | None = None,
 ):
     path = Path(db_path or get_runtime_paths()["db_path"])
     if not path.is_file():
@@ -121,6 +123,8 @@ def production_benchmark(
                     dispatch_rule=None if rule in {"CP-SAT", "COST_OPTIMIZED"} else rule,
                     policy="COST_OPTIMIZED" if rule == "COST_OPTIMIZED" else "BALANCED",
                     time_limit_seconds=time_limit_seconds,
+                    experimental_num_workers=experimental_num_workers,
+                    experimental_random_seed=experimental_random_seed,
                 )
                 result = pd.read_sql("SELECT * FROM production_schedule WHERE run_id = ?", private, params=(case_run,))
                 metrics = SchedulingBenchmarkSuite.reported_schedule_metrics(result)
