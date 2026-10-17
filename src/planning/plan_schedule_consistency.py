@@ -40,14 +40,15 @@ def compare_week_one(sku_plan: pd.DataFrame, schedule: pd.DataFrame) -> dict:
     due_by_sku = (
         final.loc[final["end_min"] <= WEEK_ONE_END_MIN].groupby("product_id")["production_units"].sum().to_dict()
     )
-    if set(first_by_sku) != set(plan["product_id"]):
+    planned_skus = set(plan.loc[plan["planned_units"] > 0, "product_id"])
+    if set(first_by_sku) != planned_skus:
         raise ValueError("scheduled SKUs do not match the week-one plan")
 
     rows = []
     for row in plan.itertuples():
         planned = int(row.planned_units)
-        scheduled = int(first_by_sku[row.product_id])
-        eventual = int(final_by_sku[row.product_id])
+        scheduled = int(first_by_sku.get(row.product_id, 0))
+        eventual = int(final_by_sku.get(row.product_id, 0))
         if scheduled != planned or eventual != planned:
             raise ValueError(f"scheduled quantities disagree with plan for {row.product_id}")
         due = int(due_by_sku.get(row.product_id, 0))
