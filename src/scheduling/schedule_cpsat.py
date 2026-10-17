@@ -1043,9 +1043,14 @@ def run_cpsat_scheduling(
         )
     elif status == cp_model.INFEASIBLE:
         conn.close()
+        if experimental_completion_deadline_min is not None:
+            raise RuntimeError(
+                "[SOLVER ROBUSTNESS] Durum: INFEASIBLE. "
+                f"{experimental_completion_deadline_min}. dakika sert bitiş sınırı mevcut model ve girdilerle sağlanamıyor."
+            )
         raise RuntimeError(
             "[SOLVER ROBUSTNESS] Durum: INFEASIBLE. Model kısıtları (kapasite, takvim, öncüllük) aynı anda sağlanamıyor. "
-            "Relaxation Stratejisi (tardiness softening veya overtime artırımı) gereklidir."
+            "Nedeni inceleyip ancak doğrulanmış işletme yetkisiyle kısıtları değiştirmek gerekir."
         )
     elif status == cp_model.MODEL_INVALID:
         conn.close()
