@@ -27,6 +27,7 @@ from src.scheduling.calendar_service import MachineCalendarService
 from src.scheduling.dispatch import local_repair_candidate
 from src.scheduling.maintenance import MaintenanceWindow, load_machine_maintenance_windows
 from src.scheduling.model_context import load_model_context, save_model_context
+from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
 from src.scheduling.schedule_cpsat import get_initial_machine_states, run_cpsat_scheduling
 from src.scheduling.what_if import NoCloseConnectionWrapper
 from src.utils.db import get_active_run_id, migrate_solver_objective_contract
@@ -651,6 +652,17 @@ class DynamicRescheduler:
                     state = execution_states.get(str(task["task_id"]))
                     if state in {"IN_PROGRESS", "COMPLETED"}:
                         new_sched.loc[index, "execution_status"] = state
+
+            candidate_audit = audit_reschedule_candidate(
+                disk_conn,
+                baseline_sched,
+                new_sched,
+                trigger,
+                completed_tasks=completed,
+            )
+            if candidate_audit["status"] != "ACCEPTED":
+                codes = ", ".join(issue["code"] for issue in candidate_audit["issues"])
+                raise ValueError(f"[RESCHEDULE] Independent candidate audit rejected schedule: {codes}")
 
             for task_id, (machine, start, end) in frozen.items():
                 row = new_sched[new_sched["task_id"].astype(str) == task_id]
