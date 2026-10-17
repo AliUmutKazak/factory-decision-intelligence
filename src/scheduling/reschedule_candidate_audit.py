@@ -37,9 +37,7 @@ def _number(value: Any) -> float | None:
 
 def _audit_supported_calendar_shape(conn: sqlite3.Connection, issue: Any) -> None:
     """Reject day-varying shifts the current daily-hours model cannot represent."""
-    if conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'"
-    ).fetchone() is None:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'").fetchone() is None:
         return
 
     machines = [str(row[0]) for row in conn.execute("SELECT machine_id FROM machines")]

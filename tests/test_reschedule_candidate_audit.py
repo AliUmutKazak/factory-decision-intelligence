@@ -9,8 +9,10 @@ from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
 def _calendar_connection(variable_day=None):
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE machines (machine_id TEXT PRIMARY KEY)")
-    conn.execute("CREATE TABLE machine_calendar (machine_id TEXT, day_of_week INTEGER, shift_id TEXT, "
-                 "start_minute INTEGER, end_minute INTEGER, available_hours REAL, exception_type TEXT, is_available INTEGER)")
+    conn.execute(
+        "CREATE TABLE machine_calendar (machine_id TEXT, day_of_week INTEGER, shift_id TEXT, "
+        "start_minute INTEGER, end_minute INTEGER, available_hours REAL, exception_type TEXT, is_available INTEGER)"
+    )
     conn.execute("INSERT INTO machines VALUES ('M01')")
     for day in range(7):
         changed = day == variable_day
@@ -24,12 +26,33 @@ def _calendar_connection(variable_day=None):
 def _schedules():
     baseline = pd.DataFrame(
         [
-            {"task_id": "FROZEN", "machine_id": "M01", "start_min": 500, "end_min": 540,
-             "schedule_state": "FREE", "freeze_until_min": 0, "execution_status": "SCHEDULED"},
-            {"task_id": "FLEX", "machine_id": "M01", "start_min": 600, "end_min": 640,
-             "schedule_state": "FREE", "freeze_until_min": 0, "execution_status": "SCHEDULED"},
-            {"task_id": "OUTSIDE", "machine_id": "M01", "start_min": 900, "end_min": 940,
-             "schedule_state": "FREE", "freeze_until_min": 0, "execution_status": "SCHEDULED"},
+            {
+                "task_id": "FROZEN",
+                "machine_id": "M01",
+                "start_min": 500,
+                "end_min": 540,
+                "schedule_state": "FREE",
+                "freeze_until_min": 0,
+                "execution_status": "SCHEDULED",
+            },
+            {
+                "task_id": "FLEX",
+                "machine_id": "M01",
+                "start_min": 600,
+                "end_min": 640,
+                "schedule_state": "FREE",
+                "freeze_until_min": 0,
+                "execution_status": "SCHEDULED",
+            },
+            {
+                "task_id": "OUTSIDE",
+                "machine_id": "M01",
+                "start_min": 900,
+                "end_min": 940,
+                "schedule_state": "FREE",
+                "freeze_until_min": 0,
+                "execution_status": "SCHEDULED",
+            },
         ]
     )
     candidate = baseline.copy()
@@ -43,8 +66,11 @@ def _schedules():
 
 def _trigger():
     return RescheduleTriggerEvent(
-        event_id="AUDIT-1", current_time_min=480, freeze_horizon_min=60,
-        flexible_horizon_min=300, max_flexible_shift_min=30,
+        event_id="AUDIT-1",
+        current_time_min=480,
+        freeze_horizon_min=60,
+        flexible_horizon_min=300,
+        max_flexible_shift_min=30,
     )
 
 
