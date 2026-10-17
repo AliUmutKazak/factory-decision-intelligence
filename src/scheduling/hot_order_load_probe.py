@@ -19,6 +19,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+import pandas as pd
+
 from src.contracts.schemas import HotOrderInjection, ScheduleSolverMetadata
 from src.scheduling.hot_order_schedule_audit import audit_hot_order_schedule
 from src.scheduling.what_if import WhatIfEngine
@@ -41,6 +43,32 @@ def _percentile(values: list[float], fraction: float) -> float | None:
     low = int(rank)
     high = min(low + 1, len(ordered) - 1)
     return round(ordered[low] + (ordered[high] - ordered[low]) * (rank - low), 4)
+
+
+def _schedule_stability(baseline: pd.DataFrame, candidate: pd.DataFrame) -> dict[str, int]:
+    """Measure movement of the same pre-existing tasks; new rush tasks are separate."""
+    required = {"task_id", "machine_id", "start_min"}
+    if not required <= set(baseline) or not required <= set(candidate):
+        raise ValueError("schedule stability requires task_id, machine_id and start_min")
+    old = baseline.set_index(baseline["task_id"].astype(str), drop=False)
+    new = candidate.set_index(candidate["task_id"].astype(str), drop=False)
+    if old.index.has_duplicates or new.index.has_duplicates:
+        raise ValueError("schedule stability requires unique task IDs")
+    if not set(old.index) <= set(new.index):
+        raise ValueError("scenario omitted baseline task IDs")
+    changed = 0
+    absolute_shift = 0
+    for task_id, original in old.iterrows():
+        proposed = new.loc[task_id]
+        shift = abs(int(proposed["start_min"]) - int(original["start_min"]))
+        absolute_shift += shift
+        changed += int(shift != 0 or str(proposed["machine_id"]) != str(original["machine_id"]))
+    return {
+        "baseline_task_count": len(old),
+        "new_task_count": len(new) - len(old),
+        "changed_existing_task_count": changed,
+        "absolute_existing_start_shift_min": absolute_shift,
+    }
 
 
 class _MeasuredWhatIfEngine(WhatIfEngine):
@@ -98,11 +126,17 @@ def probe_hot_order_replay(
     scenario_limit_seconds: float = 2.0,
     reuse_active_baseline: bool = False,
     scenario_dispatch_rule: str | None = None,
+    scenario_seed: int | None = None,
+    scenario_workers: int | None = None,
 ) -> dict[str, Any]:
     """Replay one labeled synthetic rush order without touching the source DB."""
     source = Path(source_path).resolve()
     if repeats < 1 or baseline_limit_seconds <= 0 or scenario_limit_seconds <= 0:
         raise ValueError("repeats and solver time limits must be positive")
+    if scenario_seed is not None and scenario_seed < 0:
+        raise ValueError("scenario_seed must be nonnegative")
+    if scenario_workers is not None and scenario_workers < 1:
+        raise ValueError("scenario_workers must be positive")
     source_hash = _sha256(source)
     if source_hash.lower() != expected_sha256.lower():
         raise ValueError(f"source DB SHA-256 mismatch: {source_hash}")
@@ -121,6 +155,7 @@ def probe_hot_order_replay(
         baseline_meta: ScheduleSolverMetadata | None = None
         scenario_meta: ScheduleSolverMetadata | None = None
         independent_audit: dict[str, Any] | None = None
+        stability: dict[str, int] | None = None
         failure: Exception | None = None
         started = perf_counter()
         try:
@@ -128,6 +163,11 @@ def probe_hot_order_replay(
                 warnings.filterwarnings(
                     "ignore", message="pandas only supports SQLAlchemy connectable", category=UserWarning
                 )
+                scenario_kwargs: dict[str, Any] = {}
+                if scenario_seed is not None:
+                    scenario_kwargs["experimental_scenario_seed"] = scenario_seed
+                if scenario_workers is not None:
+                    scenario_kwargs["experimental_scenario_workers"] = scenario_workers
                 baseline_meta, scenario_meta, _, scenario_schedule = engine.simulate_hot_order(
                     hot_order,
                     scenario_name=f"G7-HOT-{number}",
@@ -135,11 +175,19 @@ def probe_hot_order_replay(
                     scenario_time_limit_seconds=scenario_limit_seconds,
                     reuse_active_baseline=reuse_active_baseline,
                     scenario_dispatch_rule=scenario_dispatch_rule,
+                    **scenario_kwargs,
                 )
                 with closing(sqlite3.connect(f"{staged.as_uri()}?mode=ro", uri=True)) as audit_conn:
                     independent_audit = audit_hot_order_schedule(
                         audit_conn, baseline_run_id, hot_order, scenario_schedule
                     )
+                    if independent_audit["status"] == "ACCEPTED":
+                        baseline_schedule = pd.read_sql_query(
+                            "SELECT task_id, machine_id, start_min FROM production_schedule WHERE run_id = ?",
+                            audit_conn,
+                            params=(baseline_run_id,),
+                        )
+                        stability = _schedule_stability(baseline_schedule, scenario_schedule)
                 if independent_audit["status"] != "ACCEPTED":
                     raise RuntimeError("independent hot-order schedule audit rejected the candidate")
         except (TimeoutError, RuntimeError, ValueError, sqlite3.Error) as exc:
@@ -184,6 +232,8 @@ def probe_hot_order_replay(
                     else "NO_ACCEPTED_SOLUTION"
                 ),
                 "scenario_solver_wall_seconds": scenario_meta.wall_time_seconds if scenario_meta else None,
+                "scenario_solver_random_seed": scenario_meta.random_seed if scenario_meta else None,
+                "scenario_solver_workers": scenario_meta.num_search_workers if scenario_meta else None,
                 "scenario_makespan_min": scenario_meta.makespan_min if scenario_meta else None,
                 "scenario_total_tardiness_min": scenario_meta.total_tardiness_min if scenario_meta else None,
                 "scenario_total_setup_min": scenario_meta.total_setup_min if scenario_meta else None,
@@ -193,6 +243,7 @@ def probe_hot_order_replay(
                 "failure_type": type(failure).__name__ if failure else None,
                 "failure_reason": str(failure) if failure else None,
                 "independent_audit": independent_audit,
+                "stability": stability if failure is None else None,
                 "staged_active_unchanged": True,
             }
         )
@@ -233,6 +284,8 @@ def probe_hot_order_replay(
         "baseline_limit_seconds": None if reuse_active_baseline else baseline_limit_seconds,
         "baseline_source": "ACTIVE_SNAPSHOT" if reuse_active_baseline else "FRESH_SOLVE",
         "scenario_dispatch_rule": scenario_dispatch_rule,
+        "scenario_seed": scenario_seed,
+        "scenario_workers": scenario_workers,
         "optimization_scope": "FIXED_DISPATCH_SEQUENCE" if scenario_dispatch_rule else "FULL_PRODUCTION_MODEL",
         "scenario_limit_seconds": scenario_limit_seconds,
         "repeats": repeats,

@@ -23,7 +23,7 @@ FDI için yararlı sonraki deney, yayımlanmış online-FJSP örneğini “kopya
 4. Her koşumda bağımsız fizik/rota denetimi, çözücü durumu, duvar saati, tamamlanma/makespan ve gecikme; plan kararlılığı için değişen operasyon sayısı ve başlangıç saatlerindeki mutlak toplam kayma raporlanır. Geçersiz adayın performansı hesaplanmaz.
 5. Önceden belirlenmiş çoklu tohum ve senaryoların tamamı yayımlanır; medyan ve çeyrekler arası aralık verilir. Senaryolar, model varsayımları, kod/veri hash'leri ve başarısız koşumlar kayda alınır.
 
-Bu protokolü karşılayan dinamik iz matrisi henüz uygulanmadı; mevcut G7 hot-order tekrarları bu kanıtın yerine geçmez. Deney, FDI için gerçek fabrika faydası veya ürün üstünlüğü kanıtı olarak sunulamaz. Bu sınırlar ve karar, [17 Ekim küresel/Türkiye denetimine](global-turkey-product-science-audit-2026-10-17.md) işlendi.
+Protokolün ilk, **tek olaylı** eşlenik yöntemi [sentetik G7 kıyasında](g7-paired-hot-order-methods-2026-10-17.md) uygulandı. Üç vaka × üç tohum × dört yöntem aynı mühürlü bazla ve eşit çözücü sınırıyla ölçüldü; uygunluk ve kararlılık raporlandı. Ardışık olaylar, zaman 0'dan sonraki bilgi kesimi, arıza ve freeze ufku içeren tam dinamik iz matrisi henüz uygulanmadı. Deney, FDI için gerçek fabrika faydası veya ürün üstünlüğü kanıtı değildir. Bu sınırlar ve karar, [17 Ekim küresel/Türkiye denetimine](global-turkey-product-science-audit-2026-10-17.md) işlendi.
 
 ## Kaynaklar
 
