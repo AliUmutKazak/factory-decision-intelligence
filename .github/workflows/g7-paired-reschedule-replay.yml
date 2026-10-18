@@ -1,0 +1,53 @@
+name: G7 Paired Reschedule Replay
+
+on:
+  push:
+    branches: ["codex/paired-reschedule-traces-corrected"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paired-replay:
+    name: Isolated synthetic two-event comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install locked dependencies
+        run: pip install -r requirements-linux.lock
+      - name: Replay three sealed synthetic traces
+        run: |
+          python -m scripts.compare_reschedule_event_traces \
+            --db artifacts/reference/factory.db \
+            --sha256 8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf \
+            --baseline-run-id RUN-20261006-00a0d3 \
+            --traces examples/g7-reschedule-event-trace.json examples/g7-reschedule-moderate-event-trace.json examples/g7-reschedule-late-event-trace.json \
+            --methods FULL EDD \
+            --output artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json
+          python - <<'PY'
+          import base64
+          import gzip
+          import hashlib
+          import json
+          from pathlib import Path
+
+          path = Path('artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json')
+          result = json.loads(path.read_text(encoding='utf-8'))
+          assert result['source_db_sha256'] == '8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf'
+          assert result['planned_event_pair_count'] == 6
+          print('FDI_RESULT_SHA256=' + hashlib.sha256(path.read_bytes()).hexdigest())
+          print('FDI_RESULT_GZIP_BASE64=' + base64.b64encode(gzip.compress(path.read_bytes(), mtime=0)).decode('ascii'))
+          PY
+      - name: Preserve raw laboratory report
+        uses: actions/upload-artifact@v6
+        with:
+          name: g7-paired-reschedule-replay-${{ github.sha }}
+          path: artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json
+          if-no-files-found: error
+          retention-days: 30
