@@ -1,6 +1,8 @@
 name: G7 Paired Reschedule Replay
 
 on:
+  push:
+    branches: ["codex/reschedule-maintenance-audit"]
   workflow_dispatch:
 
 permissions:
@@ -27,7 +29,7 @@ jobs:
             --baseline-run-id RUN-20261006-00a0d3 \
             --traces examples/g7-reschedule-event-trace.json examples/g7-reschedule-moderate-event-trace.json examples/g7-reschedule-late-event-trace.json \
             --methods FULL EDD \
-            --output artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json
+            --output artifacts/research/g7-paired-reschedule-traces-maintenance-audit-2026-10-18.json
           python - <<'PY'
           import base64
           import gzip
@@ -35,7 +37,7 @@ jobs:
           import json
           from pathlib import Path
 
-          path = Path('artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json')
+          path = Path('artifacts/research/g7-paired-reschedule-traces-maintenance-audit-2026-10-18.json')
           result = json.loads(path.read_text(encoding='utf-8'))
           assert result['source_db_sha256'] == '8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf'
           assert result['planned_event_pair_count'] == 6
@@ -45,7 +47,7 @@ jobs:
       - name: Preserve raw laboratory report
         uses: actions/upload-artifact@v6
         with:
-          name: g7-paired-reschedule-replay-${{ github.sha }}
-          path: artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json
+          name: g7-paired-reschedule-maintenance-audit-${{ github.sha }}
+          path: artifacts/research/g7-paired-reschedule-traces-maintenance-audit-2026-10-18.json
           if-no-files-found: error
           retention-days: 30

@@ -667,6 +667,7 @@ class DynamicRescheduler:
                 new_sched,
                 trigger,
                 completed_tasks=completed,
+                maintenance_overrides=outage_windows,
             )
             if candidate_audit["status"] != "ACCEPTED":
                 codes = ", ".join(issue["code"] for issue in candidate_audit["issues"])

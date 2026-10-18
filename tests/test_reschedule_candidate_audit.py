@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 
 from src.contracts.schemas import RescheduleTriggerEvent
+from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
 
 
@@ -189,3 +190,60 @@ def test_independent_audit_rejects_route_precedence_and_input_change():
     codes = {item["code"] for item in result["issues"]}
     assert "ROUTE_PRECEDENCE" in codes
     assert "TASK_INPUT_CHANGED" in codes
+
+
+def test_independent_audit_rejects_active_maintenance_during_work():
+    conn = _calendar_connection()
+    try:
+        conn.execute(
+            "CREATE TABLE machine_maintenance (machine_id TEXT, start_min INTEGER, end_min INTEGER, is_active INTEGER)"
+        )
+        conn.executemany(
+            "INSERT INTO machine_maintenance VALUES ('M01', ?, ?, ?)",
+            [(585, 590, 1), (905, 915, 0)],
+        )
+        baseline, candidate = _schedules()
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert result["status"] == "REJECTED"
+    assert any(item["code"] == "MAINTENANCE_OVERLAP" and "FLEX" in item["detail"] for item in result["issues"])
+    assert not any("OUTSIDE" in item["detail"] for item in result["issues"])
+
+
+def test_independent_audit_checks_setup_against_event_outage():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        candidate.loc[candidate.task_id == "OUTSIDE", "setup_before_min"] = 10
+        candidate.loc[candidate.task_id == "OUTSIDE", "setup_start_min"] = 890
+        result = audit_reschedule_candidate(
+            conn,
+            baseline,
+            candidate,
+            _trigger(),
+            maintenance_overrides=[MaintenanceWindow("M01", 895, 900, "RESCHEDULE_DELAY")],
+        )
+    finally:
+        conn.close()
+    assert result["status"] == "REJECTED"
+    assert any(item["code"] == "MAINTENANCE_OVERLAP" and "OUTSIDE" in item["detail"] for item in result["issues"])
+
+
+def test_independent_audit_accepts_boundary_and_overlapping_closed_windows():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        result = audit_reschedule_candidate(
+            conn,
+            baseline,
+            candidate,
+            _trigger(),
+            maintenance_overrides=[
+                MaintenanceWindow("M01", 620, 650),
+                MaintenanceWindow("M01", 630, 660),
+            ],
+        )
+    finally:
+        conn.close()
+    assert result["status"] == "ACCEPTED"
