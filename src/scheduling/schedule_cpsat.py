@@ -78,6 +78,13 @@ def get_initial_machine_states(conn, run_id=None) -> dict:
     return states
 
 
+def _add_machine_availability_constraints(model, work_intervals, calendar_break_intervals, maintenance_intervals):
+    """Block work during closures while allowing closure windows to overlap."""
+    model.AddNoOverlap(work_intervals + calendar_break_intervals)
+    for maintenance_interval in maintenance_intervals:
+        model.AddNoOverlap(work_intervals + [maintenance_interval])
+
+
 def run_cpsat_scheduling(
     sku_plan=None,
     run_id=None,
@@ -747,14 +754,15 @@ def run_cpsat_scheduling(
             for tid in tids:
                 if str(tid) in frozen_ids:
                     model.Add(sum(setup_duration_by_task[tid]) == frozen_setups[str(tid)])
-        break_intervals = []
+        maintenance_intervals = []
+        calendar_break_intervals = []
         for mw in maintenance_windows:
             if str(mw.machine_id) == str(mid):
                 if mw.start_min < horizon and mw.end_min > 0:
                     start = max(0, int(mw.start_min))
                     end = min(horizon, int(mw.end_min))
                     if end > start:
-                        break_intervals.append(
+                        maintenance_intervals.append(
                             model.NewFixedSizeIntervalVar(start, end - start, f"maintenance_{mid}_{start}_{end}")
                         )
         if str(mid) not in machine_ot_hours:
@@ -800,7 +808,7 @@ def run_cpsat_scheduling(
                     sun_dur = sun_end - sun_start
                     if sun_dur > 0:
                         sun_int = model.NewIntervalVar(sun_start, sun_dur, sun_end, f"sunday_break_{mid}_d{day}")
-                        break_intervals.append(sun_int)
+                        calendar_break_intervals.append(sun_int)
             else:
                 # Pazartesi - Cumartesi: Gece penceresi (00:00 - 08:00) = 480 dakika
                 night_start = day * 1440
@@ -813,7 +821,7 @@ def run_cpsat_scheduling(
                             n_int = model.NewIntervalVar(
                                 night_start, night_dur, night_end, f"night_break_closed_{mid}_d{day}"
                             )
-                            break_intervals.append(n_int)
+                            calendar_break_intervals.append(n_int)
                         else:
                             # LP bütçe verdiyse: Gece penceresi koşullu duruştur.
                             # is_ot_closed = 1 ise gece KAPALIDIR (üretim yapılamaz, OT tüketilmez)
@@ -822,7 +830,7 @@ def run_cpsat_scheduling(
                             opt_break = model.NewOptionalIntervalVar(
                                 night_start, night_dur, night_end, is_ot_closed, f"opt_night_break_{mid}_d{day}"
                             )
-                            break_intervals.append(opt_break)
+                            calendar_break_intervals.append(opt_break)
 
                             # Gece açıldıysa (is_ot_active = 1 - is_ot_closed)
                             is_ot_active = model.NewBoolVar(f"ot_active_{mid}_d{day}")
@@ -847,13 +855,16 @@ def run_cpsat_scheduling(
         # ---------------------------------------------------------------------
         # Statik knapsack kısıtı (sum(durations) <= 5760 + OT) kaldırıldı.
         # Çözücü tek bir akıcı rolling horizon üzerinde çalışır; kapasite ve fazla
-        # mesai sınırları takvim blokları (break_intervals & week_ot_active_vars)
+        # mesai sınırları takvim blokları (calendar_break_intervals & week_ot_active_vars)
         # ile doğrudan zaman çizgisinde yönetilir. Hafta bazlı yük dağılımı ve
         # spillover takibi post-hoc varsayımlarla değil, takvime dayalı
         # weekly_accounting_rows üzerinden merkezi olarak denetlenir.
 
-        # Tezgâhta hem işlerin hem de aktif hazırlık intervallerinin çakışmasını engelle
-        model.AddNoOverlap([all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals + break_intervals)
+        # Tezgâhta işleri, hazırlıkları ve takvim kapanışlarını çakıştırma.
+        # Bakım/duruş penceresi gece veya Pazar kapanışıyla çakışabilir:
+        # bu iki kapanışı aynı NoOverlap listesine koymak sahte INFEASIBLE üretir.
+        work_intervals = [all_tasks[tid]["interval"] for tid in tids] + machine_setup_intervals
+        _add_machine_availability_constraints(model, work_intervals, calendar_break_intervals, maintenance_intervals)
         if circuit_arcs:
             model.AddCircuit(circuit_arcs)
 
