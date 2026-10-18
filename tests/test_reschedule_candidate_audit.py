@@ -11,6 +11,10 @@ def _calendar_connection(variable_day=None):
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE machines (machine_id TEXT PRIMARY KEY)")
     conn.execute(
+        "CREATE TABLE changeover_matrix (machine_id TEXT, from_product TEXT, to_product TEXT, setup_time_min REAL)"
+    )
+    conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0)")
+    conn.execute(
         "CREATE TABLE machine_calendar (machine_id TEXT, day_of_week INTEGER, shift_id TEXT, "
         "start_minute INTEGER, end_minute INTEGER, available_hours REAL, exception_type TEXT, is_available INTEGER)"
     )
@@ -247,3 +251,64 @@ def test_independent_audit_accepts_boundary_and_overlapping_closed_windows():
     finally:
         conn.close()
     assert result["status"] == "ACCEPTED"
+
+
+def _mixed_product_setup_case(conn):
+    baseline, candidate = _schedules()
+    for frame in (baseline, candidate):
+        frame.loc[frame.task_id == "FLEX", "product_id"] = "P02"
+    conn.executemany(
+        "INSERT INTO changeover_matrix VALUES (?, ?, ?, ?)",
+        [
+            ("M01", "P01", "P02", 17),
+            ("ALL", "P01", "P02", 12),
+            ("ALL", "P02", "P01", 7),
+        ],
+    )
+    conn.execute("CREATE TABLE machine_state (machine_id TEXT, last_product_id TEXT)")
+    conn.execute("INSERT INTO machine_state VALUES ('M01', 'P01')")
+    conn.execute("CREATE TABLE machine_state_snapshot (run_id TEXT, machine_id TEXT, last_product_id TEXT)")
+    conn.execute("INSERT INTO machine_state_snapshot VALUES ('BASE', 'M01', 'P02')")
+    for task_id, minutes in (("FROZEN", 7), ("FLEX", 17), ("OUTSIDE", 7)):
+        mask = candidate.task_id == task_id
+        candidate.loc[mask, "setup_before_min"] = minutes
+        candidate.loc[mask, "setup_start_min"] = candidate.loc[mask, "start_min"] - minutes
+    return baseline, candidate
+
+
+def test_independent_audit_accepts_snapshot_state_and_machine_override():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _mixed_product_setup_case(conn)
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger(), baseline_run_id="BASE")
+    finally:
+        conn.close()
+    assert result["status"] == "ACCEPTED", result["issues"]
+
+
+def test_independent_audit_rejects_self_consistent_but_wrong_changeover():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _mixed_product_setup_case(conn)
+        candidate.loc[candidate.task_id == "FLEX", "setup_before_min"] = 12
+        candidate.loc[candidate.task_id == "FLEX", "setup_start_min"] = 568
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger(), baseline_run_id="BASE")
+    finally:
+        conn.close()
+    assert result["status"] == "REJECTED"
+    assert any(item["code"] == "SETUP_TRANSITION_MISMATCH" and "FLEX" in item["detail"] for item in result["issues"])
+    assert not any(item["code"] == "INVALID_SETUP_INTERVAL" for item in result["issues"])
+
+
+def test_independent_audit_rejects_missing_or_invalid_changeover_source():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P02', 'P01', -5)")
+        invalid = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+        conn.execute("DROP TABLE changeover_matrix")
+        missing = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert any(item["code"] == "INVALID_CHANGEOVER_ROW" for item in invalid["issues"])
+    assert any(item["code"] == "MISSING_CHANGEOVER_MATRIX" for item in missing["issues"])

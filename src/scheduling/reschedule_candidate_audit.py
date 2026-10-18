@@ -13,10 +13,11 @@ from typing import Any
 
 import pandas as pd
 
+from src import config as cfg
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
 
-_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR_MAINTENANCE"
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_SETUP_CALENDAR_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -156,6 +157,82 @@ def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
             previous_sequence = sequence
 
 
+def _audit_setup_transitions(
+    conn: sqlite3.Connection, candidate: pd.DataFrame, baseline_run_id: str | None, issue: Any
+) -> None:
+    """Recompute each setup from raw changeovers and the baseline machine state."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='changeover_matrix'").fetchone() is None:
+        issue("MISSING_CHANGEOVER_MATRIX", "changeover_matrix")
+        return
+
+    machines = set(candidate["machine_id"].astype(str))
+    setup: dict[tuple[str, str, str], int] = {}
+    try:
+        rows = conn.execute(
+            "SELECT machine_id, from_product, to_product, setup_time_min FROM changeover_matrix ORDER BY rowid"
+        ).fetchall()
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_CHANGEOVER_MATRIX", str(exc))
+        return
+    for machine, before, after, raw_minutes in rows:
+        minutes = _number(raw_minutes)
+        if minutes is None or minutes < 0 or not str(before).strip() or not str(after).strip():
+            issue("INVALID_CHANGEOVER_ROW", f"{machine}: {before}->{after}={raw_minutes}")
+            continue
+        duration = int(round(minutes))
+        key = (str(before), str(after))
+        if machine in machines:
+            setup[(str(machine), *key)] = duration
+        else:
+            for routed_machine in machines:
+                setup.setdefault((routed_machine, *key), duration)
+
+    states: dict[str, str] = {}
+    try:
+        if (
+            baseline_run_id
+            and conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_state_snapshot'"
+            ).fetchone()
+        ):
+            states = {
+                str(machine): str(product)
+                for machine, product in conn.execute(
+                    "SELECT machine_id, last_product_id FROM machine_state_snapshot WHERE run_id = ?",
+                    (baseline_run_id,),
+                )
+            }
+        if (
+            not states
+            and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_state'").fetchone()
+        ):
+            states = {
+                str(machine): str(product)
+                for machine, product in conn.execute("SELECT machine_id, last_product_id FROM machine_state")
+            }
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_INITIAL_MACHINE_STATE", str(exc))
+        return
+    if not states:
+        states = dict(getattr(cfg, "INITIAL_MACHINE_STATE", {}))
+
+    for machine, group in candidate.groupby("machine_id", sort=False):
+        previous_product = states.get(str(machine))
+        ordered = sorted(
+            group.to_dict("records"), key=lambda row: (_number(row["start_min"]) or 0, str(row["task_id"]))
+        )
+        for row in ordered:
+            task_id = str(row["task_id"])
+            actual = _number(row["setup_before_min"])
+            if actual is None or _number(row["start_min"]) is None:
+                continue  # The core interval audit reports malformed timing.
+            product = str(row["product_id"])
+            expected = setup.get((str(machine), previous_product, product), 0) if previous_product is not None else 0
+            if abs(actual - expected) > 1e-6:
+                issue("SETUP_TRANSITION_MISMATCH", f"{machine}: {task_id} expected={expected}, actual={actual}")
+            previous_product = product
+
+
 def _audit_maintenance_intervals(
     conn: sqlite3.Connection,
     candidate: pd.DataFrame,
@@ -200,8 +277,9 @@ def audit_reschedule_candidate(
     trigger: RescheduleTriggerEvent,
     completed_tasks: set[Any] | None = None,
     maintenance_overrides: Sequence[MaintenanceWindow] | None = None,
+    baseline_run_id: str | None = None,
 ) -> dict[str, Any]:
-    """Check commitments, core intervals, supported calendar and outages."""
+    """Check commitments, core intervals, setup transitions, calendar and outages."""
     issues: list[dict[str, str]] = []
 
     def issue(code: str, detail: str) -> None:
@@ -302,6 +380,7 @@ def audit_reschedule_candidate(
                 issue("FLEXIBLE_STATE_MISSING", task_id)
 
     _audit_core_intervals(new, issue)
+    _audit_setup_transitions(conn, new, baseline_run_id, issue)
     _audit_supported_calendar_shape(conn, issue)
     _audit_maintenance_intervals(conn, new, maintenance_overrides or (), issue)
     return {
