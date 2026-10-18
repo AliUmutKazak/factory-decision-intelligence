@@ -81,7 +81,11 @@ def verify() -> None:
     ):
         raise ValueError("Corrected G7 replay protocol changed")
     paired = [row for trace in corrected["traces"] for row in trace["paired_events"]]
-    if len(paired) != 6 or corrected["paired_accepted_event_count"] != sum(row["both_accepted"] for row in paired):
+    if (
+        len(paired) != 6
+        or corrected["paired_accepted_event_count"] != 6
+        or not all(row["both_accepted"] for row in paired)
+    ):
         raise ValueError("Corrected G7 replay count disagrees with event records")
     for name, expected in corrected["code_sha256"].items():
         if hashlib.sha256(_historical_code(name, corrected_source["code_commit"])).hexdigest() != expected:
@@ -93,6 +97,18 @@ def verify() -> None:
             != trace["trace_sha256"]
         ):
             raise ValueError(f"Corrected G7 replay event trace disagrees: {name}")
+        if len(trace["paired_events"]) != 2:
+            raise ValueError(f"Corrected G7 replay event count disagrees: {name}")
+        for method in corrected["methods"]:
+            outcome = trace["outcomes"][method]
+            if (
+                not outcome["source_unchanged"]
+                or not outcome["completed_all_events"]
+                or outcome["final_active_run_ids"] != ["TRACE-02"]
+                or len(outcome["attempts"]) != 2
+                or not all(attempt["accepted"] for attempt in outcome["attempts"])
+            ):
+                raise ValueError(f"Corrected G7 replay outcome disagrees: {name}/{method}")
 
     gates = inventory["gates"]
     expected_ids = {f"G{index}" for index in range(14)}
