@@ -10,7 +10,19 @@ Aynı mühürlü sentetik referansın geç olayı, kesinti süresi sıfırken ve
 
 Üretim yolunu kullanan [regresyon testi](../tests/test_reschedule_calendar_overlap.py), mühürlü sentetik referansın ayrı kopyasında aynı 90 dakikalık olayı, yeni tek `ACTIVE` sürümü ve kesinti boyunca iş/hazırlık çakışmamasıyla denetler. [Küçük model testleri](../tests/test_schedule_availability_overlap.py) sabit veya koşullu takvim kapanışı ile üst üste bakım aralıklarını kapsar. Eski ham JSON tarihsel hata gözlemi olarak korunur; yöntem başarısızlığı veya fiziki üretim imkânsızlığı kanıtı sayılmaz.
 
-Üç izlik eşlenik deneyin düzeltilmiş modelle kontrollü kaynak yükünde yeniden çalıştırılması gerekir. Bu düzeltme, önceki 4/6 karşılaştırmasını güncel yöntem sonucu hâline getirmez.
+## Düzeltilmiş modelle bağımsız tekrar
+
+[Üç dizinin ham eşlenik kaydı](../artifacts/research/g7-paired-reschedule-traces-corrected-2026-10-18.json), yoğun başka bir yerel hesaplamanın çözüm sürelerini bozma riskinden dolayı ayrı bir Ubuntu 24.04 GitHub Actions koşucusunda üretildi ([koşum 39126807050](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39126807050), koşum commit'i `0e2b2734ef45cc20173b9021e8cd5e475f480c5f`; doğrulanan kaynak kod commit'i `8a27462d9960be1cc0499a89fe96b899f3d9fb89`). [Tekrarlanabilir iş akışı](../.github/workflows/g7-paired-reschedule-replay.yml) mühürlü sentetik veritabanını ve kilitli Linux bağımlılıklarını, aralarında OR-Tools 9.15.6755'i, kullanır. İki yönteme de her olayda 30 saniye, tek worker ve seed 42 verilir. Veritabanı özeti `8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf` olarak doğrulandı; koşum sonucu ve mevcut kaynak dosyalarının normalleştirilmiş özetleri eşleşti. GitHub kaynak izleri LF satır sonuyla sakladığı için ham olay dosyası özetleri Git blob'larıyla karşılaştırıldı. Ham JSON'un SHA-256 özeti kanıt kaydındadır.
+
+| Sentetik iki olay dizisi | İki yöntemce kabul edilen olay çifti | Son FULL / EDD makespan (dk) | İkinci olayda FULL / EDD yeri değişen görev |
+|---|---:|---:|---:|
+| İlk | 2/2 | 12.230 / 14.144 | 26 / 0 |
+| Orta | 2/2 | 12.625 / 14.144 | 25 / 0 |
+| Geç | 2/2 | 12.709 / 12.704 | 0 / 0 |
+
+Toplam **6/6 planlanan olay çiftinde** iki yöntem de bağımsız aday denetiminden geçip her yöntemin kendi tek `ACTIVE` sürümünü yayımladı. FULL ilk ve orta dizilerde daha kısa son makespan üretti; geç dizide EDD beş dakika daha kısaydı. İlk ve orta dizilerde FULL'ün ikinci olayda daha fazla görevi oynatması, kararlılık ile makespan arasında karar verilmesi gerektiğini gösterir; seçim eşiği önceden saha sahibiyle belirlenmelidir. FULL'ün ilk/orta olaylarının üçü yalnız `FEASIBLE`, EDD'nin altısı sabit sıra alt probleminde `OPTIMAL` durumundadır. Bu durumlar genel modelde yöntem üstünlüğü veya küresel optimum anlamına gelmez.
+
+Eski 4/6 sonucu geçersiz tarihsel kayıttır. Yeni 6/6 yalnız **üç seçilmiş sentetik dizi, bir tohum ve tek koşum** içindir. İkinci olay her yöntemin kendi ilk olay sonucundan başladığı için eşlenik satırlar ortak ikinci baz planı paylaşmaz. Ayrı koşucu yerel yük çakışmasını giderse de çözüm süresi dağılımı, hata olasılığı, p95, müşteri yükü veya fabrika SLO'su çıkarılamaz.
 
 ## Açık sınır
 
