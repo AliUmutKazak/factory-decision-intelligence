@@ -28,4 +28,4 @@ python -m scripts.probe_reschedule_event_trace --db artifacts/reference/factory.
 
 Tek iz, olay sıklığı veya yöntem üstünlüğü çıkarımı için yeterli değildir. Aynı fiziksel modelde farklı olay dizileri, farklı dondurma ufukları, eşit çözüm bütçeli yöntemler ve başarı/timeout paydalarıyla genişletilmiş karşılaştırma gerekir. Saha actuals'ı, başlamış işin miktarı, WIP, rework, operatör ve malzeme durumu bu provada yoktur. Müşteri yükü ve kabulü bekleniyor.
 
-Sonraki [üç izlik eşlenik laboratuvar deneyi](g7-paired-reschedule-traces-2026-10-18.md) bu teknik boşluğun bir bölümünü ele alır; saha kabulü açık kalır.
+Sonraki [takvim çakışması düzeltilmiş üç izlik eşlenik laboratuvar deneyi](g7-calendar-overlap-correction-2026-10-18.md) bu teknik boşluğun bir bölümünü ele alır; saha kabulü açık kalır.

@@ -25,7 +25,7 @@ FDI için yararlı sonraki deney, yayımlanmış online-FJSP örneğini “kopya
 
 Protokolün ilk, **tek olaylı** eşlenik yöntemi [sentetik G7 kıyasında](g7-paired-hot-order-methods-2026-10-17.md) uygulandı. Üç vaka × üç tohum × dört yöntem aynı mühürlü bazla ve eşit çözücü sınırıyla ölçüldü; uygunluk ve kararlılık raporlandı. Ardışık olaylar, zaman 0'dan sonraki bilgi kesimi, arıza ve freeze ufku içeren tam dinamik iz matrisi henüz uygulanmadı. Deney, FDI için gerçek fabrika faydası veya ürün üstünlüğü kanıtı değildir. Bu sınırlar ve karar, [17 Ekim küresel/Türkiye denetimine](global-turkey-product-science-audit-2026-10-17.md) işlendi.
 
-**18 Ekim güncellemesi:** [Üç sentetik iki olay dizisinde FULL/EDD kıyası](g7-paired-reschedule-traces-2026-10-18.md) arıza, olay zamanı ve freeze ufkunu kısmen kapsar. Çoklu tohum, temsilî olay dağılımı, gerçek actuals ve TU/e ile aynı problem ailesinde kıyas hâlâ yoktur.
+**18 Ekim güncellemesi:** [Takvim çakışması düzeltilmiş üç sentetik iki olay dizisinde FULL/EDD kıyası](g7-calendar-overlap-correction-2026-10-18.md) arıza, olay zamanı ve freeze ufkunu kısmen kapsar. Çoklu tohum, temsilî olay dağılımı, gerçek actuals ve TU/e ile aynı problem ailesinde kıyas hâlâ yoktur.
 
 ## Kaynaklar
 
