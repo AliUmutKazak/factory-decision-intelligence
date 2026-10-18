@@ -1,0 +1,952 @@
+{
+  "experiment_type": "paired chronological synthetic fixed-route comparison",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "baseline_run_id": "RUN-20261006-00a0d3",
+  "methods": [
+    "FULL",
+    "EDD"
+  ],
+  "code_sha256": {
+    "scripts/compare_reschedule_event_traces.py": "ae1577a021ec947d8db98cee6ec422a7ee67cbf1c887e2baed4d4d821401ae15",
+    "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+    "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+    "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602",
+    "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944"
+  },
+  "traces": [
+    {
+      "trace": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-event-trace.json",
+      "trace_sha256": "a0df1702c331027d421b4480ce3ea3b31b7be3dd94eed6b109dd73639f3137eb",
+      "method_order": [
+        "FULL",
+        "EDD"
+      ],
+      "outcomes": {
+        "FULL": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "FULL",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-event-trace.json",
+          "events_sha256": "a0df1702c331027d421b4480ce3ea3b31b7be3dd94eed6b109dd73639f3137eb",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-M01-001",
+                "current_time_min": 600,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 120,
+                "reason": "Synthetic M01 interruption after first operation starts",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "FEASIBLE",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "FEASIBLE",
+                "proven_optimal": false,
+                "wall_time_seconds": 30.0138,
+                "objective_value": 1370430.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 898270.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12374,
+                "total_setup_min": 630,
+                "total_tardiness_min": 6620
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 1,
+                "rescheduled_tasks_count": 28,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 2428.87,
+                "max_start_delta_min": 8180.0,
+                "nervousness_score": 0.1205
+              },
+              "elapsed_seconds": 44.4502
+            },
+            {
+              "event": {
+                "event_id": "TRACE-M02-002",
+                "current_time_min": 2000,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 90,
+                "reason": "Synthetic M02 interruption after first event is published",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "FEASIBLE",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "FEASIBLE",
+                "proven_optimal": false,
+                "wall_time_seconds": 30.0019,
+                "objective_value": 1326825.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1161030.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12230,
+                "total_setup_min": 505,
+                "total_tardiness_min": 5166
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 3,
+                "rescheduled_tasks_count": 26,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 820.55,
+                "max_start_delta_min": 7954.0,
+                "nervousness_score": 0.0407
+              },
+              "elapsed_seconds": 44.2736
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        },
+        "EDD": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "EDD",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-event-trace.json",
+          "events_sha256": "a0df1702c331027d421b4480ce3ea3b31b7be3dd94eed6b109dd73639f3137eb",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-M01-001",
+                "current_time_min": 600,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 120,
+                "reason": "Synthetic M01 interruption after first operation starts",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0428,
+                "objective_value": 1766320.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1766320.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 14144,
+                "total_setup_min": 540,
+                "total_tardiness_min": 17569
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 1,
+                "rescheduled_tasks_count": 26,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 955.03,
+                "max_start_delta_min": 2880.0,
+                "nervousness_score": 0.0474
+              },
+              "elapsed_seconds": 16.5287
+            },
+            {
+              "event": {
+                "event_id": "TRACE-M02-002",
+                "current_time_min": 2000,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 90,
+                "reason": "Synthetic M02 interruption after first event is published",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0376,
+                "objective_value": 1766320.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1766320.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 14144,
+                "total_setup_min": 540,
+                "total_tardiness_min": 17569
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 3,
+                "rescheduled_tasks_count": 0,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 0.0,
+                "max_start_delta_min": 0.0,
+                "nervousness_score": 0.0
+              },
+              "elapsed_seconds": 16.5826
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        }
+      },
+      "paired_events": [
+        {
+          "event_id": "TRACE-M01-001",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12374,
+              "weighted_tardiness_min": 6620,
+              "setup_min": 630,
+              "moved_tasks": 28,
+              "frozen_tasks": 1,
+              "solver_wall_seconds": 30.0138,
+              "end_to_end_seconds": 44.4502
+            },
+            "EDD": {
+              "makespan_min": 14144,
+              "weighted_tardiness_min": 17569,
+              "setup_min": 540,
+              "moved_tasks": 26,
+              "frozen_tasks": 1,
+              "solver_wall_seconds": 0.0428,
+              "end_to_end_seconds": 16.5287
+            }
+          }
+        },
+        {
+          "event_id": "TRACE-M02-002",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12230,
+              "weighted_tardiness_min": 5166,
+              "setup_min": 505,
+              "moved_tasks": 26,
+              "frozen_tasks": 3,
+              "solver_wall_seconds": 30.0019,
+              "end_to_end_seconds": 44.2736
+            },
+            "EDD": {
+              "makespan_min": 14144,
+              "weighted_tardiness_min": 17569,
+              "setup_min": 540,
+              "moved_tasks": 0,
+              "frozen_tasks": 3,
+              "solver_wall_seconds": 0.0376,
+              "end_to_end_seconds": 16.5826
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trace": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-moderate-event-trace.json",
+      "trace_sha256": "8e99881faa0537f26dea927d553964586e1b2b5539259a2fa9dbe76748c323e3",
+      "method_order": [
+        "EDD",
+        "FULL"
+      ],
+      "outcomes": {
+        "EDD": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "EDD",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-moderate-event-trace.json",
+          "events_sha256": "8e99881faa0537f26dea927d553964586e1b2b5539259a2fa9dbe76748c323e3",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-MODERATE-M01-001",
+                "current_time_min": 800,
+                "freeze_horizon_min": 90,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 60,
+                "reason": "Synthetic moderate M01 interruption",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0421,
+                "objective_value": 1766320.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1766320.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 14144,
+                "total_setup_min": 540,
+                "total_tardiness_min": 17569
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 1,
+                "rescheduled_tasks_count": 26,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 937.61,
+                "max_start_delta_min": 2880.0,
+                "nervousness_score": 0.0465
+              },
+              "elapsed_seconds": 16.5752
+            },
+            {
+              "event": {
+                "event_id": "TRACE-MODERATE-M02-002",
+                "current_time_min": 2500,
+                "freeze_horizon_min": 90,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 45,
+                "reason": "Synthetic moderate M02 interruption after first publication",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0338,
+                "objective_value": 1766320.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1766320.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 14144,
+                "total_setup_min": 540,
+                "total_tardiness_min": 17569
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 4,
+                "rescheduled_tasks_count": 0,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 0.0,
+                "max_start_delta_min": 0.0,
+                "nervousness_score": 0.0
+              },
+              "elapsed_seconds": 16.5713
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        },
+        "FULL": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "FULL",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-moderate-event-trace.json",
+          "events_sha256": "8e99881faa0537f26dea927d553964586e1b2b5539259a2fa9dbe76748c323e3",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-MODERATE-M01-001",
+                "current_time_min": 800,
+                "freeze_horizon_min": 90,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 60,
+                "reason": "Synthetic moderate M01 interruption",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "FEASIBLE",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "FEASIBLE",
+                "proven_optimal": false,
+                "wall_time_seconds": 30.0029,
+                "objective_value": 1468435.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 871565.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12880,
+                "total_setup_min": 535,
+                "total_tardiness_min": 8995
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 1,
+                "rescheduled_tasks_count": 30,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 3786.06,
+                "max_start_delta_min": 6165.0,
+                "nervousness_score": 0.1878
+              },
+              "elapsed_seconds": 45.0284
+            },
+            {
+              "event": {
+                "event_id": "TRACE-MODERATE-M02-002",
+                "current_time_min": 2500,
+                "freeze_horizon_min": 90,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 45,
+                "reason": "Synthetic moderate M02 interruption after first publication",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 25.9819,
+                "objective_value": 1386175.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1386175.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12625,
+                "total_setup_min": 595,
+                "total_tardiness_min": 6154
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 5,
+                "rescheduled_tasks_count": 25,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 2696.06,
+                "max_start_delta_min": 7205.0,
+                "nervousness_score": 0.1337
+              },
+              "elapsed_seconds": 40.7355
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        }
+      },
+      "paired_events": [
+        {
+          "event_id": "TRACE-MODERATE-M01-001",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12880,
+              "weighted_tardiness_min": 8995,
+              "setup_min": 535,
+              "moved_tasks": 30,
+              "frozen_tasks": 1,
+              "solver_wall_seconds": 30.0029,
+              "end_to_end_seconds": 45.0284
+            },
+            "EDD": {
+              "makespan_min": 14144,
+              "weighted_tardiness_min": 17569,
+              "setup_min": 540,
+              "moved_tasks": 26,
+              "frozen_tasks": 1,
+              "solver_wall_seconds": 0.0421,
+              "end_to_end_seconds": 16.5752
+            }
+          }
+        },
+        {
+          "event_id": "TRACE-MODERATE-M02-002",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12625,
+              "weighted_tardiness_min": 6154,
+              "setup_min": 595,
+              "moved_tasks": 25,
+              "frozen_tasks": 5,
+              "solver_wall_seconds": 25.9819,
+              "end_to_end_seconds": 40.7355
+            },
+            "EDD": {
+              "makespan_min": 14144,
+              "weighted_tardiness_min": 17569,
+              "setup_min": 540,
+              "moved_tasks": 0,
+              "frozen_tasks": 4,
+              "solver_wall_seconds": 0.0338,
+              "end_to_end_seconds": 16.5713
+            }
+          }
+        }
+      ]
+    },
+    {
+      "trace": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-late-event-trace.json",
+      "trace_sha256": "e7344b29905da8e8c352cdec2c9c4060ba6e175a031bdf6be19c3b87c2173611",
+      "method_order": [
+        "FULL",
+        "EDD"
+      ],
+      "outcomes": {
+        "FULL": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "FULL",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-late-event-trace.json",
+          "events_sha256": "e7344b29905da8e8c352cdec2c9c4060ba6e175a031bdf6be19c3b87c2173611",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-LATE-M02-001",
+                "current_time_min": 5500,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 90,
+                "reason": "Synthetic M02 interruption in later planning horizon",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.4058,
+                "objective_value": 1365980.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1365980.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12709,
+                "total_setup_min": 500,
+                "total_tardiness_min": 4729
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 13,
+                "rescheduled_tasks_count": 12,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 191.68,
+                "max_start_delta_min": 2855.0,
+                "nervousness_score": 0.0095
+              },
+              "elapsed_seconds": 15.3033
+            },
+            {
+              "event": {
+                "event_id": "TRACE-LATE-M01-002",
+                "current_time_min": 8000,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 120,
+                "reason": "Synthetic M01 interruption after late M02 event",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0212,
+                "objective_value": 1365980.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1365980.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12709,
+                "total_setup_min": 500,
+                "total_tardiness_min": 4729
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 24,
+                "rescheduled_tasks_count": 0,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 0.0,
+                "max_start_delta_min": 0.0,
+                "nervousness_score": 0.0
+              },
+              "elapsed_seconds": 14.8598
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        },
+        "EDD": {
+          "experiment_type": "single-policy chronological synthetic reschedule trace",
+          "full_solver_only": true,
+          "dispatch_rule": "EDD",
+          "source_db": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/artifacts/reference/factory.db",
+          "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+          "code_sha256": {
+            "scripts/probe_reschedule_event_trace.py": "1ddbdacb9263d7f250c0e8bbc37300b749d411602bc76c0b2d41e1e2cd58be88",
+            "src/scheduling/rescheduler.py": "a0449ecb7717666107ee92f02de1f842dd6cf58ca370d2b18396d33e8ba54ff4",
+            "src/scheduling/reschedule_candidate_audit.py": "1097cf1f7c3119a41bac39efa3f830f74c89f22a5eba0470f7838beb80452944",
+            "src/scheduling/schedule_cpsat.py": "0a42ecdb414cdfd0eb7fa18e4619beaac3c42b3612d4d50865ac196204f42602"
+          },
+          "events_path": "/home/runner/work/factory-decision-intelligence/factory-decision-intelligence/examples/g7-reschedule-late-event-trace.json",
+          "events_sha256": "e7344b29905da8e8c352cdec2c9c4060ba6e175a031bdf6be19c3b87c2173611",
+          "baseline_run_id": "RUN-20261006-00a0d3",
+          "attempts": [
+            {
+              "event": {
+                "event_id": "TRACE-LATE-M02-001",
+                "current_time_min": 5500,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M02",
+                "delay_duration_min": 90,
+                "reason": "Synthetic M02 interruption in later planning horizon",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "RUN-20261006-00a0d3",
+              "published_run_id": "TRACE-01",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-01",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0217,
+                "objective_value": 1389220.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1389220.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12704,
+                "total_setup_min": 540,
+                "total_tardiness_min": 5914
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 13,
+                "rescheduled_tasks_count": 8,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 57.65,
+                "max_start_delta_min": 731.0,
+                "nervousness_score": 0.0029
+              },
+              "elapsed_seconds": 14.9629
+            },
+            {
+              "event": {
+                "event_id": "TRACE-LATE-M01-002",
+                "current_time_min": 8000,
+                "freeze_horizon_min": 120,
+                "delay_machine_id": "M01",
+                "delay_duration_min": 120,
+                "reason": "Synthetic M01 interruption after late M02 event",
+                "flexible_horizon_min": 240,
+                "max_flexible_shift_min": 240,
+                "allow_local_repair": false
+              },
+              "previous_run_id": "TRACE-01",
+              "published_run_id": "TRACE-02",
+              "accepted": true,
+              "solver_status": "OPTIMAL",
+              "solver_metadata": {
+                "run_id": "TRACE-02",
+                "status": "OPTIMAL",
+                "proven_optimal": true,
+                "wall_time_seconds": 0.0156,
+                "objective_value": 1389220.0,
+                "objective_units": "weighted_minutes",
+                "objective_policy": "BALANCED",
+                "best_objective_bound": 1389220.0,
+                "random_seed": 42,
+                "num_search_workers": 1,
+                "time_limit_seconds": 30.0,
+                "makespan_min": 12704,
+                "total_setup_min": 540,
+                "total_tardiness_min": 5914
+              },
+              "decision_tier": "CPSAT_REOPTIMIZATION",
+              "local_repair_rejection": null,
+              "task_count": 31,
+              "stability": {
+                "total_tasks": 31,
+                "frozen_tasks_count": 23,
+                "rescheduled_tasks_count": 0,
+                "machine_swapped_count": 0,
+                "average_start_delta_min": 0.0,
+                "max_start_delta_min": 0.0,
+                "nervousness_score": 0.0
+              },
+              "elapsed_seconds": 14.9694
+            }
+          ],
+          "completed_all_events": true,
+          "final_active_run_ids": [
+            "TRACE-02"
+          ],
+          "source_unchanged": true,
+          "evidence_scope": "synthetic fixed-route local rehearsal; no factory actuals or service guarantee"
+        }
+      },
+      "paired_events": [
+        {
+          "event_id": "TRACE-LATE-M02-001",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12709,
+              "weighted_tardiness_min": 4729,
+              "setup_min": 500,
+              "moved_tasks": 12,
+              "frozen_tasks": 13,
+              "solver_wall_seconds": 0.4058,
+              "end_to_end_seconds": 15.3033
+            },
+            "EDD": {
+              "makespan_min": 12704,
+              "weighted_tardiness_min": 5914,
+              "setup_min": 540,
+              "moved_tasks": 8,
+              "frozen_tasks": 13,
+              "solver_wall_seconds": 0.0217,
+              "end_to_end_seconds": 14.9629
+            }
+          }
+        },
+        {
+          "event_id": "TRACE-LATE-M01-002",
+          "both_accepted": true,
+          "method_status": {
+            "FULL": "ACCEPTED",
+            "EDD": "ACCEPTED"
+          },
+          "matched_solver_settings": {
+            "time_limit_seconds": 30.0,
+            "random_seed": 42,
+            "num_search_workers": 1
+          },
+          "metrics": {
+            "FULL": {
+              "makespan_min": 12709,
+              "weighted_tardiness_min": 4729,
+              "setup_min": 500,
+              "moved_tasks": 0,
+              "frozen_tasks": 24,
+              "solver_wall_seconds": 0.0212,
+              "end_to_end_seconds": 14.8598
+            },
+            "EDD": {
+              "makespan_min": 12704,
+              "weighted_tardiness_min": 5914,
+              "setup_min": 540,
+              "moved_tasks": 0,
+              "frozen_tasks": 23,
+              "solver_wall_seconds": 0.0156,
+              "end_to_end_seconds": 14.9694
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "paired_accepted_event_count": 6,
+  "planned_event_pair_count": 6,
+  "attempted_trace_count": 3,
+  "evidence_scope": "3 synthetic traces only; no site actuals, service guarantee or general method ranking"
+}

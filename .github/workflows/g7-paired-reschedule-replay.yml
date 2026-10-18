@@ -1,8 +1,6 @@
 name: G7 Paired Reschedule Replay
 
 on:
-  push:
-    branches: ["codex/reschedule-maintenance-audit"]
   workflow_dispatch:
 
 permissions:
