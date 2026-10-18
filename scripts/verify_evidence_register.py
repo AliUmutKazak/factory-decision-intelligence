@@ -73,6 +73,7 @@ def verify() -> None:
     for source_id in (
         "g7_paired_reschedule_corrected_20261018",
         "g7_paired_reschedule_maintenance_audit_20261018",
+        "g7_paired_reschedule_setup_audit_20261018",
     ):
         replay_source = inventory["sources"][source_id]
         replay = json.loads(_repo_file(replay_source["path"]).read_text(encoding="utf-8"))
