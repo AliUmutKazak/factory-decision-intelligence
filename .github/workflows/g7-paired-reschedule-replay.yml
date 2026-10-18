@@ -2,8 +2,6 @@ name: G7 Paired Reschedule Replay
 
 on:
   workflow_dispatch:
-  push:
-    branches: [codex/reschedule-setup-audit]
 
 permissions:
   contents: read
