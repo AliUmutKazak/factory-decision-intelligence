@@ -243,13 +243,12 @@ def run_cpsat_scheduling(
         s_val = int(round(float(row[time_col])))
         row_mid = row["machine_id"] if has_mid_col and pd.notna(row.get("machine_id")) else None
 
-        # Denetim Madde 22: Tezgâh bağımlı setup (machine_id, from_product, to_product)
-        # Eğer makine belirtilmişse yalnızca o makineye, belirtilmemişse genel varsayılan olarak tüm makinelere atanır
-        if row_mid and row_mid in machines:
+        # Only ALL (or a legacy missing machine column) is a global default.
+        # A rule for another machine must never become a default for routed machines.
+        if row_mid in machines:
             setup_dict[(row_mid, f_p, t_p)] = s_val
-        else:
+        elif row_mid is None or row_mid == "ALL":
             for m in machines:
-                # Makineye özel bir kural daha önce yazılmamışsa genel değeri uygula
                 if (m, f_p, t_p) not in setup_dict:
                     setup_dict[(m, f_p, t_p)] = s_val
 

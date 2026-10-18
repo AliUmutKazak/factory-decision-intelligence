@@ -183,7 +183,7 @@ def _audit_setup_transitions(
         key = (str(before), str(after))
         if machine in machines:
             setup[(str(machine), *key)] = duration
-        else:
+        elif machine == "ALL":
             for routed_machine in machines:
                 setup.setdefault((routed_machine, *key), duration)
 

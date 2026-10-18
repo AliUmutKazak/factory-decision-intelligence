@@ -1,7 +1,9 @@
 """Tests for Dynamic Rescheduling, Freeze Horizon, and Lineage Audit (Faz 5)."""
 
+import shutil
 import sqlite3
 import warnings
+from pathlib import Path
 
 from src.contracts.schemas import (
     RescheduleAuditEntry,
@@ -10,6 +12,8 @@ from src.contracts.schemas import (
     SolverStatus,
 )
 from src.scheduling.rescheduler import DynamicRescheduler
+
+REFERENCE_DB = Path(__file__).resolve().parents[1] / "artifacts/reference/factory.db"
 
 
 def test_dynamic_reschedule_with_freeze_horizon_and_audit():
@@ -185,3 +189,36 @@ def test_rejected_local_candidate_falls_back_to_authoritative_solver(monkeypatch
     assert not schedule.empty
     assert audit.decision_tier == "CPSAT_REOPTIMIZATION"
     assert "movement budget" in audit.repair_rejection_reason
+
+
+def test_local_repair_ignores_changeover_rule_for_another_machine(tmp_path, monkeypatch):
+    import src.scheduling.rescheduler as module
+
+    source = tmp_path / "factory.db"
+    shutil.copy2(REFERENCE_DB, source)
+    with sqlite3.connect(source) as conn:
+        conn.execute("UPDATE pipeline_runs SET status='ACTIVE' WHERE status='COMPLETED'")
+        conn.execute("DELETE FROM changeover_matrix WHERE machine_id='ALL' AND from_product='P01' AND to_product='P01'")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('M99', 'P01', 'P01', 99, NULL)")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0, NULL)")
+
+    captured = {}
+    original = module.local_repair_candidate
+
+    def inspect_local_repair(*args, **kwargs):
+        captured.update(args[5])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "local_repair_candidate", inspect_local_repair)
+    DynamicRescheduler(str(source)).execute_reschedule(
+        RescheduleTriggerEvent(
+            event_id="LOCAL-CHANGEOVER-SCOPE",
+            current_time_min=0,
+            freeze_horizon_min=100000,
+            delay_machine_id="M01",
+            delay_duration_min=1,
+        ),
+        new_run_id="LOCAL-CHANGEOVER-SCOPE",
+        persist_audit=False,
+    )
+    assert captured[("M01", "P01", "P01")] == 0
