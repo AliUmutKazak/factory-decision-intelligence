@@ -70,6 +70,30 @@ def verify() -> None:
     if hashlib.sha256(forecast_code).hexdigest() != forecast["forecast_code_sha256_normalized_lf"]:
         raise ValueError("Historical forecast code disagrees with forecast_v012")
 
+    corrected_source = inventory["sources"]["g7_paired_reschedule_corrected_20261018"]
+    corrected = json.loads(_repo_file(corrected_source["path"]).read_text(encoding="utf-8"))
+    if corrected["source_db_sha256"] != inventory["sources"]["reference_db"]["sha256"]:
+        raise ValueError("Corrected G7 replay used a different reference database")
+    if (corrected["methods"], corrected["attempted_trace_count"], corrected["planned_event_pair_count"]) != (
+        ["FULL", "EDD"],
+        3,
+        6,
+    ):
+        raise ValueError("Corrected G7 replay protocol changed")
+    paired = [row for trace in corrected["traces"] for row in trace["paired_events"]]
+    if len(paired) != 6 or corrected["paired_accepted_event_count"] != sum(row["both_accepted"] for row in paired):
+        raise ValueError("Corrected G7 replay count disagrees with event records")
+    for name, expected in corrected["code_sha256"].items():
+        if hashlib.sha256(_historical_code(name, corrected_source["code_commit"])).hexdigest() != expected:
+            raise ValueError(f"Corrected G7 replay code disagrees: {name}")
+    for trace in corrected["traces"]:
+        name = Path(trace["trace"]).name
+        if (
+            hashlib.sha256(_historical_code(f"examples/{name}", corrected_source["code_commit"])).hexdigest()
+            != trace["trace_sha256"]
+        ):
+            raise ValueError(f"Corrected G7 replay event trace disagrees: {name}")
+
     gates = inventory["gates"]
     expected_ids = {f"G{index}" for index in range(14)}
     if {item["id"] for item in gates} != expected_ids or len(gates) != len(expected_ids):
