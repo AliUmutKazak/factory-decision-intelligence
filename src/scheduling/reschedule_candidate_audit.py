@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
 
 from src.contracts.schemas import RescheduleTriggerEvent
+from src.scheduling.maintenance import MaintenanceWindow
+
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -152,14 +156,52 @@ def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
             previous_sequence = sequence
 
 
+def _audit_maintenance_intervals(
+    conn: sqlite3.Connection,
+    candidate: pd.DataFrame,
+    overrides: Sequence[MaintenanceWindow],
+    issue: Any,
+) -> None:
+    """Check setup and work against raw active windows and event overrides."""
+    windows: list[tuple[Any, Any, Any]] = []
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_maintenance'").fetchone():
+        try:
+            windows.extend(
+                conn.execute(
+                    "SELECT machine_id, start_min, end_min FROM machine_maintenance WHERE is_active = 1"
+                ).fetchall()
+            )
+        except sqlite3.DatabaseError as exc:
+            issue("INVALID_MAINTENANCE_DATA", str(exc))
+    windows.extend((window.machine_id, window.start_min, window.end_min) for window in overrides)
+
+    by_machine: dict[str, list[tuple[float, float]]] = {}
+    for machine, raw_start, raw_end in windows:
+        start, end = _number(raw_start), _number(raw_end)
+        if not str(machine).strip() or start is None or end is None or start < 0 or end <= start:
+            issue("INVALID_MAINTENANCE_WINDOW", f"{machine}: {raw_start}..{raw_end}")
+            continue
+        by_machine.setdefault(str(machine), []).append((start, end))
+
+    for row in candidate.to_dict("records"):
+        occupied_start = _number(row["setup_start_min"])
+        occupied_end = _number(row["end_min"])
+        if occupied_start is None or occupied_end is None:
+            continue  # Core interval audit reports malformed task timing.
+        for start, end in by_machine.get(str(row["machine_id"]), []):
+            if occupied_start < end and start < occupied_end:
+                issue("MAINTENANCE_OVERLAP", f"{row['machine_id']}: {row['task_id']} / {start}..{end}")
+
+
 def audit_reschedule_candidate(
     conn: sqlite3.Connection,
     baseline: pd.DataFrame,
     candidate: pd.DataFrame,
     trigger: RescheduleTriggerEvent,
     completed_tasks: set[Any] | None = None,
+    maintenance_overrides: Sequence[MaintenanceWindow] | None = None,
 ) -> dict[str, Any]:
-    """Check identity, commitments, core intervals, and supported calendar shape."""
+    """Check commitments, core intervals, supported calendar and outages."""
     issues: list[dict[str, str]] = []
 
     def issue(code: str, detail: str) -> None:
@@ -170,18 +212,18 @@ def audit_reschedule_candidate(
         if missing:
             issue("MISSING_COLUMNS", f"{name}: {', '.join(sorted(missing))}")
     if issues:
-        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
+        return {"status": "REJECTED", "scope": _SCOPE, "issues": issues}
 
     if baseline.empty or candidate.empty:
         issue("EMPTY_SCHEDULE", "baseline or candidate has no operations")
-        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
+        return {"status": "REJECTED", "scope": _SCOPE, "issues": issues}
 
     for name, frame in (("baseline", baseline), ("candidate", candidate)):
         for column in ("task_id", "lot_id", "product_id", "machine_id"):
             if frame[column].isna().any() or frame[column].astype(str).str.strip().eq("").any():
                 issue("INVALID_IDENTIFIER", f"{name}: {column}")
     if issues:
-        return {"status": "REJECTED", "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR", "issues": issues}
+        return {"status": "REJECTED", "scope": _SCOPE, "issues": issues}
 
     base = baseline.copy()
     new = candidate.copy()
@@ -261,9 +303,10 @@ def audit_reschedule_candidate(
 
     _audit_core_intervals(new, issue)
     _audit_supported_calendar_shape(conn, issue)
+    _audit_maintenance_intervals(conn, new, maintenance_overrides or (), issue)
     return {
         "status": "ACCEPTED" if not issues else "REJECTED",
-        "scope": "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_CALENDAR",
+        "scope": _SCOPE,
         "task_count": len(new),
         "issues": issues,
     }

@@ -70,45 +70,49 @@ def verify() -> None:
     if hashlib.sha256(forecast_code).hexdigest() != forecast["forecast_code_sha256_normalized_lf"]:
         raise ValueError("Historical forecast code disagrees with forecast_v012")
 
-    corrected_source = inventory["sources"]["g7_paired_reschedule_corrected_20261018"]
-    corrected = json.loads(_repo_file(corrected_source["path"]).read_text(encoding="utf-8"))
-    if corrected["source_db_sha256"] != inventory["sources"]["reference_db"]["sha256"]:
-        raise ValueError("Corrected G7 replay used a different reference database")
-    if (corrected["methods"], corrected["attempted_trace_count"], corrected["planned_event_pair_count"]) != (
-        ["FULL", "EDD"],
-        3,
-        6,
+    for source_id in (
+        "g7_paired_reschedule_corrected_20261018",
+        "g7_paired_reschedule_maintenance_audit_20261018",
     ):
-        raise ValueError("Corrected G7 replay protocol changed")
-    paired = [row for trace in corrected["traces"] for row in trace["paired_events"]]
-    if (
-        len(paired) != 6
-        or corrected["paired_accepted_event_count"] != 6
-        or not all(row["both_accepted"] for row in paired)
-    ):
-        raise ValueError("Corrected G7 replay count disagrees with event records")
-    for name, expected in corrected["code_sha256"].items():
-        if hashlib.sha256(_historical_code(name, corrected_source["code_commit"])).hexdigest() != expected:
-            raise ValueError(f"Corrected G7 replay code disagrees: {name}")
-    for trace in corrected["traces"]:
-        name = Path(trace["trace"]).name
-        if (
-            hashlib.sha256(_historical_code(f"examples/{name}", corrected_source["code_commit"])).hexdigest()
-            != trace["trace_sha256"]
+        replay_source = inventory["sources"][source_id]
+        replay = json.loads(_repo_file(replay_source["path"]).read_text(encoding="utf-8"))
+        if replay["source_db_sha256"] != inventory["sources"]["reference_db"]["sha256"]:
+            raise ValueError(f"G7 replay used a different reference database: {source_id}")
+        if (replay["methods"], replay["attempted_trace_count"], replay["planned_event_pair_count"]) != (
+            ["FULL", "EDD"],
+            3,
+            6,
         ):
-            raise ValueError(f"Corrected G7 replay event trace disagrees: {name}")
-        if len(trace["paired_events"]) != 2:
-            raise ValueError(f"Corrected G7 replay event count disagrees: {name}")
-        for method in corrected["methods"]:
-            outcome = trace["outcomes"][method]
+            raise ValueError(f"G7 replay protocol changed: {source_id}")
+        paired = [row for trace in replay["traces"] for row in trace["paired_events"]]
+        if (
+            len(paired) != 6
+            or replay["paired_accepted_event_count"] != 6
+            or not all(row["both_accepted"] for row in paired)
+        ):
+            raise ValueError(f"G7 replay count disagrees with event records: {source_id}")
+        for name, expected in replay["code_sha256"].items():
+            if hashlib.sha256(_historical_code(name, replay_source["code_commit"])).hexdigest() != expected:
+                raise ValueError(f"G7 replay code disagrees: {source_id}/{name}")
+        for trace in replay["traces"]:
+            name = Path(trace["trace"]).name
             if (
-                not outcome["source_unchanged"]
-                or not outcome["completed_all_events"]
-                or outcome["final_active_run_ids"] != ["TRACE-02"]
-                or len(outcome["attempts"]) != 2
-                or not all(attempt["accepted"] for attempt in outcome["attempts"])
+                hashlib.sha256(_historical_code(f"examples/{name}", replay_source["code_commit"])).hexdigest()
+                != trace["trace_sha256"]
             ):
-                raise ValueError(f"Corrected G7 replay outcome disagrees: {name}/{method}")
+                raise ValueError(f"G7 replay event trace disagrees: {source_id}/{name}")
+            if len(trace["paired_events"]) != 2:
+                raise ValueError(f"G7 replay event count disagrees: {source_id}/{name}")
+            for method in replay["methods"]:
+                outcome = trace["outcomes"][method]
+                if (
+                    not outcome["source_unchanged"]
+                    or not outcome["completed_all_events"]
+                    or outcome["final_active_run_ids"] != ["TRACE-02"]
+                    or len(outcome["attempts"]) != 2
+                    or not all(attempt["accepted"] for attempt in outcome["attempts"])
+                ):
+                    raise ValueError(f"G7 replay outcome disagrees: {source_id}/{name}/{method}")
 
     gates = inventory["gates"]
     expected_ids = {f"G{index}" for index in range(14)}
