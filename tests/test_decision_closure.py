@@ -116,6 +116,27 @@ def test_flexible_window_is_a_hard_start_and_machine_constraint():
         conn.close()
 
 
+def test_unrouted_machine_changeover_never_becomes_global_default():
+    conn, tasks = private_case()
+    try:
+        conn.execute("DELETE FROM changeover_matrix WHERE machine_id='ALL' AND from_product='P01' AND to_product='P01'")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('M99', 'P01', 'P01', 99, NULL)")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0, NULL)")
+        run_cpsat_scheduling(
+            run_id="TINY",
+            connection=NoCloseConnectionWrapper(conn),
+            persist_outputs=False,
+            task_override=tasks.loc[tasks.task_id == "A"],
+            time_limit_seconds=3,
+        )
+        actual = conn.execute(
+            "SELECT setup_before_min FROM production_schedule WHERE run_id='TINY' AND task_id='A'"
+        ).fetchone()[0]
+        assert actual == 0
+    finally:
+        conn.close()
+
+
 def test_local_repair_preserves_commitments_and_rejects_excess_movement():
     schedule = pd.DataFrame(
         [

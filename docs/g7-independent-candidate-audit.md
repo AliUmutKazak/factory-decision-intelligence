@@ -19,6 +19,8 @@
 
 Bu denetim üretim çözücüsünden ayrı kodla **miktar, rota, işlem aralığı, setup, öncüllük, makine çakışması, bakım çakışması, kapanış günü, tanımlı laboratuvar takvimi, W1 fazla mesai bütçesi ve sentetik MRP malzeme serbest bırakmasını** kontrol eder. Kapsamı hâlâ sınırlıdır: haftalık sentetik takvim politikasını kullanır; vardiya/gün istisnalarını ve her makine takviminin tam tarihsel kuralını kapsamaz. Reschedule freeze/FLEXIBLE bağlamı, gerçek ERP/MES actuals ve ekonomik hedef bu G7 hot-order denetiminde bağımsız doğrulanmaz. `EDD` sonucu `OPTIMAL` olsa bile bu yalnız sabit sıra alt problemindedir. Beş sentetik tekrar saha güvenilirliği veya hizmet süresi hedefi değildir. Bu adaylar API'nin varsayılan yayınına alınmadı.
 
+**18 Ekim makine kapsamı düzeltmesi:** Hazırlık matrisinde yalnız `ALL` genel kuraldır. Başka bir makine adına kayıtlı satır, adayda o makine kullanılmıyorsa diğer makinelere yayılmaz. Denetçi bu ayrımı çözücüden bağımsız olarak uygular. Yukarıdaki beş tekrar daha eski kaynak sürümünün tarihsel kanıtıdır; yeni makine kapsamı regresyonu ayrı test ve CI ile doğrulanır.
+
 ## Sonraki kapı
 
 G7 hot-order adayında temel takvim, bakım, W1 OT ve sentetik MRP serbest bırakma denetimi mevcut. Kalan laboratuvar işi farklı olayların daha geniş benchmark'ı, değişken günlük takvim ve freeze/FLEXIBLE koşullarının bağımsız yeniden kurulması, önceden seçilmiş çözüm kalitesi ölçütleri, eşzamanlı API yükü, `ACTIVE` yaşı ve operatöre görünen timeout/fallback davranışıdır. Gerçek tesis kuralları ve müşteri SLO'su daha sonraki saha aşamalarında belirlenecek.

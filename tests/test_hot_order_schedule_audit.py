@@ -36,6 +36,26 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
         assert accepted["material_release_by_product_min"]["P01"] == 480
         assert accepted["material_release_by_product_min"]["P03"] == 960
 
+        # Pick a transition that actually occurs, then put an unrelated rule
+        # before its global fallback so this would fail under the old mapping.
+        groups = schedule.sort_values(["machine_id", "start_min"]).groupby("machine_id")
+        before, after = next(
+            (left, right) for _, group in groups for left, right in zip(group.product_id, group.product_id.iloc[1:])
+        )
+        original_setup = conn.execute(
+            "SELECT setup_time_min FROM changeover_matrix WHERE machine_id='ALL' AND from_product=? AND to_product=?",
+            (before, after),
+        ).fetchone()[0]
+        conn.execute(
+            "DELETE FROM changeover_matrix WHERE machine_id='ALL' AND from_product=? AND to_product=?",
+            (before, after),
+        )
+        conn.execute(
+            "INSERT INTO changeover_matrix VALUES ('M99', ?, ?, ?, NULL)", (before, after, original_setup + 99)
+        )
+        conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', ?, ?, ?, NULL)", (before, after, original_setup))
+        assert audit_hot_order_schedule(conn, active_run_id, order, schedule)["status"] == "ACCEPTED"
+
         wrong_units = schedule.copy()
         wrong_units.loc[0, "production_units"] += 25
         codes = {item["code"] for item in audit_hot_order_schedule(conn, active_run_id, order, wrong_units)["issues"]}

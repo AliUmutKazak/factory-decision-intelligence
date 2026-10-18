@@ -312,3 +312,16 @@ def test_independent_audit_rejects_missing_or_invalid_changeover_source():
         conn.close()
     assert any(item["code"] == "INVALID_CHANGEOVER_ROW" for item in invalid["issues"])
     assert any(item["code"] == "MISSING_CHANGEOVER_MATRIX" for item in missing["issues"])
+
+
+def test_independent_audit_does_not_treat_another_machine_rule_as_global():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("DELETE FROM changeover_matrix")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('M99', 'P01', 'P01', 99)")
+        conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0)")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert result["status"] == "ACCEPTED", result["issues"]

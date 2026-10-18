@@ -223,7 +223,7 @@ def audit_hot_order_schedule(
         duration = int(round(float(minutes)))
         if machine in machines:
             setups[(str(machine), *key)] = duration
-        else:
+        elif machine == "ALL":
             for routed_machine in machines:
                 setups.setdefault((routed_machine, *key), duration)
 

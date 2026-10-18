@@ -603,10 +603,16 @@ class DynamicRescheduler:
                         machines = set(baseline_sched.machine_id.astype(str))
                         setup_matrix = {}
                         for row in setup_rows.to_dict("records"):
-                            applicable = [row["machine_id"]] if row.get("machine_id") in machines else machines
+                            rule_machine = row.get("machine_id")
+                            if rule_machine in machines:
+                                applicable = [rule_machine]
+                            elif rule_machine == "ALL":
+                                applicable = machines
+                            else:
+                                continue
                             for machine in applicable:
                                 key = (machine, row["from_product"], row["to_product"])
-                                if row.get("machine_id") in machines or key not in setup_matrix:
+                                if rule_machine in machines or key not in setup_matrix:
                                     setup_matrix[key] = int(round(row["setup_time_min"]))
                         if not trigger.delay_machine_id or trigger.delay_duration_min == 0:
                             candidate = {
