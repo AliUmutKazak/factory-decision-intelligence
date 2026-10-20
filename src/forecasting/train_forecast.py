@@ -235,7 +235,7 @@ def run_forecast_benchmark(run_id=None, db_path=None):
                         if candidate_holdout is None
                         else "EVALUATED"
                     ),
-                    "Kazanan": "✓" if m_name == best_name else "",
+                    "Kazanan": "EVET" if m_name == best_name else "",
                 }
             )
 

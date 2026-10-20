@@ -1,4 +1,6 @@
+import io
 import sqlite3
+from contextlib import redirect_stdout
 
 import pandas as pd
 import pytest
@@ -109,6 +111,27 @@ def test_throughput_policy_reports_kpis_from_emitted_schedule():
         assert meta.makespan_min == row_kpis.makespan_min
         assert meta.total_setup_min == row_kpis.total_setup_min
         assert meta.total_tardiness_min == row_kpis.weighted_tardiness_min
+    finally:
+        conn.close()
+
+
+def test_scheduler_can_report_to_windows_cp1254_console():
+    conn, tasks = private_case()
+    try:
+        with io.BytesIO() as output:
+            with io.TextIOWrapper(output, encoding="cp1254", errors="strict") as console:
+                with redirect_stdout(console):
+                    run_cpsat_scheduling(
+                        run_id="TINY",
+                        connection=NoCloseConnectionWrapper(conn),
+                        persist_outputs=False,
+                        task_override=tasks,
+                        policy="THROUGHPUT_MAX",
+                        time_limit_seconds=3,
+                    )
+                console.flush()
+                rendered = output.getvalue().decode("cp1254")
+        assert "[OK] production_schedule" in rendered
     finally:
         conn.close()
 
