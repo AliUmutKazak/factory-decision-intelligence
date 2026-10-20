@@ -158,12 +158,13 @@ def test_hot_order_uses_distinct_baseline_and_scenario_limits(reference_active_d
     monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
     engine = WhatIfEngine(disk_db_path=str(reference_active_db))
     before = sha256_file(reference_active_db)
-    engine.simulate_hot_order(
-        HotOrderInjection(order_id="LIMIT-CHECK", product_id="P01", quantity=51, due_date_min=1200),
-        scenario_name="SCENARIO_LIMIT_CHECK",
-        baseline_time_limit_seconds=7,
-        scenario_time_limit_seconds=2,
-    )
+    with pytest.raises(RuntimeError, match="EMPTY_SCHEDULE"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="LIMIT-CHECK", product_id="P01", quantity=51, due_date_min=1200),
+            scenario_name="SCENARIO_LIMIT_CHECK",
+            baseline_time_limit_seconds=7,
+            scenario_time_limit_seconds=2,
+        )
     assert observed == [("BASE", 7), ("SCENARIO_LIMIT_CHECK", 2)]
     assert sha256_file(reference_active_db) == before
 
@@ -184,14 +185,14 @@ def test_hot_order_reuses_accepted_active_baseline_without_resolving_it(referenc
     monkeypatch.setattr("src.scheduling.what_if.run_cpsat_scheduling", record_solve)
     before = sha256_file(reference_active_db)
     engine = WhatIfEngine(disk_db_path=str(reference_active_db))
-    baseline, _, _, _ = engine.simulate_hot_order(
-        HotOrderInjection(order_id="RUSH-SNAPSHOT", product_id="P01", quantity=51, due_date_min=1200),
-        scenario_name="SCENARIO_SNAPSHOT",
-        reuse_active_baseline=True,
-        scenario_time_limit_seconds=2,
-        scenario_dispatch_rule="EDD",
-    )
-    assert baseline.status == SolverStatus.FEASIBLE
+    with pytest.raises(RuntimeError, match="EMPTY_SCHEDULE"):
+        engine.simulate_hot_order(
+            HotOrderInjection(order_id="RUSH-SNAPSHOT", product_id="P01", quantity=51, due_date_min=1200),
+            scenario_name="SCENARIO_SNAPSHOT",
+            reuse_active_baseline=True,
+            scenario_time_limit_seconds=2,
+            scenario_dispatch_rule="EDD",
+        )
     assert len(observed) == 1
     assert observed[0]["run_id"] == "SCENARIO_SNAPSHOT"
     assert observed[0]["time_limit_seconds"] == 2
@@ -258,3 +259,28 @@ def test_hot_order_fixed_dispatch_returns_isolated_schedule(reference_active_db,
     assert "MİKTAR MUTABAKATI" in audit_output
     assert "Hafta 1 son operasyon bitişi:" in audit_output
     assert "Bu değerler fiili üretim veya teslimat değildir." in audit_output
+
+
+def test_hot_order_rejects_independent_audit_failure_after_solver_success(reference_active_db, monkeypatch):
+    before = sha256_file(reference_active_db)
+    observed = []
+
+    def reject_candidate(conn, run_id, order, schedule):
+        observed.append((run_id, order.order_id, len(schedule)))
+        return {"status": "REJECTED", "issues": [{"code": "INJECTED_AUDIT_FAILURE"}]}
+
+    monkeypatch.setattr("src.scheduling.what_if.audit_hot_order_schedule", reject_candidate)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
+        with pytest.raises(RuntimeError, match="INJECTED_AUDIT_FAILURE"):
+            engine.simulate_hot_order(
+                HotOrderInjection(order_id="RUSH-AUDIT", product_id="P01", quantity=51, due_date_min=1200),
+                scenario_name="SCENARIO_AUDIT_REJECT",
+                reuse_active_baseline=True,
+                scenario_dispatch_rule="EDD",
+                scenario_time_limit_seconds=2,
+            )
+    assert len(observed) == 1
+    assert observed[0][1:] == ("RUSH-AUDIT", 34)
+    assert sha256_file(reference_active_db) == before

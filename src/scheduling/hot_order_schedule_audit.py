@@ -53,6 +53,58 @@ def _overlap(start: int, end: int, left: int, right: int) -> int:
     return max(0, min(end, right) - max(start, left))
 
 
+def _audit_supported_calendar_shape(conn: sqlite3.Connection, machines: set[str], issue: Any) -> None:
+    """Reject source shifts that the current constant daily-hours model cannot represent."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'").fetchone() is None:
+        return  # The production model falls back to machines.max_daily_hours.
+    for machine in sorted(machines):
+        rows = conn.execute(
+            "SELECT day_of_week, shift_id, start_minute, end_minute, available_hours, "
+            "exception_type, is_available FROM machine_calendar WHERE machine_id = ?",
+            (machine,),
+        ).fetchall()
+        by_day: dict[int, list[tuple[Any, ...]]] = defaultdict(list)
+        for raw_day, *fields in rows:
+            day = _integer(raw_day)
+            if day is None or day not in range(7):
+                issue("INVALID_CALENDAR_DAY", f"{machine}: {raw_day}")
+                continue
+            by_day[day].append(tuple(fields))
+        signatures = []
+        for day in range(6):
+            day_rows = by_day[day]
+            if len(day_rows) != 1:
+                issue("UNSUPPORTED_DAILY_CALENDAR", f"{machine}: day={day}, rows={len(day_rows)}")
+                continue
+            shift, start, end, raw_hours, exception, available = day_rows[0]
+            try:
+                hours = float(raw_hours)
+            except (TypeError, ValueError, OverflowError):
+                hours = float("nan")
+            if (
+                not math.isfinite(hours)
+                or not 0 < hours <= 24
+                or _integer(start) != round((24 - hours) * 60)
+                or _integer(end) != 1440
+                or _integer(available) != 1
+                or str(exception).upper() != "REGULAR"
+            ):
+                issue("UNSUPPORTED_DAILY_CALENDAR", f"{machine}: day={day}")
+            signatures.append((str(shift), _integer(start), _integer(end), hours, str(exception), _integer(available)))
+        if signatures and any(signature != signatures[0] for signature in signatures[1:]):
+            issue("VARIABLE_DAILY_CALENDAR", machine)
+        sunday = by_day[6]
+        if len(sunday) > 1:
+            issue("UNSUPPORTED_SUNDAY_CALENDAR", machine)
+        elif len(sunday) == 1 and _integer(sunday[0][5]) == 1 and signatures:
+            try:
+                sunday_hours = float(sunday[0][3])
+            except (TypeError, ValueError, OverflowError):
+                sunday_hours = float("nan")
+            if not math.isfinite(sunday_hours) or abs(sunday_hours - signatures[0][3]) > 1e-9:
+                issue("SUNDAY_HOURS_AFFECT_DAILY_AVERAGE", machine)
+
+
 def _audit_calendar(
     conn: sqlite3.Connection,
     run_id: str,
@@ -358,6 +410,7 @@ def audit_hot_order_schedule(
             previous_product = row["product_id"]
             previous_end = row["end_min"]
 
+    _audit_supported_calendar_shape(conn, set(by_machine), issue)
     _audit_calendar(conn, baseline_run_id, tasks, issue)
     material_release = _audit_material_release(conn, baseline_run_id, tasks, issue)
 

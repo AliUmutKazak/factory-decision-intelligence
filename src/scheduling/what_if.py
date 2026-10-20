@@ -15,6 +15,7 @@ from src.contracts.schemas import (
     ScheduleSolverMetadata,
     SolverStatus,
 )
+from src.scheduling.hot_order_schedule_audit import audit_hot_order_schedule
 from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
@@ -265,6 +266,11 @@ class WhatIfEngine:
                 mem_conn,
                 params=(scenario_name,),
             )
+
+            candidate_audit = audit_hot_order_schedule(mem_conn, source_run_id, hot_order, scenario_sched)
+            if candidate_audit["status"] != "ACCEPTED":
+                codes = ", ".join(sorted({item["code"] for item in candidate_audit["issues"]}))
+                raise RuntimeError(f"Independent hot-order candidate audit rejected the scenario: {codes}")
 
             # 4. KPI Delta Hesaplama
             report = self._calculate_delta(
