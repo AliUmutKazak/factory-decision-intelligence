@@ -43,6 +43,7 @@ from src.contracts.schemas import (
 )
 from src.scheduling.calendar_service import MachineCalendarService
 from src.scheduling.maintenance import load_machine_maintenance_windows
+from src.scheduling.schedule_metrics import schedule_kpis
 from src.utils.db import (
     get_db_connection,
     migrate_schedule_commitments,
@@ -1071,8 +1072,6 @@ def run_cpsat_scheduling(
         conn.close()
         raise RuntimeError(f"[SOLVER ROBUSTNESS] Beklenmeyen çözücü durumu: {status_name}. Pipeline sonlandırıldı.")
 
-    best_makespan = int(solver.Value(makespan))
-    total_setup_val = int(solver.Value(total_setup_duration)) if all_setup_terms else 0
     obj_val = float(solver.ObjectiveValue())
     best_bound = float(solver.BestObjectiveBound())
     if monetary:
@@ -1081,10 +1080,6 @@ def run_cpsat_scheduling(
     gap = (abs(obj_val - best_bound) / max(1.0, abs(obj_val))) * 100.0 if obj_val > 0 else 0.0
     status_audit_tag = "OPTIMAL_PROVEN" if proven_optimal else "FEASIBLE_SUBOPTIMAL"
 
-    total_tardiness_val = int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0
-    print(
-        f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika | Ağırlıklı Gecikme: {total_tardiness_val} dk"
-    )
     print(
         f"Bileşik Amaç Değeri (Composite Objective): {obj_val:.1f} | "
         f"Dual Bound (Composite): {best_bound:.1f} | "
@@ -1256,6 +1251,17 @@ def run_cpsat_scheduling(
         if col not in sched_df.columns:
             sched_df[col] = 0 if "min" in col or "units" in col or "count" in col else ""
 
+    # A feasible solver response can leave a metric auxiliary variable loose
+    # when the selected objective gives it zero weight. Published KPI fields
+    # must describe the emitted schedule, regardless of objective policy.
+    row_kpis = schedule_kpis(sched_df)
+    best_makespan = int(row_kpis.makespan_min)
+    total_setup_val = int(row_kpis.total_setup_min)
+    total_tardiness_val = int(row_kpis.weighted_tardiness_min)
+    print(
+        f"Makespan: {best_makespan} dakika ({best_makespan / 60:.2f} saat) | Toplam Setup: {total_setup_val} dakika | Ağırlıklı Gecikme: {total_tardiness_val} dk"
+    )
+
     effective_run_id = str(run_id) if run_id else "DEFAULT_RUN"
     sched_df["run_id"] = effective_run_id
     if persist_outputs and weekly_accounting_rows:
@@ -1308,9 +1314,9 @@ def run_cpsat_scheduling(
         random_seed=seed,
         num_search_workers=workers,
         time_limit_seconds=limit,
-        makespan_min=int(solver.Value(makespan)),
-        total_setup_min=int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
-        total_tardiness_min=int(solver.Value(total_weighted_tardiness)) if tardiness_terms else 0,
+        makespan_min=best_makespan,
+        total_setup_min=total_setup_val,
+        total_tardiness_min=total_tardiness_val,
     )
 
     # 2. Geriye dönük operasyonel zengin metadata (JSON raporu için)
@@ -1357,8 +1363,8 @@ def run_cpsat_scheduling(
         "mrp_coupling_mode": "EXPLICIT_MATERIAL_AVAILABILITY_DATETIME_CHAIN",
         "mrp_erp_operational_chain": "OPEN_PO_SUPPLIER_LT_GOODS_RECEIPT_QC_HOLD",
         "mrp_qc_hold_enforced": 1,
-        "objective_makespan_min": int(solver.Value(makespan)),
-        "objective_setup_min": int(solver.Value(total_setup_duration)) if all_setup_terms else 0,
+        "objective_makespan_min": best_makespan,
+        "objective_setup_min": total_setup_val,
         "total_objective_value": obj_val,
     }
 

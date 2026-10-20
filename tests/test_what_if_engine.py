@@ -17,7 +17,8 @@ from src.contracts.schemas import (
     ScheduleSolverMetadata,
     SolverStatus,
 )
-from src.scheduling.what_if import WhatIfEngine, _schedule_kpis
+from src.scheduling.schedule_metrics import schedule_kpis
+from src.scheduling.what_if import WhatIfEngine
 from src.utils.run_bundle import sha256_file
 
 REFERENCE_DB = Path(__file__).resolve().parents[1] / "artifacts" / "reference" / "factory.db"
@@ -31,7 +32,7 @@ def test_what_if_kpis_count_tardiness_once_per_lot_and_all_setups():
             {"lot_id": "B", "end_min": 20, "due_date_min": 17, "priority_weight": 2, "setup_before_min": 5},
         ]
     )
-    kpis = _schedule_kpis(rows)
+    kpis = schedule_kpis(rows)
     assert kpis.makespan_min == 20
     assert kpis.weighted_tardiness_min == 15  # A: 3*3, B: 3*2; no double count for A.
     assert kpis.total_setup_min == 11
@@ -45,7 +46,7 @@ def test_what_if_kpis_reject_incomplete_or_invalid_rows(column, value):
     row[column] = value
     rows = pd.DataFrame([row])
     with pytest.raises(RuntimeError, match="invalid"):
-        _schedule_kpis(rows)
+        schedule_kpis(rows)
 
 
 def test_what_if_kpis_reject_conflicting_lot_commitment():
@@ -56,7 +57,7 @@ def test_what_if_kpis_reject_conflicting_lot_commitment():
         ]
     )
     with pytest.raises(RuntimeError, match="conflicting"):
-        _schedule_kpis(rows)
+        schedule_kpis(rows)
 
 
 def test_what_if_delta_uses_schedule_rows_for_both_plans():

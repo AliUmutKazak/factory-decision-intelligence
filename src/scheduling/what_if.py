@@ -3,7 +3,6 @@
 import math
 import sqlite3
 from pathlib import Path
-from typing import NamedTuple
 
 import pandas as pd
 
@@ -22,6 +21,7 @@ from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
 from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.scheduling.schedule_metrics import schedule_kpis
 from src.utils.db import clone_run_inputs, get_active_run_id
 from src.utils.solver_slot import admitted_solver_call
 
@@ -52,33 +52,6 @@ class NoCloseConnectionWrapper:
 
     def __getattr__(self, name):
         return getattr(self._target, name)
-
-
-class _ScheduleKpis(NamedTuple):
-    makespan_min: float
-    weighted_tardiness_min: float
-    total_setup_min: float
-
-
-def _schedule_kpis(schedule: pd.DataFrame) -> _ScheduleKpis:
-    """Recompute planned outcomes from operation rows, one tardiness term per lot."""
-    required = {"lot_id", "end_min", "due_date_min", "priority_weight", "setup_before_min"}
-    if schedule.empty or not required.issubset(schedule.columns) or schedule["lot_id"].isna().any():
-        raise RuntimeError("What-if KPI source has no complete lot schedule")
-    numeric = schedule[["end_min", "due_date_min", "priority_weight", "setup_before_min"]].apply(
-        pd.to_numeric, errors="coerce"
-    )
-    if not numeric.map(lambda value: math.isfinite(value) and value >= 0).all().all():
-        raise RuntimeError("What-if KPI source contains invalid time, due date, priority or setup")
-    rows = numeric.assign(lot_id=schedule["lot_id"].to_numpy())
-    grouped = rows.groupby("lot_id", dropna=False)
-    if (grouped["due_date_min"].nunique() != 1).any() or (grouped["priority_weight"].nunique() != 1).any():
-        raise RuntimeError("What-if KPI source has conflicting lot due dates or priorities")
-    lots = grouped.agg(
-        completion=("end_min", "max"), due=("due_date_min", "first"), weight=("priority_weight", "first")
-    )
-    tardiness = (lots["completion"] - lots["due"]).clip(lower=0).mul(lots["weight"]).sum()
-    return _ScheduleKpis(float(rows["end_min"].max()), float(tardiness), float(rows["setup_before_min"].sum()))
 
 
 class WhatIfEngine:
@@ -350,8 +323,8 @@ class WhatIfEngine:
         baseline_schedule: pd.DataFrame,
         scenario_schedule: pd.DataFrame,
     ) -> ScenarioDeltaReport:
-        baseline = _schedule_kpis(baseline_schedule)
-        scenario = _schedule_kpis(scenario_schedule)
+        baseline = schedule_kpis(baseline_schedule)
+        scenario = schedule_kpis(scenario_schedule)
 
         return ScenarioDeltaReport(
             scenario_name=scenario_name,
