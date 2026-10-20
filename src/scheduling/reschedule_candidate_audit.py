@@ -17,7 +17,7 @@ from src import config as cfg
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
 
-_SCOPE = "RESCHEDULE_FREEZE_FLEX_QUANTITY_ROUTING_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_QUANTITY_ROUTING_MATERIAL_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -325,6 +325,71 @@ def _audit_route_source(conn: sqlite3.Connection, candidate: pd.DataFrame, issue
             issue("INCOMPLETE_LOT_ROUTE", f"{lot}: expected={sorted(expected)}, actual={sorted(actual)}")
 
 
+def _audit_material_release_source(
+    conn: sqlite3.Connection, candidate: pd.DataFrame, baseline_run_id: str | None, issue: Any
+) -> None:
+    """Rebuild the model's W1 material timing gate from baseline BOM/MRP inputs."""
+    if not baseline_run_id:
+        return  # The calendar audit already rejects an unscoped baseline.
+    for table in ("bom", "mrp_plan"):
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone() is None:
+            issue("MISSING_MATERIAL_SOURCE", table)
+            return
+    try:
+        bom_rows = conn.execute("SELECT product_id, material_id FROM bom").fetchall()
+        mrp_rows = conn.execute(
+            "SELECT material_id, action_message, planned_release_week FROM mrp_plan "
+            "WHERE run_id = ? AND period_week = 1",
+            (baseline_run_id,),
+        ).fetchall()
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_MATERIAL_SOURCE", str(exc))
+        return
+
+    product_materials: dict[str, set[str]] = {}
+    for product, material in bom_rows:
+        if product is None or material is None or not str(product).strip() or not str(material).strip():
+            issue("INVALID_BOM_ROW", f"{product}: {material}")
+            continue
+        product_materials.setdefault(str(product), set()).add(str(material))
+
+    ready: dict[str, int] = {}
+    invalid: set[str] = set()
+    for raw_material, action, raw_week in mrp_rows:
+        material = str(raw_material)
+        week = _number(raw_week)
+        if raw_material is None or not material.strip():
+            issue("INVALID_MRP_MATERIAL", material)
+            continue
+        if material in ready or material in invalid:
+            issue("DUPLICATE_MRP_MATERIAL", material)
+            invalid.add(material)
+            continue
+        if week is None or not week.is_integer():
+            issue("INVALID_MRP_RELEASE_WEEK", material)
+            invalid.add(material)
+            continue
+        ready[material] = 480 + max(0, -int(week)) * 480 if "EXPEDITE" in str(action) else 0
+
+    for product in sorted(candidate["product_id"].astype(str).unique()):
+        materials = product_materials.get(product, set())
+        if not materials:
+            continue  # The production model treats a product with no BOM rows as release 0.
+        missing = materials - ready.keys() - invalid
+        if missing:
+            issue("MISSING_MRP_MATERIAL", f"{product}: {','.join(sorted(missing))}")
+        if missing or materials & invalid:
+            continue
+        expected = max(ready[material] for material in materials)
+        for row in candidate.loc[candidate["product_id"].astype(str) == product].to_dict("records"):
+            actual = _number(row["release_time_min"])
+            if actual is not None and actual < expected - 1e-6:
+                issue(
+                    "MATERIAL_RELEASE_BEFORE_SOURCE",
+                    f"{row['task_id']}: minimum={expected}, actual={actual:g}",
+                )
+
+
 def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
     """Rebuild task timing, route order and machine occupancy from candidate rows."""
     by_machine: dict[str, list[tuple[float, float, str]]] = {}
@@ -615,6 +680,7 @@ def audit_reschedule_candidate(
     _audit_core_intervals(new, issue)
     _audit_production_units(conn, new, baseline_run_id, issue)
     _audit_route_source(conn, new, issue)
+    _audit_material_release_source(conn, new, baseline_run_id, issue)
     _audit_setup_transitions(conn, new, baseline_run_id, issue)
     _audit_supported_calendar_shape(conn, issue)
     _audit_calendar_occupancy(conn, new, baseline_run_id, issue)

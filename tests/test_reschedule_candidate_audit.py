@@ -18,6 +18,13 @@ def _calendar_connection(variable_day=None):
         "CREATE TABLE sku_production_plan (run_id TEXT, period_week INTEGER, product_id TEXT, planned_units INTEGER)"
     )
     conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P01', 75)")
+    conn.execute("CREATE TABLE bom (product_id TEXT, material_id TEXT)")
+    conn.execute("INSERT INTO bom VALUES ('P01', 'MAT1')")
+    conn.execute(
+        "CREATE TABLE mrp_plan (run_id TEXT, period_week INTEGER, material_id TEXT, "
+        "action_message TEXT, planned_release_week INTEGER)"
+    )
+    conn.execute("INSERT INTO mrp_plan VALUES ('BASE', 1, 'MAT1', 'NONE', 1)")
     conn.execute(
         "CREATE TABLE routing (product_id TEXT, operation_seq INTEGER, machine_id TEXT, processing_time_min REAL)"
     )
@@ -283,6 +290,8 @@ def _mixed_product_setup_case(conn):
         frame.loc[frame.task_id == "FLEX", "product_id"] = "P02"
     conn.execute("UPDATE sku_production_plan SET planned_units = 50 WHERE product_id = 'P01'")
     conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P02', 25)")
+    conn.execute("INSERT INTO bom VALUES ('P02', 'MAT2')")
+    conn.execute("INSERT INTO mrp_plan VALUES ('BASE', 1, 'MAT2', 'NONE', 1)")
     conn.execute("INSERT INTO routing VALUES ('P02', 1, 'M01', 40)")
     conn.executemany(
         "INSERT INTO changeover_matrix VALUES (?, ?, ?, ?)",
@@ -523,3 +532,59 @@ def test_independent_audit_rejects_missing_lot_operation_in_source_route():
     finally:
         conn.close()
     assert "INCOMPLETE_LOT_ROUTE" in {item["code"] for item in result["issues"]}
+
+
+def test_independent_audit_rejects_release_before_expedited_material_gate():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("UPDATE mrp_plan SET action_message = 'EXPEDITE', planned_release_week = 1")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "MATERIAL_RELEASE_BEFORE_SOURCE" in codes
+    assert "TASK_INPUT_CHANGED" not in codes
+
+
+def test_independent_audit_accepts_source_gate_and_later_task_override():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("UPDATE mrp_plan SET action_message = 'EXPEDITE', planned_release_week = 1")
+        for frame in (baseline, candidate):
+            frame["release_time_min"] = 500
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert result["status"] == "ACCEPTED", result["issues"]
+
+
+def test_independent_audit_rejects_negative_release_week_delay():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("UPDATE mrp_plan SET action_message = 'EXPEDITE', planned_release_week = -1")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "MATERIAL_RELEASE_BEFORE_SOURCE" in {item["code"] for item in result["issues"]}
+
+
+def test_independent_audit_rejects_missing_duplicate_or_invalid_mrp_source():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("DELETE FROM mrp_plan WHERE run_id = 'BASE'")
+        conn.execute("INSERT INTO mrp_plan VALUES ('OTHER', 1, 'MAT1', 'EXPEDITE', 1)")
+        missing = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+        conn.execute("INSERT INTO mrp_plan VALUES ('BASE', 1, 'MAT1', 'EXPEDITE', 'bad')")
+        invalid = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+        conn.execute("UPDATE mrp_plan SET planned_release_week = 1 WHERE run_id = 'BASE'")
+        conn.execute("INSERT INTO mrp_plan VALUES ('BASE', 1, 'MAT1', 'EXPEDITE', 1)")
+        duplicate = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "MISSING_MRP_MATERIAL" in {item["code"] for item in missing["issues"]}
+    assert "INVALID_MRP_RELEASE_WEEK" in {item["code"] for item in invalid["issues"]}
+    assert "DUPLICATE_MRP_MATERIAL" in {item["code"] for item in duplicate["issues"]}
