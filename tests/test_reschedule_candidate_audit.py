@@ -19,6 +19,10 @@ def _calendar_connection(variable_day=None):
     )
     conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P01', 75)")
     conn.execute(
+        "CREATE TABLE routing (product_id TEXT, operation_seq INTEGER, machine_id TEXT, processing_time_min REAL)"
+    )
+    conn.execute("INSERT INTO routing VALUES ('P01', 1, 'M01', 40)")
+    conn.execute(
         "CREATE TABLE changeover_matrix (machine_id TEXT, from_product TEXT, to_product TEXT, setup_time_min REAL)"
     )
     conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0)")
@@ -279,6 +283,7 @@ def _mixed_product_setup_case(conn):
         frame.loc[frame.task_id == "FLEX", "product_id"] = "P02"
     conn.execute("UPDATE sku_production_plan SET planned_units = 50 WHERE product_id = 'P01'")
     conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P02', 25)")
+    conn.execute("INSERT INTO routing VALUES ('P02', 1, 'M01', 40)")
     conn.executemany(
         "INSERT INTO changeover_matrix VALUES (?, ?, ?, ?)",
         [
@@ -491,3 +496,30 @@ def test_independent_audit_rejects_units_without_matching_batches():
     finally:
         conn.close()
     assert "INVALID_LOT_QUANTITY" in {item["code"] for item in result["issues"]}
+
+
+def test_independent_audit_detects_source_routing_machine_and_duration_drift():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        for frame in (baseline, candidate):
+            frame.loc[frame.task_id == "OUTSIDE", ["end_min", "duration_min"]] = [950, 50]
+        conn.execute("UPDATE routing SET machine_id = 'M02'")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "ROUTING_MISMATCH" in codes
+    assert "ROUTE_DURATION_MISMATCH" in codes
+    assert "DURATION_CHANGED" not in codes
+
+
+def test_independent_audit_rejects_missing_lot_operation_in_source_route():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("INSERT INTO routing VALUES ('P01', 2, 'M01', 20)")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "INCOMPLETE_LOT_ROUTE" in {item["code"] for item in result["issues"]}
