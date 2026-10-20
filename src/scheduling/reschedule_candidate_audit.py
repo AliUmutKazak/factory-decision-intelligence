@@ -17,7 +17,7 @@ from src import config as cfg
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
 
-_SCOPE = "RESCHEDULE_FREEZE_FLEX_QUANTITY_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_QUANTITY_ROUTING_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -256,6 +256,73 @@ def _audit_production_units(
 
     if actual != planned:
         issue("PRODUCTION_PLAN_QUANTITY_MISMATCH", f"planned={planned}, scheduled={actual}")
+
+
+def _audit_route_source(conn: sqlite3.Connection, candidate: pd.DataFrame, issue: Any) -> None:
+    """Rebuild each lot's required operations, machine and duration from routing."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='routing'").fetchone() is None:
+        issue("MISSING_ROUTING", "routing")
+        return
+    try:
+        source_rows = conn.execute(
+            "SELECT product_id, operation_seq, machine_id, processing_time_min FROM routing"
+        ).fetchall()
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_ROUTING", str(exc))
+        return
+    routes: dict[str, dict[int, tuple[str, float]]] = {}
+    for product, raw_sequence, machine, raw_minutes in source_rows:
+        sequence = _number(raw_sequence)
+        minutes = _number(raw_minutes)
+        if (
+            product is None
+            or machine is None
+            or not str(product).strip()
+            or not str(machine).strip()
+            or sequence is None
+            or not sequence.is_integer()
+            or sequence < 0
+            or minutes is None
+            or minutes <= 0
+        ):
+            issue("INVALID_ROUTING_ROW", f"{product}: {raw_sequence}, {machine}, {raw_minutes}")
+            continue
+        product = str(product)
+        sequence = int(sequence)
+        if sequence in routes.get(product, {}):
+            issue("DUPLICATE_ROUTING_OPERATION", f"{product}: {sequence}")
+            continue
+        routes.setdefault(product, {})[sequence] = (str(machine), minutes)
+
+    for row in candidate.to_dict("records"):
+        task_id = str(row["task_id"])
+        product = str(row["product_id"])
+        sequence = _number(row["operation_seq"])
+        batches = _number(row["batch_count"])
+        duration = _number(row["duration_min"])
+        if sequence is None or not sequence.is_integer() or batches is None or duration is None:
+            continue  # Core and quantity audits report malformed task fields.
+        route = routes.get(product, {}).get(int(sequence))
+        if route is None:
+            issue("MISSING_ROUTE_OPERATION", f"{product}: {sequence:g} / {task_id}")
+            continue
+        expected_machine, minutes_per_batch = route
+        if str(row["machine_id"]) != expected_machine:
+            issue("ROUTING_MISMATCH", f"{task_id}: expected={expected_machine}, actual={row['machine_id']}")
+        expected_duration = round(batches * minutes_per_batch)
+        if abs(duration - expected_duration) > 1e-6:
+            issue("ROUTE_DURATION_MISMATCH", f"{task_id}: expected={expected_duration}, actual={duration:g}")
+
+    for lot, group in candidate.groupby("lot_id", sort=False):
+        product = str(group.iloc[0]["product_id"])
+        expected = set(routes.get(product, {}))
+        actual = {
+            int(sequence)
+            for raw_sequence in group["operation_seq"]
+            if (sequence := _number(raw_sequence)) is not None and sequence.is_integer()
+        }
+        if expected != actual:
+            issue("INCOMPLETE_LOT_ROUTE", f"{lot}: expected={sorted(expected)}, actual={sorted(actual)}")
 
 
 def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
@@ -547,6 +614,7 @@ def audit_reschedule_candidate(
 
     _audit_core_intervals(new, issue)
     _audit_production_units(conn, new, baseline_run_id, issue)
+    _audit_route_source(conn, new, issue)
     _audit_setup_transitions(conn, new, baseline_run_id, issue)
     _audit_supported_calendar_shape(conn, issue)
     _audit_calendar_occupancy(conn, new, baseline_run_id, issue)
