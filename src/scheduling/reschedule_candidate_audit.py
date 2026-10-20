@@ -17,7 +17,7 @@ from src import config as cfg
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
 
-_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_SETUP_CALENDAR_MAINTENANCE"
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -99,6 +99,90 @@ def _audit_supported_calendar_shape(conn: sqlite3.Connection, issue: Any) -> Non
             sunday_hours = _number(sunday_rows[0][3])
             if sunday_hours is None or abs(sunday_hours - signatures[0][3]) > 1e-9:
                 issue("SUNDAY_HOURS_AFFECT_DAILY_AVERAGE", machine)
+
+
+def _audit_calendar_occupancy(
+    conn: sqlite3.Connection, candidate: pd.DataFrame, baseline_run_id: str | None, issue: Any
+) -> None:
+    """Recount occupied minutes against the baseline's shift and W1 OT authority."""
+    if not baseline_run_id:
+        issue("MISSING_BASELINE_RUN_ID", "calendar and OT authorization require a baseline run")
+        return
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_capacity_plan'").fetchone() is None:
+        issue("MISSING_OT_PLAN", "machine_capacity_plan")
+        return
+    try:
+        hours_by_machine = {
+            str(machine): _number(hours)
+            for machine, hours in conn.execute("SELECT machine_id, max_daily_hours FROM machines")
+        }
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_calendar'").fetchone():
+            hours_by_machine.update(
+                (str(machine), _number(hours))
+                for machine, hours in conn.execute(
+                    "SELECT machine_id, AVG(available_hours) FROM machine_calendar "
+                    "WHERE is_available = 1 GROUP BY machine_id"
+                )
+            )
+        budget_rows = conn.execute(
+            "SELECT machine_id, overtime_hours FROM machine_capacity_plan WHERE run_id = ? AND period_week = 1",
+            (baseline_run_id,),
+        ).fetchall()
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_CALENDAR_OR_OT_SOURCE", str(exc))
+        return
+
+    budgets: dict[str, int] = {}
+    for machine, raw_hours in budget_rows:
+        machine = str(machine)
+        hours = _number(raw_hours)
+        if machine in budgets or hours is None or hours < 0:
+            issue("INVALID_OT_PLAN", f"{machine}: {raw_hours}")
+            continue
+        budgets[machine] = int(hours * 60)  # Same minute granularity as the operational authorization.
+
+    used_minutes: dict[str, float] = {}
+    used_days: dict[str, set[int]] = {}
+    for row in candidate.to_dict("records"):
+        machine = str(row["machine_id"])
+        task_id = str(row["task_id"])
+        hours = hours_by_machine.get(machine)
+        budget = budgets.get(machine)
+        if hours is None or not 0 < hours <= 24:
+            issue("MISSING_CALENDAR", machine)
+            continue
+        if budget is None:
+            issue("MISSING_OT_BUDGET", f"{machine}: run={baseline_run_id}")
+            continue
+        start, end = _number(row["setup_start_min"]), _number(row["end_min"])
+        if start is None or end is None or start < 0 or end <= start:
+            continue  # The core interval audit reports malformed occupancy.
+        night = int(round((24 - hours) * 60))
+        for day in range(math.floor(start / 1440), math.ceil(end / 1440)):
+            day_start = day * 1440
+            overlap = max(0.0, min(end, day_start + 1440) - max(start, day_start))
+            if not overlap:
+                continue
+            if day % 7 == 6:
+                issue("SUNDAY_CLOSED", f"{machine}: {task_id} day={day}")
+                continue
+            night_usage = max(0.0, min(end, day_start + night) - max(start, day_start))
+            if not night_usage:
+                continue
+            if day >= 7:
+                issue("WEEK2_OVERTIME", f"{machine}: {task_id} day={day}")
+            else:
+                used_minutes[machine] = used_minutes.get(machine, 0.0) + night_usage
+                used_days.setdefault(machine, set()).add(day)
+
+    for machine, used in used_minutes.items():
+        budget = budgets[machine]
+        if used > budget + 1e-6:
+            issue("OT_BUDGET_EXCEEDED", f"{machine}: used={used:g}, budget={budget}")
+        night = int(round((24 - hours_by_machine[machine]) * 60))
+        max_days = math.ceil(budget / night) if night else 0
+        if len(used_days[machine]) > max_days:
+            issue("OT_WINDOW_COUNT", f"{machine}: used={len(used_days[machine])}, allowed={max_days}")
 
 
 def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
@@ -382,6 +466,7 @@ def audit_reschedule_candidate(
     _audit_core_intervals(new, issue)
     _audit_setup_transitions(conn, new, baseline_run_id, issue)
     _audit_supported_calendar_shape(conn, issue)
+    _audit_calendar_occupancy(conn, new, baseline_run_id, issue)
     _audit_maintenance_intervals(conn, new, maintenance_overrides or (), issue)
     return {
         "status": "ACCEPTED" if not issues else "REJECTED",
