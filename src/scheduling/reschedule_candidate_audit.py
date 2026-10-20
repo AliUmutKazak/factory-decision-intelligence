@@ -1,7 +1,7 @@
 """Independent, fail-closed checks for reschedule commitments and core physics.
 
 This module intentionally does not import the solver or its constraint builder.
-It checks the published candidate against the baseline and raw calendar inputs.
+It checks the published candidate against the baseline and raw plan/calendar inputs.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from src import config as cfg
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
 
-_SCOPE = "RESCHEDULE_FREEZE_FLEX_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
+_SCOPE = "RESCHEDULE_FREEZE_FLEX_QUANTITY_CORE_INTERVALS_SETUP_CALENDAR_OT_MAINTENANCE"
 
 _REQUIRED = {
     "task_id",
@@ -25,6 +25,13 @@ _REQUIRED = {
     "product_id",
     "machine_id",
     "operation_seq",
+    "parent_lot_id",
+    "sub_lot_index",
+    "batch_count",
+    "batch_size_units",
+    "production_units",
+    "due_date_min",
+    "priority_weight",
     "start_min",
     "end_min",
     "duration_min",
@@ -186,6 +193,69 @@ def _audit_calendar_occupancy(
         max_days = math.ceil(budget / night) if night else 0
         if len(used_days[machine]) > max_days:
             issue("OT_WINDOW_COUNT", f"{machine}: used={len(used_days[machine])}, allowed={max_days}")
+
+
+def _audit_production_units(
+    conn: sqlite3.Connection, candidate: pd.DataFrame, baseline_run_id: str | None, issue: Any
+) -> None:
+    """Count physical units once per lot and reconcile with the source W1 plan."""
+    if not baseline_run_id:
+        return  # The calendar audit already rejects an unscoped baseline.
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sku_production_plan'").fetchone() is None:
+        issue("MISSING_SKU_PLAN", "sku_production_plan")
+        return
+    try:
+        plan_rows = conn.execute(
+            "SELECT product_id, planned_units FROM sku_production_plan WHERE run_id = ? AND period_week = 1",
+            (baseline_run_id,),
+        ).fetchall()
+    except sqlite3.DatabaseError as exc:
+        issue("INVALID_SKU_PLAN", str(exc))
+        return
+    planned: dict[str, int] = {}
+    for product, raw_units in plan_rows:
+        units = _number(raw_units)
+        if not str(product).strip() or units is None or not units.is_integer() or units < 0:
+            issue("INVALID_SKU_PLAN_ROW", f"{product}: {raw_units}")
+            continue
+        planned[str(product)] = planned.get(str(product), 0) + int(units)
+    if not planned:
+        issue("MISSING_SKU_PLAN", f"run={baseline_run_id}")
+        return
+
+    actual: dict[str, int] = {}
+    for lot, group in candidate.groupby("lot_id", sort=False):
+        rows = group.to_dict("records")
+        first = rows[0]
+        product = str(first["product_id"])
+        units = _number(first["production_units"])
+        batches = _number(first["batch_count"])
+        batch_size = _number(first["batch_size_units"])
+        if (
+            any(value is None or not value.is_integer() or value <= 0 for value in (units, batches, batch_size))
+            or units != batches * batch_size
+        ):
+            issue("INVALID_LOT_QUANTITY", str(lot))
+            continue
+        if any(
+            str(row["product_id"]) != product
+            or str(row["parent_lot_id"]) != str(first["parent_lot_id"])
+            or any(
+                _number(row[key]) != first_value
+                for key, first_value in (
+                    ("production_units", units),
+                    ("batch_count", batches),
+                    ("batch_size_units", batch_size),
+                )
+            )
+            for row in rows[1:]
+        ):
+            issue("LOT_QUANTITY_INCONSISTENT", str(lot))
+            continue
+        actual[product] = actual.get(product, 0) + int(units)
+
+    if actual != planned:
+        issue("PRODUCTION_PLAN_QUANTITY_MISMATCH", f"planned={planned}, scheduled={actual}")
 
 
 def _audit_core_intervals(candidate: pd.DataFrame, issue: Any) -> None:
@@ -366,7 +436,7 @@ def audit_reschedule_candidate(
     maintenance_overrides: Sequence[MaintenanceWindow] | None = None,
     baseline_run_id: str | None = None,
 ) -> dict[str, Any]:
-    """Check commitments, core intervals, setup transitions, calendar and outages."""
+    """Check commitments, quantities, intervals, setup, calendar and outages."""
     issues: list[dict[str, str]] = []
 
     def issue(code: str, detail: str) -> None:
@@ -422,11 +492,20 @@ def audit_reschedule_candidate(
             continue
         if str(current["machine_id"]) != str(old["machine_id"]):
             issue("ROUTING_CHANGED", task_id)
-        if any(str(current[column]) != str(old[column]) for column in ("lot_id", "product_id")) or any(
+        if any(str(current[column]) != str(old[column]) for column in ("lot_id", "product_id", "parent_lot_id")) or any(
             _number(current[column]) is None
             or _number(old[column]) is None
             or abs(_number(current[column]) - _number(old[column])) > 1e-6
-            for column in ("operation_seq", "release_time_min")
+            for column in (
+                "operation_seq",
+                "release_time_min",
+                "sub_lot_index",
+                "batch_count",
+                "batch_size_units",
+                "production_units",
+                "due_date_min",
+                "priority_weight",
+            )
         ):
             issue("TASK_INPUT_CHANGED", task_id)
         if abs((end - start) - (old_end - old_start)) > 1e-6:
@@ -467,6 +546,7 @@ def audit_reschedule_candidate(
                 issue("FLEXIBLE_STATE_MISSING", task_id)
 
     _audit_core_intervals(new, issue)
+    _audit_production_units(conn, new, baseline_run_id, issue)
     _audit_setup_transitions(conn, new, baseline_run_id, issue)
     _audit_supported_calendar_shape(conn, issue)
     _audit_calendar_occupancy(conn, new, baseline_run_id, issue)

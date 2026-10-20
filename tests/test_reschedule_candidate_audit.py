@@ -15,6 +15,10 @@ def _calendar_connection(variable_day=None):
     )
     conn.execute("INSERT INTO machine_capacity_plan VALUES ('BASE', 1, 'M01', 0)")
     conn.execute(
+        "CREATE TABLE sku_production_plan (run_id TEXT, period_week INTEGER, product_id TEXT, planned_units INTEGER)"
+    )
+    conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P01', 75)")
+    conn.execute(
         "CREATE TABLE changeover_matrix (machine_id TEXT, from_product TEXT, to_product TEXT, setup_time_min REAL)"
     )
     conn.execute("INSERT INTO changeover_matrix VALUES ('ALL', 'P01', 'P01', 0)")
@@ -93,6 +97,13 @@ def _schedules():
             },
         ]
     )
+    baseline["parent_lot_id"] = baseline["lot_id"]
+    baseline["sub_lot_index"] = 1
+    baseline["batch_count"] = 1
+    baseline["batch_size_units"] = 25
+    baseline["production_units"] = 25
+    baseline["due_date_min"] = 10080
+    baseline["priority_weight"] = 1
     candidate = baseline.copy()
     candidate.loc[candidate.task_id == "FROZEN", "schedule_state"] = "FROZEN"
     candidate.loc[candidate.task_id == "FROZEN", "freeze_until_min"] = 540
@@ -266,6 +277,8 @@ def _mixed_product_setup_case(conn):
     baseline, candidate = _schedules()
     for frame in (baseline, candidate):
         frame.loc[frame.task_id == "FLEX", "product_id"] = "P02"
+    conn.execute("UPDATE sku_production_plan SET planned_units = 50 WHERE product_id = 'P01'")
+    conn.execute("INSERT INTO sku_production_plan VALUES ('BASE', 1, 'P02', 25)")
     conn.executemany(
         "INSERT INTO changeover_matrix VALUES (?, ?, ?, ?)",
         [
@@ -424,3 +437,57 @@ def test_independent_audit_rejects_missing_baseline_or_ot_authorization():
         conn.close()
     assert "MISSING_BASELINE_RUN_ID" in {item["code"] for item in missing_run["issues"]}
     assert "MISSING_OT_BUDGET" in {item["code"] for item in missing_budget["issues"]}
+
+
+def test_independent_audit_rejects_candidate_quantity_and_order_input_change():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        candidate.loc[candidate.task_id == "OUTSIDE", ["batch_count", "production_units", "due_date_min"]] = [
+            2,
+            50,
+            10000,
+        ]
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "TASK_INPUT_CHANGED" in codes
+    assert "PRODUCTION_PLAN_QUANTITY_MISMATCH" in codes
+
+
+def test_independent_audit_detects_self_consistent_but_wrong_plan_quantity():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        for frame in (baseline, candidate):
+            frame.loc[frame.task_id == "OUTSIDE", ["batch_count", "production_units"]] = [2, 50]
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "PRODUCTION_PLAN_QUANTITY_MISMATCH" in codes
+    assert "TASK_INPUT_CHANGED" not in codes
+
+
+def test_independent_audit_rejects_missing_run_scoped_sku_plan():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        conn.execute("DELETE FROM sku_production_plan")
+        conn.execute("INSERT INTO sku_production_plan VALUES ('OTHER', 1, 'P01', 75)")
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "MISSING_SKU_PLAN" in {item["code"] for item in result["issues"]}
+
+
+def test_independent_audit_rejects_units_without_matching_batches():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        candidate.loc[candidate.task_id == "OUTSIDE", "production_units"] = 30
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "INVALID_LOT_QUANTITY" in {item["code"] for item in result["issues"]}
