@@ -272,15 +272,15 @@ Yeniden optimizasyonun sahada yaratacağı operasyonel kaosu sınırlamak için 
 5. **Yayınlama:** Çizelge SQLite'a işlenir ve FastAPI/Streamlit üzerinden dağıtılır.
 
 ### SOP-02: Makine Arızası Müdahale Prosedürü (Breakdown Response)
-1. **Arıza Girişi:** Arızalanan makine ID'si, arıza anı ($t_{breakdown}$) ve tahmini tamir süresi ($T_{repair}$) girilir.
-2. **Dondurma Uygulama:** $t_{breakdown} + H_{freeze}$ penceresindeki işler kilitlenir.
-3. **What-If Simülasyonu:** `/api/v1/schedule/what-if/breakdown` çağrılarak termin gecikmeleri simüle edilir.
-4. **Onay & Reschedule:** Kabul edilebilir senaryo seçilerek `/api/v1/schedule/reschedule` ile yeni çizelge yürürlüğe alınır.
+1. **Varsayımsal analiz:** Makine, duruş başlangıcı ve süresiyle `/api/v1/schedule/what-if/breakdown` çağrılır. Bu çağrı zamanı sıfırdan başlayan ayrı bir plan üretir; yürütülmüş işi veya dondurulmuş ufku temsil etmez.
+2. **Gerçek olay:** Saha olayı doğrulanırsa `/api/v1/schedule/reschedule` için olay zamanı ve dondurma ufku ayrıca verilir. Adayın fiziksel ve freeze kuralları bağımsız denetlenir. Laboratuvar API'si kabul edilen adayı doğrudan `ACTIVE` yayımlar; doğrulanmış planlamacı onayı ve saha actuals akışı henüz yoktur.
 
 ### SOP-03: Acil Sipariş Enjeksiyon Prosedürü (Hot-Order Injection)
 1. **Öncelik Tanımlama:** Acil sipariş yüksek öncelik bayrağı ve teslim tarihi ile sisteme verilir.
-2. **Çatışma Analizi:** `/api/v1/schedule/what-if/hot-order` çağrısı ile mevcut müşteri siparişlerinde oluşacak gecikmeler listelenir.
-3. **Kapasite Tahsisi:** Mümkünse mesai artışı, değilse düşük öncelikli işlerin ötelenmesiyle acil sipariş hatta enjekte edilir.
+2. **Plan etkisi:** `/api/v1/schedule/what-if/hot-order` ayrı bir aday çizelge ve planlanan KPI farklarını döndürür; mevcut müşteri teslimatının fiili sonucu veya otomatik kapasite tahsisi değildir.
+3. **Operasyonel karar:** Mesai, öncelik ve yayımlama kararı saha kuralları ile yetkili planlamacıya aittir.
+
+What-if fark raporunda makespan, hazırlık süresi ve lot başına öncelik ağırlıklı gecikme, çözücü özetinden bağımsız olarak baz ve aday çizelge satırlarından hesaplanır. Bunlar planlanan senaryo değerleridir; gerçekleşmiş teslimat veya tasarruf ölçüsü değildir.
 
 ---
 
