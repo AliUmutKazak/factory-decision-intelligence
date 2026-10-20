@@ -1433,7 +1433,7 @@ def run_cpsat_scheduling(
     persist_run_scoped_dataframe(conn, "production_schedule", sched_df, effective_run_id)
     persist_run_scoped_dataframe(conn, "schedule_solver_metadata", solver_meta_df, effective_run_id)
     conn.commit()
-    print("✓ production_schedule ve schedule_solver_metadata güncellendi.")
+    print("[OK] production_schedule ve schedule_solver_metadata güncellendi.")
 
     # Hiyerarşik Kapasite Mutabakatı (Tactical LP vs. Operational CP-SAT)
     print()
@@ -1464,7 +1464,7 @@ def run_cpsat_scheduling(
         audit_df = pd.DataFrame(audit_records)
         print(audit_df.to_string(index=False))
         print(
-            "✓ HPP Tasarım Prensibi: Agrega LP saf işlem süresini sınırlar; sıra bağımlı hazırlık yükü operasyonel seviyede eklenir."
+            "[OK] HPP Tasarım Prensibi: Agrega LP saf işlem süresini sınırlar; sıra bağımlı hazırlık yükü operasyonel seviyede eklenir."
         )
         print()
 
@@ -1480,7 +1480,7 @@ def run_cpsat_scheduling(
     print("\n--- SKU Plan ve Çizelge Mutabakatı (Audit) ---")
     print(merged_audit.to_string(index=False))
     if (merged_audit["diff"] == 0).all():
-        print("✓ MİKTAR MUTABAKATI: Tüm planlanan SKU adetleri çizelge ufkuna yerleştirildi.")
+        print("[OK] MİKTAR MUTABAKATI: Tüm planlanan SKU adetleri çizelge ufkuna yerleştirildi.")
         final_operations = (
             sched_df.sort_values("operation_seq").groupby(["parent_lot_id", "sub_lot_index"], sort=False).tail(1)
         )
@@ -1494,7 +1494,7 @@ def run_cpsat_scheduling(
         )
         print("  Bu değerler fiili üretim veya teslimat değildir.")
     else:
-        print("⚠ DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
+        print("[UYARI] DİKKAT: Plan ve çizelge adetleri arasında uyumsuzluk var!")
 
     # Fazla Mesai (OT) Bütçe Uyumu Denetimi (Source of Truth: Weekly Accounting)
     if weekly_accounting_rows:
@@ -1513,9 +1513,9 @@ def run_cpsat_scheduling(
     print(f"M01 İzin Verilen OT : {allowed_ot_min} dk ({allowed_ot_min / 60:.2f} saat)")
     print(f"M01 Fiili Net OT    : {actual_ot_min:.1f} dk ({actual_ot_min / 60:.2f} saat)")
     if actual_ot_min <= allowed_ot_min:
-        print("✓ BÜTÇE UYUMLU: Fiili fazla mesai LP tavan sınırını aşmadı.")
+        print("[OK] BÜTÇE UYUMLU: Fiili fazla mesai LP tavan sınırını aşmadı.")
     else:
-        print("⚠ BÜTÇE AŞIMI: Fiili fazla mesai LP sınırının üzerinde!")
+        print("[UYARI] BÜTÇE AŞIMI: Fiili fazla mesai LP sınırının üzerinde!")
 
     # Cross-Week Spillover (Hafta Aşımı) Analizi & Model B Mutabakatı
     WEEK_1_HORIZON_MIN = 7 * 24 * 60  # 10,080 dakika
@@ -1530,7 +1530,7 @@ def run_cpsat_scheduling(
     print(
         f"Hafta 2'ye Sarkan    : {tasks_spillover_count} görev | Taşma Süresi: {spillover_min} dk ({spillover_min / 60:.2f} saat)"
     )
-    print("✓ MODEL B PRENSİBİ: Taktik LP agrega yükü belirler; MRP gecikmesi & sıra bağımlı setup nedeniyle")
+    print("[OK] MODEL B PRENSİBİ: Taktik LP agrega yükü belirler; MRP gecikmesi & sıra bağımlı setup nedeniyle")
     print("                   operasyonel çizelge kesintisiz akışla (rolling horizon) Hafta 2'ye sarkar.")
 
     conn.close()
