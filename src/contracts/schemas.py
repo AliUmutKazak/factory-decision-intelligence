@@ -376,9 +376,13 @@ class ScenarioDeltaReport(BaseModel):
     baseline_makespan_min: float = Field(ge=0.0, description="Baz plan makespan (dakika)")
     scenario_makespan_min: float = Field(ge=0.0, description="Senaryo makespan (dakika)")
     makespan_delta_min: float = Field(description="Makespan farkı (dakika)")
-    baseline_total_tardiness_min: float = Field(ge=0.0, description="Baz plan gecikme (dakika)")
-    scenario_total_tardiness_min: float = Field(ge=0.0, description="Senaryo gecikme (dakika)")
-    tardiness_delta_min: float = Field(description="Toplam gecikme farkı (dakika)")
+    baseline_total_tardiness_min: float = Field(
+        ge=0.0, description="Baz plan öncelik ağırlıklı gecikme (ağırlıklı dakika)"
+    )
+    scenario_total_tardiness_min: float = Field(
+        ge=0.0, description="Senaryo öncelik ağırlıklı gecikme (ağırlıklı dakika)"
+    )
+    tardiness_delta_min: float = Field(description="Öncelik ağırlıklı gecikme farkı (ağırlıklı dakika)")
     baseline_total_setup_min: float = Field(ge=0.0, description="Baz plan hazırlık süresi (dakika)")
     scenario_total_setup_min: float = Field(ge=0.0, description="Senaryo hazırlık süresi (dakika)")
     setup_delta_min: float = Field(description="Hazırlık süresi farkı (dakika)")

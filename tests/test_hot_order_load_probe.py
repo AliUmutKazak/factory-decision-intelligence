@@ -1,11 +1,14 @@
 """G7 replay must distinguish baseline failure from hot-order failure."""
 
 import hashlib
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from src.contracts.schemas import ScheduleSolverMetadata, SolverStatus
+from src.contracts.schemas import ScenarioDeltaReport, ScenarioType, ScheduleSolverMetadata, SolverStatus
 from src.scheduling import hot_order_load_probe
 
 REFERENCE_DB = Path(__file__).resolve().parents[1] / "artifacts/reference/factory.db"
@@ -103,3 +106,59 @@ def test_probe_rejects_solver_result_when_independent_audit_fails(monkeypatch):
     assert report["attempts"][0]["scenario_status"] == "REJECTED_BY_AUDIT"
     assert report["summary"]["scenario_accepted_count"] == 0
     assert report["summary"]["audit_failure_count"] == 1
+
+
+def test_probe_uses_recomputed_kpis_not_solver_metadata(monkeypatch):
+    source_hash = hashlib.sha256(REFERENCE_DB.read_bytes()).hexdigest()
+
+    class FakeEngine:
+        def __init__(self, disk_db_path):
+            self.disk_db_path = disk_db_path
+            self.baseline_metadata = None
+
+        def simulate_hot_order(self, *args, **kwargs):
+            metadata = ScheduleSolverMetadata(
+                run_id="SYNTHETIC",
+                status=SolverStatus.FEASIBLE,
+                proven_optimal=False,
+                wall_time_seconds=0.1,
+                objective_value=1,
+                makespan_min=999,
+                total_tardiness_min=999,
+                total_setup_min=999,
+            )
+            delta = ScenarioDeltaReport(
+                scenario_name="SYNTHETIC",
+                scenario_type=ScenarioType.HOT_ORDER,
+                baseline_makespan_min=1,
+                scenario_makespan_min=10,
+                makespan_delta_min=9,
+                baseline_total_tardiness_min=2,
+                scenario_total_tardiness_min=20,
+                tardiness_delta_min=18,
+                baseline_total_setup_min=3,
+                scenario_total_setup_min=30,
+                setup_delta_min=27,
+                impacted_tasks_count=31,
+            )
+            with closing(sqlite3.connect(self.disk_db_path)) as conn:
+                schedule = pd.read_sql_query("SELECT * FROM production_schedule", conn)
+            return metadata, metadata, delta, schedule
+
+    monkeypatch.setattr(hot_order_load_probe, "_MeasuredWhatIfEngine", FakeEngine)
+    monkeypatch.setattr(
+        hot_order_load_probe,
+        "audit_hot_order_schedule",
+        lambda *args: {"status": "ACCEPTED", "scope": "TEST", "issues": [], "task_count": 31},
+    )
+    report = hot_order_load_probe.probe_hot_order_replay(
+        REFERENCE_DB,
+        "RUN-20261006-00a0d3",
+        expected_sha256=source_hash,
+        repeats=1,
+    )
+    attempt = report["attempts"][0]
+    assert attempt["scenario_status"] == "FEASIBLE"
+    assert attempt["scenario_makespan_min"] == 10
+    assert attempt["scenario_total_tardiness_min"] == 20
+    assert attempt["scenario_total_setup_min"] == 30

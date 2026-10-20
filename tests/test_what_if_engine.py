@@ -6,6 +6,7 @@ import warnings
 from contextlib import closing
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from src.contracts.schemas import (
@@ -16,10 +17,60 @@ from src.contracts.schemas import (
     ScheduleSolverMetadata,
     SolverStatus,
 )
-from src.scheduling.what_if import WhatIfEngine
+from src.scheduling.what_if import WhatIfEngine, _schedule_kpis
 from src.utils.run_bundle import sha256_file
 
 REFERENCE_DB = Path(__file__).resolve().parents[1] / "artifacts" / "reference" / "factory.db"
+
+
+def test_what_if_kpis_count_tardiness_once_per_lot_and_all_setups():
+    rows = pd.DataFrame(
+        [
+            {"lot_id": "A", "end_min": 8, "due_date_min": 12, "priority_weight": 3, "setup_before_min": 2},
+            {"lot_id": "A", "end_min": 15, "due_date_min": 12, "priority_weight": 3, "setup_before_min": 4},
+            {"lot_id": "B", "end_min": 20, "due_date_min": 17, "priority_weight": 2, "setup_before_min": 5},
+        ]
+    )
+    kpis = _schedule_kpis(rows)
+    assert kpis.makespan_min == 20
+    assert kpis.weighted_tardiness_min == 15  # A: 3*3, B: 3*2; no double count for A.
+    assert kpis.total_setup_min == 11
+
+
+@pytest.mark.parametrize(
+    "column,value", [("due_date_min", None), ("priority_weight", float("inf")), ("setup_before_min", -1)]
+)
+def test_what_if_kpis_reject_incomplete_or_invalid_rows(column, value):
+    row = {"lot_id": "A", "end_min": 15, "due_date_min": 12, "priority_weight": 3, "setup_before_min": 2}
+    row[column] = value
+    rows = pd.DataFrame([row])
+    with pytest.raises(RuntimeError, match="invalid"):
+        _schedule_kpis(rows)
+
+
+def test_what_if_kpis_reject_conflicting_lot_commitment():
+    rows = pd.DataFrame(
+        [
+            {"lot_id": "A", "end_min": 8, "due_date_min": 12, "priority_weight": 3, "setup_before_min": 2},
+            {"lot_id": "A", "end_min": 15, "due_date_min": 13, "priority_weight": 3, "setup_before_min": 4},
+        ]
+    )
+    with pytest.raises(RuntimeError, match="conflicting"):
+        _schedule_kpis(rows)
+
+
+def test_what_if_delta_uses_schedule_rows_for_both_plans():
+    baseline = pd.DataFrame(
+        [{"lot_id": "A", "end_min": 20, "due_date_min": 12, "priority_weight": 2, "setup_before_min": 5}]
+    )
+    scenario = pd.DataFrame(
+        [{"lot_id": "A", "end_min": 15, "due_date_min": 12, "priority_weight": 2, "setup_before_min": 3}]
+    )
+    report = WhatIfEngine()._calculate_delta("DUMMY", ScenarioType.MACHINE_BREAKDOWN, baseline, scenario)
+    assert report.makespan_delta_min == -5
+    assert report.tardiness_delta_min == -10
+    assert report.setup_delta_min == -2
+    assert report.impacted_tasks_count == 1
 
 
 @pytest.fixture
@@ -68,6 +119,8 @@ def test_machine_breakdown_scenario_simulation(reference_active_db):
     assert delta_report.baseline_makespan_min >= 0
     assert delta_report.makespan_delta_min == delta_report.scenario_makespan_min - delta_report.baseline_makespan_min
     assert delta_report.impacted_tasks_count == len(sched_df)
+    assert delta_report.scenario_makespan_min == sched_df["end_min"].max()
+    assert delta_report.scenario_total_setup_min == sched_df["setup_before_min"].sum()
 
 
 def test_breakdown_rejects_independent_audit_failure_after_solver_success(reference_active_db, monkeypatch):
@@ -132,6 +185,8 @@ def test_hot_order_injection_scenario_simulation(reference_active_db, monkeypatc
 
     # Acil sipariş sonrasında çizelgelenen iş sayısı baz plana eşit veya daha fazla olmalıdır
     assert delta_report.makespan_delta_min == delta_report.scenario_makespan_min - delta_report.baseline_makespan_min
+    assert delta_report.scenario_makespan_min == sched_df["end_min"].max()
+    assert delta_report.scenario_total_setup_min == sched_df["setup_before_min"].sum()
 
 
 def test_hot_order_timeout_keeps_source_active_run_unchanged(reference_active_db, monkeypatch):

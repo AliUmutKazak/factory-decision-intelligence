@@ -3,6 +3,7 @@
 import math
 import sqlite3
 from pathlib import Path
+from typing import NamedTuple
 
 import pandas as pd
 
@@ -51,6 +52,33 @@ class NoCloseConnectionWrapper:
 
     def __getattr__(self, name):
         return getattr(self._target, name)
+
+
+class _ScheduleKpis(NamedTuple):
+    makespan_min: float
+    weighted_tardiness_min: float
+    total_setup_min: float
+
+
+def _schedule_kpis(schedule: pd.DataFrame) -> _ScheduleKpis:
+    """Recompute planned outcomes from operation rows, one tardiness term per lot."""
+    required = {"lot_id", "end_min", "due_date_min", "priority_weight", "setup_before_min"}
+    if schedule.empty or not required.issubset(schedule.columns) or schedule["lot_id"].isna().any():
+        raise RuntimeError("What-if KPI source has no complete lot schedule")
+    numeric = schedule[["end_min", "due_date_min", "priority_weight", "setup_before_min"]].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    if not numeric.map(lambda value: math.isfinite(value) and value >= 0).all().all():
+        raise RuntimeError("What-if KPI source contains invalid time, due date, priority or setup")
+    rows = numeric.assign(lot_id=schedule["lot_id"].to_numpy())
+    grouped = rows.groupby("lot_id", dropna=False)
+    if (grouped["due_date_min"].nunique() != 1).any() or (grouped["priority_weight"].nunique() != 1).any():
+        raise RuntimeError("What-if KPI source has conflicting lot due dates or priorities")
+    lots = grouped.agg(
+        completion=("end_min", "max"), due=("due_date_min", "first"), weight=("priority_weight", "first")
+    )
+    tardiness = (lots["completion"] - lots["due"]).clip(lower=0).mul(lots["weight"]).sum()
+    return _ScheduleKpis(float(rows["end_min"].max()), float(tardiness), float(rows["setup_before_min"].sum()))
 
 
 class WhatIfEngine:
@@ -188,9 +216,8 @@ class WhatIfEngine:
             report = self._calculate_delta(
                 scenario_name=scenario_name,
                 scenario_type=ScenarioType.MACHINE_BREAKDOWN,
-                baseline_meta=baseline_meta,
-                scenario_meta=scenario_meta,
-                impacted_tasks=len(scenario_sched),
+                baseline_schedule=baseline_sched,
+                scenario_schedule=scenario_sched,
             )
             return baseline_meta, scenario_meta, report, scenario_sched
         finally:
@@ -301,12 +328,16 @@ class WhatIfEngine:
                 raise RuntimeError(f"Independent hot-order candidate audit rejected the scenario: {codes}")
 
             # 4. KPI Delta Hesaplama
+            baseline_sched = reference_schedule
+            if baseline_sched is None:
+                baseline_sched = pd.read_sql(
+                    "SELECT * FROM production_schedule WHERE run_id = ?", mem_conn, params=(source_run_id,)
+                )
             report = self._calculate_delta(
                 scenario_name=scenario_name,
                 scenario_type=ScenarioType.HOT_ORDER,
-                baseline_meta=baseline_meta,
-                scenario_meta=scenario_meta,
-                impacted_tasks=len(scenario_sched),
+                baseline_schedule=baseline_sched,
+                scenario_schedule=scenario_sched,
             )
             return baseline_meta, scenario_meta, report, scenario_sched
         finally:
@@ -316,30 +347,23 @@ class WhatIfEngine:
         self,
         scenario_name: str,
         scenario_type: ScenarioType,
-        baseline_meta: ScheduleSolverMetadata,
-        scenario_meta: ScheduleSolverMetadata,
-        impacted_tasks: int,
+        baseline_schedule: pd.DataFrame,
+        scenario_schedule: pd.DataFrame,
     ) -> ScenarioDeltaReport:
-        b_makespan = float(baseline_meta.makespan_min or 0.0)
-        s_makespan = float(scenario_meta.makespan_min or 0.0)
-
-        b_tardiness = float(baseline_meta.total_tardiness_min or 0.0)
-        s_tardiness = float(scenario_meta.total_tardiness_min or 0.0)
-
-        b_setup = float(baseline_meta.total_setup_min or 0.0)
-        s_setup = float(scenario_meta.total_setup_min or 0.0)
+        baseline = _schedule_kpis(baseline_schedule)
+        scenario = _schedule_kpis(scenario_schedule)
 
         return ScenarioDeltaReport(
             scenario_name=scenario_name,
             scenario_type=scenario_type,
-            baseline_makespan_min=b_makespan,
-            scenario_makespan_min=s_makespan,
-            makespan_delta_min=s_makespan - b_makespan,
-            baseline_total_tardiness_min=b_tardiness,
-            scenario_total_tardiness_min=s_tardiness,
-            tardiness_delta_min=s_tardiness - b_tardiness,
-            baseline_total_setup_min=b_setup,
-            scenario_total_setup_min=s_setup,
-            setup_delta_min=s_setup - b_setup,
-            impacted_tasks_count=impacted_tasks,
+            baseline_makespan_min=baseline.makespan_min,
+            scenario_makespan_min=scenario.makespan_min,
+            makespan_delta_min=scenario.makespan_min - baseline.makespan_min,
+            baseline_total_tardiness_min=baseline.weighted_tardiness_min,
+            scenario_total_tardiness_min=scenario.weighted_tardiness_min,
+            tardiness_delta_min=scenario.weighted_tardiness_min - baseline.weighted_tardiness_min,
+            baseline_total_setup_min=baseline.total_setup_min,
+            scenario_total_setup_min=scenario.total_setup_min,
+            setup_delta_min=scenario.total_setup_min - baseline.total_setup_min,
+            impacted_tasks_count=len(scenario_schedule),
         )

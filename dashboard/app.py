@@ -1043,9 +1043,9 @@ with tab_mes:
                         delta_color="inverse",
                     )
                     k2.metric(
-                        "Gecikme (Tardiness)",
-                        f"{report.scenario_total_tardiness_min:,.0f} dk",
-                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        "Öncelik Ağırlıklı Gecikme",
+                        f"{report.scenario_total_tardiness_min:,.0f} ağırlıklı dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} ağırlıklı dk",
                         delta_color="inverse",
                     )
                     k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
@@ -1097,9 +1097,9 @@ with tab_mes:
                         delta_color="inverse",
                     )
                     k2.metric(
-                        "Gecikme (Tardiness)",
-                        f"{report.scenario_total_tardiness_min:,.0f} dk",
-                        delta=f"{report.tardiness_delta_min:+,.0f} dk",
+                        "Öncelik Ağırlıklı Gecikme",
+                        f"{report.scenario_total_tardiness_min:,.0f} ağırlıklı dk",
+                        delta=f"{report.tardiness_delta_min:+,.0f} ağırlıklı dk",
                         delta_color="inverse",
                     )
                     k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
