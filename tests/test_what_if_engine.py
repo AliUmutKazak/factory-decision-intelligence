@@ -70,6 +70,28 @@ def test_machine_breakdown_scenario_simulation(reference_active_db):
     assert delta_report.impacted_tasks_count == len(sched_df)
 
 
+def test_breakdown_rejects_independent_audit_failure_after_solver_success(reference_active_db, monkeypatch):
+    before = sha256_file(reference_active_db)
+    observed = []
+
+    def reject_candidate(conn, baseline, candidate, trigger, **kwargs):
+        observed.append((len(baseline), len(candidate), trigger.current_time_min, kwargs["baseline_run_id"]))
+        return {"status": "REJECTED", "issues": [{"code": "INJECTED_AUDIT_FAILURE"}]}
+
+    monkeypatch.setattr("src.scheduling.what_if.audit_reschedule_candidate", reject_candidate)
+    engine = WhatIfEngine(disk_db_path=str(reference_active_db))
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=UserWarning, module="pandas")
+        with pytest.raises(RuntimeError, match="INJECTED_AUDIT_FAILURE"):
+            engine.simulate_breakdown(
+                MachineBreakdownEvent(machine_id="M01", start_min=600, duration_min=240),
+                scenario_name="SCENARIO_BREAKDOWN_AUDIT_REJECT",
+            )
+    assert len(observed) == 1
+    assert observed[0] == (31, 31, 0, "BASE")
+    assert sha256_file(reference_active_db) == before
+
+
 def test_hot_order_injection_scenario_simulation(reference_active_db, monkeypatch):
     """Verify that injecting a rush hot order triggers schedule expansion
 

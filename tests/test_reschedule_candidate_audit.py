@@ -147,6 +147,34 @@ def test_independent_audit_accepts_frozen_and_bounded_flexible_tasks():
     assert result["task_count"] == 3
 
 
+def test_hypothetical_time_zero_does_not_freeze_an_unstarted_task():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        baseline.loc[baseline.task_id == "FROZEN", ["start_min", "end_min", "setup_start_min", "setup_end_min"]] = [
+            0,
+            40,
+            0,
+            0,
+        ]
+        candidate.loc[candidate.task_id == "FROZEN", "schedule_state"] = "FREE"
+        trigger = RescheduleTriggerEvent(
+            event_id="HYPOTHETICAL-0",
+            current_time_min=0,
+            freeze_horizon_min=0,
+            flexible_horizon_min=0,
+            max_flexible_shift_min=0,
+        )
+        operational = audit_reschedule_candidate(conn, baseline, candidate, trigger)
+        hypothetical = audit_reschedule_candidate(
+            conn, baseline, candidate, trigger, enforce_started_at_current_time=False
+        )
+    finally:
+        conn.close()
+    assert "FROZEN_POSITION_CHANGED" in {item["code"] for item in operational["issues"]}
+    assert hypothetical["status"] == "ACCEPTED", hypothetical["issues"]
+
+
 def test_independent_audit_rejects_frozen_position_and_flexible_window_changes():
     conn = _calendar_connection()
     try:

@@ -567,6 +567,7 @@ def audit_reschedule_candidate(
     completed_tasks: set[Any] | None = None,
     maintenance_overrides: Sequence[MaintenanceWindow] | None = None,
     baseline_run_id: str | None = None,
+    enforce_started_at_current_time: bool = True,
 ) -> dict[str, Any]:
     """Check commitments, quantities, intervals, setup, calendar and outages."""
     issues: list[dict[str, str]] = []
@@ -647,7 +648,7 @@ def audit_reschedule_candidate(
         old_schedule_state = str(old.get("schedule_state", "FREE"))
         is_frozen = (
             old_start < cutoff
-            or old_start <= trigger.current_time_min
+            or (enforce_started_at_current_time and old_start <= trigger.current_time_min)
             or task_id in committed
             or old_state in {"IN_PROGRESS", "COMPLETED"}
             or old_schedule_state == "FROZEN"
