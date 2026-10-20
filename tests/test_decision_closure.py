@@ -10,6 +10,7 @@ from src.scheduling.dispatch import local_repair_candidate
 from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
+from src.scheduling.schedule_metrics import schedule_kpis
 from src.scheduling.what_if import NoCloseConnectionWrapper
 from src.utils.db import clone_run_inputs, get_active_run_id
 
@@ -78,12 +79,36 @@ def test_money_rates_change_chosen_sequence_and_match_independent_tmc():
                 time_limit_seconds=3,
             )
             schedule = pd.read_sql("SELECT * FROM production_schedule WHERE run_id='TINY' ORDER BY start_min", conn)
+            row_kpis = schedule_kpis(schedule)
+            assert meta.makespan_min == row_kpis.makespan_min
+            assert meta.total_setup_min == row_kpis.total_setup_min
+            assert meta.total_tardiness_min == row_kpis.weighted_tardiness_min
             choices.append(schedule.iloc[0].task_id)
             cost = evaluate_schedule_cost(conn, schedule, "TINY", rates)
             assert meta.objective_units == "EUR"
             assert meta.objective_value == pytest.approx(cost["total_manufacturing_cost"], abs=0.011)
             assert load_model_context(conn, "TINY")["earliest_start_min"] == 0
         assert choices == ["A", "B"]
+    finally:
+        conn.close()
+
+
+def test_throughput_policy_reports_kpis_from_emitted_schedule():
+    conn, tasks = private_case()
+    try:
+        meta = run_cpsat_scheduling(
+            run_id="TINY",
+            connection=NoCloseConnectionWrapper(conn),
+            persist_outputs=False,
+            task_override=tasks,
+            policy="THROUGHPUT_MAX",
+            time_limit_seconds=3,
+        )
+        schedule = pd.read_sql("SELECT * FROM production_schedule WHERE run_id='TINY'", conn)
+        row_kpis = schedule_kpis(schedule)
+        assert meta.makespan_min == row_kpis.makespan_min
+        assert meta.total_setup_min == row_kpis.total_setup_min
+        assert meta.total_tardiness_min == row_kpis.weighted_tardiness_min
     finally:
         conn.close()
 
