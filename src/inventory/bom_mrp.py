@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 
 import numpy as np
@@ -165,10 +166,13 @@ def run_mrp_engine(run_id=None, db_path=None, processed_dir=None):
 
     mrp_df.to_csv(output_mrp_path, index=False)
 
-    conn = get_db_connection(active_db_path)
-    persist_run_scoped_dataframe(conn, "mrp_plan", mrp_df, str(run_id))
-    conn.commit()
-    conn.close()
+    with closing(get_db_connection(active_db_path)) as conn, conn:
+        # Older sealed reference databases predate this provenance column.
+        # Historic rows remain NULL because their method is not known.
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(mrp_plan)")}
+        if columns and "safety_stock_method" not in columns:
+            conn.execute("ALTER TABLE mrp_plan ADD COLUMN safety_stock_method TEXT")
+        persist_run_scoped_dataframe(conn, "mrp_plan", mrp_df, str(run_id))
 
     print(f"[OK] Zaman Fazlı MRP Planı Kaydedildi: {output_mrp_path}")
     print("[OK] SQLite 'mrp_plan' tablosu güncellendi.")
