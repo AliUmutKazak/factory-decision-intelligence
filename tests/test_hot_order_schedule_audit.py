@@ -36,6 +36,18 @@ def test_independent_hot_order_audit_detects_quantity_route_and_machine_corrupti
         assert accepted["material_release_by_product_min"]["P01"] == 480
         assert accepted["material_release_by_product_min"]["P03"] == 960
 
+        with closing(sqlite3.connect(":memory:")) as unsupported_calendar:
+            conn.backup(unsupported_calendar)
+            unsupported_calendar.execute(
+                "UPDATE machine_calendar SET available_hours=15, start_minute=540 "
+                "WHERE machine_id='M01' AND day_of_week=2"
+            )
+            codes = {
+                item["code"]
+                for item in audit_hot_order_schedule(unsupported_calendar, active_run_id, order, schedule)["issues"]
+            }
+            assert "VARIABLE_DAILY_CALENDAR" in codes
+
         # Pick a transition that actually occurs, then put an unrelated rule
         # before its global fallback so this would fail under the old mapping.
         groups = schedule.sort_values(["machine_id", "start_min"]).groupby("machine_id")
