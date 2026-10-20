@@ -10,6 +10,7 @@ from src.config import PRODUCTION_BATCH_SIZE, get_runtime_paths
 from src.contracts.schemas import (
     HotOrderInjection,
     MachineBreakdownEvent,
+    RescheduleTriggerEvent,
     ScenarioDeltaReport,
     ScenarioType,
     ScheduleSolverMetadata,
@@ -18,6 +19,7 @@ from src.contracts.schemas import (
 from src.scheduling.hot_order_schedule_audit import audit_hot_order_schedule
 from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
+from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
 from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 from src.utils.db import clone_run_inputs, get_active_run_id
 from src.utils.solver_slot import admitted_solver_call
@@ -130,24 +132,26 @@ class WhatIfEngine:
         try:
             # 1. Baz Senaryoyu Koştur
             baseline_meta = self.run_baseline(mem_conn, run_id="BASE")
+            baseline_sched = pd.read_sql(
+                "SELECT * FROM production_schedule WHERE run_id = ?", mem_conn, params=("BASE",)
+            )
 
             # 2. Makine Takviminde Duruş Simülasyonu
             clone_run_inputs(mem_conn, "BASE", scenario_name)
             # 3. Senaryo Çözümü
             wrapped_conn = NoCloseConnectionWrapper(mem_conn)
+            breakdown_window = MaintenanceWindow(
+                breakdown.machine_id,
+                breakdown.start_min,
+                breakdown.start_min + breakdown.duration_min,
+                "BREAKDOWN",
+                breakdown.description,
+            )
             scenario_meta = run_cpsat_scheduling(
                 run_id=scenario_name,
                 persist_outputs=False,
                 connection=wrapped_conn,
-                maintenance_overrides=[
-                    MaintenanceWindow(
-                        breakdown.machine_id,
-                        breakdown.start_min,
-                        breakdown.start_min + breakdown.duration_min,
-                        "BREAKDOWN",
-                        breakdown.description,
-                    )
-                ],
+                maintenance_overrides=[breakdown_window],
             )
 
             scenario_sched = pd.read_sql(
@@ -155,6 +159,30 @@ class WhatIfEngine:
                 mem_conn,
                 params=(scenario_name,),
             )
+
+            # This is a hypothetical plan from time zero, not an executed MES
+            # event: no frozen or flexible commitments are claimed here.
+            candidate_audit = audit_reschedule_candidate(
+                mem_conn,
+                baseline_sched,
+                scenario_sched,
+                RescheduleTriggerEvent(
+                    event_id=f"WHATIF-{scenario_name}",
+                    current_time_min=0,
+                    freeze_horizon_min=0,
+                    flexible_horizon_min=0,
+                    max_flexible_shift_min=0,
+                    delay_machine_id=breakdown.machine_id,
+                    delay_duration_min=breakdown.duration_min,
+                    reason=breakdown.description,
+                ),
+                maintenance_overrides=[breakdown_window],
+                baseline_run_id="BASE",
+                enforce_started_at_current_time=False,
+            )
+            if candidate_audit["status"] != "ACCEPTED":
+                codes = ", ".join(sorted({item["code"] for item in candidate_audit["issues"]}))
+                raise RuntimeError(f"Independent breakdown candidate audit rejected the scenario: {codes}")
 
             # 4. KPI Delta Hesaplama
             report = self._calculate_delta(
