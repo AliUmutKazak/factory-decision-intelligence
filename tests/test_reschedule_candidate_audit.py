@@ -4,12 +4,16 @@ import pandas as pd
 
 from src.contracts.schemas import RescheduleTriggerEvent
 from src.scheduling.maintenance import MaintenanceWindow
-from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate
+from src.scheduling.reschedule_candidate_audit import audit_reschedule_candidate as _raw_audit
 
 
 def _calendar_connection(variable_day=None):
     conn = sqlite3.connect(":memory:")
-    conn.execute("CREATE TABLE machines (machine_id TEXT PRIMARY KEY)")
+    conn.execute("CREATE TABLE machines (machine_id TEXT PRIMARY KEY, max_daily_hours REAL)")
+    conn.execute(
+        "CREATE TABLE machine_capacity_plan (run_id TEXT, period_week INTEGER, machine_id TEXT, overtime_hours REAL)"
+    )
+    conn.execute("INSERT INTO machine_capacity_plan VALUES ('BASE', 1, 'M01', 0)")
     conn.execute(
         "CREATE TABLE changeover_matrix (machine_id TEXT, from_product TEXT, to_product TEXT, setup_time_min REAL)"
     )
@@ -18,7 +22,7 @@ def _calendar_connection(variable_day=None):
         "CREATE TABLE machine_calendar (machine_id TEXT, day_of_week INTEGER, shift_id TEXT, "
         "start_minute INTEGER, end_minute INTEGER, available_hours REAL, exception_type TEXT, is_available INTEGER)"
     )
-    conn.execute("INSERT INTO machines VALUES ('M01')")
+    conn.execute("INSERT INTO machines VALUES ('M01', 16)")
     for day in range(7):
         changed = day == variable_day
         conn.execute(
@@ -26,6 +30,11 @@ def _calendar_connection(variable_day=None):
             (day, 1380 if changed else 1440, 15 if changed else 16, "EXCEPTION" if changed else "REGULAR"),
         )
     return conn
+
+
+def audit_reschedule_candidate(conn, baseline, candidate, trigger, **kwargs):
+    kwargs.setdefault("baseline_run_id", "BASE")
+    return _raw_audit(conn, baseline, candidate, trigger, **kwargs)
 
 
 def _schedules():
@@ -325,3 +334,93 @@ def test_independent_audit_does_not_treat_another_machine_rule_as_global():
     finally:
         conn.close()
     assert result["status"] == "ACCEPTED", result["issues"]
+
+
+def _move_outside_to_day(baseline, candidate, day, minute, duration=40, task_id="OUTSIDE"):
+    for frame in (baseline, candidate):
+        mask = frame.task_id == task_id
+        start = day * 1440 + minute
+        frame.loc[mask, ["start_min", "end_min", "duration_min", "setup_start_min", "setup_end_min"]] = [
+            start,
+            start + duration,
+            duration,
+            start,
+            start,
+        ]
+
+
+def test_independent_audit_rejects_sunday_and_second_week_night():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        _move_outside_to_day(baseline, candidate, 6, 600)
+        sunday = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+        _move_outside_to_day(baseline, candidate, 7, 100)
+        week_two = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "SUNDAY_CLOSED" in {item["code"] for item in sunday["issues"]}
+    assert "WEEK2_OVERTIME" in {item["code"] for item in week_two["issues"]}
+
+
+def test_independent_audit_recounts_week_one_setup_and_work_against_budget():
+    conn = _calendar_connection()
+    try:
+        conn.execute("UPDATE machine_capacity_plan SET overtime_hours = 0.5")
+        baseline, candidate = _schedules()
+        _move_outside_to_day(baseline, candidate, 1, 0)
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "OT_BUDGET_EXCEEDED" in {item["code"] for item in result["issues"]}
+
+
+def test_independent_audit_counts_setup_before_regular_shift_as_overtime():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _mixed_product_setup_case(conn)
+        _move_outside_to_day(baseline, candidate, 1, 480)
+        mask = candidate.task_id == "OUTSIDE"
+        candidate.loc[mask, "setup_before_min"] = 7
+        candidate.loc[mask, "setup_start_min"] = 1440 + 473
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger(), baseline_run_id="BASE")
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "OT_BUDGET_EXCEEDED" in codes
+    assert "SETUP_TRANSITION_MISMATCH" not in codes
+
+
+def test_independent_audit_enforces_count_of_open_ot_nights():
+    conn = _calendar_connection()
+    try:
+        conn.execute("UPDATE machine_capacity_plan SET overtime_hours = 0.5")
+        baseline, candidate = _schedules()
+        _move_outside_to_day(baseline, candidate, 1, 10, duration=10)
+        extra_base = baseline.loc[baseline.task_id == "OUTSIDE"].copy()
+        extra_candidate = candidate.loc[candidate.task_id == "OUTSIDE"].copy()
+        extra_base.loc[:, ["task_id", "lot_id"]] = ["EXTRA", "LOT-EXTRA"]
+        extra_candidate.loc[:, ["task_id", "lot_id"]] = ["EXTRA", "LOT-EXTRA"]
+        _move_outside_to_day(extra_base, extra_candidate, 2, 10, duration=10, task_id="EXTRA")
+        baseline = pd.concat([baseline, extra_base], ignore_index=True)
+        candidate = pd.concat([candidate, extra_candidate], ignore_index=True)
+        result = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    codes = {item["code"] for item in result["issues"]}
+    assert "OT_WINDOW_COUNT" in codes
+    assert "OT_BUDGET_EXCEEDED" not in codes
+
+
+def test_independent_audit_rejects_missing_baseline_or_ot_authorization():
+    conn = _calendar_connection()
+    try:
+        baseline, candidate = _schedules()
+        missing_run = _raw_audit(conn, baseline, candidate, _trigger())
+        conn.execute("DELETE FROM machine_capacity_plan")
+        conn.execute("INSERT INTO machine_capacity_plan VALUES ('OTHER', 1, 'M01', 48)")
+        missing_budget = audit_reschedule_candidate(conn, baseline, candidate, _trigger())
+    finally:
+        conn.close()
+    assert "MISSING_BASELINE_RUN_ID" in {item["code"] for item in missing_run["issues"]}
+    assert "MISSING_OT_BUDGET" in {item["code"] for item in missing_budget["issues"]}
