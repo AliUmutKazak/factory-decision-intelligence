@@ -154,6 +154,7 @@ def probe_hot_order_replay(
         engine = _MeasuredWhatIfEngine(str(staged))
         baseline_meta: ScheduleSolverMetadata | None = None
         scenario_meta: ScheduleSolverMetadata | None = None
+        delta_report = None
         independent_audit: dict[str, Any] | None = None
         stability: dict[str, int] | None = None
         failure: Exception | None = None
@@ -168,7 +169,7 @@ def probe_hot_order_replay(
                     scenario_kwargs["experimental_scenario_seed"] = scenario_seed
                 if scenario_workers is not None:
                     scenario_kwargs["experimental_scenario_workers"] = scenario_workers
-                baseline_meta, scenario_meta, _, scenario_schedule = engine.simulate_hot_order(
+                baseline_meta, scenario_meta, delta_report, scenario_schedule = engine.simulate_hot_order(
                     hot_order,
                     scenario_name=f"G7-HOT-{number}",
                     baseline_time_limit_seconds=baseline_limit_seconds,
@@ -234,9 +235,9 @@ def probe_hot_order_replay(
                 "scenario_solver_wall_seconds": scenario_meta.wall_time_seconds if scenario_meta else None,
                 "scenario_solver_random_seed": scenario_meta.random_seed if scenario_meta else None,
                 "scenario_solver_workers": scenario_meta.num_search_workers if scenario_meta else None,
-                "scenario_makespan_min": scenario_meta.makespan_min if scenario_meta else None,
-                "scenario_total_tardiness_min": scenario_meta.total_tardiness_min if scenario_meta else None,
-                "scenario_total_setup_min": scenario_meta.total_setup_min if scenario_meta else None,
+                "scenario_makespan_min": delta_report.scenario_makespan_min if delta_report else None,
+                "scenario_total_tardiness_min": delta_report.scenario_total_tardiness_min if delta_report else None,
+                "scenario_total_setup_min": delta_report.scenario_total_setup_min if delta_report else None,
                 "scenario_proven_optimal_within_scope": scenario_meta.proven_optimal if scenario_meta else None,
                 "replay_wall_seconds": round(elapsed, 4),
                 "failure_stage": failure_stage,
