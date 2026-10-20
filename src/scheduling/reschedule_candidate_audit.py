@@ -108,7 +108,10 @@ def _audit_calendar_occupancy(
     if not baseline_run_id:
         issue("MISSING_BASELINE_RUN_ID", "calendar and OT authorization require a baseline run")
         return
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_capacity_plan'").fetchone() is None:
+    if (
+        conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='machine_capacity_plan'").fetchone()
+        is None
+    ):
         issue("MISSING_OT_PLAN", "machine_capacity_plan")
         return
     try:

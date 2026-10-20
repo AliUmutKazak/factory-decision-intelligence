@@ -11,8 +11,7 @@ def _calendar_connection(variable_day=None):
     conn = sqlite3.connect(":memory:")
     conn.execute("CREATE TABLE machines (machine_id TEXT PRIMARY KEY, max_daily_hours REAL)")
     conn.execute(
-        "CREATE TABLE machine_capacity_plan (run_id TEXT, period_week INTEGER, "
-        "machine_id TEXT, overtime_hours REAL)"
+        "CREATE TABLE machine_capacity_plan (run_id TEXT, period_week INTEGER, machine_id TEXT, overtime_hours REAL)"
     )
     conn.execute("INSERT INTO machine_capacity_plan VALUES ('BASE', 1, 'M01', 0)")
     conn.execute(
