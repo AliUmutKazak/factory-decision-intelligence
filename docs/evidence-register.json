@@ -141,15 +141,15 @@
     },
     "g7_reference_independent_audit_20261022": {
       "path": "artifacts/research/g7-reference-independent-audit-2026-10-22.json",
-      "code_commit": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
-      "sha256": "44e9c514a5220768709cfa50deed0cdf6e4fd726490c25a4f5b57435e37ce7e0",
+      "code_commit": "017811a4be35bec823ef45159075eaf40c2508a1",
+      "sha256": "4d6db110d7371090df83b896be1962fda4152069b8a33eb2094a31c7490c30f5",
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_reference_independently_audited"
     },
     "g7_reference_workers4_independent_audit_20261022": {
       "path": "artifacts/research/g7-reference-independent-audit-workers4-2026-10-22.json",
-      "code_commit": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
-      "sha256": "e56fd40817e81e8c91273e862bf3f324a95a7dd936a67e2d40a7929b60889ede",
+      "code_commit": "017811a4be35bec823ef45159075eaf40c2508a1",
+      "sha256": "afef7b626073722dfd9dd0c4ca2bf6bb27ce40c8294ed391748f3336a5b8629f",
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_reference_independently_audited"
     },

@@ -1,10 +1,10 @@
 {
   "scope": "LAB_REFERENCE_SNAPSHOT_ONLY_NO_CUSTOMER_SLO",
-  "measured_at_utc": "2026-10-22T09:26:05.858539+00:00",
+  "measured_at_utc": "2026-10-22T09:32:51.162665+00:00",
   "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
   "source_run_id": "RUN-20261006-00a0d3",
   "input_hash": "3b661b07be4b97c3b5d9385789efb111cccf50217b41dcd6c27f0788169070cd",
-  "git_sha": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
+  "git_sha": "017811a4be35bec823ef45159075eaf40c2508a1",
   "code_hashes": {
     "src/config.py": "6cbc39f4e74f7d1253a143217aeb2653b2713cae7eec62b087f31ca8468a8980",
     "src/scheduling/schedule_cpsat.py": "b3f54c94fce8e2065242e8e76e40936b626c83e16b8d35109dc15ee8204c7424",
@@ -21,7 +21,7 @@
     "src/utils/db.py": "9caf99fc2016e6558c84835fbdee436d4ef1b094b9c1fb036f70ae2ebb07ba89"
   },
   "probe_code_sha256": "0350a80bdd7d2f583ea18d9ea16291838393c9c65b85069d40dfdda2abfdb7ae",
-  "audit_code_sha256": "d69844ae7363c458d892254ca6f09e3a3bdb099e7c792ceecd3db1c1663e4630",
+  "audit_code_sha256": "af102c3fb3fe19020feecbf1374c0901120e60cd2e108388caa9566c7d74dcf0",
   "ortools_version": "9.15.6755",
   "platform": "Windows-11-10.0.26300-SP0",
   "python_version": "3.14.7",
@@ -35,23 +35,23 @@
       "number": 1,
       "status": "FEASIBLE",
       "solver_status": "FEASIBLE",
-      "attempt_wall_seconds": 10.9118,
-      "solver_wall_seconds": 10.0394,
+      "attempt_wall_seconds": 10.5533,
+      "solver_wall_seconds": 10.0292,
       "reason": null,
       "solver_metadata": {
         "run_id": "BENCH-RUN-20261006-00a0d3-0",
         "status": "FEASIBLE",
         "proven_optimal": false,
-        "wall_time_seconds": 10.0394,
-        "objective_value": 1365515.0,
+        "wall_time_seconds": 10.0292,
+        "objective_value": 1365425.0,
         "objective_units": "weighted_minutes",
         "objective_policy": "BALANCED",
-        "best_objective_bound": 948700.0,
+        "best_objective_bound": 989050.0,
         "random_seed": 42,
         "num_search_workers": 4,
         "time_limit_seconds": 10.0,
         "makespan_min": 12709,
-        "total_setup_min": 435,
+        "total_setup_min": 345,
         "total_tardiness_min": 4709
       },
       "independent_audit": {
@@ -68,10 +68,10 @@
     },
     "accepted_count": 1,
     "no_accepted_solution_count": 0,
-    "attempt_wall_p50_seconds": 10.9118,
-    "attempt_wall_p95_seconds": 10.9118,
-    "accepted_solver_wall_p50_seconds": 10.0394,
-    "accepted_solver_wall_p95_seconds": 10.0394,
+    "attempt_wall_p50_seconds": 10.5533,
+    "attempt_wall_p95_seconds": 10.5533,
+    "accepted_solver_wall_p50_seconds": 10.0292,
+    "accepted_solver_wall_p95_seconds": 10.0292,
     "percentile_method": "linear interpolation over sorted samples"
   }
 }
