@@ -692,3 +692,122 @@ def audit_reschedule_candidate(
         "task_count": len(new),
         "issues": issues,
     }
+
+
+def audit_reference_benchmark_candidate(
+    conn: sqlite3.Connection,
+    baseline_run_id: str,
+    baseline: pd.DataFrame,
+    candidate: pd.DataFrame,
+    context: dict[str, Any],
+) -> dict[str, Any]:
+    """Independently check a replayed reference candidate against sealed inputs.
+
+    The benchmark solver is not imported here. Historical timing artifacts are
+    unaffected; this checks newly generated candidates before counting them.
+    """
+    issues: list[dict[str, str]] = []
+
+    def issue(code: str, detail: str) -> None:
+        issues.append({"code": code, "detail": detail})
+
+    required = _REQUIRED - {"schedule_state", "freeze_until_min", "execution_status"}
+    for name, frame in (("baseline", baseline), ("candidate", candidate)):
+        missing = required - set(frame.columns)
+        if missing:
+            issue("MISSING_COLUMNS", f"{name}: {', '.join(sorted(missing))}")
+        if frame.empty:
+            issue("EMPTY_SCHEDULE", name)
+    if issues:
+        return {"status": "REJECTED", "scope": "REFERENCE_BENCHMARK_CORE_PHYSICS", "issues": issues}
+
+    for name, frame in (("baseline", baseline), ("candidate", candidate)):
+        if frame["task_id"].isna().any() or frame["task_id"].astype(str).duplicated().any():
+            issue("INVALID_TASK_IDS", name)
+    if issues:
+        return {"status": "REJECTED", "scope": "REFERENCE_BENCHMARK_CORE_PHYSICS", "issues": issues}
+
+    base = baseline.set_index(baseline["task_id"].astype(str), drop=False)
+    new = candidate.set_index(candidate["task_id"].astype(str), drop=False)
+    if set(base.index) != set(new.index):
+        issue(
+            "TASK_SET_MISMATCH",
+            f"missing={sorted(set(base.index) - set(new.index))}, extra={sorted(set(new.index) - set(base.index))}",
+        )
+
+    text_fields = ("lot_id", "parent_lot_id", "product_id", "machine_id")
+    numeric_fields = (
+        "operation_seq",
+        "sub_lot_index",
+        "batch_count",
+        "batch_size_units",
+        "production_units",
+        "due_date_min",
+        "priority_weight",
+        "release_time_min",
+        "duration_min",
+    )
+    for task_id in sorted(set(base.index) & set(new.index)):
+        old, row = base.loc[task_id], new.loc[task_id]
+        if any(str(old[field]) != str(row[field]) for field in text_fields) or any(
+            _number(old[field]) is None
+            or _number(row[field]) is None
+            or abs(_number(old[field]) - _number(row[field])) > 1e-6
+            for field in numeric_fields
+        ):
+            issue("TASK_INPUT_CHANGED", task_id)
+
+    earliest = _number(context.get("earliest_start_min"))
+    if earliest is None or earliest < 0:
+        issue("INVALID_EARLIEST_START", str(context.get("earliest_start_min")))
+    else:
+        for task_id, row in new.iterrows():
+            start = _number(row["start_min"])
+            if start is not None and start < earliest - 1e-6:
+                issue("EARLIEST_START_VIOLATION", task_id)
+
+    frozen: dict[str, Any] = dict(context.get("frozen_positions") or {})
+    if {"schedule_state", "execution_status"} <= set(baseline.columns):
+        for task_id, row in base.iterrows():
+            if row["schedule_state"] == "FROZEN" or row["execution_status"] in {"IN_PROGRESS", "COMPLETED"}:
+                frozen[task_id] = (row["machine_id"], row["start_min"], row["end_min"])
+    for task_id, position in frozen.items():
+        if str(task_id) not in new.index or len(position) != 3:
+            issue("INVALID_FROZEN_POSITION", str(task_id))
+            continue
+        row = new.loc[str(task_id)]
+        if str(row["machine_id"]) != str(position[0]) or any(
+            _number(row[field]) is None
+            or _number(expected) is None
+            or abs(_number(row[field]) - _number(expected)) > 1e-6
+            for field, expected in zip(("start_min", "end_min"), position[1:])
+        ):
+            issue("FROZEN_POSITION_CHANGED", str(task_id))
+    for task_id, window in (context.get("flexible_windows") or {}).items():
+        if str(task_id) not in new.index or len(window) != 3:
+            issue("INVALID_FLEXIBLE_WINDOW", str(task_id))
+            continue
+        row = new.loc[str(task_id)]
+        start, lower, upper = _number(row["start_min"]), _number(window[1]), _number(window[2])
+        if (
+            str(row["machine_id"]) != str(window[0])
+            or None in (start, lower, upper)
+            or not lower - 1e-6 <= start <= upper + 1e-6
+        ):
+            issue("FLEXIBLE_WINDOW_VIOLATION", str(task_id))
+
+    _audit_core_intervals(candidate, issue)
+    _audit_production_units(conn, candidate, baseline_run_id, issue)
+    _audit_route_source(conn, candidate, issue)
+    _audit_material_release_source(conn, candidate, baseline_run_id, issue)
+    _audit_setup_transitions(conn, candidate, baseline_run_id, issue)
+    _audit_supported_calendar_shape(conn, issue)
+    _audit_calendar_occupancy(conn, candidate, baseline_run_id, issue)
+    overrides = [MaintenanceWindow(**window) for window in context.get("maintenance_overrides", [])]
+    _audit_maintenance_intervals(conn, candidate, overrides, issue)
+    return {
+        "status": "ACCEPTED" if not issues else "REJECTED",
+        "scope": "REFERENCE_BENCHMARK_CORE_PHYSICS",
+        "task_count": len(candidate),
+        "issues": issues,
+    }
