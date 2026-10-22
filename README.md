@@ -4,7 +4,7 @@
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.66.1-FF4B4B?style=flat&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![OR-Tools](https://img.shields.io/badge/Google%20OR--Tools-CP--SAT-EA4335?style=flat&logo=google&logoColor=white)](https://developers.google.com/optimization)
 [![PuLP](https://img.shields.io/badge/PuLP-LP%20Optimization-4B8BBE?style=flat)](https://coin-or.github.io/pulp/)
 [![CI](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/workflows/ci.yml)
@@ -38,7 +38,7 @@ Factory Decision Intelligence (FDI), üretim planı ve makine çizelgelemesi iç
 
 ## Yol haritası ve kanıt durumu
 
-**Son doğrulanmış laboratuvar etiketi:** [`v0.1.10-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.10-lab), commit `57e2ebcba171a2533b78601ec580177f3d779b05`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39772987004) 416 test ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. [Temiz Windows klon provası](docs/clean-demo-v010-2026-10-22.md) ayrıca tamamlandı. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz. İnternete açık dağıtım için [Pillow güvenlik sınırı](docs/dependency-security-2026-10-11.md) çözülmüş değildir.
+**Son doğrulanmış laboratuvar etiketi:** [`v0.1.11-lab`](https://github.com/AliUmutKazak/factory-decision-intelligence/tree/v0.1.11-lab), commit `5057da9061380fc120a2979694504515af982a13`. [Aynı commit'in CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39798272025) 418 test, danışma taraması ve temiz Docker başlangıç/yeniden başlatma işlerinde başarılıdır. [Temiz Windows klon provası](docs/clean-demo-v011-2026-10-22.md) ayrıca tamamlandı. CI'da 30 gün tutulan sentetik run paketinin digest'i, veri türü ve açık saha kapıları [kanıt envanterinde](docs/evidence-register.json) kayıtlıdır. Daha yeni bir kaynak commit'i bu etiketin test sonucunu otomatik devralmaz. [Bağımlılık güvenliği kaydı](docs/dependency-security-2026-10-11.md) bilinen danışma taramasının kapsamını ve kalan upstream sınırı açıklar; bu sonuç tesis güvenlik kabulü değildir.
 
 **17 Ekim tarihsel plan–çizelge denetimi:** `77a5f13809730513a81557183454b1a5afd7d757` için [ana dal CI koşumu](https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39037061869) başarılıdır. [Aynı commit'in sentetik referans denetimi](docs/plan-schedule-gap-audit-2026-10-17.md), ilk hafta hedeflenen 8.400 adedin 6.100'ünün hafta bitiminde tamamlandığını ve 2.300'ünün sonraya sarktığını gösterir. Aynı modelde tüm 8.400 adede ilk hafta sonu sert bitiş koşulu eklendiğinde sonuç `INFEASIBLE` oldu; bu tarihsel ölçüm gerçek tesis kapasitesi veya güncel sürüm sonucu değildir.
 
