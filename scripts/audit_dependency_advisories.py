@@ -7,8 +7,8 @@ import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-# Streamlit 1.64.0 requires Pillow <13 while these eight advisories are fixed
-# in Pillow 13.0.0. Keep the exception explicit and expire it automatically.
+# Streamlit 1.64.0 requires Pillow <13 while these 24 advisories are fixed
+# in Pillow 13.0.0. Lab-only exception; keep it explicit and time-limited.
 PILLOW_EXCEPTION_EXPIRES = date(2026, 11, 20)
 PILLOW_ADVISORIES = (
     "CVE-2026-112895",
@@ -19,6 +19,22 @@ PILLOW_ADVISORIES = (
     "CVE-2026-112395",
     "CVE-2026-112404",
     "CVE-2026-112899",
+    "CVE-2026-112402",
+    "CVE-2026-112900",
+    "CVE-2026-112893",
+    "CVE-2026-112392",
+    "CVE-2026-112891",
+    "CVE-2026-112405",
+    "CVE-2026-112390",
+    "CVE-2026-112401",
+    "CVE-2026-112901",
+    "CVE-2026-112391",
+    "CVE-2026-112894",
+    "CVE-2026-112406",
+    "CVE-2026-112399",
+    "CVE-2026-112892",
+    "CVE-2026-112393",
+    "CVE-2026-112396",
 )
 
 

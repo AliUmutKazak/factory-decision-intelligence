@@ -12,12 +12,14 @@ python -m src.scheduling.reference_load_probe `
   --baseline-run-id RUN-20261006-00a0d3 `
   --expected-sha256 8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf `
   --repeats 5 --time-limit 2 `
-  --output artifacts/research/g7-reference-load-probe.json
+  --output <yeni-dosya.json>
 ```
 
-Çıktı her denemenin durumunu, toplam deneme süresini ve kabul edilmiş çözümlerde CP-SAT'ın kendi süresini ayrı kaydeder. `OPTIMAL` ve `FEASIBLE` geçerli çözüm sayılır; `NO_ACCEPTED_SOLUTION` ayrıca sayılır ve gerekçesi saklanır. Toplam süre, bellek kopyalama, model kurma ve raporlama yükünü de içerir. p50/p95, sıralanmış örnekler üzerinde doğrusal ara değer yöntemiyle hesaplanır; yalnız birkaç örneğin p95 değeri hizmet hedefi değildir. [Makine tarafından okunabilen sonuç](../artifacts/research/g7-reference-load-probe.json) aynı kaynak, girdi ve kod hash'lerini içerir.
+Güncel araç `OPTIMAL` veya `FEASIBLE` çözücü sonucunu ancak çizelge bağımsız fizik denetiminden de geçerse kabul sayar. Denetim görev ve miktar korunumu, rota, malzeme serbest bırakma, setup, işlem sırası, makine çakışması, takvim, fazla mesai, bakım ve kayıtlı donmuş/esnek kısıtları kontrol eder. Reddedilen çözüm `REJECTED_BY_AUDIT` olarak kalır; çözücünün özgün durumu ve denetim sorunları ayrıca saklanır. `NO_ACCEPTED_SOLUTION` ayrıca sayılır ve gerekçesi saklanır. Toplam deneme süresi bellek kopyalama, model kurma, denetim ve raporlamayı içerir. p50/p95 sıralanmış örnekler üzerinde doğrusal ara değer yöntemiyle hesaplanır; yalnız birkaç örneğin p95 değeri hizmet hedefi değildir.
 
-8 Ekim 2026 yerel koşumunda, kod commit'i `b905ab7` üzerinde 2 saniye sınırıyla **5/5 `FEASIBLE`** sonuç alındı; optimum kanıtlanmadı. Kabul edilmiş çözümlerin CP-SAT süreleri için p50 **2,0026 sn**, p95 **2,0038 sn**; tüm deneme süresi için p50 **2,7585 sn**, p95 **2,7776 sn** ölçüldü. Bu küçük örnek yalnız referans yükte araç ve raporlama zincirinin çalıştığını gösterir.
+[22 Ekim 2026 tek işçili yeni koşum](../artifacts/research/g7-reference-independent-audit-2026-10-22.json) aynı mühürlü sentetik kaynakta, 2 saniye solver sınırı ve tohum 42 ile **5/5 `FEASIBLE` ve 5/5 bağımsız kabul** verdi. CP-SAT süresi p50/p95 **2,0014 / 2,0030 sn**; denetim dahil deneme süresi p50/p95 **2,3866 / 2,5930 sn**. [Dört işçili tek koşum](../artifacts/research/g7-reference-independent-audit-workers4-2026-10-22.json) 10 saniye sınırı ve aynı tohumla **1/1 `FEASIBLE` ve 1/1 bağımsız kabul** verdi. Her iki çıktı kaynak, girdi, kod ve denetim hash'lerini, kaynak commit'ini ve her denemenin sonucunu taşır. Farklı süre sınırları ve bu küçük örnekle işçi ayarı seçilmez.
+
+Eski [8 Ekim 2026 sonucu](../artifacts/research/g7-reference-load-probe.json), kod commit'i `b905ab7` üzerinde 2 saniye sınırıyla **5/5 `FEASIBLE`** bildirmişti. O kayıtta bağımsız aday denetimi yoktur ve yeni kabul sayılarıyla aynı kanıt sınıfında değildir. Her iki küçük örnek yalnız referans yükte araç ve raporlama zincirinin çalıştığını gösterir; optimumluk kanıtı değildir.
 
 `WhatIfEngine` de kaynak veritabanını salt okunur açar. Yerel testte acil sipariş senaryosu zaman aşımı hatasıyla durdurulduğunda kaynak dosyanın hash'i, önceki `ACTIVE` run kimliği ve run kayıtları değişmedi. Bu başarısız çözüm emniyeti kanıtıdır; gerçek timeout/fallback oranı ölçümü değildir.
 

@@ -11,16 +11,21 @@ import hashlib
 import io
 import json
 import platform
+import sqlite3
 import warnings
 from collections import Counter
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+import pandas as pd
+
+from src.scheduling.model_context import load_model_context
 from src.scheduling.production_benchmark import production_benchmark
+from src.scheduling.reschedule_candidate_audit import audit_reference_benchmark_candidate
 
 ACCEPTED = {"OPTIMAL", "FEASIBLE"}
 
@@ -41,6 +46,17 @@ def _percentile(values: list[float], fraction: float) -> float | None:
     low = int(rank)
     high = min(low + 1, len(ordered) - 1)
     return round(ordered[low] + (ordered[high] - ordered[low]) * (rank - low), 4)
+
+
+def _audit_candidate(path: Path, baseline_run_id: str, case: dict[str, Any]) -> dict[str, Any]:
+    with closing(sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True)) as conn:
+        baseline = pd.read_sql_query(
+            "SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(baseline_run_id,)
+        )
+        context = load_model_context(conn, baseline_run_id)
+        return audit_reference_benchmark_candidate(
+            conn, baseline_run_id, baseline, pd.DataFrame(case["schedule"]), context
+        )
 
 
 def probe_reference_load(
@@ -83,7 +99,6 @@ def probe_reference_load(
                 experimental_num_workers=experimental_num_workers,
                 experimental_random_seed=experimental_random_seed,
             )
-        elapsed = perf_counter() - started
         if len(result["cases"]) != 1 or result["cases"][0]["Method"] != "CP-SAT":
             raise RuntimeError("probe expected exactly one CP-SAT case")
         if input_hash is not None and result["input_hash"] != input_hash:
@@ -94,14 +109,21 @@ def probe_reference_load(
         code_hashes = result["code_hashes"]
         git_sha = result["git_sha"]
         case = result["cases"][0]
+        if _sha256(path) != source_hash:
+            raise RuntimeError("source DB changed during the read-only probe")
+        independent_audit = _audit_candidate(path, baseline_run_id, case) if case["Status"] in ACCEPTED else None
+        elapsed = perf_counter() - started
+        accepted = independent_audit is not None and independent_audit["status"] == "ACCEPTED"
         attempts.append(
             {
                 "number": index + 1,
-                "status": case["Status"],
+                "status": case["Status"] if accepted or case["Status"] not in ACCEPTED else "REJECTED_BY_AUDIT",
+                "solver_status": case["Status"],
                 "attempt_wall_seconds": round(elapsed, 4),
                 "solver_wall_seconds": case.get("Solve Time (s)"),
                 "reason": case.get("Reason"),
                 "solver_metadata": case.get("solver_metadata"),
+                "independent_audit": independent_audit,
             }
         )
 
@@ -119,6 +141,7 @@ def probe_reference_load(
         "git_sha": git_sha,
         "code_hashes": code_hashes,
         "probe_code_sha256": _sha256(Path(__file__).resolve()),
+        "audit_code_sha256": _sha256(Path(audit_reference_benchmark_candidate.__code__.co_filename).resolve()),
         "ortools_version": version("ortools"),
         "platform": platform.platform(),
         "python_version": platform.python_version(),
