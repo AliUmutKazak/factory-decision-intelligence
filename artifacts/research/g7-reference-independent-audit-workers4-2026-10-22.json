@@ -1,0 +1,77 @@
+{
+  "scope": "LAB_REFERENCE_SNAPSHOT_ONLY_NO_CUSTOMER_SLO",
+  "measured_at_utc": "2026-10-22T09:26:05.858539+00:00",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "input_hash": "3b661b07be4b97c3b5d9385789efb111cccf50217b41dcd6c27f0788169070cd",
+  "git_sha": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
+  "code_hashes": {
+    "src/config.py": "6cbc39f4e74f7d1253a143217aeb2653b2713cae7eec62b087f31ca8468a8980",
+    "src/scheduling/schedule_cpsat.py": "b3f54c94fce8e2065242e8e76e40936b626c83e16b8d35109dc15ee8204c7424",
+    "src/scheduling/dispatch.py": "5a00e736e364dae4efcdffcdfec1f8b0cdc83f0162f31ae5e8b34d99a6b61dd9",
+    "src/scheduling/production_benchmark.py": "dfe74897a9949c9602d783f742c42640e43f72240605a06a9af815fa9cd7f87c",
+    "src/scheduling/monetary_objective.py": "c69e89df13a026a749ad539d4a497e38115f7b1bcbd2ca72b71ef6eefe67a273",
+    "src/scheduling/model_context.py": "4fd6b94ff13c68e030c758cb41c207d505632b25065a6b435ff996ca7af7a958",
+    "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+    "src/scheduling/analytics_schema.py": "46fe7798a034c7f11db0b0f00b1bf73e5bd8f7bd9f55ebbc1cd5b011a83b0dee",
+    "src/scheduling/maintenance.py": "e3308288f6108faf4ae07b071e78dbf3c8aed3659bcb02c229784b21c8d54c09",
+    "src/economics/schedule_cost.py": "0e3a19276b52c70dc7519e8396477b707a37aabd8fcca1ddb8b63319fb3eeba4",
+    "src/economics/cost_to_serve.py": "0e66bcb92cd91f4adbee36c95093226084cdb505e299cca097da8bf55bc646ee",
+    "src/contracts/schemas.py": "85348bfc93a576364adb62be7b78c1b9bc356bc89976ede85e679aa40dd51c0a",
+    "src/utils/db.py": "9caf99fc2016e6558c84835fbdee436d4ef1b094b9c1fb036f70ae2ebb07ba89"
+  },
+  "probe_code_sha256": "0350a80bdd7d2f583ea18d9ea16291838393c9c65b85069d40dfdda2abfdb7ae",
+  "audit_code_sha256": "d69844ae7363c458d892254ca6f09e3a3bdb099e7c792ceecd3db1c1663e4630",
+  "ortools_version": "9.15.6755",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python_version": "3.14.7",
+  "policy": "CP-SAT BALANCED via production_benchmark",
+  "time_limit_seconds": 10.0,
+  "experimental_num_workers": 4,
+  "experimental_random_seed": 42,
+  "repeats": 1,
+  "attempts": [
+    {
+      "number": 1,
+      "status": "FEASIBLE",
+      "solver_status": "FEASIBLE",
+      "attempt_wall_seconds": 10.9118,
+      "solver_wall_seconds": 10.0394,
+      "reason": null,
+      "solver_metadata": {
+        "run_id": "BENCH-RUN-20261006-00a0d3-0",
+        "status": "FEASIBLE",
+        "proven_optimal": false,
+        "wall_time_seconds": 10.0394,
+        "objective_value": 1365515.0,
+        "objective_units": "weighted_minutes",
+        "objective_policy": "BALANCED",
+        "best_objective_bound": 948700.0,
+        "random_seed": 42,
+        "num_search_workers": 4,
+        "time_limit_seconds": 10.0,
+        "makespan_min": 12709,
+        "total_setup_min": 435,
+        "total_tardiness_min": 4709
+      },
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "REFERENCE_BENCHMARK_CORE_PHYSICS",
+        "task_count": 31,
+        "issues": []
+      }
+    }
+  ],
+  "summary": {
+    "status_counts": {
+      "FEASIBLE": 1
+    },
+    "accepted_count": 1,
+    "no_accepted_solution_count": 0,
+    "attempt_wall_p50_seconds": 10.9118,
+    "attempt_wall_p95_seconds": 10.9118,
+    "accepted_solver_wall_p50_seconds": 10.0394,
+    "accepted_solver_wall_p95_seconds": 10.0394,
+    "percentile_method": "linear interpolation over sorted samples"
+  }
+}

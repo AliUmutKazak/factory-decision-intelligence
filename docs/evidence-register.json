@@ -139,6 +139,20 @@
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_reference"
     },
+    "g7_reference_independent_audit_20261022": {
+      "path": "artifacts/research/g7-reference-independent-audit-2026-10-22.json",
+      "code_commit": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
+      "sha256": "44e9c514a5220768709cfa50deed0cdf6e4fd726490c25a4f5b57435e37ce7e0",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference_independently_audited"
+    },
+    "g7_reference_workers4_independent_audit_20261022": {
+      "path": "artifacts/research/g7-reference-independent-audit-workers4-2026-10-22.json",
+      "code_commit": "9d2b879a18f49facef82f96f06a261d9ea8eedd9",
+      "sha256": "e56fd40817e81e8c91273e862bf3f324a95a7dd936a67e2d40a7929b60889ede",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_reference_independently_audited"
+    },
     "plan_schedule_consistency_probe": {
       "path": "artifacts/research/plan-schedule-consistency-2026-10-17.json",
       "sha256": "22cdd9989c6b206381e011798716a22468c67c80776d729ed6709999afc6e2ff",
@@ -160,7 +174,7 @@
     {"id": "G4", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/fdi-roadmap-execution.md"], "result": "Only synthetic file intake is available", "open_risk": "Authorized customer dataset, mapping and data-owner acceptance", "decision_owner_role": "site data owner", "accepted_by": null},
     {"id": "G5", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/g5-reschedule-dispatcher.md"], "result": "Local durable message replay and dispatch", "open_risk": "Vendor tenant, transport and round-trip ACK", "decision_owner_role": "site IT/MES", "accepted_by": null},
     {"id": "G6", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/g6-synthetic-execution-replay.md"], "result": "Synthetic partial-production replay", "open_risk": "Real started work, WIP, scrap, rework and resource rules", "decision_owner_role": "site process expert", "accepted_by": null},
-    {"id": "G7", "status": "Çalışılıyor", "evidence_date": "2026-10-18", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012", "g7_paired_hot_order_20261017", "g7_two_event_freeze_20261018", "g7_paired_reschedule_corrected_20261018", "g7_paired_reschedule_maintenance_audit_20261018", "g7_paired_reschedule_setup_audit_20261018"], "evidence": ["docs/g7-v012-lab-envelope.md", "docs/g7-paired-hot-order-methods-2026-10-17.md", "docs/reschedule-core-candidate-audit-2026-10-17.md", "docs/g7-two-event-freeze-rehearsal-2026-10-18.md", "docs/g7-paired-reschedule-traces-2026-10-18.md", "docs/g7-calendar-overlap-correction-2026-10-18.md"], "result": "Local timing, controlled timeout, ACTIVE preservation, paired single-event comparison and 6/6 paired sequential synthetic events with independent maintenance and setup transition audits", "open_risk": "Three selected traces and one seed do not establish site workload, SLO, alert thresholds or operations acceptance", "decision_owner_role": "site operations", "accepted_by": null},
+    {"id": "G7", "status": "Çalışılıyor", "evidence_date": "2026-10-22", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012", "g7_paired_hot_order_20261017", "g7_two_event_freeze_20261018", "g7_paired_reschedule_corrected_20261018", "g7_paired_reschedule_maintenance_audit_20261018", "g7_paired_reschedule_setup_audit_20261018", "g7_reference_independent_audit_20261022", "g7_reference_workers4_independent_audit_20261022"], "evidence": ["docs/g7-v012-lab-envelope.md", "docs/g7-reference-load-probe.md", "docs/g7-paired-hot-order-methods-2026-10-17.md", "docs/reschedule-core-candidate-audit-2026-10-17.md", "docs/g7-two-event-freeze-rehearsal-2026-10-18.md", "docs/g7-paired-reschedule-traces-2026-10-18.md", "docs/g7-calendar-overlap-correction-2026-10-18.md"], "result": "Local timing, controlled timeout, ACTIVE preservation, paired event comparisons, and independently audited synthetic reference candidates (5/5 single-worker and 1/1 four-worker)", "open_risk": "Small synthetic samples do not establish site workload, SLO, alert thresholds or operations acceptance", "decision_owner_role": "site operations", "accepted_by": null},
     {"id": "G8", "status": "Bekliyor", "evidence_date": null, "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md", "docs/global-evidence-audit-2026-10-15.md", "docs/clean-demo-v018-2026-10-15.md"], "result": "Historical independent fixed-machine benchmark and synthetic three-fold selection plus final holdout forecast; no site acceptance", "open_risk": "Real same-snapshot planner baseline, forecast and physical/cost acceptance", "decision_owner_role": "site planner and KPI owner", "accepted_by": null},
     {"id": "G9", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Shadow pilot design only", "open_risk": "Representative cycles, human decisions and actuals", "decision_owner_role": "pilot sponsor and planner", "accepted_by": null},
     {"id": "G10", "status": "Bekliyor", "evidence_date": null, "source_ids": [], "evidence": ["docs/pilot-charter.md"], "result": "Fail-safe laboratory runtime only", "open_risk": "G9 acceptance, controlled operation and rollback", "decision_owner_role": "site operations and IT", "accepted_by": null},
