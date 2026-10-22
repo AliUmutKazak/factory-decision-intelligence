@@ -92,6 +92,23 @@ def test_reference_audit_detects_candidate_timing_corruption():
     assert {issue["code"] for issue in rejected["issues"]} & {"TASK_INPUT_CHANGED", "INVALID_TASK_TIMING"}
 
 
+def test_reference_audit_exempts_frozen_work_from_new_earliest_start():
+    source = "artifacts/reference/factory.db"
+    run_id = "RUN-20261006-00a0d3"
+    with sqlite3.connect(source) as conn:
+        baseline = pd.read_sql_query("SELECT * FROM production_schedule WHERE run_id = ?", conn, params=(run_id,))
+        context = load_model_context(conn, run_id)
+        earliest = int(baseline["start_min"].min()) + 1
+        context["earliest_start_min"] = earliest
+        context["frozen_positions"] = {
+            str(row.task_id): [row.machine_id, row.start_min, row.end_min]
+            for row in baseline.itertuples()
+            if row.start_min < earliest
+        }
+        result = audit_reference_benchmark_candidate(conn, run_id, baseline, baseline.copy(), context)
+    assert result["status"] == "ACCEPTED", result["issues"]
+
+
 def test_reference_probe_rejects_source_change(tmp_path, monkeypatch):
     source = tmp_path / "reference.db"
     source.write_bytes(b"original")

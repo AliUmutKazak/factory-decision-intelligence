@@ -757,15 +757,6 @@ def audit_reference_benchmark_candidate(
         ):
             issue("TASK_INPUT_CHANGED", task_id)
 
-    earliest = _number(context.get("earliest_start_min"))
-    if earliest is None or earliest < 0:
-        issue("INVALID_EARLIEST_START", str(context.get("earliest_start_min")))
-    else:
-        for task_id, row in new.iterrows():
-            start = _number(row["start_min"])
-            if start is not None and start < earliest - 1e-6:
-                issue("EARLIEST_START_VIOLATION", task_id)
-
     frozen: dict[str, Any] = dict(context.get("frozen_positions") or {})
     if {"schedule_state", "execution_status"} <= set(baseline.columns):
         for task_id, row in base.iterrows():
@@ -783,6 +774,14 @@ def audit_reference_benchmark_candidate(
             for field, expected in zip(("start_min", "end_min"), position[1:])
         ):
             issue("FROZEN_POSITION_CHANGED", str(task_id))
+    earliest = _number(context.get("earliest_start_min"))
+    if earliest is None or earliest < 0:
+        issue("INVALID_EARLIEST_START", str(context.get("earliest_start_min")))
+    else:
+        for task_id, row in new.iterrows():
+            start = _number(row["start_min"])
+            if task_id not in frozen and start is not None and start < earliest - 1e-6:
+                issue("EARLIEST_START_VIOLATION", task_id)
     for task_id, window in (context.get("flexible_windows") or {}).items():
         if str(task_id) not in new.index or len(window) != 3:
             issue("INVALID_FLEXIBLE_WINDOW", str(task_id))
