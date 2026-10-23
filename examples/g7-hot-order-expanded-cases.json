@@ -1,0 +1,12 @@
+{
+  "source_type": "SYNTHETIC",
+  "description": "Predeclared single-arrival laboratory cases spanning five product routes, three urgency levels and different lot sizes; no customer or factory data",
+  "cases": [
+    {"case_id": "SMALL_URGENT_P01", "hot_order": {"order_id": "G7-SMALL-P01-1", "product_id": "P01", "quantity": 1, "due_date_min": 480, "priority_weight": 20}},
+    {"case_id": "REFERENCE_P01", "hot_order": {"order_id": "G7-RUSH-P01-51", "product_id": "P01", "quantity": 51, "due_date_min": 1200, "priority_weight": 20}},
+    {"case_id": "DIFFERENT_ROUTE_P03", "hot_order": {"order_id": "G7-DIFFERENT-P03-200", "product_id": "P03", "quantity": 200, "due_date_min": 2880, "priority_weight": 10}},
+    {"case_id": "SMALL_P02", "hot_order": {"order_id": "G7-SMALL-P02-25", "product_id": "P02", "quantity": 25, "due_date_min": 960, "priority_weight": 5}},
+    {"case_id": "MEDIUM_P04", "hot_order": {"order_id": "G7-MEDIUM-P04-75", "product_id": "P04", "quantity": 75, "due_date_min": 1920, "priority_weight": 10}},
+    {"case_id": "LARGER_P05", "hot_order": {"order_id": "G7-LARGER-P05-150", "product_id": "P05", "quantity": 150, "due_date_min": 3600, "priority_weight": 3}}
+  ]
+}

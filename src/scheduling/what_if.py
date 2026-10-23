@@ -16,6 +16,7 @@ from src.contracts.schemas import (
     ScheduleSolverMetadata,
     SolverStatus,
 )
+from src.scheduling.candidate_comparison import compare_schedule_operations
 from src.scheduling.hot_order_schedule_audit import audit_hot_order_schedule
 from src.scheduling.maintenance import MaintenanceWindow
 from src.scheduling.model_context import load_model_context
@@ -325,6 +326,7 @@ class WhatIfEngine:
     ) -> ScenarioDeltaReport:
         baseline = schedule_kpis(baseline_schedule)
         scenario = schedule_kpis(scenario_schedule)
+        operation_delta = compare_schedule_operations(baseline_schedule, scenario_schedule)
 
         return ScenarioDeltaReport(
             scenario_name=scenario_name,
@@ -339,4 +341,5 @@ class WhatIfEngine:
             scenario_total_setup_min=scenario.total_setup_min,
             setup_delta_min=scenario.total_setup_min - baseline.total_setup_min,
             impacted_tasks_count=len(scenario_schedule),
+            **operation_delta,
         )

@@ -368,6 +368,23 @@ class HotOrderInjection(BaseModel):
     priority_weight: int = Field(default=10, description="Acil sipariş için yüksek ceza ağırlığı")
 
 
+class ScenarioOperationChange(BaseModel):
+    """A single changed existing operation or a new scenario operation."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    task_id: str = Field(min_length=1)
+    lot_id: str = Field(min_length=1)
+    change_type: Literal["CHANGED", "NEW"]
+    baseline_machine_id: str | None
+    candidate_machine_id: str = Field(min_length=1)
+    baseline_start_min: float | None
+    candidate_start_min: float = Field(ge=0)
+    start_shift_min: float | None
+    baseline_end_min: float | None
+    candidate_end_min: float = Field(ge=0)
+
+
 class ScenarioDeltaReport(BaseModel):
     """Baz plan ile senaryo planı arasındaki KPI fark raporu."""
 
@@ -387,6 +404,18 @@ class ScenarioDeltaReport(BaseModel):
     scenario_total_setup_min: float = Field(ge=0.0, description="Senaryo hazırlık süresi (dakika)")
     setup_delta_min: float = Field(description="Hazırlık süresi farkı (dakika)")
     impacted_tasks_count: int = Field(ge=0, description="Senaryodaki toplam çizelgelenen iş sayısı")
+    baseline_task_count: int = Field(default=0, ge=0, description="Baz plandaki operasyon sayısı")
+    candidate_task_count: int = Field(default=0, ge=0, description="Aday plandaki operasyon sayısı")
+    changed_existing_task_count: int = Field(
+        default=0, ge=0, description="Yeri veya bitişi değişen mevcut operasyon sayısı"
+    )
+    new_task_count: int = Field(default=0, ge=0, description="Senaryoya eklenen operasyon sayısı")
+    absolute_existing_start_shift_min: float = Field(
+        default=0.0, ge=0, description="Mevcut operasyonların mutlak başlangıç kayması toplamı"
+    )
+    operation_changes: list[ScenarioOperationChange] = Field(
+        default_factory=list, description="Değişen ve yeni operasyonların karşılaştırması"
+    )
 
 
 # -------------------------------------------------------------------------

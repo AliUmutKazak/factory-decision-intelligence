@@ -89,6 +89,7 @@ def run_orlibrary_fixed_jsp(
         name: _sha256(code_root / name)
         for name in (
             "src/config.py",
+            "src/contracts/schemas.py",
             "src/scheduling/schedule_cpsat.py",
             "src/scheduling/calendar_service.py",
             "src/scheduling/fjsp_reference.py",

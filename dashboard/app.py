@@ -1,3 +1,5 @@
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -1017,6 +1019,9 @@ with tab_mes:
                 run_bd_btn = st.form_submit_button("Simüle Et (What-If CP-SAT)", disabled=not may_simulate)
 
             if run_bd_btn and may_simulate:
+                st.session_state.pop("what_if_candidate", None)
+                st.session_state.pop("what_if_review_state", None)
+                st.session_state.pop("what_if_review_note", None)
                 try:
                     with st.spinner("CP-SAT çözücüsü senaryoyu çözüyor..."):
                         engine = WhatIfEngine()
@@ -1034,21 +1039,14 @@ with tab_mes:
                 except SolverBusyError:
                     st.warning("Çözücü başka bir işlemde meşgul; kısa süre sonra yeniden deneyin.")
                 else:
-                    st.success("✅ Arıza senaryosu başarıyla simüle edildi!")
-                    k1, k2, k3 = st.columns(3)
-                    k1.metric(
-                        "Yeni Makespan",
-                        f"{report.scenario_makespan_min:,.0f} dk",
-                        delta=f"{report.makespan_delta_min:+,.0f} dk",
-                        delta_color="inverse",
-                    )
-                    k2.metric(
-                        "Öncelik Ağırlıklı Gecikme",
-                        f"{report.scenario_total_tardiness_min:,.0f} ağırlıklı dk",
-                        delta=f"{report.tardiness_delta_min:+,.0f} ağırlıklı dk",
-                        delta_color="inverse",
-                    )
-                    k3.metric("Etkilenen Görevler", f"{report.impacted_tasks_count} adet")
+                    st.session_state["what_if_candidate"] = {
+                        "active_run_id_at_simulation": run_id_val,
+                        "input": event.model_dump(mode="json"),
+                        "baseline_solver": b_meta.model_dump(mode="json"),
+                        "candidate_solver": s_meta.model_dump(mode="json"),
+                        "comparison": report.model_dump(mode="json"),
+                    }
+                    st.success("Arıza için yalıtılmış aday plan hazır.")
 
         elif sim_type == "🔥 Acil Sipariş Enjeksiyonu (Hot-Order)":
             with st.form("hot_order_form"):
@@ -1070,6 +1068,9 @@ with tab_mes:
                 run_ho_btn = st.form_submit_button("Acil Siparişi Çizelgeye Ekle", disabled=not may_simulate)
 
             if run_ho_btn and may_simulate:
+                st.session_state.pop("what_if_candidate", None)
+                st.session_state.pop("what_if_review_state", None)
+                st.session_state.pop("what_if_review_note", None)
                 try:
                     with st.spinner("Acil parti enjekte ediliyor ve yeniden optimize ediliyor..."):
                         engine = WhatIfEngine()
@@ -1088,21 +1089,14 @@ with tab_mes:
                 except SolverBusyError:
                     st.warning("Çözücü başka bir işlemde meşgul; kısa süre sonra yeniden deneyin.")
                 else:
-                    st.success("✅ Acil sipariş başarıyla çizelgeye dahil edildi!")
-                    k1, k2, k3 = st.columns(3)
-                    k1.metric(
-                        "Yeni Makespan",
-                        f"{report.scenario_makespan_min:,.0f} dk",
-                        delta=f"{report.makespan_delta_min:+,.0f} dk",
-                        delta_color="inverse",
-                    )
-                    k2.metric(
-                        "Öncelik Ağırlıklı Gecikme",
-                        f"{report.scenario_total_tardiness_min:,.0f} ağırlıklı dk",
-                        delta=f"{report.tardiness_delta_min:+,.0f} ağırlıklı dk",
-                        delta_color="inverse",
-                    )
-                    k3.metric("Toplam Görev Sayısı", report.impacted_tasks_count)
+                    st.session_state["what_if_candidate"] = {
+                        "active_run_id_at_simulation": run_id_val,
+                        "input": injection.model_dump(mode="json"),
+                        "baseline_solver": b_meta.model_dump(mode="json"),
+                        "candidate_solver": s_meta.model_dump(mode="json"),
+                        "comparison": report.model_dump(mode="json"),
+                    }
+                    st.success("Acil sipariş için yalıtılmış aday plan hazır.")
 
         else:
             with st.form("dynamic_resched_form"):
@@ -1164,6 +1158,78 @@ with tab_mes:
                         f"📌 **Soyağacı Denetim Kaydı:** {audit.audit_id} oluşturuldu. "
                         f"Ortalama iş kayması: {n_rep.average_start_delta_min:.1f} dk, Maksimum kayma: {n_rep.max_start_delta_min:.1f} dk."
                     )
+
+        candidate_review = (
+            st.session_state.get("what_if_candidate")
+            if may_simulate and sim_type != "🔄 Dinamik Yeniden Çizelgeleme (Freeze Horizon)"
+            else None
+        )
+        if candidate_review and candidate_review["active_run_id_at_simulation"] == run_id_val:
+            comparison = candidate_review["comparison"]
+            solver = candidate_review["candidate_solver"]
+            st.markdown("#### Aday plan karşılaştırması")
+            st.caption(
+                "Bu what-if planı laboratuvar simülasyonudur. Baz plan simülasyon sırasında yeniden çözülür; "
+                "ACTIVE plan ve fiili üretim değişmez. MRP yeniden hesaplanmadığı için malzeme farkı bu karşılaştırmada "
+                "ölçülmez. Aşağıdaki inceleme notu yalnız bu oturumda saklanır."
+            )
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Ölçüt": "Tamamlanma süresi (dk)",
+                            "Baz": comparison["baseline_makespan_min"],
+                            "Aday": comparison["scenario_makespan_min"],
+                            "Fark": comparison["makespan_delta_min"],
+                        },
+                        {
+                            "Ölçüt": "Ağırlıklı gecikme (ağırlıklı dk)",
+                            "Baz": comparison["baseline_total_tardiness_min"],
+                            "Aday": comparison["scenario_total_tardiness_min"],
+                            "Fark": comparison["tardiness_delta_min"],
+                        },
+                        {
+                            "Ölçüt": "Hazırlık süresi (dk)",
+                            "Baz": comparison["baseline_total_setup_min"],
+                            "Aday": comparison["scenario_total_setup_min"],
+                            "Fark": comparison["setup_delta_min"],
+                        },
+                    ]
+                ),
+                hide_index=True,
+                use_container_width=True,
+            )
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Değişen mevcut operasyon", comparison["changed_existing_task_count"])
+            c2.metric("Yeni operasyon", comparison["new_task_count"])
+            c3.metric("Mutlak başlangıç kayması", f"{comparison['absolute_existing_start_shift_min']:,.0f} dk")
+            st.caption(
+                f"Aday çözücü: {solver['status']} · optimum kanıtı: {'var' if solver['proven_optimal'] else 'yok'} "
+                f"· süre: {solver['wall_time_seconds']:.2f} sn. Başlangıç kayması yalnız mevcut operasyonları kapsar."
+            )
+            if comparison["operation_changes"]:
+                with st.expander("Değişen ve yeni operasyonları incele"):
+                    st.dataframe(
+                        pd.DataFrame(comparison["operation_changes"]), hide_index=True, use_container_width=True
+                    )
+            review_state = st.selectbox(
+                "Laboratuvar ön değerlendirmesi",
+                ["İncelemede", "Denemeye uygun", "Reddedildi"],
+                key="what_if_review_state",
+            )
+            review_note = st.text_area("İnceleme notu", key="what_if_review_note")
+            review_payload = {**candidate_review, "review": {"state": review_state, "note": review_note}}
+            review_bytes = json.dumps(review_payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            candidate_id = hashlib.sha256(review_bytes).hexdigest()[:16]
+            st.caption(f"İnceleme kaydı: {candidate_id} · Bu seçim saha onayı veya plan yayını değildir.")
+            st.download_button(
+                "Karşılaştırma ve inceleme notunu indir (JSON)",
+                data=review_bytes,
+                file_name=f"fdi-candidate-{candidate_id}.json",
+                mime="application/json",
+            )
+        elif candidate_review:
+            st.info("ACTIVE plan değiştiği için eski what-if adayı burada gösterilmiyor.")
 
         st.markdown("---")
         st.markdown("### 📜 Dinamik Çizelgeleme Denetim Kütüğü (Lineage Audit)")
