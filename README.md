@@ -12,9 +12,9 @@ FDI connects demand forecasting, tactical capacity planning, material requiremen
 
 > **Project status:** laboratory prototype tested with synthetic and public benchmark data. No factory pilot, customer data, live ERP/MES integration or measured production benefit is claimed.
 
-![CP-SAT production schedule (Gantt) from a synthetic demonstration run](docs/screenshots/02-Uretim-Cizelgesi-Gantt.png)
+![CP-SAT production schedule (Gantt) from the verified synthetic v0.1.12-lab run](docs/screenshots/05-Dogrulanmis-Laboratuvar-Cizelgesi.png)
 
-*Capacity-constrained schedule from a synthetic demonstration run; the displayed figures are illustrative, not factory results.*
+*Capacity-constrained schedule from a [fresh synthetic v0.1.12-lab run](docs/clean-demo-v012-2026-10-23.md); these figures are not factory results.*
 
 ## What the system does
 
