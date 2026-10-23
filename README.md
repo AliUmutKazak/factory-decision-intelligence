@@ -6,13 +6,15 @@
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+When a machine breaks down or a rush order arrives, planners must rebuild the schedule quickly without breaking material, calendar or setup constraints. FDI is built to make that decision traceable and checkable.
+
 FDI connects demand forecasting, tactical capacity planning, material requirements and finite-capacity machine scheduling in one local workflow. It also evaluates machine-breakdown and rush-order scenarios against a baseline schedule, with operation-level changes and solver status visible to the reviewer.
 
 > **Project status:** laboratory prototype tested with synthetic and public benchmark data. No factory pilot, customer data, live ERP/MES integration or measured production benefit is claimed.
 
-![FDI dashboard showing a synthetic demonstration run](docs/screenshots/01_executive_summary.png)
+![CP-SAT production schedule (Gantt) from a synthetic demonstration run](docs/screenshots/02-Uretim-Cizelgesi-Gantt.png)
 
-*Dashboard from a synthetic demonstration run; the displayed figures are illustrative, not factory results.*
+*Capacity-constrained schedule from a synthetic demonstration run; the displayed figures are illustrative, not factory results.*
 
 ## What the system does
 
