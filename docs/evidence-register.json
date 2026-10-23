@@ -4,14 +4,14 @@
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
     "tag": "v0.1.12-lab",
-    "commit": "fa61c34e597214b1185461da89fdeba3349334f6",
-    "ci_run_id": 39962902203,
-    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39962902203",
+    "commit": "13d93869c7c18e9ad1b3d549f77e71155a1f384c",
+    "ci_run_id": 39976758643,
+    "ci_url": "https://github.com/AliUmutKazak/factory-decision-intelligence/actions/runs/39976758643",
     "test_count": 420,
     "quality_gate": "success",
     "docker_smoke": "success",
-    "artifact_name": "fdi-lab-candidate-fa61c34e597214b1185461da89fdeba3349334f6",
-    "artifact_sha256": "c2105a19b7ad0bf8374f715c0d669f9a148f8be9ec1c213332cf6abc8f090451",
+    "artifact_name": "fdi-lab-candidate-13d93869c7c18e9ad1b3d549f77e71155a1f384c",
+    "artifact_sha256": "e3cae9605fbf31e33e707b82f3ea4851341205cd16d39553675b3be659cc3ad9",
     "artifact_retention_days": 30
   },
   "sources": {
