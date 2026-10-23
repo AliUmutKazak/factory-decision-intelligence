@@ -1,0 +1,225 @@
+{
+  "status": "PASS",
+  "measured_at_utc": "2026-10-23T12:31:43.048485+00:00",
+  "environment": "Windows-11-10.0.26300-SP0",
+  "identity": {
+    "source_sha256": "7f36d103332f94cfdeb76358e40927a57cfa7a426ebeaabd4de666350c69f028",
+    "reference_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+    "code_hashes": {
+      "src/config.py": "6cbc39f4e74f7d1253a143217aeb2653b2713cae7eec62b087f31ca8468a8980",
+      "src/contracts/schemas.py": "d2268c0a34d5cd3d4805a2b0128041d1f38b7c78a2a8bde19cdb2c39c3d7d96e",
+      "src/scheduling/schedule_cpsat.py": "b3f54c94fce8e2065242e8e76e40936b626c83e16b8d35109dc15ee8204c7424",
+      "src/scheduling/calendar_service.py": "32a7c6f04b77f379da593ff763a35d8078bb395f313cbcef17ef1e83029dc37f",
+      "src/scheduling/fjsp_reference.py": "0c9a3bed5d1fc9bfdefebd42b83828f4346f535bb3dfaa5676af8d652512d109",
+      "src/scheduling/external_jsp_benchmark.py": "e51b02676130ab9d981d08185cc47dc6f5630b1bcb8cdb1fc619a40be8fadb2d"
+    },
+    "code_hashes_normalized_lf": {
+      "src/config.py": "fa88565d02c464cb5244b3a0c65e0f6f2fadca8abb912864076b4544f7629aa4",
+      "src/contracts/schemas.py": "450334a2954c10a7c71f0b8dc893bd73338dd8285c9f54a9894e20c9f7a081e5",
+      "src/scheduling/schedule_cpsat.py": "98f5b4c81cb73fd3eb44609668edcd7a0ff8b9544bcc2f06c24e7fa1a1e61ae5",
+      "src/scheduling/calendar_service.py": "9ed0648e560b43e7ef2e188eed185b81314c1a0d3426b291a3dd6ae8fc470288",
+      "src/scheduling/fjsp_reference.py": "da29e272564ff13753bc4ef174e064b9337a86e237b324cdc77814865a52785d",
+      "src/scheduling/external_jsp_benchmark.py": "9e72c39ef7548b1160ccf0caa2e5c060b5b9bbca2428ab74aa987d3692687c08"
+    },
+    "solver_version": "9.15.6755",
+    "random_seed": 42,
+    "num_search_workers": 1,
+    "objective_policy": "THROUGHPUT_MAX",
+    "objective_weights": {
+      "makespan": 100,
+      "setup": 0,
+      "tardiness": 0
+    }
+  },
+  "repeats_per_instance": 3,
+  "time_limit_seconds": 10.0,
+  "instances": [
+    {
+      "instance": "la03",
+      "attempts": [
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 597,
+          "best_objective_bound": 107700.0,
+          "solver_wall_time_seconds": 0.2611,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 597,
+          "best_objective_bound": 107700.0,
+          "solver_wall_time_seconds": 0.281,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 597,
+          "best_objective_bound": 107700.0,
+          "solver_wall_time_seconds": 0.2481,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        }
+      ],
+      "accepted_count": 3,
+      "solver_time_p50_seconds": 0.2611,
+      "solver_time_p95_seconds": 0.27901000000000004
+    },
+    {
+      "instance": "la04",
+      "attempts": [
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 590,
+          "best_objective_bound": 107000.0,
+          "solver_wall_time_seconds": 1.299,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 590,
+          "best_objective_bound": 107000.0,
+          "solver_wall_time_seconds": 1.0235,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 590,
+          "best_objective_bound": 107000.0,
+          "solver_wall_time_seconds": 1.0625,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        }
+      ],
+      "accepted_count": 3,
+      "solver_time_p50_seconds": 1.0625,
+      "solver_time_p95_seconds": 1.27535
+    },
+    {
+      "instance": "la05",
+      "attempts": [
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 593,
+          "best_objective_bound": 107300.0,
+          "solver_wall_time_seconds": 0.2358,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 593,
+          "best_objective_bound": 107300.0,
+          "solver_wall_time_seconds": 0.2372,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        },
+        {
+          "solver_status": "OPTIMAL",
+          "proven_optimal": true,
+          "relative_makespan": 593,
+          "best_objective_bound": 107300.0,
+          "solver_wall_time_seconds": 0.236,
+          "independent_status": "ACCEPTED",
+          "neutrality_checks": {
+            "pure_makespan_policy": true,
+            "zero_setup": true,
+            "zero_tardiness": true,
+            "within_first_regular_shift": true,
+            "zero_overtime": true,
+            "all_operations_present": true,
+            "independent_feasibility": true
+          },
+          "comparable_static_jsp_subset": true
+        }
+      ],
+      "accepted_count": 3,
+      "solver_time_p50_seconds": 0.236,
+      "solver_time_p95_seconds": 0.23707999999999999
+    }
+  ],
+  "scope": "REPEATED_LAB_STATIC_FIXED_MACHINE_JSP_ONLY_NO_CUSTOMER_KPI"
+}

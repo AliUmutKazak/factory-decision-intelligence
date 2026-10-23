@@ -1,0 +1,4172 @@
+{
+  "scope": "ADAPTED_SYNTHETIC_FIXED_ROUTE_SINGLE_ARRIVAL_NO_FACTORY_VALIDATION",
+  "event_time_min": 0,
+  "future_event_information": "NONE; each trial has one declared arrival at time zero",
+  "baseline_source": "SAME_SEALED_ACTIVE_SNAPSHOT",
+  "source_db_sha256": "8ae3219733c07e7bc10d01f82d9524c0d6c328b78205dc57c4a8774272af0caf",
+  "source_run_id": "RUN-20261006-00a0d3",
+  "cases_manifest_sha256": "013976d33993cdfd35cf73923baa44567ad9aeb1ec15120b8ca364d16a3aab44",
+  "cases_manifest_name": "g7-hot-order-expanded-cases.json",
+  "code_sha256": {
+    "src/scheduling/hot_order_method_comparison.py": "c63738ef162be59a996fa4b90b5149d9db159220f7b9c7ec37f6e8ee09faaef5",
+    "src/scheduling/hot_order_load_probe.py": "0bf079f95e713c15caadc45a7d41b9d9fc8cb340099a7709dbf505ee743f1189",
+    "src/scheduling/what_if.py": "88c62a76ea330432dbfcc9273dfe498835794ff0224d06e2876c9034a2622a05",
+    "src/scheduling/candidate_comparison.py": "94842878582140d2bbc377765e778d19a0e3901e391ebbce841931af7a1400fb",
+    "src/contracts/schemas.py": "450334a2954c10a7c71f0b8dc893bd73338dd8285c9f54a9894e20c9f7a081e5",
+    "src/scheduling/schedule_cpsat.py": "98f5b4c81cb73fd3eb44609668edcd7a0ff8b9544bcc2f06c24e7fa1a1e61ae5",
+    "src/scheduling/hot_order_schedule_audit.py": "8c333255b2d5c21ebdbd946734361f2d7748d081840332d441f2f141c7878dfd"
+  },
+  "git_sha": "ec67ba4bafea94847b01d957ddb0c6b78dfdb6b3",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "python_version": "3.14.7",
+  "ortools_version": "9.15.6755",
+  "seeds": [
+    7,
+    17,
+    42
+  ],
+  "methods": [
+    "FULL",
+    "FIFO",
+    "EDD",
+    "SPT"
+  ],
+  "workers_per_trial": 1,
+  "scenario_limit_seconds_per_trial": 10.0,
+  "metric_policy": "quantiles use independently accepted candidates only; failures remain in denominator",
+  "quantile_method": "linear interpolation over sorted samples",
+  "trials": [
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.3599,
+      "measured_solver_wall_seconds": 10.0041,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 17060.0,
+      "scenario_total_tardiness_min": 371051.0,
+      "scenario_total_setup_min": 425.0,
+      "scenario_solver_wall_seconds": 10.0041,
+      "changed_existing_task_count": 30,
+      "absolute_existing_start_shift_min": 102492,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.827,
+      "measured_solver_wall_seconds": 0.1546,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1546,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7861,
+      "measured_solver_wall_seconds": 0.1526,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1526,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.825,
+      "measured_solver_wall_seconds": 0.1753,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 82720.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1753,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156221,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7546,
+      "measured_solver_wall_seconds": 0.1561,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1561,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.823,
+      "measured_solver_wall_seconds": 0.1703,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1703,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7942,
+      "measured_solver_wall_seconds": 0.1602,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 82720.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1602,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156221,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3453,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7475,
+      "measured_solver_wall_seconds": 0.143,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.143,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8231,
+      "measured_solver_wall_seconds": 0.1486,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 82720.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1486,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156221,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.5882,
+      "measured_solver_wall_seconds": 10.0063,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 14065.0,
+      "scenario_total_tardiness_min": 86721.0,
+      "scenario_total_setup_min": 445.0,
+      "scenario_solver_wall_seconds": 10.0063,
+      "changed_existing_task_count": 30,
+      "absolute_existing_start_shift_min": 63782,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_URGENT_P01",
+      "hot_order": {
+        "order_id": "G7-SMALL-P01-1",
+        "product_id": "P01",
+        "quantity": 1,
+        "due_date_min": 480,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7674,
+      "measured_solver_wall_seconds": 0.1613,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 76469.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1613,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47048,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3431,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7374,
+      "measured_solver_wall_seconds": 0.1534,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1534,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7907,
+      "measured_solver_wall_seconds": 0.1599,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1599,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8029,
+      "measured_solver_wall_seconds": 0.152,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 68920.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.152,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156059,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7441,
+      "measured_solver_wall_seconds": 0.1423,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1423,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7479,
+      "measured_solver_wall_seconds": 0.1437,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1437,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7499,
+      "measured_solver_wall_seconds": 0.1317,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 68920.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1317,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156059,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3236,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7618,
+      "measured_solver_wall_seconds": 0.1502,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1502,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7351,
+      "measured_solver_wall_seconds": 0.1287,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 68920.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1287,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156059,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3191,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "REFERENCE_P01",
+      "hot_order": {
+        "order_id": "G7-RUSH-P01-51",
+        "product_id": "P01",
+        "quantity": 51,
+        "due_date_min": 1200,
+        "priority_weight": 20
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7907,
+      "measured_solver_wall_seconds": 0.1446,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 62669.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1446,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46922,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.5234,
+      "measured_solver_wall_seconds": 10.0048,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 21520.0,
+      "scenario_total_tardiness_min": 58333.0,
+      "scenario_total_setup_min": 415.0,
+      "scenario_solver_wall_seconds": 10.0048,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 149610,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7685,
+      "measured_solver_wall_seconds": 0.1364,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1364,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7383,
+      "measured_solver_wall_seconds": 0.1356,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1356,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7323,
+      "measured_solver_wall_seconds": 0.1287,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 26690.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1287,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160415,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7625,
+      "measured_solver_wall_seconds": 0.1289,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1289,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7624,
+      "measured_solver_wall_seconds": 0.1414,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1414,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8702,
+      "measured_solver_wall_seconds": 0.1151,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 26690.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1151,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160415,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.6183,
+      "measured_solver_wall_seconds": 10.0014,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 18490.0,
+      "scenario_total_tardiness_min": 76824.0,
+      "scenario_total_setup_min": 640.0,
+      "scenario_solver_wall_seconds": 10.0014,
+      "changed_existing_task_count": 30,
+      "absolute_existing_start_shift_min": 129468,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7026,
+      "measured_solver_wall_seconds": 0.1314,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1314,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7477,
+      "measured_solver_wall_seconds": 0.1269,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 26690.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1269,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160415,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.5341,
+      "measured_solver_wall_seconds": 10.0068,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 17200.0,
+      "scenario_total_tardiness_min": 114289.0,
+      "scenario_total_setup_min": 460.0,
+      "scenario_solver_wall_seconds": 10.0068,
+      "changed_existing_task_count": 28,
+      "absolute_existing_start_shift_min": 90199,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "DIFFERENT_ROUTE_P03",
+      "hot_order": {
+        "order_id": "G7-DIFFERENT-P03-200",
+        "product_id": "P03",
+        "quantity": 200,
+        "due_date_min": 2880,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7666,
+      "measured_solver_wall_seconds": 0.142,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 58119.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.142,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46535,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3746,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7004,
+      "measured_solver_wall_seconds": 0.1515,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1515,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47063,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7994,
+      "measured_solver_wall_seconds": 0.1727,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1727,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47063,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7081,
+      "measured_solver_wall_seconds": 0.1229,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 64620.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1229,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156350,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7899,
+      "measured_solver_wall_seconds": 0.1523,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1523,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46973,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8124,
+      "measured_solver_wall_seconds": 0.1525,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1525,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 46973,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8462,
+      "measured_solver_wall_seconds": 0.1526,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 64620.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1526,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156350,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3741,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.737,
+      "measured_solver_wall_seconds": 0.1369,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1369,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47063,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.6743,
+      "measured_solver_wall_seconds": 0.1372,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 64620.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1372,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156350,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.2432,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "SMALL_P02",
+      "hot_order": {
+        "order_id": "G7-SMALL-P02-25",
+        "product_id": "P02",
+        "quantity": 25,
+        "due_date_min": 960,
+        "priority_weight": 5
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7841,
+      "measured_solver_wall_seconds": 0.1412,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 29594.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1412,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47063,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.4467,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7074,
+      "measured_solver_wall_seconds": 0.1277,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1277,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7522,
+      "measured_solver_wall_seconds": 0.1368,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1368,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7549,
+      "measured_solver_wall_seconds": 0.1323,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 17580.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1323,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156022,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.773,
+      "measured_solver_wall_seconds": 0.1409,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1409,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7187,
+      "measured_solver_wall_seconds": 0.1379,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1379,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7315,
+      "measured_solver_wall_seconds": 0.1529,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 17580.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1529,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156022,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3846,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7489,
+      "measured_solver_wall_seconds": 0.1309,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1309,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7754,
+      "measured_solver_wall_seconds": 0.1315,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 17580.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1315,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 156022,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "FEASIBLE",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 10.505,
+      "measured_solver_wall_seconds": 10.0038,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": 24400.0,
+      "scenario_total_tardiness_min": 127163.0,
+      "scenario_total_setup_min": 435.0,
+      "scenario_solver_wall_seconds": 10.0038,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 259803,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "MEDIUM_P04",
+      "hot_order": {
+        "order_id": "G7-MEDIUM-P04-75",
+        "product_id": "P04",
+        "quantity": 75,
+        "due_date_min": 1920,
+        "priority_weight": 10
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 33,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7541,
+      "measured_solver_wall_seconds": 0.1422,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14149.0,
+      "scenario_total_tardiness_min": 98065.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1422,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47105,
+      "baseline_task_count": 31,
+      "new_task_count": 2
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 7,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3398,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 7,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7699,
+      "measured_solver_wall_seconds": 0.1472,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1472,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 7,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7232,
+      "measured_solver_wall_seconds": 0.1428,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1428,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 7,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 7,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 7,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8308,
+      "measured_solver_wall_seconds": 0.159,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 18486.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.159,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160347,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 17,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8478,
+      "measured_solver_wall_seconds": 0.1604,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1604,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 17,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.8161,
+      "measured_solver_wall_seconds": 0.1516,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1516,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 17,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 17,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7723,
+      "measured_solver_wall_seconds": 0.1449,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 18486.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1449,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160347,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 17,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 17,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.3585,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 42,
+      "method": "EDD",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7325,
+      "measured_solver_wall_seconds": 0.1416,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1416,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 42,
+      "method": "SPT",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7674,
+      "measured_solver_wall_seconds": 0.1461,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14320.0,
+      "scenario_total_tardiness_min": 18486.0,
+      "scenario_total_setup_min": 360.0,
+      "scenario_solver_wall_seconds": 0.1461,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 160347,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 42,
+      "method": "FULL",
+      "status": "NO_ACCEPTED_SOLUTION",
+      "accepted": false,
+      "failure_stage": "SCENARIO",
+      "failure_type": "TimeoutError",
+      "failure_reason": "[SOLVER ROBUSTNESS] Durum: UNKNOWN (Timeout/\u00c7\u00f6z\u00fcm Yok). Zaman limiti (10.0s) a\u015f\u0131ld\u0131 ve ge\u00e7erli bir ba\u015flang\u0131\u00e7 \u00e7\u00f6z\u00fcm\u00fc bulunamad\u0131. Safe Fallback / Retry stratejisi gerekiyor.",
+      "independent_audit": null,
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": null,
+      "measured_solver_workers": null,
+      "replay_wall_seconds": 10.4004,
+      "measured_solver_wall_seconds": null,
+      "optimization_scope": "FULL_PRODUCTION_MODEL",
+      "scenario_makespan_min": null,
+      "scenario_total_tardiness_min": null,
+      "scenario_total_setup_min": null,
+      "scenario_solver_wall_seconds": null,
+      "changed_existing_task_count": null,
+      "absolute_existing_start_shift_min": null,
+      "baseline_task_count": null,
+      "new_task_count": null
+    },
+    {
+      "case_id": "LARGER_P05",
+      "hot_order": {
+        "order_id": "G7-LARGER-P05-150",
+        "product_id": "P05",
+        "quantity": 150,
+        "due_date_min": 3600,
+        "priority_weight": 3
+      },
+      "seed": 42,
+      "method": "FIFO",
+      "status": "OPTIMAL",
+      "accepted": true,
+      "failure_stage": null,
+      "failure_type": null,
+      "failure_reason": null,
+      "independent_audit": {
+        "status": "ACCEPTED",
+        "scope": "G7_HOT_ORDER_QUANTITY_ROUTING_CALENDAR_OT_MAINTENANCE_MRP_RELEASE",
+        "task_count": 34,
+        "lot_count": 13,
+        "material_release_by_product_min": {
+          "P01": 480,
+          "P02": 480,
+          "P03": 960,
+          "P04": 480,
+          "P05": 480
+        },
+        "issues": []
+      },
+      "solver_random_seed": 42,
+      "solver_workers": 1,
+      "measured_solver_random_seed": 42,
+      "measured_solver_workers": 1,
+      "replay_wall_seconds": 0.7071,
+      "measured_solver_wall_seconds": 0.1447,
+      "optimization_scope": "FIXED_DISPATCH_SEQUENCE",
+      "scenario_makespan_min": 14257.0,
+      "scenario_total_tardiness_min": 38140.0,
+      "scenario_total_setup_min": 390.0,
+      "scenario_solver_wall_seconds": 0.1447,
+      "changed_existing_task_count": 31,
+      "absolute_existing_start_shift_min": 47111,
+      "baseline_task_count": 31,
+      "new_task_count": 3
+    }
+  ],
+  "summary": {
+    "SMALL_URGENT_P01": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 2,
+        "failures": 1,
+        "status_counts": {
+          "FEASIBLE": 2,
+          "NO_ACCEPTED_SOLUTION": 1
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14813.75,
+            "median": 15562.5,
+            "p75": 16311.25
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 157803.5,
+            "median": 228886.0,
+            "p75": 299968.5
+          },
+          "scenario_total_setup_min": {
+            "p25": 430.0,
+            "median": 435.0,
+            "p75": 440.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 10.0046,
+            "median": 10.0052,
+            "p75": 10.0057
+          },
+          "changed_existing_task_count": {
+            "p25": 30.0,
+            "median": 30.0,
+            "p75": 30.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 73459.5,
+            "median": 83137.0,
+            "p75": 92814.5
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 76469.0,
+            "median": 76469.0,
+            "p75": 76469.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1553,
+            "median": 0.1561,
+            "p75": 0.1587
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47048.0,
+            "median": 47048.0,
+            "p75": 47048.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 76469.0,
+            "median": 76469.0,
+            "p75": 76469.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1478,
+            "median": 0.1526,
+            "p75": 0.1615
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47048.0,
+            "median": 47048.0,
+            "p75": 47048.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 82720.0,
+            "median": 82720.0,
+            "p75": 82720.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1544,
+            "median": 0.1602,
+            "p75": 0.1678
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 156221.0,
+            "median": 156221.0,
+            "p75": 156221.0
+          }
+        }
+      }
+    },
+    "REFERENCE_P01": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 0,
+        "failures": 3,
+        "status_counts": {
+          "NO_ACCEPTED_SOLUTION": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_tardiness_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_setup_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "changed_existing_task_count": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 62669.0,
+            "median": 62669.0,
+            "p75": 62669.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1435,
+            "median": 0.1446,
+            "p75": 0.149
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 46922.0,
+            "median": 46922.0,
+            "p75": 46922.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 62669.0,
+            "median": 62669.0,
+            "p75": 62669.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1469,
+            "median": 0.1502,
+            "p75": 0.155
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 46922.0,
+            "median": 46922.0,
+            "p75": 46922.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 68920.0,
+            "median": 68920.0,
+            "p75": 68920.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1302,
+            "median": 0.1317,
+            "p75": 0.1419
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 156059.0,
+            "median": 156059.0,
+            "p75": 156059.0
+          }
+        }
+      }
+    },
+    "DIFFERENT_ROUTE_P03": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "FEASIBLE": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 17845.0,
+            "median": 18490.0,
+            "p75": 20005.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 67578.5,
+            "median": 76824.0,
+            "p75": 95556.5
+          },
+          "scenario_total_setup_min": {
+            "p25": 437.5,
+            "median": 460.0,
+            "p75": 550.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 10.0031,
+            "median": 10.0048,
+            "p75": 10.0058
+          },
+          "changed_existing_task_count": {
+            "p25": 29.0,
+            "median": 30.0,
+            "p75": 30.5
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 109833.5,
+            "median": 129468.0,
+            "p75": 139539.0
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 58119.0,
+            "median": 58119.0,
+            "p75": 58119.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1326,
+            "median": 0.1364,
+            "p75": 0.1392
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 46535.0,
+            "median": 46535.0,
+            "p75": 46535.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 58119.0,
+            "median": 58119.0,
+            "p75": 58119.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1335,
+            "median": 0.1356,
+            "p75": 0.1385
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 46535.0,
+            "median": 46535.0,
+            "p75": 46535.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 26690.0,
+            "median": 26690.0,
+            "p75": 26690.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.121,
+            "median": 0.1269,
+            "p75": 0.1278
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 160415.0,
+            "median": 160415.0,
+            "p75": 160415.0
+          }
+        }
+      }
+    },
+    "SMALL_P02": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 0,
+        "failures": 3,
+        "status_counts": {
+          "NO_ACCEPTED_SOLUTION": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_tardiness_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_setup_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "changed_existing_task_count": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 29594.0,
+            "median": 29594.0,
+            "p75": 29594.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1463,
+            "median": 0.1515,
+            "p75": 0.1519
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47018.0,
+            "median": 47063.0,
+            "p75": 47063.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 29594.0,
+            "median": 29594.0,
+            "p75": 29594.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1447,
+            "median": 0.1525,
+            "p75": 0.1626
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47018.0,
+            "median": 47063.0,
+            "p75": 47063.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 64620.0,
+            "median": 64620.0,
+            "p75": 64620.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.13,
+            "median": 0.1372,
+            "p75": 0.1449
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 156350.0,
+            "median": 156350.0,
+            "p75": 156350.0
+          }
+        }
+      }
+    },
+    "MEDIUM_P04": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 1,
+        "failures": 2,
+        "status_counts": {
+          "FEASIBLE": 1,
+          "NO_ACCEPTED_SOLUTION": 2
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 24400.0,
+            "median": 24400.0,
+            "p75": 24400.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 127163.0,
+            "median": 127163.0,
+            "p75": 127163.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 435.0,
+            "median": 435.0,
+            "p75": 435.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 10.0038,
+            "median": 10.0038,
+            "p75": 10.0038
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 259803.0,
+            "median": 259803.0,
+            "p75": 259803.0
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 98065.0,
+            "median": 98065.0,
+            "p75": 98065.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1343,
+            "median": 0.1409,
+            "p75": 0.1416
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47105.0,
+            "median": 47105.0,
+            "p75": 47105.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14149.0,
+            "median": 14149.0,
+            "p75": 14149.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 98065.0,
+            "median": 98065.0,
+            "p75": 98065.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1338,
+            "median": 0.1368,
+            "p75": 0.1373
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47105.0,
+            "median": 47105.0,
+            "p75": 47105.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 17580.0,
+            "median": 17580.0,
+            "p75": 17580.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1319,
+            "median": 0.1323,
+            "p75": 0.1426
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 156022.0,
+            "median": 156022.0,
+            "p75": 156022.0
+          }
+        }
+      }
+    },
+    "LARGER_P05": {
+      "FULL": {
+        "attempts": 3,
+        "accepted": 0,
+        "failures": 3,
+        "status_counts": {
+          "NO_ACCEPTED_SOLUTION": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_tardiness_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_total_setup_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "changed_existing_task_count": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": null,
+            "median": null,
+            "p75": null
+          }
+        }
+      },
+      "FIFO": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14257.0,
+            "median": 14257.0,
+            "p75": 14257.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 38140.0,
+            "median": 38140.0,
+            "p75": 38140.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1459,
+            "median": 0.1472,
+            "p75": 0.1538
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47111.0,
+            "median": 47111.0,
+            "p75": 47111.0
+          }
+        }
+      },
+      "EDD": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14257.0,
+            "median": 14257.0,
+            "p75": 14257.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 38140.0,
+            "median": 38140.0,
+            "p75": 38140.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 390.0,
+            "median": 390.0,
+            "p75": 390.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1422,
+            "median": 0.1428,
+            "p75": 0.1472
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 47111.0,
+            "median": 47111.0,
+            "p75": 47111.0
+          }
+        }
+      },
+      "SPT": {
+        "attempts": 3,
+        "accepted": 3,
+        "failures": 0,
+        "status_counts": {
+          "OPTIMAL": 3
+        },
+        "metric_quantiles_accepted_only": {
+          "scenario_makespan_min": {
+            "p25": 14320.0,
+            "median": 14320.0,
+            "p75": 14320.0
+          },
+          "scenario_total_tardiness_min": {
+            "p25": 18486.0,
+            "median": 18486.0,
+            "p75": 18486.0
+          },
+          "scenario_total_setup_min": {
+            "p25": 360.0,
+            "median": 360.0,
+            "p75": 360.0
+          },
+          "scenario_solver_wall_seconds": {
+            "p25": 0.1455,
+            "median": 0.1461,
+            "p75": 0.1526
+          },
+          "changed_existing_task_count": {
+            "p25": 31.0,
+            "median": 31.0,
+            "p75": 31.0
+          },
+          "absolute_existing_start_shift_min": {
+            "p25": 160347.0,
+            "median": 160347.0,
+            "p75": 160347.0
+          }
+        }
+      }
+    }
+  }
+}
