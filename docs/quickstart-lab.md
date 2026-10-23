@@ -1,6 +1,6 @@
 # Temiz klonda yerel laboratuvar demosu
 
-Bu akış `v0.1.11-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
+Bu akış `v0.1.12-lab` sürümünün sentetik/açık veri sınırını gösterir. Python **3.11** gerekir. Gerçek tesis verisi, ERP/MES erişimi veya internete açık servis gerekmez. [Sürüm kimliği ve CI](evidence-register.json) kod değişirse yeniden doğrulanmalıdır.
 
 ## 1. Kod ve bağımlılıklar
 
@@ -9,7 +9,7 @@ PowerShell'de:
 ```powershell
 git clone https://github.com/AliUmutKazak/factory-decision-intelligence.git
 Set-Location factory-decision-intelligence
-git checkout v0.1.11-lab
+git checkout v0.1.12-lab
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-windows.lock
 ```
