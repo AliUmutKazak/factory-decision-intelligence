@@ -195,6 +195,8 @@ def compare_hot_order_methods(
                 Path(__file__).resolve(),
                 Path(__file__).with_name("hot_order_load_probe.py").resolve(),
                 Path(__file__).with_name("what_if.py").resolve(),
+                Path(__file__).with_name("candidate_comparison.py").resolve(),
+                Path(__file__).resolve().parents[1] / "contracts" / "schemas.py",
                 Path(__file__).with_name("schedule_cpsat.py").resolve(),
                 Path(__file__).with_name("hot_order_schedule_audit.py").resolve(),
             )

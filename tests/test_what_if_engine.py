@@ -62,16 +62,71 @@ def test_what_if_kpis_reject_conflicting_lot_commitment():
 
 def test_what_if_delta_uses_schedule_rows_for_both_plans():
     baseline = pd.DataFrame(
-        [{"lot_id": "A", "end_min": 20, "due_date_min": 12, "priority_weight": 2, "setup_before_min": 5}]
+        [
+            {
+                "task_id": "A-1",
+                "lot_id": "A",
+                "machine_id": "M01",
+                "start_min": 10,
+                "end_min": 20,
+                "due_date_min": 12,
+                "priority_weight": 2,
+                "setup_before_min": 5,
+            }
+        ]
     )
     scenario = pd.DataFrame(
-        [{"lot_id": "A", "end_min": 15, "due_date_min": 12, "priority_weight": 2, "setup_before_min": 3}]
+        [
+            {
+                "task_id": "A-1",
+                "lot_id": "A",
+                "machine_id": "M01",
+                "start_min": 5,
+                "end_min": 15,
+                "due_date_min": 12,
+                "priority_weight": 2,
+                "setup_before_min": 3,
+            }
+        ]
     )
     report = WhatIfEngine()._calculate_delta("DUMMY", ScenarioType.MACHINE_BREAKDOWN, baseline, scenario)
     assert report.makespan_delta_min == -5
     assert report.tardiness_delta_min == -10
     assert report.setup_delta_min == -2
     assert report.impacted_tasks_count == 1
+    assert report.changed_existing_task_count == 1
+    assert report.new_task_count == 0
+    assert report.absolute_existing_start_shift_min == 5
+    assert report.operation_changes[0].start_shift_min == -5
+
+
+def test_operation_comparison_separates_new_tasks_and_rejects_missing_or_duplicate_ids():
+    from src.scheduling.candidate_comparison import compare_schedule_operations
+
+    baseline = pd.DataFrame(
+        [
+            {"task_id": "A", "lot_id": "L1", "machine_id": "M01", "start_min": 10, "end_min": 20},
+            {"task_id": "B", "lot_id": "L2", "machine_id": "M02", "start_min": 30, "end_min": 40},
+        ]
+    )
+    candidate = pd.DataFrame(
+        [
+            {"task_id": "A", "lot_id": "L1", "machine_id": "M01", "start_min": 10, "end_min": 20},
+            {"task_id": "B", "lot_id": "L2", "machine_id": "M02", "start_min": 25, "end_min": 35},
+            {"task_id": "C", "lot_id": "L3", "machine_id": "M03", "start_min": 40, "end_min": 50},
+        ]
+    )
+    result = compare_schedule_operations(baseline, candidate)
+    assert result["baseline_task_count"] == 2
+    assert result["candidate_task_count"] == 3
+    assert result["changed_existing_task_count"] == 1
+    assert result["new_task_count"] == 1
+    assert result["absolute_existing_start_shift_min"] == 5
+    assert [row["task_id"] for row in result["operation_changes"]] == ["B", "C"]
+    with pytest.raises(ValueError, match="omitted baseline"):
+        compare_schedule_operations(baseline, candidate[candidate.task_id != "A"])
+    with pytest.raises(ValueError, match="duplicate task IDs"):
+        compare_schedule_operations(baseline, pd.concat([candidate, candidate.iloc[[0]]]))
 
 
 @pytest.fixture
