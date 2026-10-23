@@ -1,0 +1,29 @@
+{
+    "run_id": "RUN-20261023-9d2482",
+    "run_timestamp": "2026-10-23T17:28:19.228660",
+    "git_sha": "fa61c34e597214b1185461da89fdeba3349334f6",
+    "data_source": "data\\fixtures\\demand_fixture.csv",
+    "forecast_origin": "2017-12-31",
+    "forecast_method": "Hybrid_Backtest_Selection",
+    "selected_models": {
+        "P01": "Holt-Winters",
+        "P02": "Holt-Winters",
+        "P03": "Holt-Winters",
+        "P04": "Moving Average",
+        "P05": "Naive"
+    },
+    "config_hash": "6cbc39f4e74f7d12",
+    "status": "COMPLETED",
+    "orders_count": 1825,
+    "environment": {
+        "python_version": "3.11.16",
+        "pandas_version": "3.0.5",
+        "ortools_version": "9.15.6755",
+        "pulp_version": "3.3.2"
+    },
+    "optimization_metrics": {
+        "aggregate_lp_status": "OPTIMAL",
+        "cpsat_solver_status": "OPTIMAL_OR_FEASIBLE",
+        "notes": "End-to-end execution completed successfully"
+    }
+}
