@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "as_of": "2026-10-23",
+  "as_of": "2026-10-25",
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
     "tag": "v0.1.12-lab",
