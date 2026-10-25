@@ -115,6 +115,46 @@ def verify() -> None:
                 ):
                     raise ValueError(f"G7 replay outcome disagrees: {source_id}/{name}/{method}")
 
+    for source_id, limit, seeds in (
+        ("g7_hot_order_stability_2s_20261025", 2.0, [7, 17, 42, 73, 101]),
+        ("g7_hot_order_stability_10s_20261025", 10.0, [7, 17, 42]),
+    ):
+        source = inventory["sources"][source_id]
+        report = json.loads(_repo_file(source["path"]).read_text(encoding="utf-8"))
+        methods = ["FULL", "FIFO", "EDD", "SPT", "APPEND", "INSERT"]
+        cases_path = _repo_file("examples/g7-hot-order-expanded-cases.json")
+        case_ids = {case["case_id"] for case in json.loads(cases_path.read_text(encoding="utf-8"))["cases"]}
+        if (
+            report["git_sha"] != source["code_commit"]
+            or report["source_db_sha256"] != inventory["sources"]["reference_db"]["sha256"]
+            or report["cases_manifest_sha256"]
+            != hashlib.sha256(cases_path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+            or report["methods"] != methods
+            or report["seeds"] != seeds
+            or report["scenario_limit_seconds_per_trial"] != limit
+            or report["workers_per_trial"] != 1
+        ):
+            raise ValueError(f"G7 stability protocol disagrees: {source_id}")
+        trials = report["trials"]
+        keys = {(row["case_id"], row["seed"], row["method"]) for row in trials}
+        expected = {(case, seed, method) for case in case_ids for seed in seeds for method in methods}
+        if len(trials) != len(expected) or keys != expected:
+            raise ValueError(f"G7 stability trial matrix is incomplete: {source_id}")
+        for name, expected_hash in report["code_sha256"].items():
+            if hashlib.sha256(_historical_code(name, source["code_commit"])).hexdigest() != expected_hash:
+                raise ValueError(f"G7 stability code disagrees: {source_id}/{name}")
+        for row in trials:
+            if row["accepted"]:
+                if (
+                    row["status"] not in {"OPTIMAL", "FEASIBLE"}
+                    or row["independent_audit"]["status"] != "ACCEPTED"
+                    or row["measured_solver_workers"] != 1
+                    or row["measured_solver_random_seed"] != row["seed"]
+                ):
+                    raise ValueError(f"G7 stability accepted trial lacks evidence: {source_id}")
+            elif row["scenario_total_tardiness_min"] is not None or row["changed_existing_task_count"] is not None:
+                raise ValueError(f"G7 stability failure has quality metrics: {source_id}")
+
     gates = inventory["gates"]
     expected_ids = {f"G{index}" for index in range(14)}
     if {item["id"] for item in gates} != expected_ids or len(gates) != len(expected_ids):

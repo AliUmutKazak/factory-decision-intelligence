@@ -134,8 +134,16 @@ def run_cpsat_scheduling(
             raise ValueError("Experimental completion deadline must be positive.")
         if any(row[2] for row in connection.execute("PRAGMA database_list").fetchall()):
             raise ValueError("Experimental completion deadline requires an isolated in-memory connection.")
-    if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy"}:
+    if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy", "APPEND", "INSERT"}:
         raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
+    if dispatch_rule in {"APPEND", "INSERT"} and (
+        reference_schedule is None
+        or persist_outputs
+        or policy != SchedulingObjectivePolicy.BALANCED
+        or connection is None
+        or any(row[2] for row in connection.execute("PRAGMA database_list").fetchall())
+    ):
+        raise ValueError("APPEND and INSERT require an isolated BALANCED what-if with a reference schedule")
     conn = connection if connection is not None else get_db_connection(active_db_path)
     if run_id and conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pipeline_runs'").fetchone():
         existing_run = conn.execute("SELECT status FROM pipeline_runs WHERE run_id = ?", (str(run_id),)).fetchone()
@@ -629,8 +637,9 @@ def run_cpsat_scheduling(
             if prev_tid is not None:
                 model.Add(all_tasks[curr_tid]["start"] >= all_tasks[prev_tid]["end"])
             prev_tid = curr_tid
-    # Alt Lotlar Arası Sıralama (FIFO): Aynı SKU'nun sub_k+1 partisi aynı operasyonda sub_k partisinden önce başlayamaz
-    for (pid, op_seq), grp in tasks_df.groupby(["product_id", "operation_seq"]):
+    # FIFO applies to transfer sublots of one parent order. An independent
+    # rush order for the same SKU must not inherit that order's sublot chain.
+    for (_, _, _), grp in tasks_df.groupby(["parent_lot_id", "product_id", "operation_seq"]):
         if len(grp) > 1:
             sorted_subs = grp.sort_values("sub_lot_index")
             prev_tid = None
@@ -669,10 +678,19 @@ def run_cpsat_scheduling(
         if dispatch_rule:
             from src.scheduling.dispatch import dispatch_rank
 
-            ranks = dispatch_rank(tasks_df, dispatch_rule)
-            ordered = sorted(tids, key=lambda tid: ranks[str(tid)])
-            for previous, following in zip(ordered, ordered[1:]):
-                model.Add(all_tasks[following]["start"] >= all_tasks[previous]["end"])
+            ranks = dispatch_rank(tasks_df, "EDD" if dispatch_rule in {"APPEND", "INSERT"} else dispatch_rule)
+            if dispatch_rule in {"APPEND", "INSERT"}:
+                old = sorted(
+                    (tid for tid in tids if str(tid) in reference_hints),
+                    key=lambda tid: (reference_hints[str(tid)][0], ranks[str(tid)]),
+                )
+                new = sorted((tid for tid in tids if str(tid) not in reference_hints), key=lambda tid: ranks[str(tid)])
+                chains = (old + new,) if dispatch_rule == "APPEND" else (old, new)
+            else:
+                chains = (sorted(tids, key=lambda tid: ranks[str(tid)]),)
+            for ordered in chains:
+                for previous, following in zip(ordered, ordered[1:]):
+                    model.Add(all_tasks[following]["start"] >= all_tasks[previous]["end"])
 
         # 1) Dummy -> Task (Günün ilk işi): Tezgâh başlangıç durumuna (Initial State) göre setup
         p_init = machine_initial_states.get(mid, None)
@@ -1028,6 +1046,18 @@ def run_cpsat_scheduling(
             + int(weight_setup) * total_setup_duration
             + int(weight_tardiness) * total_weighted_tardiness
         )
+        if dispatch_rule in {"APPEND", "INSERT"}:
+            shifts = []
+            for tid, task in all_tasks.items():
+                if str(tid) in reference_hints:
+                    original_start = reference_hints[str(tid)][0]
+                    shift = model.NewIntVar(0, horizon, f"reference_start_shift_{tid}")
+                    model.AddAbsEquality(shift, task["start"] - original_start)
+                    shifts.append(shift)
+            # Declared laboratory preferences, not measured factory costs.
+            # INSERT permits rush operations between existing jobs while
+            # preserving their order; APPEND is the conservative comparison.
+            objective_expr += (1000 if dispatch_rule == "APPEND" else 100) * sum(shifts)
         model.Minimize(monetary.expression if monetary else objective_expr)
         status = solver.Solve(model)
 
@@ -1327,7 +1357,11 @@ def run_cpsat_scheduling(
         "objective_policy": str(policy),
         "objective_units": str((economic_config or cfg.ECONOMIC_CONFIG).currency) if monetary else "weighted_minutes",
         "primary_stage_status": solver.StatusName(stage1_status) if hierarchical and tardiness_terms else None,
-        "gap_scope": "DISPATCH_SEQUENCE"
+        "gap_scope": "BASELINE_APPEND_STABILITY_OBJECTIVE"
+        if dispatch_rule == "APPEND"
+        else "BASELINE_INSERT_STABILITY_OBJECTIVE"
+        if dispatch_rule == "INSERT"
+        else "DISPATCH_SEQUENCE"
         if dispatch_rule
         else "EFFICIENCY_STAGE"
         if hierarchical and tardiness_terms

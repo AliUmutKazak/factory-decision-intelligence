@@ -2,6 +2,8 @@
 
 **23 Ekim 2026.** Bu çalışma fabrika verisi veya saha kabulü içermez. Karar ekranı ve deneyler FDI'nin mevcut sabit rota, sentetik laboratuvar kapsamındadır.
 
+**25 Ekim takip kaydı:** [Ayrı acil siparişin alt lot FIFO zincirinden ayrıldığı yeni model ve eşit bütçeli tekrar](g7-hot-order-stability-2026-10-25.md) yayımlandı. Bu sayfadaki ham sonuçlar tarihsel kod sürümüne aittir; yeni modelin sonuçlarıyla doğrudan yöntem kazanımı hesabı yapılmaz.
+
 Kod sürümü `ec67ba4bafea94847b01d957ddb0c6b78dfdb6b3` üzerinde ölçüldü. Ham kayıtlar kaynak, manifest ve ilgili kod hash'lerini taşır; çalışma ağacındaki belgeler daha sonra eklenmiştir.
 
 ## Aday planı inceleme

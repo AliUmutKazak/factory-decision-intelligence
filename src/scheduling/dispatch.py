@@ -17,7 +17,7 @@ def dispatch_rank(tasks, rule):
         ordered = list(group.sort_values("operation_seq").task_id.astype(str))
         for previous, following in zip(ordered, ordered[1:]):
             predecessors[following].add(previous)
-    for _, group in tasks.groupby(["product_id", "operation_seq"]):
+    for _, group in tasks.groupby(["parent_lot_id", "product_id", "operation_seq"]):
         ordered = list(group.sort_values("sub_lot_index", kind="stable").task_id.astype(str))
         for previous, following in zip(ordered, ordered[1:]):
             predecessors[following].add(previous)

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "as_of": "2026-10-23",
+  "as_of": "2026-10-25",
   "scope": "Laboratory evidence inventory; customer and site acceptance require separate named approvers",
   "latest_verified_release": {
     "tag": "v0.1.12-lab",
@@ -164,6 +164,20 @@
       "sha256": "581a080eb068760e4e4d74d514575e789070c340f3c58fd2defcf40b57cbee42",
       "sha256_mode": "normalized_lf",
       "data_class": "synthetic_model_feasibility"
+    },
+    "g7_hot_order_stability_2s_20261025": {
+      "path": "artifacts/research/g7-hot-order-stability-2026-10-25.json",
+      "code_commit": "ebc48d65c6a023b6297bb4c2985f559f3be419e1",
+      "sha256": "d26d819947b32f6e77f63a59a7191e9813ec957379e5bdaf158b147a6b83c8a1",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_paired_hot_order_stability_comparison"
+    },
+    "g7_hot_order_stability_10s_20261025": {
+      "path": "artifacts/research/g7-hot-order-stability-10s-2026-10-25.json",
+      "code_commit": "ebc48d65c6a023b6297bb4c2985f559f3be419e1",
+      "sha256": "45ed949a319593a4dfe1c4c4eadfdd9c7741e118089eefc6b5e53ce2c3162fcb",
+      "sha256_mode": "normalized_lf",
+      "data_class": "synthetic_paired_hot_order_stability_comparison"
     }
   },
   "gates": [
@@ -191,6 +205,7 @@
     {"id": "G6-T", "status": "Kanıt hazır", "source_ids": [], "evidence": ["docs/g6-synthetic-execution-replay.md"], "open_risk": "No site WIP/rework semantics"},
     {"id": "G7-lab", "status": "Kanıt hazır", "source_ids": ["reference_db", "g7_reference_v012", "g7_hot_order_v012", "g7_timeout_v012", "g7_paired_hot_order_20261017", "g7_two_event_freeze_20261018", "g7_paired_reschedule_corrected_20261018", "g7_paired_reschedule_maintenance_audit_20261018", "g7_paired_reschedule_setup_audit_20261018"], "evidence": ["docs/g7-v012-lab-envelope.md", "docs/g7-paired-hot-order-methods-2026-10-17.md", "docs/reschedule-core-candidate-audit-2026-10-17.md", "docs/g7-two-event-freeze-rehearsal-2026-10-18.md", "docs/g7-paired-reschedule-traces-2026-10-18.md", "docs/g7-calendar-overlap-correction-2026-10-18.md"], "open_risk": "Only three selected traces and one seed; no representative customer load, alarm threshold or SLO"},
     {"id": "G8-T", "status": "Kanıt hazır", "source_ids": ["jsp_v012_30s", "jsp_v012_60s", "forecast_v012"], "evidence": ["docs/external-jsp-benchmark.md", "docs/forecast-v012-lab-evidence.md", "docs/global-evidence-audit-2026-10-15.md", "docs/clean-demo-v018-2026-10-15.md"], "open_risk": "ft10 30-second quality varies; one synthetic holdout does not establish customer forecast accuracy or general solver superiority"},
-    {"id": "SCI-20261017-lab", "status": "Ön ölçüm", "source_ids": ["scientific_ft10_worker_probe", "scientific_reference_worker_probe", "plan_schedule_consistency_probe", "week_one_feasibility_probe"], "evidence": ["docs/scientific-review-2026-10-17.md", "docs/plan-schedule-gap-audit-2026-10-17.md"], "open_risk": "Synthetic model infeasibility is not factory capacity acceptance; no site workload or calibrated inventory service level"}
+    {"id": "SCI-20261017-lab", "status": "Ön ölçüm", "source_ids": ["scientific_ft10_worker_probe", "scientific_reference_worker_probe", "plan_schedule_consistency_probe", "week_one_feasibility_probe"], "evidence": ["docs/scientific-review-2026-10-17.md", "docs/plan-schedule-gap-audit-2026-10-17.md"], "open_risk": "Synthetic model infeasibility is not factory capacity acceptance; no site workload or calibrated inventory service level"},
+    {"id": "G7-20261025-stability-lab", "status": "Ön ölçüm", "source_ids": ["reference_db", "g7_hot_order_stability_2s_20261025", "g7_hot_order_stability_10s_20261025"], "evidence": ["docs/g7-hot-order-stability-2026-10-25.md"], "code_commit": "ebc48d65c6a023b6297bb4c2985f559f3be419e1", "open_risk": "Service and plan movement tradeoff has no site-approved decision threshold; synthetic runs do not establish customer SLO"}
   ]
 }
