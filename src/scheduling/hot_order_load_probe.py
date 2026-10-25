@@ -288,7 +288,13 @@ def probe_hot_order_replay(
         "scenario_dispatch_rule": scenario_dispatch_rule,
         "scenario_seed": scenario_seed,
         "scenario_workers": scenario_workers,
-        "optimization_scope": "FIXED_DISPATCH_SEQUENCE" if scenario_dispatch_rule else "FULL_PRODUCTION_MODEL",
+        "optimization_scope": "BASELINE_ORDER_APPEND_WITH_START_SHIFT_PENALTY"
+        if scenario_dispatch_rule == "APPEND"
+        else "BASELINE_ORDER_INSERT_WITH_START_SHIFT_PENALTY"
+        if scenario_dispatch_rule == "INSERT"
+        else "FIXED_DISPATCH_SEQUENCE"
+        if scenario_dispatch_rule
+        else "FULL_PRODUCTION_MODEL",
         "scenario_limit_seconds": scenario_limit_seconds,
         "repeats": repeats,
         "attempts": attempts,

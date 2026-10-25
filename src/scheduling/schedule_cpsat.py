@@ -1353,7 +1353,11 @@ def run_cpsat_scheduling(
         "objective_policy": str(policy),
         "objective_units": str((economic_config or cfg.ECONOMIC_CONFIG).currency) if monetary else "weighted_minutes",
         "primary_stage_status": solver.StatusName(stage1_status) if hierarchical and tardiness_terms else None,
-        "gap_scope": "DISPATCH_SEQUENCE"
+        "gap_scope": "BASELINE_APPEND_STABILITY_OBJECTIVE"
+        if dispatch_rule == "APPEND"
+        else "BASELINE_INSERT_STABILITY_OBJECTIVE"
+        if dispatch_rule == "INSERT"
+        else "DISPATCH_SEQUENCE"
         if dispatch_rule
         else "EFFICIENCY_STAGE"
         if hierarchical and tardiness_terms
