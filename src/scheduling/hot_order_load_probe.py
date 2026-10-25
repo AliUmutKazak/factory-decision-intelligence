@@ -275,6 +275,7 @@ def probe_hot_order_replay(
                 "src/scheduling/hot_order_schedule_audit.py",
                 "src/scheduling/what_if.py",
                 "src/scheduling/schedule_cpsat.py",
+                "src/scheduling/dispatch.py",
                 "src/contracts/schemas.py",
             )
         },

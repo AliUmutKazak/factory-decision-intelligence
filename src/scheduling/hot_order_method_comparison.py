@@ -19,7 +19,7 @@ from src.contracts.schemas import HotOrderInjection
 from src.scheduling.hot_order_load_probe import probe_hot_order_replay
 from src.utils.lineage import get_git_sha
 
-METHODS = ("FULL", "FIFO", "EDD", "SPT")
+METHODS = ("FULL", "FIFO", "EDD", "SPT", "APPEND", "INSERT")
 METRICS = (
     "scenario_makespan_min",
     "scenario_total_tardiness_min",
@@ -59,6 +59,10 @@ def _summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "status_counts": {
             status: sum(row["status"] == status for row in rows) for status in sorted({r["status"] for r in rows})
         },
+        "replay_wall_seconds_all_attempts": {
+            "p50": _quantile([float(row["replay_wall_seconds"]) for row in rows], 0.5),
+            "p95": _quantile([float(row["replay_wall_seconds"]) for row in rows], 0.95),
+        },
         "metric_quantiles_accepted_only": {},
     }
     for metric in METRICS:
@@ -88,7 +92,7 @@ def compare_hot_order_methods(
     if not seeds or len(set(seeds)) != len(seeds) or any(seed < 0 for seed in seeds):
         raise ValueError("seeds must be unique nonnegative integers")
     if not methods or len(set(methods)) != len(methods) or any(method not in METHODS for method in methods):
-        raise ValueError("methods must be unique members of FULL, FIFO, EDD, SPT")
+        raise ValueError("methods must be unique members of FULL, FIFO, EDD, SPT, APPEND, INSERT")
     if scenario_limit_seconds <= 0 or workers < 1:
         raise ValueError("time limit and worker count must be positive")
     source_hash = _hash(source)
@@ -165,6 +169,10 @@ def compare_hot_order_methods(
                         "measured_solver_wall_seconds": attempt["scenario_solver_wall_seconds"],
                         "optimization_scope": "FULL_PRODUCTION_MODEL"
                         if method == "FULL"
+                        else "BASELINE_ORDER_APPEND_WITH_START_SHIFT_PENALTY"
+                        if method == "APPEND"
+                        else "BASELINE_ORDER_INSERT_WITH_START_SHIFT_PENALTY"
+                        if method == "INSERT"
                         else "FIXED_DISPATCH_SEQUENCE",
                         "scenario_makespan_min": attempt["scenario_makespan_min"] if accepted else None,
                         "scenario_total_tardiness_min": attempt["scenario_total_tardiness_min"] if accepted else None,
@@ -198,6 +206,7 @@ def compare_hot_order_methods(
                 Path(__file__).with_name("candidate_comparison.py").resolve(),
                 Path(__file__).resolve().parents[1] / "contracts" / "schemas.py",
                 Path(__file__).with_name("schedule_cpsat.py").resolve(),
+                Path(__file__).with_name("dispatch.py").resolve(),
                 Path(__file__).with_name("hot_order_schedule_audit.py").resolve(),
             )
         },
@@ -210,6 +219,11 @@ def compare_hot_order_methods(
         "workers_per_trial": workers,
         "scenario_limit_seconds_per_trial": scenario_limit_seconds,
         "metric_policy": "quantiles use independently accepted candidates only; failures remain in denominator",
+        "stable_method_policy": (
+            "APPEND keeps old per-machine order before rush tasks and adds a 1000-weight start-shift penalty; "
+            "INSERT preserves old per-machine order but permits rush insertion and uses weight 100. "
+            "These are laboratory preferences, not measured cash costs."
+        ),
         "quantile_method": "linear interpolation over sorted samples",
         "trials": trials,
         "summary": {
