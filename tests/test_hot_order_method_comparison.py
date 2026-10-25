@@ -5,13 +5,24 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src.scheduling.dispatch import dispatch_rank
 from src.scheduling.hot_order_load_probe import _schedule_stability
 from src.scheduling.hot_order_method_comparison import _summarize, compare_hot_order_methods
+from src.scheduling.schedule_cpsat import run_cpsat_scheduling
 
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE_DB = ROOT / "artifacts/reference/factory.db"
+
+
+def test_stability_methods_require_an_isolated_memory_connection():
+    with pytest.raises(ValueError, match="isolated BALANCED what-if"):
+        run_cpsat_scheduling(
+            reference_schedule=pd.DataFrame([{"task_id": "old", "start_min": 1, "end_min": 2}]),
+            dispatch_rule="APPEND",
+            persist_outputs=False,
+        )
 
 
 def test_stability_counts_only_existing_tasks_and_machine_changes():

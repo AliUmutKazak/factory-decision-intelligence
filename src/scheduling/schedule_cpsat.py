@@ -137,7 +137,11 @@ def run_cpsat_scheduling(
     if dispatch_rule not in {None, "FIFO", "EDD", "SPT", "Greedy", "APPEND", "INSERT"}:
         raise ValueError(f"Unknown dispatch rule: {dispatch_rule}")
     if dispatch_rule in {"APPEND", "INSERT"} and (
-        reference_schedule is None or persist_outputs or policy != SchedulingObjectivePolicy.BALANCED
+        reference_schedule is None
+        or persist_outputs
+        or policy != SchedulingObjectivePolicy.BALANCED
+        or connection is None
+        or any(row[2] for row in connection.execute("PRAGMA database_list").fetchall())
     ):
         raise ValueError("APPEND and INSERT require an isolated BALANCED what-if with a reference schedule")
     conn = connection if connection is not None else get_db_connection(active_db_path)
